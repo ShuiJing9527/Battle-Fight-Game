@@ -55,8 +55,16 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _Float: 1
+    - _MaskParcent_Y: 0.1
     - _QueueControl: 0
     - _QueueOffset: 0
-    m_Colors: []
+    - _WindScale: 1
+    - _WindStrength: 0.3
+    - _Windspeed: 1
+    m_Colors:
+    - _Position: {r: 0, g: 0, b: 0, a: 0}
+    - _WindDirection: {r: 1, g: 0, b: 0, a: 0}
+    - _Windspeed: {r: 1, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
