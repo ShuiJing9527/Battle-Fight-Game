@@ -1,7 +1,7 @@
 ﻿using System.Collections;
 using UnityEngine;
 
-namespace UnderTheStars.GenerationMap
+namespace UnderTheStars.GenerationMap//统一化脚本前缀，方便管理和查找
 {
     public class RandomMapPainProp : MonoBehaviour
     {
