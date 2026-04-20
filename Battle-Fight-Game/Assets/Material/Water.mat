@@ -50,8 +50,8 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     - _Speed: 0.03
-    - __3: 2
-    - __4: 1
+    - __3: 100
+    - __4: 90
     - __5: 0
     - __6: 0.5
     - _subwavescale: 12
