@@ -69,7 +69,7 @@ Material:
     - _Windspeed: 1
     - _YMaskinfluence: 1
     m_Colors:
-    - _: {r: 0, g: 1, b: 0, a: 0}
+    - _: {r: 1, g: 5, b: 0, a: 0}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _Position: {r: 0, g: 0, b: 0, a: 0}
     - _WindDirection: {r: 1, g: 1, b: 0, a: 0}

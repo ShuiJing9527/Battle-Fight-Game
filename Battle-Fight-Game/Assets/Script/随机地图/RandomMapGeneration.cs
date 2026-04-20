@@ -2,6 +2,7 @@ using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Tilemaps;
 
 namespace UnderTheStars.GenerationMap
 {
@@ -22,6 +23,9 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private Vector2Int regionSize;//区域大小
         [SerializeField] private Vector2Int regionArea;//区域范围
 
+        [Header("玩家设置")]
+        [SerializeField] private PlayerMovement player; // 在 Inspector 里把你的 Player 拖进来
+
         private HashSet<Vector2Int>[,] floorPoints;//地面坐标点
         private HashSet<Vector2Int>[,] propsPoints;//道具坐标点
         private HashSet<Vector2Int>[,] wallColliderPoints;//墙体碰撞坐标点
@@ -41,15 +45,61 @@ namespace UnderTheStars.GenerationMap
             var regionPoints = InitMapRegion();
             var checkAllFloor = GeneraterFloorPoints(regionPoints);
 
+            // 等待所有 Tilemap 绘制完成
             await UniTask.WhenAll(panintTilemap(0, 0), panintTilemap(0, 1), panintTilemap(1, 0));
             await UniTask.WhenAll(panintTilemap(1, 1), panintTilemap(2, 0), panintTilemap(2, 1));
             await UniTask.WhenAll(panintTilemap(0, 2), panintTilemap(1, 2), panintTilemap(2, 2));
+
+            // 安置玩家
+            PlacePlayerOnMap();
         }
 
         private UniTask panintTilemap(int v1, int v2)
         {
             int index = v1 * regionSize.y + v2;
             return paintTilemap.PaintFloorTile(floorPoints[v1, v2], index);
+        }
+
+        private void PlacePlayerOnMap()
+        {
+            if (player == null || floorPoints == null) return;
+
+            // 获取参考 Tilemap
+            Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
+            if (refTilemap == null) return;
+
+            Vector2Int spawnCoord = Vector2Int.zero;
+            bool found = false;
+
+            // 尝试找到一个合法的起始坐标
+            if (floorPoints[0, 0] != null && floorPoints[0, 0].Count > 0)
+            {
+                foreach (var point in floorPoints[0, 0])
+                {
+                    spawnCoord = point;
+                    found = true;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                // 转换为格子坐标
+                Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
+
+                // 转换为世界坐标（自动处理 90 度旋转）
+                Vector3 worldSpawnPos = refTilemap.GetCellCenterWorld(cellPos);
+
+                // 执行传送
+                // 记得使用 rb.linearVelocity 而不是 velocity (Unity 6 推荐)
+                player.rb.linearVelocity = Vector3.zero;
+
+                // 抬高 Y 轴以防掉出地图，因为 Tilemap 旋转 90 度后，平铺面在 XZ 平面
+                // worldSpawnPos 已经包含了正确的 3D 位置
+                player.transform.position = worldSpawnPos + Vector3.up * 1.0f;
+
+                Debug.Log($"玩家已精准安置！格子:{cellPos} -> 世界:{worldSpawnPos}");
+            }
         }
 
         #region 区域生成

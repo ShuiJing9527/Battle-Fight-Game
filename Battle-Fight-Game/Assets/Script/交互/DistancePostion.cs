@@ -11,9 +11,12 @@ public class DistancePostion : MonoBehaviour
         
     }
 
-    // Update is called once per frame
+    public Transform footTransform; // 在 Inspector 里把 FootAnchor 拖进来
+
     void Update()
     {
-        Shader.SetGlobalVector("_Position", transform.position);
+        // 传给 Shader 脚底的坐标，而不是角色肚子的坐标
+        if (footTransform != null)
+            Shader.SetGlobalVector("_Position", footTransform.position);
     }
 }
