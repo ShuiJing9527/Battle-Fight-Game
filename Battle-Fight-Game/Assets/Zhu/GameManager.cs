@@ -163,6 +163,17 @@ public class GameManager : MonoBehaviour
         foreach (var kv in supportedLanguages) list.Add(kv.Value);
         return list;
     }
+    
+
+    // 根据语言代码获取显示名
+    public string GetLanguageDisplayName(string code)
+    {
+        foreach (var kv in supportedLanguages)
+        {
+            if (kv.Key == code) return kv.Value;
+        }
+        return code; // 如果找不到，返回代码本身
+    }
 
     // 切换语言
     public void SetLanguage(string languageCode)
