@@ -3,14 +3,24 @@ using UnityEngine;
 public class EnemyController : MonoBehaviour
 {
     private Rigidbody rb;
-    public Transform Player;
+    private Transform Player;
     private bool isChasing;
 
-    private float moveSpeed = 20f;
+    private float moveSpeed = 10f;
 
     void Start()
     {
         rb = GetComponent<Rigidbody>();
+
+        GameObject playerObject = GameObject.FindWithTag("Player");
+        if (playerObject != null)
+        {
+            Player = playerObject.transform;
+        }
+        else
+        {
+            Debug.LogWarning("Player not found");
+        }
     }
 
     // Update is called once per frame
@@ -34,6 +44,7 @@ public class EnemyController : MonoBehaviour
         if (collision.gameObject.tag == "Player")
         {
             isChasing = false;   
+            rb.linearVelocity = Vector3.zero;
         }
     }
 }
