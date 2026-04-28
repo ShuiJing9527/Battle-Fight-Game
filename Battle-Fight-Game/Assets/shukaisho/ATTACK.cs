@@ -16,6 +16,7 @@ public class ATTACK : MonoBehaviour
 
     private Rigidbody rb;
     private Animator animator;
+    private CombatSkillCaster skillCaster;
 
     private Vector3 moveInput;
     private Vector3 lastMoveDir = Vector3.forward;
@@ -26,6 +27,7 @@ public class ATTACK : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         animator = GetComponent<Animator>();
+        skillCaster = GetComponent<CombatSkillCaster>();
     }
 
     void Update()
@@ -70,6 +72,11 @@ public class ATTACK : MonoBehaviour
 
     void Attack()
     {
+        if (skillCaster != null && skillCaster.CastSkill(0))
+        {
+            return;
+        }
+
         if (animator != null)
         {
             animator.SetTrigger("Attack");
@@ -80,6 +87,11 @@ public class ATTACK : MonoBehaviour
         {
             attackPoint.localPosition = lastMoveDir.normalized * attackRange;
         }
+        else
+        {
+            Debug.LogWarning("ATTACK requires attackPoint for normal attacks.");
+            return;
+        }
 
         Collider[] hitEnemies = Physics.OverlapSphere(
             attackPoint.position,
@@ -89,11 +101,16 @@ public class ATTACK : MonoBehaviour
 
         foreach (Collider enemy in hitEnemies)
         {
-            EnemyHealth hp = enemy.GetComponent<EnemyHealth>();
+            CombatHealth combatHealth = enemy.GetComponentInParent<CombatHealth>();
+            EnemyHealth hp = enemy.GetComponentInParent<EnemyHealth>();
 
-            if (hp != null)
+            if (combatHealth != null)
             {
-                hp.TakeDamage(attackDamage);
+                combatHealth.TakeDamage(new BattleDamage(attackDamage, BattleDamageType.Physical, gameObject));
+            }
+            else if (hp != null)
+            {
+                hp.TakeDamage(attackDamage, gameObject);
             }
         }
     }

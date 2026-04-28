@@ -4121,6 +4121,11 @@ GameObject:
   - component: {fileID: 1414717684}
   - component: {fileID: 1414717683}
   - component: {fileID: 1414717686}
+  - component: {fileID: 1414717687}
+  - component: {fileID: 1414717688}
+  - component: {fileID: 1414717689}
+  - component: {fileID: 1414717690}
+  - component: {fileID: 1414717691}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -4335,6 +4340,93 @@ Animator:
   m_AllowConstantClipSamplingOptimization: 1
   m_KeepAnimatorStateOnDisable: 0
   m_WriteDefaultValuesOnDisable: 0
+--- !u!114 &1414717687
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 3
+  physicalAttack: 1
+  physicalDefense: 0
+  specialAttack: 1
+  specialDefense: 0
+  speed: 1
+  luck: 0
+--- !u!114 &1414717688
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6343b8929e9e49e3aaa45d39bf0d1f6b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 3
+  currentHealth: 3
+  shield: 0
+  maxEnergy: 100
+  currentEnergy: 100
+  energyOverflowDamageBonusPerPoint: 0
+  energyOverflowBuffSeconds: 0
+  growthSoul: 0
+  functionSoul: 0
+--- !u!114 &1414717689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f2997d5a0e249c1968ac6499795c313, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  stats: {fileID: 1414717687}
+  resourceBank: {fileID: 1414717688}
+  currentHealth: 3
+  destroyOnDeath: 1
+--- !u!114 &1414717690
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4a1b94e13234370aaa8109d964f419f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  skills: []
+  attackPoint: {fileID: 1414717680}
+  enemyLayer:
+    serializedVersion: 2
+    m_Bits: 0
+  damageType: 0
+--- !u!114 &1414717691
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1549417ae4b143a488f76dac35a6947b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  runes: []
 --- !u!1 &1559502148
 GameObject:
   m_ObjectHideFlags: 0
@@ -4633,6 +4725,7 @@ GameObject:
   - component: {fileID: 1959916821}
   - component: {fileID: 1959916820}
   - component: {fileID: 1959916823}
+  - component: {fileID: 1959916825}
   m_Layer: 0
   m_Name: Main Camera
   m_TagString: MainCamera
@@ -4707,8 +4800,8 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959916819}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.2588191, y: 0, z: 0, w: 0.9659258}
-  m_LocalPosition: {x: 0, y: 10, z: -18}
+  m_LocalRotation: {x: 0.8810523, y: 0, z: 0, w: 0.473018}
+  m_LocalPosition: {x: -1.412, y: 10.75, z: -18}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4758,6 +4851,24 @@ MonoBehaviour:
     m_VarianceClampScale: 0.9
     m_ContrastAdaptiveSharpening: 0
   m_Version: 2
+--- !u!114 &1959916825
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1959916819}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2ec38d3d54524aa9a58602e534f68c7f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  playerSlot: {fileID: 1414717680}
+  distance: 18
+  height: 4
+  yaw: 0
+  centerOffset: {x: 0, y: 1, z: 0}
+  lockEveryFrame: 1
 --- !u!1 &1970225116
 GameObject:
   m_ObjectHideFlags: 0
