@@ -983,7 +983,7 @@ MonoBehaviour:
   loadText: {fileID: 0}
   startButton: {fileID: 0}
   simulateLoadTime: 3
-  gameSceneName: GameScene
+  gameSceneName: "\u8349\u539F"
 --- !u!1 &385201539
 GameObject:
   m_ObjectHideFlags: 0

@@ -284,7 +284,10 @@ public class GameManager : MonoBehaviour
             }
 
             // 保存场景和时间
-            gameData.saveData.currentScene = SceneManager.GetActiveScene().name;
+            if (player != null)
+            {
+                gameData.saveData.currentScene = SceneManager.GetActiveScene().name;
+            }
             gameData.saveData.saveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
             // 加密保存
@@ -304,7 +307,7 @@ public class GameManager : MonoBehaviour
     {
         gameData.saveData = new SaveData
         {
-            currentScene = "GameScene",
+            currentScene = "草原",
             saveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             playerScore = 0,
             playerLevel = 1,
