@@ -13,15 +13,31 @@ public class PlayerMovement : MonoBehaviour
         if (rb == null) rb = GetComponent<Rigidbody>();
     }
 
-    void OnEnable() => moveAction.Enable();
-    void OnDisable() => moveAction.Disable();
+    void OnEnable()
+    {
+        moveAction?.Enable();
+    }
+
+    void OnDisable()
+    {
+        moveAction?.Disable();
+    }
 
     void FixedUpdate()
     {
         if (rb == null) return;
 
         // 获取 WASD 的 Vector2 输入 (x, y)
-        Vector2 input = moveAction.ReadValue<Vector2>();
+        Vector2 input = moveAction != null ? moveAction.ReadValue<Vector2>() : Vector2.zero;
+
+        if (input == Vector2.zero && Keyboard.current != null)
+        {
+            if (Keyboard.current.aKey.isPressed) input.x -= 1f;
+            if (Keyboard.current.dKey.isPressed) input.x += 1f;
+            if (Keyboard.current.sKey.isPressed) input.y -= 1f;
+            if (Keyboard.current.wKey.isPressed) input.y += 1f;
+            input = Vector2.ClampMagnitude(input, 1f);
+        }
 
         // 关键逻辑：
         // input.x 对应世界的 X（左右）

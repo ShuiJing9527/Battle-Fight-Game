@@ -2,19 +2,12 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-public class SettingsPanel : MonoBehaviour
+public class SettingsUI : MonoBehaviour
 {
-    public Slider sliderMusic;
-    public Slider sliderSFX;
-    public Toggle toggleFullscreen;
-    public TMP_Dropdown dropdownLanguage;
-
-    private GameManager gm;
-
-    void Awake()
-    {
-        gm = GameManager.Instance;
-    }
+    public Slider musicSlider;
+    public Slider sfxSlider;
+    public Toggle fullscreenToggle;
+    public TMP_Dropdown langDrop;
 
     void OnEnable()
     {
@@ -23,23 +16,29 @@ public class SettingsPanel : MonoBehaviour
 
     void RefreshUI()
     {
-        sliderMusic.value = gm.settings.musicVolume;
-        sliderSFX.value = gm.settings.sfxVolume;
-        toggleFullscreen.isOn = gm.settings.fullscreen;
-        dropdownLanguage.ClearOptions();
-        dropdownLanguage.AddOptions(gm.GetSupportedLanguageDisplayNames());
-        dropdownLanguage.value = gm.GetSupportedLanguageCodes().IndexOf(gm.CurrentLanguage);
+        var gm = GameManager.Instance;
+        musicSlider.value = gm.settings.musicVolume;
+        sfxSlider.value = gm.settings.sfxVolume;
+        fullscreenToggle.isOn = gm.settings.fullscreen;
+
+        langDrop.ClearOptions();
+        langDrop.AddOptions(gm.GetLangNames());
+
+        int index = gm.GetLangKeys().IndexOf(gm.settings.language);
+        langDrop.value = index;
     }
 
-    public void ApplySettings()
+    public void SaveSetting()
     {
-        gm.settings.musicVolume = sliderMusic.value;
-        gm.settings.sfxVolume = sliderSFX.value;
-        gm.settings.fullscreen = toggleFullscreen.isOn;
-        string lang = gm.GetSupportedLanguageCodes()[dropdownLanguage.value];
-        gm.SetLanguage(lang);
+        var gm = GameManager.Instance;
+        gm.settings.musicVolume = musicSlider.value;
+        gm.settings.sfxVolume = sfxSlider.value;
+        gm.settings.fullscreen = fullscreenToggle.isOn;
+
+        string langKey = gm.GetLangKeys()[langDrop.value];
+        gm.SetLanguage(langKey);
+
         gm.SaveSettings();
-        gm.ApplySettings();
     }
 
     public void ClosePanel()

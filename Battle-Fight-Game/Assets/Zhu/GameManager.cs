@@ -163,7 +163,6 @@ public class GameManager : MonoBehaviour
         foreach (var kv in supportedLanguages) list.Add(kv.Value);
         return list;
     }
-    
 
     // 根据语言代码获取显示名
     public string GetLanguageDisplayName(string code)
@@ -185,6 +184,24 @@ public class GameManager : MonoBehaviour
 
     // 当前语言
     public string CurrentLanguage => settings.language ?? "en";
+
+    // ==========================================
+    // 兼容 UI 脚本调用的短方法名
+    // ==========================================
+    public string GetText(string key)
+    {
+        return GetLocalizedText(key);
+    }
+
+    public List<string> GetLangNames()
+    {
+        return GetSupportedLanguageDisplayNames();
+    }
+
+    public List<string> GetLangKeys()
+    {
+        return GetSupportedLanguageCodes();
+    }
     #endregion
 
     #region 设置数据加载/保存/生效
@@ -284,7 +301,10 @@ public class GameManager : MonoBehaviour
             }
 
             // 保存场景和时间
-            gameData.saveData.currentScene = SceneManager.GetActiveScene().name;
+            if (player != null)
+            {
+                gameData.saveData.currentScene = SceneManager.GetActiveScene().name;
+            }
             gameData.saveData.saveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
 
             // 加密保存
@@ -304,7 +324,7 @@ public class GameManager : MonoBehaviour
     {
         gameData.saveData = new SaveData
         {
-            currentScene = "GameScene",
+            currentScene = "草原",
             saveTime = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             playerScore = 0,
             playerLevel = 1,
