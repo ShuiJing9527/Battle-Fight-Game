@@ -1157,6 +1157,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &278046053
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &758916901
 GameObject:
   m_ObjectHideFlags: 0
@@ -2610,7 +2647,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 2141450069}
+  m_CustomBakedTexture: {fileID: 278046053}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -4008,8 +4045,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.810096, g: 0.40660867, b: 0.10276933, a: 0.4836225}
-  m_Intensity: 3.46415
+  m_Color: {r: 0.9949285, g: 0.80264676, b: 0.36152977, a: 1}
+  m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -4071,7 +4108,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.9457466, y: 0.25341204, z: 0.052627373, w: 0.19640803}
+  m_LocalRotation: {x: 0.49051744, y: 0.13143376, z: 0.22296296, w: 0.83210903}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -4200,7 +4237,7 @@ Transform:
   m_GameObject: {fileID: 1414717678}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -1.412, y: 0.75, z: 0}
+  m_LocalPosition: {x: -1.811, y: 0.75, z: 0}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -4408,7 +4445,286 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b4a1b94e13234370aaa8109d964f419f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  skills: []
+  skills:
+  - skillName: "\u5C0F\u6280\u80FD1"
+    skillType: 0
+    energyCost: 10
+    runeSlotCount: 5
+    hitCount: 1
+    baseDamage: 1
+    attackRange: 1.5
+    equippedRunes:
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+  - skillName: "\u5C0F\u6280\u80FD2"
+    skillType: 0
+    energyCost: 10
+    runeSlotCount: 5
+    hitCount: 1
+    baseDamage: 1
+    attackRange: 1.5
+    equippedRunes:
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+  - skillName: "\u5927\u62DB"
+    skillType: 1
+    energyCost: 100
+    runeSlotCount: 5
+    hitCount: 1
+    baseDamage: 1
+    attackRange: 1.5
+    equippedRunes:
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
   attackPoint: {fileID: 1414717680}
   enemyLayer:
     serializedVersion: 2
@@ -4426,7 +4742,177 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1549417ae4b143a488f76dac35a6947b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  runes: []
+  runes:
+  - id: 1
+    runeName: "\u8FDE\u51FB\u7B26\u6587"
+    category: "\u6539\u9020\u7C7B"
+    rarity: 0
+    mechanic: 0
+    triggerCondition: "\u6280\u80FD\u91CA\u653E"
+    limitOrSideEffect: "\u5355\u6BB5\u4F24\u5BB3\u7565\u964D\u4F4E"
+    playStyle: "\u8FDE\u6BB5\u6D41"
+    extraHitCount: 1
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 2
+    runeName: "\u53CC\u661F\u7B26\u6587"
+    category: "\u6539\u9020\u7C7B"
+    rarity: 1
+    mechanic: 1
+    triggerCondition: "\u6280\u80FD\u91CA\u653E"
+    limitOrSideEffect: "\u5355\u6B21\u4F24\u5BB3\u964D\u4F4E"
+    playStyle: "\u89E6\u53D1\u6D41"
+    extraHitCount: 0
+    extraCastCount: 2
+    damageMultiplier: 0.5
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 3
+    runeName: "\u6B8B\u5F71\u7B26\u6587"
+    category: "\u6539\u9020\u7C7B"
+    rarity: 2
+    mechanic: 2
+    triggerCondition: "\u6280\u80FD\u7ED3\u675F"
+    limitOrSideEffect: "\u6280\u80FDCD\u589E\u52A0"
+    playStyle: "\u6280\u80FD\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 4
+    runeName: "\u5206\u88C2\u7B26\u6587"
+    category: "\u6539\u9020\u7C7B"
+    rarity: 1
+    mechanic: 3
+    triggerCondition: "\u547D\u4E2D\u654C\u4EBA"
+    limitOrSideEffect: "\u5355\u4F53\u80FD\u529B\u4E0B\u964D"
+    playStyle: "AOE\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 5
+    runeName: "\u56DE\u54CD\u7B26\u6587"
+    category: "\u673A\u5236\u7C7B"
+    rarity: 1
+    mechanic: 4
+    triggerCondition: "\u547D\u4E2D\u654C\u4EBA"
+    limitOrSideEffect: "\u6709\u89E6\u53D1\u95F4\u9694"
+    playStyle: "\u8FDE\u9501\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 6
+    runeName: "\u8840\u7206\u7B26\u6587"
+    category: "\u673A\u5236\u7C7B"
+    rarity: 1
+    mechanic: 5
+    triggerCondition: "\u51FB\u6740\u654C\u4EBA"
+    limitOrSideEffect: "\u5FC5\u987B\u5B8C\u6210\u51FB\u6740"
+    playStyle: "\u6536\u5272\u6D41 / \u751F\u5B58"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 7
+    runeName: "\u6C72\u53D6\u5370\u8BB0\u7B26\u6587"
+    category: "\u673A\u5236\u7C7B"
+    rarity: 1
+    mechanic: 6
+    triggerCondition: "\u547D\u4E2D + \u51FB\u6740"
+    limitOrSideEffect: "\u9700\u5B8C\u6210\u4E24\u6B65\u89E6\u53D1"
+    playStyle: "\u6280\u672F\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 8
+    runeName: "\u518D\u751F\u7B26\u6587"
+    category: "\u673A\u5236\u7C7B"
+    rarity: 0
+    mechanic: 7
+    triggerCondition: "\u6280\u80FD\u547D\u4E2D"
+    limitOrSideEffect: "\u9700\u7AD9\u5728\u533A\u57DF\u5185"
+    playStyle: "\u9635\u5730\u6218"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 9
+    runeName: "\u4EA4\u6362\u7B26\u6587"
+    category: "\u9AD8\u9636\u673A\u5236"
+    rarity: 2
+    mechanic: 8
+    triggerCondition: "\u6280\u80FD\u91CA\u653E + \u547D\u4E2D"
+    limitOrSideEffect: "\u6709\u751F\u547D\u98CE\u9669"
+    playStyle: "\u9AD8\u98CE\u9669\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
+  - id: 10
+    runeName: "\u7075\u9B42\u94FE\u63A5\u7B26\u6587"
+    category: "\u673A\u5236\u7C7B"
+    rarity: 1
+    mechanic: 9
+    triggerCondition: "\u547D\u4E2D\u591A\u4E2A\u654C\u4EBA"
+    limitOrSideEffect: "\u4F9D\u8D56\u7FA4\u4F53\u76EE\u6807"
+    playStyle: "\u7FA4\u6218\u6D41"
+    extraHitCount: 0
+    extraCastCount: 1
+    damageMultiplier: 1
+    delaySeconds: 0
+    cooldownMultiplier: 1
+    range: 0
+    healthCost: 0
+    healAmount: 0
+    lifeSoulPrefab: {fileID: 0}
 --- !u!1 &1559502148
 GameObject:
   m_ObjectHideFlags: 0
@@ -4800,13 +5286,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1959916819}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.8810523, y: 0, z: 0, w: 0.473018}
-  m_LocalPosition: {x: -1.412, y: 10.75, z: -18}
+  m_LocalRotation: {x: 0.08715578, y: 0, z: 0, w: 0.9961947}
+  m_LocalPosition: {x: 0, y: 2, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 30, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 10, y: 0, z: 0}
 --- !u!114 &1959916823
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -4863,11 +5349,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ec38d3d54524aa9a58602e534f68c7f, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  playerSlot: {fileID: 1414717680}
-  distance: 18
-  height: 4
+  playerSlot: {fileID: 2090811302}
+  distance: 10
+  height: 2
+  pitchRotation: 10
   yaw: 0
-  centerOffset: {x: 0, y: 1, z: 0}
+  targetCenterOffset: {x: 0, y: 0, z: 0}
   lockEveryFrame: 1
 --- !u!1 &1970225116
 GameObject:
@@ -4950,7 +5437,7 @@ Transform:
   m_GameObject: {fileID: 2090811301}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0.19999996, y: -8.25, z: 3.1}
+  m_LocalPosition: {x: 0, y: -7.5, z: 3.1}
   m_LocalScale: {x: 5, y: 5, z: 5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -4969,43 +5456,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistancePostion
   footTransform: {fileID: 2090811302}
---- !u!84 &2141450069
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1001 &1156295780970191264
 PrefabInstance:
   m_ObjectHideFlags: 0
