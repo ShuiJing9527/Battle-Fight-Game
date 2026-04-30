@@ -1444,6 +1444,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &1056628210
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1088213933
 GameObject:
   m_ObjectHideFlags: 0
@@ -2294,7 +2331,7 @@ MonoBehaviour:
   - {fileID: 11400000, guid: 6e9a4ddb5048f964caa54e367fdd9578, type: 2}
   - {fileID: 11400000, guid: bdff1156c572c0744b1dd6a5b90cc228, type: 2}
   - {fileID: 11400000, guid: 5dfb02ef0eb72404485e4c2f6a9d6503, type: 2}
-  wallColliderTile: {fileID: 11400000, guid: 1f5dec63ed3b0634f870328fc4f6f483, type: 2}
+  wallColliderTile: {fileID: 11400000, guid: 958f089daf3005c4eb13f7b9685303fc, type: 2}
   floorTilemap:
   - {fileID: 1034681569}
   - {fileID: 1158976106}
@@ -2610,7 +2647,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1910861017}
+  m_CustomBakedTexture: {fileID: 1056628210}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -4008,8 +4045,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.39105034, g: 0.07319343, b: 0.118383646, a: 0}
-  m_Intensity: 0
+  m_Color: {r: 0.884259, g: 0.48586926, b: 0.12811899, a: 0.6029155}
+  m_Intensity: 4.3186364
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -4071,7 +4108,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
+  m_LocalRotation: {x: 0.9442557, y: 0.25301254, z: 0.054515556, w: 0.20345482}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -5162,43 +5199,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!84 &1910861017
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1959916819
 GameObject:
   m_ObjectHideFlags: 0

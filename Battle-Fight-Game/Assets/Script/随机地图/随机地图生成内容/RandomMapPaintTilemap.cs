@@ -1,7 +1,6 @@
 using Cysharp.Threading.Tasks;
-using System;
-using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -9,61 +8,50 @@ namespace UnderTheStars.GenerationMap
 {
     public class RandomMapPaintTilemap : MonoBehaviour
     {
-        [Header("地图瓷砖")]
-        [SerializeField] private TileBase[] floorTile;//地面瓷砖
-        [SerializeField] private TileBase wallColliderTile;//墙体碰撞瓷砖
+        [Header("Map Tiles")]
+        [SerializeField] private TileBase[] floorTile;
+        [SerializeField] private TileBase wallColliderTile;
 
-        [Header("地图Tilemap")]
-        [SerializeField] private Tilemap[] floorTilemap;//地面Tilemap组件
-        [SerializeField] private Tilemap wallColliderTilemap;//墙体碰撞Tilemap组件
+        [Header("Tilemaps")]
+        [SerializeField] private Tilemap[] floorTilemap;
+        [SerializeField] private Tilemap wallColliderTilemap;
 
-        /// <summary> 初始化清除地图瓷砖 </summary>
+        [Header("Wall Collider")]
+        [SerializeField] private float wallColliderHeight = 2f;
+        [SerializeField] private string wallColliderRootName = "Merged Wall Colliders";
+
+        private Transform wallColliderRoot;
+
         internal void InitClearTile()
         {
             foreach (var tile in floorTilemap)
             {
                 tile.ClearAllTiles();
             }
+
             wallColliderTilemap.ClearAllTiles();
+            ClearWallColliders();
         }
 
-        /// <summary> 获取指定的地面Tilemap，用于坐标转换 </summary>
         public Tilemap GetFloorTilemap(int index)
         {
             if (floorTilemap != null && index < floorTilemap.Length)
             {
                 return floorTilemap[index];
             }
+
             return null;
         }
 
-        #region 绘制地图
-        /// <summary> 绘制地图瓷砖 </summary>
-        /*private async UniTask PaintTile(HashSet<Vector2Int> points, Tilemap tilemap, TileBase tile)
-        {
-            int count = 0;
-            foreach (var point in points)
-            {
-                var tilePoint = tilemap.WorldToCell((Vector3Int)point);
-                tilemap.SetTile(tilePoint, tile);
-                if (count >= 500)
-                {
-                    count = 0;
-                    await UniTask.NextFrame();
-                }
-            }
-        }*/
         private async UniTask PaintTile(HashSet<Vector2Int> points, Tilemap tilemap, TileBase tile)
         {
             int count = 0;
             foreach (var point in points)
             {
-                // 直接使用 Vector3Int 作为格子坐标 (x, y, 0)
-                // 在旋转了 90 度的 Grid 下，这个 (x, y) 会自动映射到世界的 (X, Z) 平面
                 Vector3Int tilePoint = new Vector3Int(point.x, point.y, 0);
-
                 tilemap.SetTile(tilePoint, tile);
 
+                count++;
                 if (count >= 500)
                 {
                     count = 0;
@@ -72,18 +60,133 @@ namespace UnderTheStars.GenerationMap
             }
         }
 
-
-        /// <summary> 绘制地面地图瓷砖 </summary>
         public UniTask PaintFloorTile(HashSet<Vector2Int> points, int tileIndex)
         {
             return PaintTile(points, floorTilemap[tileIndex], floorTile[tileIndex]);
         }
 
-        /// <summary> 绘制墙体地图瓷砖 </summary>
         public UniTask PaintWallTile(HashSet<Vector2Int> points)
         {
-            return PaintTile(points, wallColliderTilemap, wallColliderTile);
+            return PaintWallTileAsync(points);
         }
-        #endregion
+
+        private async UniTask PaintWallTileAsync(HashSet<Vector2Int> points)
+        {
+            await PaintTile(points, wallColliderTilemap, wallColliderTile);
+            RebuildWallColliders(points);
+        }
+
+        private void RebuildWallColliders(HashSet<Vector2Int> points)
+        {
+            ClearWallColliders();
+
+            if (points == null || points.Count == 0)
+            {
+                return;
+            }
+
+            wallColliderRoot = new GameObject(wallColliderRootName).transform;
+            wallColliderRoot.SetParent(wallColliderTilemap.transform, false);
+
+            foreach (RectInt rect in MergeCells(points))
+            {
+                CreateWallCollider(rect);
+            }
+        }
+
+        private void ClearWallColliders()
+        {
+            if (wallColliderRoot == null)
+            {
+                Transform existingRoot = wallColliderTilemap.transform.Find(wallColliderRootName);
+                if (existingRoot != null)
+                {
+                    wallColliderRoot = existingRoot;
+                }
+            }
+
+            if (wallColliderRoot == null)
+            {
+                return;
+            }
+
+            if (Application.isPlaying)
+            {
+                Destroy(wallColliderRoot.gameObject);
+            }
+            else
+            {
+                DestroyImmediate(wallColliderRoot.gameObject);
+            }
+
+            wallColliderRoot = null;
+        }
+
+        private IEnumerable<RectInt> MergeCells(HashSet<Vector2Int> points)
+        {
+            HashSet<Vector2Int> remaining = new HashSet<Vector2Int>(points);
+
+            while (remaining.Count > 0)
+            {
+                Vector2Int start = remaining.OrderBy(point => point.y).ThenBy(point => point.x).First();
+
+                int width = 1;
+                while (remaining.Contains(new Vector2Int(start.x + width, start.y)))
+                {
+                    width++;
+                }
+
+                int height = 1;
+                bool canGrow = true;
+                while (canGrow)
+                {
+                    int nextY = start.y + height;
+                    for (int x = 0; x < width; x++)
+                    {
+                        if (!remaining.Contains(new Vector2Int(start.x + x, nextY)))
+                        {
+                            canGrow = false;
+                            break;
+                        }
+                    }
+
+                    if (canGrow)
+                    {
+                        height++;
+                    }
+                }
+
+                for (int x = 0; x < width; x++)
+                {
+                    for (int y = 0; y < height; y++)
+                    {
+                        remaining.Remove(new Vector2Int(start.x + x, start.y + y));
+                    }
+                }
+
+                yield return new RectInt(start.x, start.y, width, height);
+            }
+        }
+
+        private void CreateWallCollider(RectInt rect)
+        {
+            GameObject colliderObject = new GameObject($"Wall Collider {rect.x},{rect.y} {rect.width}x{rect.height}");
+            colliderObject.layer = wallColliderTilemap.gameObject.layer;
+            colliderObject.transform.SetParent(wallColliderRoot, false);
+
+            colliderObject.transform.localPosition = wallColliderTilemap.CellToLocalInterpolated(
+                new Vector3(rect.x + rect.width * 0.5f, rect.y + rect.height * 0.5f, 0f));
+
+            Vector3 cellSize = wallColliderTilemap.layoutGrid != null
+                ? wallColliderTilemap.layoutGrid.cellSize
+                : Vector3.one;
+
+            BoxCollider boxCollider = colliderObject.AddComponent<BoxCollider>();
+            boxCollider.size = new Vector3(
+                Mathf.Abs(cellSize.x) * rect.width,
+                Mathf.Abs(cellSize.y) * rect.height,
+                wallColliderHeight);
+            boxCollider.center = Vector3.zero;
+        }
     }
 }
