@@ -113,6 +113,26 @@ namespace UnderTheStars.GenerationMap
                 dir == 6 ? new Vector2Int(-1, -1) :
                 new Vector2Int(1, -1);
         }
+
+        internal static HashSet<Vector2Int> GenraterWallPoints(HashSet<Vector2Int> checkAllFloor,int wallWidth = 6)
+        {
+            HashSet<Vector2Int> wallPoints = new HashSet<Vector2Int>();
+            foreach (var point in checkAllFloor)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    for (int j = 0; j < wallWidth; j++)
+                    {
+                        var newPoint = point + j * GetDir(i);
+                        if (!checkAllFloor.Contains(newPoint))
+                        {
+                            wallPoints.Add(newPoint);
+                        }
+                    }
+                }
+            }
+            return wallPoints;
+        }
         #endregion
     }
 }

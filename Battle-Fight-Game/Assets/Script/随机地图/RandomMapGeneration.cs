@@ -28,10 +28,8 @@ namespace UnderTheStars.GenerationMap
 
         private HashSet<Vector2Int>[,] floorPoints;//地面坐标点
         private HashSet<Vector2Int>[,] propsPoints;//道具坐标点
-        private HashSet<Vector2Int>[,] wallColliderPoints;//墙体碰撞坐标点
+        private HashSet<Vector2Int> wallColliderPoints;//墙体碰撞坐标点
 
-        private HashSet<Vector2Int> farthestCorridor;//最远的走廊坐标点,待删除
-        private HashSet<Vector2Int> wallDecorationPoints;//墙体装饰坐标点,待删除
 
         private void Start()
         {
@@ -44,6 +42,9 @@ namespace UnderTheStars.GenerationMap
 
             var regionPoints = InitMapRegion();
             var checkAllFloor = GeneraterFloorPoints(regionPoints);
+            var generateWallPointsTask = GeneraterWallPointsAsync(checkAllFloor);
+            await UniTask.WhenAny(generateWallPointsTask);
+            PanintWallTilemap().Forget();
 
             // 等待所有 Tilemap 绘制完成
             await UniTask.WhenAll(panintTilemap(0, 0), panintTilemap(0, 1), panintTilemap(1, 0));
@@ -52,6 +53,18 @@ namespace UnderTheStars.GenerationMap
 
             // 安置玩家
             PlacePlayerOnMap();
+        }
+
+        private UniTask PanintWallTilemap()
+        {
+            return paintTilemap.PaintWallTile(wallColliderPoints);
+        }
+
+        private async UniTask GeneraterWallPointsAsync(HashSet<Vector2Int> checkAllFloor)
+        {
+            wallColliderPoints = new HashSet<Vector2Int>();
+            wallColliderPoints = RandomMapGenerationAlgorithms.GenraterWallPoints(checkAllFloor);
+            await UniTask.NextFrame();
         }
 
         private UniTask panintTilemap(int v1, int v2)
@@ -168,8 +181,6 @@ namespace UnderTheStars.GenerationMap
             floorPoints = null;
             propsPoints = null;
             wallColliderPoints = null;
-            farthestCorridor = null;//待删除
-            wallDecorationPoints = null;//待删除
         }
 
         /// <summary> 初始化地图随机种 </summary>
