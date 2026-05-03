@@ -77,6 +77,22 @@ MonoBehaviour:
   m_DepthTextureFormat: 0
   m_AccurateGbufferNormals: 0
   m_IntermediateTextureMode: 0
+--- !u!114 &6600000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56c529187ffe4bd29418d61b82c5c83e, type: 3}
+  m_Name: AirWallScreenDistortionRendererFeature
+  m_EditorClassIdentifier: 
+  m_Active: 0
+  distortionMaterial: {fileID: 2100000, guid: 9f2a6c75d2be4f91a3d84c6b7e5a1023, type: 2}
+  injectionPoint: 600
+  m_Version: 1
 --- !u!114 &7833122117494664109
 MonoBehaviour:
   m_ObjectHideFlags: 0

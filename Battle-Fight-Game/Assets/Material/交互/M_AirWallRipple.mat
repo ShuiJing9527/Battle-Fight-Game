@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_AirWallRipple
+  m_Shader: {fileID: 4800000, guid: 5a1614b8507247b1a14b3e904f793473, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 1
+  m_CustomRenderQueue: 3000
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs: []
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 0.32
+    - _AngularWarpStrength: 0.02
+    - _BaseDistortionStrength: 0.06
+    - _ChromaticStrength: 0.012
+    - _DistortionFalloff: 0.55
+    - _DistortionStrength: 0.06
+    - _EdgeFadeWidth: 0.75
+    - _EdgeGlow: 0.22
+    - _EmissionEdgeStrength: 0.24
+    - _EmissionStrength: 0.3
+    - _HueOffset: 0
+    - _IridescenceEmissionStrength: 0.5
+    - _IridescenceScale: 3.2
+    - _IridescenceSpeed: 0.7
+    - _IridescenceStrength: 0.32
+    - _MaskRadius: 1.08
+    - _NoiseScale: 3.2
+    - _NoiseStrength: 0.008
+    - _OuterFadeStrength: 1.15
+    - _RainbowBrightness: 1.18
+    - _RainbowSaturation: 0.82
+    - _RainbowSpeed: 0.28
+    - _RainbowStrength: 0.72
+    - _RingColorIntensity: 1.35
+    - _RingDistortionBoost: 0.75
+    - _RingEmissionBoost: 0.85
+    - _RingEmissionStrength: 1.15
+    - _RingIrregularity: 0.12
+    - _RingWidth: 0.38
+    - _RippleCount: 14
+    - _RippleStrength: 1.4
+    - _SecondaryRippleScale: 2
+    - _SecondaryRippleStrength: 0.04
+    - _Speed: 0.85
+    - _TintIntensity: 0.12
+    - _WhiteLineSuppression: 0.92
+    m_Colors:
+    - _EmissionColor: {r: 0.58, g: 0.9, b: 1, a: 1}
+    - _RippleColor: {r: 0.65, g: 0.9, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

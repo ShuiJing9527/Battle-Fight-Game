@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 174403696}
   - component: {fileID: 174403698}
   - component: {fileID: 174403697}
-  m_Layer: 0
+  m_Layer: 3
   m_Name: WallTilemap
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -1157,43 +1157,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!84 &432294997
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &758916901
 GameObject:
   m_ObjectHideFlags: 0
@@ -1339,7 +1302,7 @@ MonoBehaviour:
   priority: 0
   blendDistance: 0
   weight: 1
-  sharedProfile: {fileID: 11400000, guid: 10fc4df2da32a41aaa32d77bc913491c, type: 2}
+  sharedProfile: {fileID: 11400000, guid: 7de44fe3b0c34edab0d4e7d1aa8a8c91, type: 2}
 --- !u!4 &805530300
 Transform:
   m_ObjectHideFlags: 0
@@ -2649,7 +2612,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 432294997}
+  m_CustomBakedTexture: {fileID: 2075865079}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -4047,7 +4010,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.0897721, g: 0.108404204, b: 0.30714652, a: 0}
+  m_Color: {r: 0.09364704, g: 0.11217173, b: 0.3097683, a: 0}
   m_Intensity: 0
   m_Range: 10
   m_SpotAngle: 30
@@ -4165,6 +4128,7 @@ GameObject:
   - component: {fileID: 1414717689}
   - component: {fileID: 1414717690}
   - component: {fileID: 1414717691}
+  - component: {fileID: 1414717692}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -4915,6 +4879,28 @@ MonoBehaviour:
     healthCost: 0
     healAmount: 0
     lifeSoulPrefab: {fileID: 0}
+--- !u!114 &1414717692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1414717678}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c1c3d5b834441e2b9f103491674e87c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerWallHitEffect
+  effectPrefab: {fileID: 1000000000000000000, guid: ac87919ed53c410a8ab8fbdc91e0039e, type: 3}
+  wallLayers:
+    serializedVersion: 2
+    m_Bits: 8
+  cooldown: 0.5
+  destroyDelay: 1.5
+  surfaceOffset: 0.02
+  heightOffset: 0.5
+  spawnOnStay: 0
+  maxActiveEffects: 1
 --- !u!1 &1559502148
 GameObject:
   m_ObjectHideFlags: 0
@@ -5486,6 +5472,43 @@ Transform:
   - {fileID: 758916902}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 90, y: 180, z: 0}
+--- !u!84 &2075865079
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &2090811301
 GameObject:
   m_ObjectHideFlags: 0
