@@ -1,0 +1,80 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: "Cloud \u2161"
+  m_Shader: {fileID: -6465566751694194690, guid: 718c3a9c543aa69458bf2e43b9b87495, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 2
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses:
+  - MOTIONVECTORS
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Edge: 1.5
+    - _Fresnel: 2
+    - _Nome: -1.5
+    - _QueueControl: 0
+    - _QueueOffset: 0
+    - _Scale: 5
+    - __1: 20
+    - __10: 2
+    - __11: 100
+    - __2: 20
+    - __4: 3
+    - __5: 0.015
+    - __6: 15
+    - __7: 5
+    - __8: 1
+    - __9: 100
+    m_Colors:
+    - _: {r: 1, g: 0, b: 0, a: 90}
+    - _Color: {r: 2.1650906, g: 2.9960785, b: 2.9960785, a: 1}
+    - _Color_1: {r: 0.3491278, g: 0.38543376, b: 0.3962264, a: 1}
+    - __3: {r: 0, g: 1, b: -0.5, a: 2.5}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
+--- !u!114 &2612782930856726267
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Editor::UnityEditor.Rendering.Universal.AssetVersion
+  version: 10
