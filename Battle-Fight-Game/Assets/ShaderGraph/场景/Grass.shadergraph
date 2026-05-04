@@ -5998,7 +5998,7 @@
     "m_Hidden": false,
     "m_ShaderOutputName": "Smoothness",
     "m_StageCapability": 2,
-    "m_Value": 0.5,
+    "m_Value": 0.25,
     "m_DefaultValue": 0.5,
     "m_Labels": []
 }
@@ -6251,7 +6251,7 @@
     "m_Title": "光照系统",
     "m_Position": {
         "x": -827.999755859375,
-        "y": 285.60009765625
+        "y": 285.60003662109377
     }
 }
 
@@ -6999,7 +6999,7 @@
     "m_Title": "随风摆动",
     "m_Position": {
         "x": -5032.0,
-        "y": -278.39996337890627
+        "y": -278.4000244140625
     }
 }
 
