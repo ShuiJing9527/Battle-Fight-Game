@@ -7,8 +7,8 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: "\u6930\u5B50\u6811"
-  m_Shader: {fileID: -6465566751694194690, guid: 42fbd3a63139cbd458a0a8a23c42b046, type: 3}
+  m_Name: "\u5C0F\u7EA2\u82B1"
+  m_Shader: {fileID: -6465566751694194690, guid: 799675f89c10e5c4c8d9193c106cce44, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,11 +25,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: d173491db8f776d4ea0d80cfc5138544, type: 3}
-        m_Scale: {x: 1, y: 1}
-        m_Offset: {x: 0, y: 0}
-    - _MainTex2:
-        m_Texture: {fileID: 0}
+        m_Texture: {fileID: 2800000, guid: f60acfe14fb377e41a0ff4ca1935470d, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -46,18 +42,18 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _MaskParcent_Y: 0.2
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Speed: 0.03
-    - __3: 8
-    - __4: 12
-    - __6: 0.5
+    - _WindStrength: 0.4
+    - _Windspeed: 1
     m_Colors:
-    - __1: {r: 0.18039218, g: 0.5882353, b: 0.96078426, a: 1}
-    - __2: {r: 0.29803917, g: 0.854902, b: 0.9294118, a: 1}
+    - _: {r: 1, g: 5, b: 0, a: 0}
+    - _Color: {r: 1, g: 1, b: 1, a: 0}
+    - _WindDirection: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
---- !u!114 &6150804315152215411
+--- !u!114 &759207197548846324
 MonoBehaviour:
   m_ObjectHideFlags: 11
   m_CorrespondingSourceObject: {fileID: 0}
