@@ -13,6 +13,19 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
         _DepthStrength ("Depth Strength", Range(0, 0.5)) = 0.08
         _DepthScale ("Depth Scale", Range(0.05, 8)) = 0.55
         _DepthFlowSpeed ("Depth Flow Speed", Range(0, 0.5)) = 0.01
+        _MistTex ("Mist Texture", 2D) = "gray" {}
+        _MistColor ("Mist Color", Color) = (0.78, 0.9, 0.86, 1)
+        _MistStrength ("Mist Strength", Range(0, 1)) = 0.2
+        _MistScale ("Mist Scale", Range(0.05, 8)) = 0.25
+        _MistFlowSpeed ("Mist Flow Speed", Range(0, 0.2)) = 0.015
+        _MistDirection ("Mist Direction", Vector) = (0.8, 0.2, 0, 0)
+        _DebugWetOnly ("Debug Wet Only", Range(0, 1)) = 0
+        _DebugMistOnly ("Debug Mist Only", Range(0, 1)) = 0
+        _GrassSwayStrength ("Grass Sway Strength", Range(0, 0.02)) = 0
+        _GrassSwaySpeed ("Grass Sway Speed", Range(0, 3)) = 0.5
+        _GrassSwayScale ("Grass Sway Scale", Range(0.1, 10)) = 3
+        _GrassSwayDirection ("Grass Sway Direction", Vector) = (1, 0.3, 0, 0)
+        _DebugSwayOnly ("Debug Sway Only", Range(0, 1)) = 0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.22
         _Metallic ("Metallic", Range(0, 1)) = 0
 
@@ -76,6 +89,8 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            TEXTURE2D(_MistTex);
+            SAMPLER(sampler_MistTex);
 
             CBUFFER_START(UnityPerMaterial)
                 half4 _Color;
@@ -89,6 +104,18 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
                 half _DepthStrength;
                 half _DepthScale;
                 half _DepthFlowSpeed;
+                half4 _MistColor;
+                half _MistStrength;
+                half _MistScale;
+                half _MistFlowSpeed;
+                half4 _MistDirection;
+                half _DebugWetOnly;
+                half _DebugMistOnly;
+                half _GrassSwayStrength;
+                half _GrassSwaySpeed;
+                half _GrassSwayScale;
+                half4 _GrassSwayDirection;
+                half _DebugSwayOnly;
                 half _Smoothness;
                 half _Metallic;
             CBUFFER_END
@@ -129,13 +156,39 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
 
             half4 Frag(Varyings input) : SV_Target
             {
-                half4 sprite = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, input.uv);
+                half2 swayDir = normalize(_GrassSwayDirection.xy + half2(1e-4h, 1e-4h));
+                half swayTime = _Time.y * _GrassSwaySpeed;
+                half swayScale = max(_GrassSwayScale, 0.001);
+                half2 swayBaseUV = input.positionWS.xz * swayScale;
+                half swayNoiseA = sin(dot(swayBaseUV, swayDir) + swayTime);
+                half swayNoiseB = sin(dot(swayBaseUV, half2(-swayDir.y, swayDir.x)) * 1.37h - swayTime * 0.81h);
+                half swayNoise = (swayNoiseA * 0.65h + swayNoiseB * 0.35h);
+                half swayNoise2 = sin((swayBaseUV.x + swayBaseUV.y) * 0.73h + swayTime * 1.19h);
+                half2 swayOrtho = half2(-swayDir.y, swayDir.x);
+                half2 swayVector = swayDir * swayNoise + swayOrtho * swayNoise2 * 0.45h;
+                half2 swayOffset = swayVector * _GrassSwayStrength;
+                half2 mainUV = input.uv + swayOffset;
+
+                half4 sprite = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, mainUV);
                 half4 baseColor = sprite * input.color * _TintColor;
 
-                half2 wetUV = input.positionWS.xz * max(_WetFlowScale, 0.001);
-                half wet = WetNoise(wetUV, _Time.y * _WetFlowSpeed) * _WetStrength;
-                half pulse = 1.0h + sin(_Time.y * _WetFlowSpeed) * _LightPulseStrength;
+                half safeWetScale = max(_WetFlowScale, 0.001);
+                half wetTime = _Time.y * _WetFlowSpeed;
+                half2 wetFlowA = half2(0.23h, -0.17h) * wetTime;
+                half2 wetFlowB = half2(-0.13h, 0.19h) * wetTime;
+                half2 wetUV = input.positionWS.xz * safeWetScale;
+                half wetA = WetNoise(wetUV + wetFlowA, wetTime * 1.25h);
+                half wetB = WetNoise(wetUV * 1.63h + wetFlowB, -wetTime * 0.93h);
+                half wetMask = saturate((wetA * 0.68h + wetB * 0.32h - 0.42h) * 1.75h);
+                half wet = wetMask * _WetStrength;
+                half pulse = 1.0h + sin(wetTime * 3.5h) * _LightPulseStrength;
                 half depthMask = DepthNoise(input.positionWS.xz * max(_DepthScale, 0.001), _Time.y * _DepthFlowSpeed) * _DepthStrength;
+                half2 mistDir = normalize(_MistDirection.xy + half2(1e-4h, 1e-4h));
+                half mistTime = _Time.y * _MistFlowSpeed;
+                half2 mistUV = input.positionWS.xz * max(_MistScale, 0.001) + mistDir * mistTime;
+                half3 mistTex = SAMPLE_TEXTURE2D(_MistTex, sampler_MistTex, mistUV).rgb;
+                half mistMask = saturate(dot(mistTex, half3(0.299h, 0.587h, 0.114h)));
+                mistMask = smoothstep(0.2h, 0.85h, mistMask);
 
                 half3 normalWS = normalize(input.normalWS);
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
@@ -147,11 +200,31 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
 
                 half3 wetColor = baseColor.rgb + _WetColor.rgb * wet;
                 half3 layeredColor = lerp(wetColor, wetColor * _DepthColor.rgb, depthMask);
+                half mistAmount = saturate(_MistStrength) * mistMask * 0.45h;
+                half3 mistTint = _MistColor.rgb * lerp(0.75h, 1.1h, mistMask);
+                layeredColor = lerp(layeredColor, layeredColor + mistTint, mistAmount);
+                layeredColor += _WetColor.rgb * wetMask * (_WetStrength * 0.25h);
                 half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
                 half3 halfDir = normalize(mainLight.direction + viewDirWS);
                 half specPower = lerp(8.0h, 96.0h, _Smoothness);
                 half specular = pow(saturate(abs(dot(normalWS, halfDir))), specPower) * _Smoothness * (wet + 0.02) * mainLight.shadowAttenuation;
                 half3 litColor = layeredColor * lighting * pulse + mainLight.color * specular;
+
+                if (_DebugWetOnly > 0.5h)
+                {
+                    half debugValue = wetMask;
+                    return half4(debugValue.xxx, baseColor.a);
+                }
+                if (_DebugMistOnly > 0.5h)
+                {
+                    return half4(mistMask.xxx, baseColor.a);
+                }
+                if (_DebugSwayOnly > 0.5h)
+                {
+                    half2 debugOffset = swayOffset / max(_GrassSwayStrength, 1e-4h);
+                    half3 debugSway = half3(debugOffset.x * 0.5h + 0.5h, debugOffset.y * 0.5h + 0.5h, swayNoise * 0.5h + 0.5h);
+                    return half4(debugSway, baseColor.a);
+                }
 
                 return half4(litColor, baseColor.a);
             }

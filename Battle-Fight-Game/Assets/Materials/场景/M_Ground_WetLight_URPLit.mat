@@ -20,7 +20,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
-  m_LockedProperties: _DepthFlowSpeed
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -34,6 +34,10 @@ Material:
         m_Offset: {x: 0, y: 0}
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: 886aea049a027af4db4be7e0be868409, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MistTex:
+        m_Texture: {fileID: 2800000, guid: 7d97fbfa72e720b4cbd913c5aa093234, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -51,19 +55,28 @@ Material:
     m_Ints: []
     m_Floats:
     - PixelSnap: 0
-    - _DepthFlowSpeed: 0.01
-    - _DepthScale: 0.35
-    - _DepthStrength: 0.18
+    - _DebugMistOnly: 0
+    - _DebugSwayOnly: 0
+    - _DebugWetOnly: 0
+    - _DepthFlowSpeed: 0
+    - _DepthScale: 0.5
+    - _DepthStrength: 0.2
     - _EnableExternalAlpha: 0
+    - _GrassSwayScale: 2
+    - _GrassSwaySpeed: 1
+    - _GrassSwayStrength: 0.01
     - _LightPulseStrength: 0
     - _MaskParcent_Y: 0.1
     - _Metallic: 0
+    - _MistFlowSpeed: 0.05
+    - _MistScale: 0.05
+    - _MistStrength: 0.5
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Smoothness: 0.22
+    - _Smoothness: 0
     - _WetFlowScale: 2.5
-    - _WetFlowSpeed: 0.01
-    - _WetStrength: 0.02
+    - _WetFlowSpeed: 0.05
+    - _WetStrength: 0.05
     - _WindStrength: 0.5
     - _Windspeed: 0.5
     m_Colors:
@@ -71,9 +84,12 @@ Material:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _DepthColor: {r: 0.09733712, g: 0.3509434, b: 0.09733712, a: 1}
+    - _GrassSwayDirection: {r: 1, g: 0.3, b: 0, a: 0}
+    - _MistColor: {r: 0.86240655, g: 0.9622642, b: 0.93175215, a: 1}
+    - _MistDirection: {r: 0.8, g: 0.2, b: 0, a: 0}
     - _RendererColor: {r: 1, g: 1, b: 1, a: 1}
-    - _TintColor: {r: 0.9607843, g: 0.9607843, b: 0.9607843, a: 1}
-    - _WetColor: {r: 0.65, g: 0.95, b: 0.8, a: 1}
+    - _TintColor: {r: 0.9445879, g: 1, b: 0.9415095, a: 1}
+    - _WetColor: {r: 0.73333335, g: 0.9529412, b: 0.8640519, a: 1}
     - _WindDirection: {r: 1, g: 1, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
