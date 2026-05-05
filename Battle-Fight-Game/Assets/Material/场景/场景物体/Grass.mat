@@ -60,11 +60,11 @@ Material:
     - _Externallnfluence: 1
     - _Float: 0
     - _MaskFromBottom: 1
-    - _MaskParcent_Y: 0.1
+    - _MaskParcent_Y: 0.2
     - _QueueControl: 0
     - _QueueOffset: 0
     - _WindScale: 1
-    - _WindStrength: 0.2
+    - _WindStrength: 0.4
     - _Windintensity: 1
     - _Windspeed: 1
     - _YMaskinfluence: 1

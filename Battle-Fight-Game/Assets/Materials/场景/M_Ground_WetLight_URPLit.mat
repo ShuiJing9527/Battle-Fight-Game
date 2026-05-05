@@ -66,6 +66,7 @@ Material:
     - _GrassSwaySpeed: 1
     - _GrassSwayStrength: 0.01
     - _LightPulseStrength: 0
+    - _LightStrength: 0.6
     - _MaskParcent_Y: 0.1
     - _Metallic: 0
     - _MistFlowSpeed: 0.05
@@ -73,7 +74,7 @@ Material:
     - _MistStrength: 0.5
     - _QueueControl: 0
     - _QueueOffset: 0
-    - _Smoothness: 0
+    - _Smoothness: 0.2
     - _WetFlowScale: 2.5
     - _WetFlowSpeed: 0.05
     - _WetStrength: 0.05

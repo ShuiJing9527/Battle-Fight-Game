@@ -26,7 +26,8 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
         _GrassSwayScale ("Grass Sway Scale", Range(0.1, 10)) = 3
         _GrassSwayDirection ("Grass Sway Direction", Vector) = (1, 0.3, 0, 0)
         _DebugSwayOnly ("Debug Sway Only", Range(0, 1)) = 0
-        _Smoothness ("Smoothness", Range(0, 1)) = 0.22
+        _LightStrength ("Light Strength", Range(0, 1)) = 0.25
+        _Smoothness ("Smoothness", Range(0, 1)) = 0.12
         _Metallic ("Metallic", Range(0, 1)) = 0
 
         [HideInInspector] _Color ("Sprite Tint", Color) = (1, 1, 1, 1)
@@ -116,6 +117,7 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
                 half _GrassSwayScale;
                 half4 _GrassSwayDirection;
                 half _DebugSwayOnly;
+                half _LightStrength;
                 half _Smoothness;
                 half _Metallic;
             CBUFFER_END
@@ -190,13 +192,11 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
                 half mistMask = saturate(dot(mistTex, half3(0.299h, 0.587h, 0.114h)));
                 mistMask = smoothstep(0.2h, 0.85h, mistMask);
 
-                half3 normalWS = normalize(input.normalWS);
+                half3 normalWS = input.normalWS;
+                half normalLenSq = dot(normalWS, normalWS);
+                normalWS = (normalLenSq > 1e-4h) ? normalize(normalWS) : half3(0.0h, 1.0h, 0.0h);
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
-                half mainLightAmount = saturate(abs(dot(normalWS, mainLight.direction))) * 0.75 + 0.25;
-                half3 ambient = SampleSH(normalWS);
-                half3 directLighting = mainLight.color * mainLightAmount * mainLight.shadowAttenuation;
-                half3 lighting = max(ambient + directLighting, half3(0.22, 0.22, 0.22));
 
                 half3 wetColor = baseColor.rgb + _WetColor.rgb * wet;
                 half3 layeredColor = lerp(wetColor, wetColor * _DepthColor.rgb, depthMask);
@@ -204,11 +204,17 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
                 half3 mistTint = _MistColor.rgb * lerp(0.75h, 1.1h, mistMask);
                 layeredColor = lerp(layeredColor, layeredColor + mistTint, mistAmount);
                 layeredColor += _WetColor.rgb * wetMask * (_WetStrength * 0.25h);
-                half3 viewDirWS = normalize(GetWorldSpaceViewDir(input.positionWS));
-                half3 halfDir = normalize(mainLight.direction + viewDirWS);
-                half specPower = lerp(8.0h, 96.0h, _Smoothness);
-                half specular = pow(saturate(abs(dot(normalWS, halfDir))), specPower) * _Smoothness * (wet + 0.02) * mainLight.shadowAttenuation;
-                half3 litColor = layeredColor * lighting * pulse + mainLight.color * specular;
+                half3 unlitColor = layeredColor * pulse;
+                half3 ambient = SampleSH(normalWS);
+                half ndotl = saturate(dot(normalWS, mainLight.direction));
+                half3 lightColor = mainLight.color * mainLight.shadowAttenuation;
+                half3 diffuse = lightColor * ndotl;
+                half3 viewDir = normalize(_WorldSpaceCameraPos.xyz - input.positionWS);
+                half3 halfDir = normalize(mainLight.direction + viewDir);
+                half specPower = lerp(8.0h, 64.0h, _Smoothness);
+                half specular = pow(saturate(dot(normalWS, halfDir)), specPower) * _Smoothness;
+                half3 litColor = unlitColor * (ambient + diffuse) + specular * lightColor;
+                half3 finalColor = lerp(unlitColor, litColor, saturate(_LightStrength));
 
                 if (_DebugWetOnly > 0.5h)
                 {
@@ -226,7 +232,7 @@ Shader "UnderTheStars/Tilemap/Ground Wet Light URP"
                     return half4(debugSway, baseColor.a);
                 }
 
-                return half4(litColor, baseColor.a);
+                return half4(finalColor, baseColor.a);
             }
             ENDHLSL
         }
