@@ -10,12 +10,18 @@ namespace UnderTheStars.GenerationMap
         public static BoundsInt[,] GenraterRegionPoints(int regionSizeX, int regionSizeY, int regionWidth, int regionHeight)
         {
             BoundsInt[,] regionPoints = new BoundsInt[regionSizeX, regionSizeY];
+            int totalWidth = regionSizeX * regionWidth;
+            int totalHeight = regionSizeY * regionHeight;
+            int offsetX = -totalWidth / 2;
+            int offsetY = -totalHeight / 2;
 
             for (int i = 0; i < regionPoints.GetLength(0); i ++)
             {
                 for (int j = 0; j < regionPoints.GetLength(1); j++)
                 {
-                    regionPoints[i, j] = new BoundsInt(new Vector3Int(i * regionWidth, j * regionHeight), new Vector3Int(regionWidth, regionHeight));
+                    regionPoints[i, j] = new BoundsInt(
+                        new Vector3Int(offsetX + i * regionWidth, offsetY + j * regionHeight, 0),
+                        new Vector3Int(regionWidth, regionHeight));
                 }
             }
             return regionPoints;
