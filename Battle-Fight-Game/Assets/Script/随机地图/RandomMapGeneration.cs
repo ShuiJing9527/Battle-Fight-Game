@@ -1,4 +1,4 @@
-using Cysharp.Threading.Tasks;
+﻿using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
 using UnityEngine;
@@ -8,27 +8,31 @@ namespace UnderTheStars.GenerationMap
 {
     public class RandomMapGeneration : MonoBehaviour
     {
-        [Header("地图种子")]
-        public int mapSeed;//地图种子
-        [Header("地图大小")]
-        public int mapSize;//地图大小
-        [Header("地图迭代次数")]
-        public int maplterations;//地图迭代次数
+        [Header("Map Seed")]
+        public int mapSeed;// Map seed
+        [Header("Map Size")]
+        public int mapSize;// Map size
+        [Header("Map Iterations")]
+        public int maplterations;// Map iterations
 
-        [Header("地图绘制")]
-        [SerializeField] private RandomMapPaintTilemap paintTilemap;//绘制Tilemap组件
-        [SerializeField] private RandomMapPainProp paintProp;//绘制道具组件
+        [Header("Map Painting")]
+        [SerializeField] private RandomMapPaintTilemap paintTilemap;// Tilemap painter
+        [SerializeField] private RandomMapPainProp paintProp;// Prop painter
 
         [Header("区域大小与范围")]
-        [SerializeField] private Vector2Int regionSize;//区域大小
-        [SerializeField] private Vector2Int regionArea;//区域范围
+        [SerializeField] private Vector2Int regionSize;// Region count (x,y)
+        [SerializeField] private Vector2Int regionArea;// Region dimensions (width,height)
+        [Header("Area Types (by tileIndex 0..8)")]
+        [SerializeField] private bool useRegionAreaTypes = false;
+        [SerializeField] private AreaType[] regionAreaTypes = new AreaType[9];
+        [SerializeField] private List<int> grassRegionIndices = new List<int> { 0, 1 };
 
-        [Header("玩家设置")]
-        [SerializeField] private PlayerMovement player; // 在 Inspector 里把你的 Player 拖进来
+        [Header("Player Settings")]
+        [SerializeField] private PlayerMovement player; // Drag Player here in Inspector
 
-        private HashSet<Vector2Int>[,] floorPoints;//地面坐标点
-        private HashSet<Vector2Int>[,] propsPoints;//道具坐标点
-        private HashSet<Vector2Int> wallColliderPoints;//墙体碰撞坐标点
+        private HashSet<Vector2Int>[,] floorPoints;// Floor points
+        private HashSet<Vector2Int>[,] propsPoints;// Prop points
+        private HashSet<Vector2Int> wallColliderPoints;// Wall collider points
 
 
         private void Start()
@@ -46,12 +50,13 @@ namespace UnderTheStars.GenerationMap
             await UniTask.WhenAny(generateWallPointsTask);
             PanintWallTilemap().Forget();
 
-            // 等待所有 Tilemap 绘制完成
+            // Wait until all Tilemaps are painted.
             await UniTask.WhenAll(panintTilemap(0, 0), panintTilemap(0, 1), panintTilemap(1, 0));
             await UniTask.WhenAll(panintTilemap(1, 1), panintTilemap(2, 0), panintTilemap(2, 1));
             await UniTask.WhenAll(panintTilemap(0, 2), panintTilemap(1, 2), panintTilemap(2, 2));
 
-            // 安置玩家
+            // Place player
+            SpawnPropsOnFloor();
             PlacePlayerOnMap();
         }
 
@@ -73,18 +78,80 @@ namespace UnderTheStars.GenerationMap
             return paintTilemap.PaintFloorTile(floorPoints[v1, v2], index);
         }
 
+        private void SpawnPropsOnFloor()
+        {
+            if (paintProp == null || floorPoints == null)
+            {
+                return;
+            }
+
+            Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
+            if (refTilemap == null)
+            {
+                return;
+            }
+
+            Dictionary<Vector2Int, AreaType> pointAreaTypes = BuildPointAreaTypes();
+            paintProp.SpawnProps(floorPoints, refTilemap, pointAreaTypes);
+        }
+
+        private Dictionary<Vector2Int, AreaType> BuildPointAreaTypes()
+        {
+            Dictionary<Vector2Int, AreaType> result = new Dictionary<Vector2Int, AreaType>();
+            if (floorPoints == null)
+            {
+                return result;
+            }
+
+            for (int x = 0; x < floorPoints.GetLength(0); x++)
+            {
+                for (int y = 0; y < floorPoints.GetLength(1); y++)
+                {
+                    HashSet<Vector2Int> regionPointSet = floorPoints[x, y];
+                    if (regionPointSet == null)
+                    {
+                        continue;
+                    }
+
+                    int tileIndex = x * regionSize.y + y;
+                    AreaType areaType = ResolveRegionAreaType(tileIndex);
+                    foreach (Vector2Int point in regionPointSet)
+                    {
+                        result[point] = areaType;
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        private AreaType ResolveRegionAreaType(int tileIndex)
+        {
+            if (useRegionAreaTypes && regionAreaTypes != null && tileIndex >= 0 && tileIndex < regionAreaTypes.Length)
+            {
+                return regionAreaTypes[tileIndex];
+            }
+
+            if (grassRegionIndices != null && grassRegionIndices.Contains(tileIndex))
+            {
+                return AreaType.Grass;
+            }
+
+            return AreaType.NoSpawn;
+        }
+
         private void PlacePlayerOnMap()
         {
             if (player == null || floorPoints == null) return;
 
-            // 获取参考 Tilemap
+            // Get reference Tilemap
             Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
             if (refTilemap == null) return;
 
             Vector2Int spawnCoord = Vector2Int.zero;
             bool found = false;
 
-            // 尝试找到一个合法的起始坐标
+            // Try finding a valid spawn coordinate.
             if (floorPoints[0, 0] != null && floorPoints[0, 0].Count > 0)
             {
                 foreach (var point in floorPoints[0, 0])
@@ -97,26 +164,26 @@ namespace UnderTheStars.GenerationMap
 
             if (found)
             {
-                // 转换为格子坐标
+                // Convert to cell position.
                 Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
 
-                // 转换为世界坐标（自动处理 90 度旋转）
+                // Convert to world position (handles tilemap transform/rotation).
                 Vector3 worldSpawnPos = refTilemap.GetCellCenterWorld(cellPos);
 
-                // 执行传送
-                // 记得使用 rb.linearVelocity 而不是 velocity (Unity 6 推荐)
+                // Teleport player.
+                // Use rb.linearVelocity instead of velocity (Unity 6 recommendation).
                 player.rb.linearVelocity = Vector3.zero;
 
-                // 抬高 Y 轴以防掉出地图，因为 Tilemap 旋转 90 度后，平铺面在 XZ 平面
-                // worldSpawnPos 已经包含了正确的 3D 位置
+                // Lift Y a little to avoid clipping into ground.
+                // worldSpawnPos already contains the correct 3D position.
                 player.transform.position = worldSpawnPos + Vector3.up * 1.0f;
 
-                Debug.Log($"玩家已精准安置！格子:{cellPos} -> 世界:{worldSpawnPos}");
+                Debug.Log($"Player placed. Cell:{cellPos} -> World:{worldSpawnPos}");
             }
         }
 
-        #region 区域生成
-        /// <summary> 生成地面坐标点 </summary>
+        #region Region Generation
+        /// <summary> Generate floor points. </summary>
         private HashSet<Vector2Int> GeneraterFloorPoints(BoundsInt[,] regionPoints)
         {
             floorPoints = new HashSet<Vector2Int>[regionSize.x, regionSize.y];
@@ -131,7 +198,7 @@ namespace UnderTheStars.GenerationMap
             return checkFloor;
         }
 
-        /// <summary> 生成区域坐标点 </summary>
+        /// <summary> Generate region points. </summary>
         private void GeneraterFloorPoints(BoundsInt[,] regionPoints, Vector2Int[,] regionCenters, HashSet<Vector2Int> checkFloor)
         {
             for (int i = 0; i < regionPoints.GetLength(0); i++)
@@ -152,14 +219,14 @@ namespace UnderTheStars.GenerationMap
         }
         #endregion
 
-        #region 初始化
-        /// <summary> 重置地图区域 </summary>
+        #region Init
+        /// <summary> Initialize map regions. </summary>
         private BoundsInt[,] InitMapRegion()
         {
             return RandomMapGenerationAlgorithms.GenraterRegionPoints(regionSize.x, regionSize.y, regionArea.x, regionArea.y);
         }
 
-        /// <summary> 重置地图数据 </summary>
+        /// <summary> Reset map data. </summary>
         public void ResetMapData()
         {
             InitMapSeed();
@@ -168,14 +235,14 @@ namespace UnderTheStars.GenerationMap
             GC.Collect();
         }
 
-        /// <summary> 初始化地图绘制 </summary>
+        /// <summary> Clear tile/prop painting. </summary>
         private void InitMapPaint()
         {
             paintTilemap.InitClearTile();
             paintProp.InitClearProp();
         }
 
-        /// <summary> 初始化地图坐标数据 </summary>
+        /// <summary> Clear cached point sets. </summary>
         private void InitMapData()
         {
             floorPoints = null;
@@ -183,7 +250,7 @@ namespace UnderTheStars.GenerationMap
             wallColliderPoints = null;
         }
 
-        /// <summary> 初始化地图随机种 </summary>
+        /// <summary> Initialize map random seed. </summary>
         private void InitMapSeed()
         {
             if (mapSeed == 0)
