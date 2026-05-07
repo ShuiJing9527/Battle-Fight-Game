@@ -10,12 +10,18 @@ namespace UnderTheStars.GenerationMap
         public static BoundsInt[,] GenraterRegionPoints(int regionSizeX, int regionSizeY, int regionWidth, int regionHeight)
         {
             BoundsInt[,] regionPoints = new BoundsInt[regionSizeX, regionSizeY];
+            int totalWidth = regionSizeX * regionWidth;
+            int totalHeight = regionSizeY * regionHeight;
+            int offsetX = -totalWidth / 2;
+            int offsetY = -totalHeight / 2;
 
             for (int i = 0; i < regionPoints.GetLength(0); i ++)
             {
                 for (int j = 0; j < regionPoints.GetLength(1); j++)
                 {
-                    regionPoints[i, j] = new BoundsInt(new Vector3Int(i * regionWidth, j * regionHeight), new Vector3Int(regionWidth, regionHeight));
+                    regionPoints[i, j] = new BoundsInt(
+                        new Vector3Int(offsetX + i * regionWidth, offsetY + j * regionHeight, 0),
+                        new Vector3Int(regionWidth, regionHeight));
                 }
             }
             return regionPoints;
@@ -112,6 +118,26 @@ namespace UnderTheStars.GenerationMap
                 dir == 5 ? new Vector2Int(1, 1) :
                 dir == 6 ? new Vector2Int(-1, -1) :
                 new Vector2Int(1, -1);
+        }
+
+        internal static HashSet<Vector2Int> GenraterWallPoints(HashSet<Vector2Int> checkAllFloor,int wallWidth = 6)
+        {
+            HashSet<Vector2Int> wallPoints = new HashSet<Vector2Int>();
+            foreach (var point in checkAllFloor)
+            {
+                for (int i = 0; i < 8; i++)
+                {
+                    for (int j = 0; j < wallWidth; j++)
+                    {
+                        var newPoint = point + j * GetDir(i);
+                        if (!checkAllFloor.Contains(newPoint))
+                        {
+                            wallPoints.Add(newPoint);
+                        }
+                    }
+                }
+            }
+            return wallPoints;
         }
         #endregion
     }

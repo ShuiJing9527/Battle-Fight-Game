@@ -22,7 +22,7 @@ public class SimpleLoadBar : MonoBehaviour
     [Tooltip("模拟加载时长（秒），测试用")]
     public float simulateLoadTime = 3f;
     [Tooltip("游戏主场景名（必须和 Build Settings 里的完全一致！）")]
-    public string gameSceneName = "GameScene";
+    public string gameSceneName = "草原";
 
     private GameManager _gameManager;
     private float _loadTimer;
