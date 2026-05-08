@@ -10,6 +10,7 @@ GameObject:
   m_Component:
   - component: {fileID: 1200379752230381877}
   - component: {fileID: 233701598523416370}
+  - component: {fileID: 2174381727719771431}
   m_Layer: 0
   m_Name: "\u5927\u77F3\u5757"
   m_TagString: Untagged
@@ -90,3 +91,24 @@ SpriteRenderer:
   m_WasSpriteAssigned: 1
   m_MaskInteraction: 0
   m_SpriteSortPoint: 0
+--- !u!65 &2174381727719771431
+BoxCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 4561421347570942554}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 0
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 3
+  m_Size: {x: 1.6, y: 1.2, z: 1}
+  m_Center: {x: 0, y: 0.7, z: 0}

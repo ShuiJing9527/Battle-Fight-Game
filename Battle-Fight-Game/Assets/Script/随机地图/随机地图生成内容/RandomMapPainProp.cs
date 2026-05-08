@@ -30,6 +30,7 @@ namespace UnderTheStars.GenerationMap
         [Min(0f)] public float spawnWeight = 1f;
         [Range(0f, 1f)] public float density = 0.15f;
         [Min(0f)] public float minDistance = 0.5f;
+        [Min(0)] public int requiredGroundRadius = 0;
         public List<AreaType> allowedAreaTypes = new List<AreaType> { AreaType.Grass };
         public List<AreaType> forbiddenAreaTypes = new List<AreaType>();
         public Vector3 positionOffset = Vector3.zero;
@@ -66,6 +67,7 @@ namespace UnderTheStars.GenerationMap
         public Vector3 aroundPositionOffset = Vector3.zero;
         public Vector2 randomCellOffset = Vector2.zero;
         [Min(0f)] public float minGroupDistance = 5f;
+        [Min(0)] public int requiredGroundRadius = 0;
         public List<AreaType> allowedAreaTypes = new List<AreaType> { AreaType.Grass };
         public List<AreaType> forbiddenAreaTypes = new List<AreaType>();
         public float randomScaleMin = 1f;
@@ -143,19 +145,21 @@ namespace UnderTheStars.GenerationMap
 
             List<SpawnedPropRecord> spawnedRecords = new List<SpawnedPropRecord>();
             Dictionary<PropSpawnRule, int> spawnedCountPerRule = new Dictionary<PropSpawnRule, int>();
+            Dictionary<Vector2Int, AreaType> areaLookup = BuildAreaLookup(allFloorPoints);
 
             List<PropSpawnRule> clusterRules = new List<PropSpawnRule>();
             List<PropSpawnRule> singleRules = new List<PropSpawnRule>();
             SplitRules(clusterRules, singleRules);
 
-            SpawnGroups(groupRules, allFloorPoints, referenceTilemap, spawnedRecords);
-            SpawnClusters(clusterRules, allFloorPoints, referenceTilemap, spawnedRecords, spawnedCountPerRule);
-            SpawnSingles(singleRules, allFloorPoints, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+            SpawnGroups(groupRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords);
+            SpawnClusters(clusterRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+            SpawnSingles(singleRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
         }
 
         private void SpawnGroups(
             List<PropGroupRule> rules,
             List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords)
         {
@@ -192,6 +196,15 @@ namespace UnderTheStars.GenerationMap
                 for (int i = 0; i < centerCandidates.Count && built < groupCount; i++)
                 {
                     SpawnPoint centerPoint = centerCandidates[i];
+                    if (!PassRequiredGround(
+                            centerPoint.point,
+                            rule.requiredGroundRadius,
+                            areaLookup,
+                            areaType => IsAreaAllowed(rule.allowedAreaTypes, rule.forbiddenAreaTypes, areaType)))
+                    {
+                        continue;
+                    }
+
                     Vector3 centerTileWorld = referenceTilemap.GetCellCenterWorld(new Vector3Int(centerPoint.point.x, centerPoint.point.y, 0));
                     Vector3 centerSpawnPosition = centerTileWorld + rule.centerOffset;
                     centerSpawnPosition = ApplyRandomCellOffset(centerSpawnPosition, rule.randomCellOffset);
@@ -293,6 +306,7 @@ namespace UnderTheStars.GenerationMap
         private void SpawnSingles(
             List<PropSpawnRule> singleRules,
             List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -317,6 +331,15 @@ namespace UnderTheStars.GenerationMap
                 }
 
                 if (UnityEngine.Random.value > selectedRule.density)
+                {
+                    continue;
+                }
+
+                if (!PassRequiredGround(
+                        spawnPoint.point,
+                        selectedRule.requiredGroundRadius,
+                        areaLookup,
+                        areaType => IsAreaAllowed(selectedRule, areaType)))
                 {
                     continue;
                 }
@@ -347,6 +370,7 @@ namespace UnderTheStars.GenerationMap
         private void SpawnClusters(
             List<PropSpawnRule> clusterRules,
             List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -422,6 +446,14 @@ namespace UnderTheStars.GenerationMap
 
                         SpawnPoint point = candidates[i];
                         if (!IsAreaAllowed(rule, point.areaType))
+                        {
+                            continue;
+                        }
+                        if (!PassRequiredGround(
+                                point.point,
+                                rule.requiredGroundRadius,
+                                areaLookup,
+                                areaType => IsAreaAllowed(rule, areaType)))
                         {
                             continue;
                         }
@@ -507,6 +539,17 @@ namespace UnderTheStars.GenerationMap
                 result.Add(new SpawnPoint(kv.Key, kv.Value));
             }
             return result;
+        }
+
+        private static Dictionary<Vector2Int, AreaType> BuildAreaLookup(List<SpawnPoint> points)
+        {
+            Dictionary<Vector2Int, AreaType> lookup = new Dictionary<Vector2Int, AreaType>(points.Count);
+            for (int i = 0; i < points.Count; i++)
+            {
+                lookup[points[i].point] = points[i].areaType;
+            }
+
+            return lookup;
         }
 
         private List<PropSpawnRule> GetCandidateRules(List<PropSpawnRule> sourceRules, AreaType areaType, Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -705,6 +748,43 @@ namespace UnderTheStars.GenerationMap
                 if ((placedCenters[i] - centerWorldPos).sqrMagnitude < minDistSq)
                 {
                     return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool PassRequiredGround(
+            Vector2Int centerPoint,
+            int requiredGroundRadius,
+            Dictionary<Vector2Int, AreaType> areaLookup,
+            Func<AreaType, bool> areaPredicate)
+        {
+            if (requiredGroundRadius <= 0)
+            {
+                return true;
+            }
+
+            int radiusSq = requiredGroundRadius * requiredGroundRadius;
+            for (int x = -requiredGroundRadius; x <= requiredGroundRadius; x++)
+            {
+                for (int y = -requiredGroundRadius; y <= requiredGroundRadius; y++)
+                {
+                    if ((x * x + y * y) > radiusSq)
+                    {
+                        continue;
+                    }
+
+                    Vector2Int point = new Vector2Int(centerPoint.x + x, centerPoint.y + y);
+                    if (!areaLookup.TryGetValue(point, out AreaType areaType))
+                    {
+                        return false;
+                    }
+
+                    if (areaPredicate != null && !areaPredicate(areaType))
+                    {
+                        return false;
+                    }
                 }
             }
 
