@@ -14,10 +14,10 @@ OcclusionCullingSettings:
 RenderSettings:
   m_ObjectHideFlags: 0
   serializedVersion: 10
-  m_Fog: 0
-  m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  m_Fog: 1
+  m_FogColor: {r: 0.6026557, g: 0.7257705, b: 0.85490197, a: 0.7058824}
   m_FogMode: 3
-  m_FogDensity: 0.01
+  m_FogDensity: 0.012
   m_LinearFogStart: 0
   m_LinearFogEnd: 300
   m_AmbientSkyColor: {r: 0.212, g: 0.227, b: 0.259, a: 1}
@@ -6296,43 +6296,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!84 &245564564
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!4 &253254888 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 7509995362207881944, guid: 6b5249f9483ff2345927916f027d6401, type: 3}
@@ -8206,7 +8169,7 @@ ReflectionProbe:
   m_TimeSlicingMode: 0
   m_Resolution: 128
   m_UpdateFrequency: 0
-  m_BoxSize: {x: 1000, y: 100, z: 1000}
+  m_BoxSize: {x: 1000, y: 200, z: 1000}
   m_BoxOffset: {x: 0, y: 0, z: 0}
   m_NearClip: 0.3
   m_FarClip: 1000
@@ -8223,7 +8186,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 245564564}
+  m_CustomBakedTexture: {fileID: 1910735854}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -8233,7 +8196,7 @@ Transform:
   m_GameObject: {fileID: 1174314782}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 5, z: 0}
+  m_LocalPosition: {x: 0, y: 50, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -9609,6 +9572,7 @@ GameObject:
   - component: {fileID: 1373474696}
   - component: {fileID: 1373474695}
   - component: {fileID: 1373474697}
+  - component: {fileID: 1373474698}
   m_Layer: 0
   m_Name: Directional Light
   m_TagString: Untagged
@@ -9626,12 +9590,12 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.09410164, g: 0.11261372, b: 0.31007588, a: 0}
-  m_Intensity: 0
+  m_Color: {r: 0.99316055, g: 0.79994005, b: 0.35666955, a: 1}
+  m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
-  m_CookieSize: 10
+  m_CookieSize: 28
   m_Shadows:
     m_Type: 2
     m_Resolution: -1
@@ -9689,7 +9653,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
+  m_LocalRotation: {x: 0.56678504, y: 0.15186961, z: 0.209578, w: 0.78215563}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -9725,6 +9689,34 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!114 &1373474698
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1373474694}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9fbe7dc1934a9a84fa848f03b9b4af97, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UnderTheStars.Lighting.CloudLightCookieController
+  targetDirectionalLight: {fileID: 1373474695}
+  cookieResolution: 512
+  cookieSize: 28
+  blurRadius: 12
+  penumbraWidth: 0.35
+  minLight: 0.72
+  shadowStrength: 0.3
+  brightness: 0.95
+  contrast: 0.18
+  edgeSoftness: 0.65
+  bigNoiseScale: 8
+  detailNoiseScale: 28
+  detailStrength: 0.25
+  cloudSpeed: {x: 0.005, y: 0.012}
+  detailSpeed: {x: 0.002, y: 0.004}
+  updateInterval: 0.08
 --- !u!1 &1414717678
 GameObject:
   m_ObjectHideFlags: 0
@@ -10881,6 +10873,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &1910735854
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1959916819
 GameObject:
   m_ObjectHideFlags: 0
@@ -12829,6 +12858,63 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: fb15bfa8f6fb5c445814a8d4d234a0e3, type: 3}
+--- !u!1001 &8440771652044630702
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 100
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4246477857740440373, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 4342223214069281056, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
+      propertyPath: m_Name
+      value: "\u4E91\u6735\u6D41\u52A8"
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 2ef999287795d0249bb7b01b9cff26c2, type: 3}
 --- !u!1001 &8511114650421011682
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -13028,6 +13114,7 @@ SceneRoots:
   - {fileID: 922453254}
   - {fileID: 2109914627}
   - {fileID: 1970225118}
+  - {fileID: 8440771652044630702}
   - {fileID: 1217854671707348786}
   - {fileID: 979945786}
   - {fileID: 493982237}
