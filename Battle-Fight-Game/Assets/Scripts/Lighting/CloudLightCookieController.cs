@@ -9,9 +9,9 @@ namespace UnderTheStars.Lighting
         [SerializeField] private Light targetDirectionalLight;
 
         [Header("Cookie")]
-        [SerializeField] private int cookieResolution = 512;
+        [SerializeField] private int cookieResolution = 256;
         [SerializeField] private float cookieSize = 30f;
-        [SerializeField] private int blurRadius = 10;
+        [SerializeField] private int blurRadius = 4;
         [SerializeField] private float penumbraWidth = 0.35f;
         [SerializeField, Range(0f, 1f)] private float minLight = 0.75f;
         [SerializeField] private float shadowStrength = 0.35f;
@@ -29,10 +29,13 @@ namespace UnderTheStars.Lighting
         [SerializeField] private Vector2 detailSpeed = new Vector2(0.002f, 0.004f);
 
         [Header("Performance")]
-        [SerializeField] private float updateInterval = 0.08f;
+        [SerializeField] private float updateInterval = 0.25f;
+        [SerializeField] private int maxRuntimeResolution = 256;
+        [SerializeField] private int maxRuntimeBlurRadius = 4;
+        [SerializeField] private float minRuntimeUpdateInterval = 0.25f;
 
         private Texture2D cookieTexture;
-        private Color[] cookiePixels;
+        private Color32[] cookiePixels;
         private float[] rawMask;
         private float[] blurTemp;
         private float[] blurMask;
@@ -42,14 +45,14 @@ namespace UnderTheStars.Lighting
         {
             EnsureTargetLight();
             EnsureCookieTexture();
-            UpdateCookie(force: true);
         }
 
         private void OnEnable()
         {
             EnsureTargetLight();
             EnsureCookieTexture();
-            UpdateCookie(force: true);
+            UpdateCookie();
+            nextUpdateTime = Time.time + GetRuntimeUpdateInterval();
         }
 
         private void OnValidate()
@@ -74,8 +77,8 @@ namespace UnderTheStars.Lighting
 
             if (Time.time >= nextUpdateTime)
             {
-                UpdateCookie(force: false);
-                nextUpdateTime = Time.time + Mathf.Max(0.01f, updateInterval);
+                UpdateCookie();
+                nextUpdateTime = Time.time + GetRuntimeUpdateInterval();
             }
         }
 
@@ -106,7 +109,12 @@ namespace UnderTheStars.Lighting
 
         private void EnsureCookieTexture()
         {
-            int res = Mathf.Clamp(cookieResolution, 64, 2048);
+            int requestedResolution = Mathf.Clamp(cookieResolution, 64, 2048);
+            int runtimeLimit = Mathf.Clamp(maxRuntimeResolution, 64, 2048);
+            int res = Application.isPlaying
+                ? Mathf.Min(requestedResolution, runtimeLimit)
+                : requestedResolution;
+
             if (cookieTexture != null && cookieTexture.width == res && cookieTexture.height == res)
             {
                 return;
@@ -121,13 +129,13 @@ namespace UnderTheStars.Lighting
                 anisoLevel = 1,
                 name = "CloudLightCookieRuntime"
             };
-            cookiePixels = new Color[res * res];
+            cookiePixels = new Color32[res * res];
             rawMask = new float[res * res];
             blurTemp = new float[res * res];
             blurMask = new float[res * res];
         }
 
-        private void UpdateCookie(bool force)
+        private void UpdateCookie()
         {
             EnsureCookieTexture();
             if (cookieTexture == null)
@@ -148,7 +156,9 @@ namespace UnderTheStars.Lighting
             float safeDetailStrength = Mathf.Clamp01(detailStrength);
             float safeSoftness = Mathf.Clamp01(edgeSoftness);
             float safeMinLight = Mathf.Clamp01(minLight);
-            int safeBlurRadius = Mathf.Clamp(blurRadius, 0, 64);
+            int safeBlurRadius = Application.isPlaying
+                ? Mathf.Clamp(blurRadius, 0, Mathf.Clamp(maxRuntimeBlurRadius, 0, 64))
+                : Mathf.Clamp(blurRadius, 0, 64);
             float safePenumbra = Mathf.Clamp01(penumbraWidth);
             float edgeCenter = Mathf.Lerp(0.45f, 0.7f, safeSoftness);
             float edgeHalfWidth = Mathf.Lerp(0.01f, 0.45f, safePenumbra);
@@ -162,13 +172,14 @@ namespace UnderTheStars.Lighting
             for (int y = 0; y < res; y++)
             {
                 float v = (float)y / (res - 1);
+                float bigY = v * safeBigScale + bigOffset.y;
+                float detailY = v * safeDetailScale + detailOffset.y;
+
                 for (int x = 0; x < res; x++)
                 {
                     float u = (float)x / (res - 1);
-                    Vector2 uv = new Vector2(u, v);
-
-                    float big = Mathf.PerlinNoise(uv.x * safeBigScale + bigOffset.x, uv.y * safeBigScale + bigOffset.y);
-                    float detail = Mathf.PerlinNoise(uv.x * safeDetailScale + detailOffset.x, uv.y * safeDetailScale + detailOffset.y) * 2f - 1f;
+                    float big = Mathf.PerlinNoise(u * safeBigScale + bigOffset.x, bigY);
+                    float detail = Mathf.PerlinNoise(u * safeDetailScale + detailOffset.x, detailY) * 2f - 1f;
 
                     float cloud = Mathf.Clamp01(big + detail * safeDetailStrength);
                     cloud = Mathf.Clamp01((cloud - 0.5f) * (1f + safeContrast * 2f) + 0.5f);
@@ -188,11 +199,12 @@ namespace UnderTheStars.Lighting
                     float lightValue = Mathf.Lerp(1f, safeMinLight, shadowMask * safeShadow);
                     lightValue = Mathf.Lerp(lightValue, 1f, safeBrightness);
                     lightValue = Mathf.Clamp(lightValue, safeMinLight, 1f);
-                    cookiePixels[idx] = new Color(lightValue, lightValue, lightValue, 1f);
+                    byte lightByte = (byte)Mathf.RoundToInt(lightValue * 255f);
+                    cookiePixels[idx] = new Color32(lightByte, lightByte, lightByte, 255);
                 }
             }
 
-            cookieTexture.SetPixels(cookiePixels);
+            cookieTexture.SetPixels32(cookiePixels);
             cookieTexture.Apply(false, false);
 
             if (targetDirectionalLight != null)
@@ -200,6 +212,15 @@ namespace UnderTheStars.Lighting
                 targetDirectionalLight.cookieSize = Mathf.Max(0.01f, cookieSize);
                 targetDirectionalLight.cookie = cookieTexture;
             }
+        }
+
+        private float GetRuntimeUpdateInterval()
+        {
+            float interval = Application.isPlaying
+                ? Mathf.Max(updateInterval, minRuntimeUpdateInterval)
+                : updateInterval;
+
+            return Mathf.Max(0.05f, interval);
         }
 
         private void ReleaseCookieTexture()
@@ -238,20 +259,25 @@ namespace UnderTheStars.Lighting
                 return;
             }
 
+            int diameter = radius * 2 + 1;
             for (int y = 0; y < resolution; y++)
             {
                 int row = y * resolution;
+                float sum = 0f;
+
+                for (int k = -radius; k <= radius; k++)
+                {
+                    int sx = (k + resolution) % resolution;
+                    sum += src[row + sx];
+                }
+
                 for (int x = 0; x < resolution; x++)
                 {
-                    float sum = 0f;
-                    int count = 0;
-                    for (int k = -radius; k <= radius; k++)
-                    {
-                        int sx = (x + k + resolution) % resolution;
-                        sum += src[row + sx];
-                        count++;
-                    }
-                    dst[row + x] = sum / count;
+                    dst[row + x] = sum / diameter;
+
+                    int removeX = (x - radius + resolution) % resolution;
+                    int addX = (x + radius + 1) % resolution;
+                    sum += src[row + addX] - src[row + removeX];
                 }
             }
         }
@@ -264,19 +290,30 @@ namespace UnderTheStars.Lighting
                 return;
             }
 
+            int diameter = radius * 2 + 1;
             for (int y = 0; y < resolution; y++)
             {
                 for (int x = 0; x < resolution; x++)
                 {
-                    float sum = 0f;
-                    int count = 0;
-                    for (int k = -radius; k <= radius; k++)
+                    if (y == 0)
                     {
-                        int sy = (y + k + resolution) % resolution;
-                        sum += src[sy * resolution + x];
-                        count++;
+                        float sum = 0f;
+                        for (int k = -radius; k <= radius; k++)
+                        {
+                            int sy = (k + resolution) % resolution;
+                            sum += src[sy * resolution + x];
+                        }
+
+                        dst[x] = sum / diameter;
+                        continue;
                     }
-                    dst[y * resolution + x] = sum / count;
+
+                    int previousY = y - 1;
+                    int removeY = (previousY - radius + resolution) % resolution;
+                    int addY = (previousY + radius + 1) % resolution;
+                    float previousSum = dst[previousY * resolution + x] * diameter;
+                    float nextSum = previousSum + src[addY * resolution + x] - src[removeY * resolution + x];
+                    dst[y * resolution + x] = nextSum / diameter;
                 }
             }
         }
