@@ -314,6 +314,12 @@
         },
         {
             "m_Id": "0016bd796c9b404b81b0ec3e3530d4cc"
+        },
+        {
+            "m_Id": "123695f28e0a4242bf2ce53600751d9b"
+        },
+        {
+            "m_Id": "eb6bf360c61444b7bb7a528957448529"
         }
     ],
     "m_GroupDatas": [
@@ -1617,6 +1623,12 @@
             },
             {
                 "m_Id": "0cda93e8eae14c84bce4b3bdb048dff5"
+            },
+            {
+                "m_Id": "123695f28e0a4242bf2ce53600751d9b"
+            },
+            {
+                "m_Id": "eb6bf360c61444b7bb7a528957448529"
             }
         ]
     },
@@ -1728,12 +1740,6 @@
     "m_Value": 0.0,
     "m_DefaultValue": 0.0,
     "m_Labels": []
-}
-
-{
-    "m_SGVersion": 2,
-    "m_Type": "UnityEditor.Rendering.Universal.ShaderGraph.UniversalUnlitSubTarget",
-    "m_ObjectId": "0124a05d025145ba8d7bfccca670e5ad"
 }
 
 {
@@ -2562,6 +2568,40 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.BlockNode",
+    "m_ObjectId": "123695f28e0a4242bf2ce53600751d9b",
+    "m_Group": {
+        "m_Id": ""
+    },
+    "m_Name": "SurfaceDescription.NormalTS",
+    "m_DrawState": {
+        "m_Expanded": true,
+        "m_Position": {
+            "serializedVersion": "2",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 0.0,
+            "height": 0.0
+        }
+    },
+    "m_Slots": [
+        {
+            "m_Id": "6d0bc28c4f964665bdcdf2db6b275b94"
+        }
+    ],
+    "synonyms": [],
+    "m_Precision": 0,
+    "m_PreviewExpanded": true,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
+    "m_CustomColors": {
+        "m_SerializableColors": []
+    },
+    "m_SerializedDescriptor": "SurfaceDescription.NormalTS"
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.DynamicVectorMaterialSlot",
     "m_ObjectId": "12d586980c1243fda6b1efbde39eeeb6",
     "m_Id": 0,
@@ -2591,7 +2631,7 @@
     "m_Title": "云层区域",
     "m_Position": {
         "x": -1398.4000244140625,
-        "y": 175.2000274658203
+        "y": 175.20001220703126
     }
 }
 
@@ -3585,7 +3625,7 @@
     "m_ObjectId": "28d8d52bd81840abb099b394006c2a11",
     "m_Title": "云密度",
     "m_Position": {
-        "x": 1272.0,
+        "x": 1272.0001220703125,
         "y": 704.7999267578125
     }
 }
@@ -4489,7 +4529,7 @@
     "m_Title": "Mine",
     "m_Position": {
         "x": -1321.5999755859375,
-        "y": -911.199951171875
+        "y": -911.2000732421875
     }
 }
 
@@ -5610,7 +5650,7 @@
     "m_ObjectId": "616fcdb9ce76473db748946013504a62",
     "m_Title": "Bowl Curvature",
     "m_Position": {
-        "x": 930.3999633789063,
+        "x": 930.39990234375,
         "y": -1492.800048828125
     }
 }
@@ -5984,6 +6024,30 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.NormalMaterialSlot",
+    "m_ObjectId": "6d0bc28c4f964665bdcdf2db6b275b94",
+    "m_Id": 0,
+    "m_DisplayName": "Normal (Tangent Space)",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "NormalTS",
+    "m_StageCapability": 2,
+    "m_Value": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_DefaultValue": {
+        "x": 0.0,
+        "y": 0.0,
+        "z": 0.0
+    },
+    "m_Labels": [],
+    "m_Space": 3
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.DynamicVectorMaterialSlot",
     "m_ObjectId": "6dcdd270b185487098c6d84e1c97aa67",
     "m_Id": 2,
@@ -6336,7 +6400,7 @@
     "m_ObjectId": "741a1742c8454d8c83424f602cfb4432",
     "m_Datas": [],
     "m_ActiveSubTarget": {
-        "m_Id": "0124a05d025145ba8d7bfccca670e5ad"
+        "m_Id": "e70aed7ebd8b4f4ca9f7dcc648d89395"
     },
     "m_AllowMaterialOverride": false,
     "m_SurfaceType": 1,
@@ -8183,7 +8247,7 @@
     "m_ObjectId": "afbff353fef7456894354b3ab334bcfb",
     "m_Title": "颜色设置",
     "m_Position": {
-        "x": 1290.39990234375,
+        "x": 1290.4000244140625,
         "y": 9.600006103515625
     }
 }
@@ -8647,7 +8711,7 @@
     "m_ObjectId": "bc865ba6637e4b0fa60b55f6887e9aea",
     "m_Title": "时间",
     "m_Position": {
-        "x": -3130.400390625,
+        "x": -3130.400634765625,
         "y": -844.0000610351563
     }
 }
@@ -8846,8 +8910,8 @@
     "m_ObjectId": "c04d08b8c75a43ef94c1d843d37aa07e",
     "m_Title": "发光强度",
     "m_Position": {
-        "x": 2035.19970703125,
-        "y": 456.7999267578125
+        "x": 2035.199951171875,
+        "y": 456.800048828125
     }
 }
 
@@ -8962,8 +9026,8 @@
     "m_ObjectId": "c4229dab36074e328066b1639c802fdb",
     "m_Title": "Combine",
     "m_Position": {
-        "x": 542.3999633789063,
-        "y": 36.799964904785159
+        "x": 542.4000244140625,
+        "y": 36.79998779296875
     }
 }
 
@@ -10181,6 +10245,12 @@
 
 {
     "m_SGVersion": 0,
+    "m_Type": "UnityEditor.Rendering.Universal.ShaderGraph.UniversalSpriteLitSubTarget",
+    "m_ObjectId": "e70aed7ebd8b4f4ca9f7dcc648d89395"
+}
+
+{
+    "m_SGVersion": 0,
     "m_Type": "UnityEditor.ShaderGraph.DynamicValueMaterialSlot",
     "m_ObjectId": "e851c7d95a3c4188a0c90781da4f1087",
     "m_Id": 0,
@@ -10270,6 +10340,65 @@
         "z": 0.0,
         "w": 0.0
     }
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.BlockNode",
+    "m_ObjectId": "eb6bf360c61444b7bb7a528957448529",
+    "m_Group": {
+        "m_Id": ""
+    },
+    "m_Name": "SurfaceDescription.SpriteMask",
+    "m_DrawState": {
+        "m_Expanded": true,
+        "m_Position": {
+            "serializedVersion": "2",
+            "x": 0.0,
+            "y": 0.0,
+            "width": 0.0,
+            "height": 0.0
+        }
+    },
+    "m_Slots": [
+        {
+            "m_Id": "eb7c1b0694094869a90d67eeb419b435"
+        }
+    ],
+    "synonyms": [],
+    "m_Precision": 0,
+    "m_PreviewExpanded": true,
+    "m_DismissedVersion": 0,
+    "m_PreviewMode": 0,
+    "m_CustomColors": {
+        "m_SerializableColors": []
+    },
+    "m_SerializedDescriptor": "SurfaceDescription.SpriteMask"
+}
+
+{
+    "m_SGVersion": 0,
+    "m_Type": "UnityEditor.ShaderGraph.ColorRGBAMaterialSlot",
+    "m_ObjectId": "eb7c1b0694094869a90d67eeb419b435",
+    "m_Id": 0,
+    "m_DisplayName": "Sprite Mask",
+    "m_SlotType": 0,
+    "m_Hidden": false,
+    "m_ShaderOutputName": "SpriteMask",
+    "m_StageCapability": 2,
+    "m_Value": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0,
+        "w": 1.0
+    },
+    "m_DefaultValue": {
+        "x": 1.0,
+        "y": 1.0,
+        "z": 1.0,
+        "w": 1.0
+    },
+    "m_Labels": []
 }
 
 {
@@ -10929,7 +11058,7 @@
     "m_ObjectId": "fc6b7eda9cc54180a8e9071529170a03",
     "m_Title": "噪音模式",
     "m_Position": {
-        "x": -3296.799560546875,
+        "x": -3296.7998046875,
         "y": -403.1999816894531
     }
 }
@@ -10940,7 +11069,7 @@
     "m_ObjectId": "fee6576b48fe4a70a0e7dab23b5b930f",
     "m_Title": "Vertex Offset",
     "m_Position": {
-        "x": 1020.7997436523438,
+        "x": 1020.7998657226563,
         "y": -668.800048828125
     }
 }

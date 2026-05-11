@@ -30,9 +30,11 @@ namespace UnderTheStars.GenerationMap
         [Min(0f)] public float spawnWeight = 1f;
         [Range(0f, 1f)] public float density = 0.15f;
         [Min(0f)] public float minDistance = 0.5f;
+        [Min(0)] public int requiredGroundRadius = 0;
         public List<AreaType> allowedAreaTypes = new List<AreaType> { AreaType.Grass };
         public List<AreaType> forbiddenAreaTypes = new List<AreaType>();
         public Vector3 positionOffset = Vector3.zero;
+        public Vector2 randomCellOffset = Vector2.zero;
         public float randomScaleMin = 1f;
         public float randomScaleMax = 1f;
         public bool randomFlipX = false;
@@ -50,10 +52,34 @@ namespace UnderTheStars.GenerationMap
         [Range(0f, 3f)] public float clusterFalloff = 1f;
     }
 
+    [Serializable]
+    public class PropGroupRule
+    {
+        public List<GameObject> groupCenterPrefabs = new List<GameObject>();
+        public List<GameObject> aroundPrefabs = new List<GameObject>();
+        [Min(0)] public int groupCountMin = 1;
+        [Min(0)] public int groupCountMax = 3;
+        [Min(0f)] public float groupRadiusMin = 2f;
+        [Min(0f)] public float groupRadiusMax = 4f;
+        [Min(0)] public int aroundCountMin = 3;
+        [Min(0)] public int aroundCountMax = 8;
+        public Vector3 centerOffset = Vector3.zero;
+        public Vector3 aroundPositionOffset = Vector3.zero;
+        public Vector2 randomCellOffset = Vector2.zero;
+        [Min(0f)] public float minGroupDistance = 5f;
+        [Min(0)] public int requiredGroundRadius = 0;
+        public List<AreaType> allowedAreaTypes = new List<AreaType> { AreaType.Grass };
+        public List<AreaType> forbiddenAreaTypes = new List<AreaType>();
+        public float randomScaleMin = 1f;
+        public float randomScaleMax = 1f;
+        public bool randomFlipX = false;
+    }
+
     public class RandomMapPainProp : MonoBehaviour
     {
         [Header("Spawn Rules")]
         [SerializeField] private List<PropSpawnRule> spawnRules = new List<PropSpawnRule>();
+        [SerializeField] private List<PropGroupRule> groupRules = new List<PropGroupRule>();
 
         [Header("Container")]
         [SerializeField] private string propsRootName = "PropsRoot";
@@ -119,13 +145,142 @@ namespace UnderTheStars.GenerationMap
 
             List<SpawnedPropRecord> spawnedRecords = new List<SpawnedPropRecord>();
             Dictionary<PropSpawnRule, int> spawnedCountPerRule = new Dictionary<PropSpawnRule, int>();
+            Dictionary<Vector2Int, AreaType> areaLookup = BuildAreaLookup(allFloorPoints);
 
             List<PropSpawnRule> clusterRules = new List<PropSpawnRule>();
             List<PropSpawnRule> singleRules = new List<PropSpawnRule>();
             SplitRules(clusterRules, singleRules);
 
-            SpawnClusters(clusterRules, allFloorPoints, referenceTilemap, spawnedRecords, spawnedCountPerRule);
-            SpawnSingles(singleRules, allFloorPoints, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+            SpawnGroups(groupRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords);
+            SpawnClusters(clusterRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+            SpawnSingles(singleRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+        }
+
+        private void SpawnGroups(
+            List<PropGroupRule> rules,
+            List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
+            Tilemap referenceTilemap,
+            List<SpawnedPropRecord> spawnedRecords)
+        {
+            if (rules == null || rules.Count == 0 || allFloorPoints.Count == 0)
+            {
+                return;
+            }
+
+            List<Vector3> placedGroupCenters = new List<Vector3>();
+
+            foreach (PropGroupRule rule in rules)
+            {
+                if (rule == null || !HasValidPrefabList(rule.groupCenterPrefabs) || !HasValidPrefabList(rule.aroundPrefabs))
+                {
+                    continue;
+                }
+
+                int groupMin = Mathf.Max(0, Mathf.Min(rule.groupCountMin, rule.groupCountMax));
+                int groupMax = Mathf.Max(groupMin, Mathf.Max(rule.groupCountMin, rule.groupCountMax));
+                int groupCount = UnityEngine.Random.Range(groupMin, groupMax + 1);
+
+                List<SpawnPoint> centerCandidates = new List<SpawnPoint>();
+                for (int i = 0; i < allFloorPoints.Count; i++)
+                {
+                    if (IsAreaAllowed(rule.allowedAreaTypes, rule.forbiddenAreaTypes, allFloorPoints[i].areaType))
+                    {
+                        centerCandidates.Add(allFloorPoints[i]);
+                    }
+                }
+
+                Shuffle(centerCandidates);
+
+                int built = 0;
+                for (int i = 0; i < centerCandidates.Count && built < groupCount; i++)
+                {
+                    SpawnPoint centerPoint = centerCandidates[i];
+                    if (!PassRequiredGround(
+                            centerPoint.point,
+                            rule.requiredGroundRadius,
+                            areaLookup,
+                            areaType => IsAreaAllowed(rule.allowedAreaTypes, rule.forbiddenAreaTypes, areaType)))
+                    {
+                        continue;
+                    }
+
+                    Vector3 centerTileWorld = referenceTilemap.GetCellCenterWorld(new Vector3Int(centerPoint.point.x, centerPoint.point.y, 0));
+                    Vector3 centerSpawnPosition = centerTileWorld + rule.centerOffset;
+                    centerSpawnPosition = ApplyRandomCellOffset(centerSpawnPosition, rule.randomCellOffset);
+
+                    if (!PassGroupDistance(centerSpawnPosition, rule.minGroupDistance, placedGroupCenters))
+                    {
+                        continue;
+                    }
+
+                    GameObject centerPrefab = PickRandomPrefab(rule.groupCenterPrefabs);
+                    if (centerPrefab == null)
+                    {
+                        continue;
+                    }
+
+                    Quaternion centerRotation = centerPrefab.transform.rotation;
+                    GameObject centerObj = Instantiate(centerPrefab, centerSpawnPosition, centerRotation, propsRoot);
+                    ApplyRandomTransform(centerObj.transform, rule.randomScaleMin, rule.randomScaleMax, rule.randomFlipX);
+                    placedGroupCenters.Add(centerSpawnPosition);
+                    spawnedRecords.Add(new SpawnedPropRecord(centerSpawnPosition, 0f));
+
+                    float radiusMin = Mathf.Min(rule.groupRadiusMin, rule.groupRadiusMax);
+                    float radiusMax = Mathf.Max(rule.groupRadiusMin, rule.groupRadiusMax);
+                    float radius = UnityEngine.Random.Range(radiusMin, radiusMax);
+                    float radiusSq = radius * radius;
+                    int aroundMin = Mathf.Max(0, Mathf.Min(rule.aroundCountMin, rule.aroundCountMax));
+                    int aroundMax = Mathf.Max(aroundMin, Mathf.Max(rule.aroundCountMin, rule.aroundCountMax));
+                    int aroundCount = UnityEngine.Random.Range(aroundMin, aroundMax + 1);
+
+                    List<SpawnPoint> aroundCandidates = new List<SpawnPoint>();
+                    for (int p = 0; p < allFloorPoints.Count; p++)
+                    {
+                        SpawnPoint sp = allFloorPoints[p];
+                        if (!IsAreaAllowed(rule.allowedAreaTypes, rule.forbiddenAreaTypes, sp.areaType))
+                        {
+                            continue;
+                        }
+
+                        Vector2 delta = sp.point - centerPoint.point;
+                        if (delta.sqrMagnitude <= radiusSq)
+                        {
+                            aroundCandidates.Add(sp);
+                        }
+                    }
+
+                    Shuffle(aroundCandidates);
+
+                    int spawnedAround = 0;
+                    for (int p = 0; p < aroundCandidates.Count && spawnedAround < aroundCount; p++)
+                    {
+                        SpawnPoint aroundPoint = aroundCandidates[p];
+                        Vector3 aroundTileWorld = referenceTilemap.GetCellCenterWorld(new Vector3Int(aroundPoint.point.x, aroundPoint.point.y, 0));
+                        Vector3 aroundSpawnPosition = aroundTileWorld + rule.aroundPositionOffset;
+                        aroundSpawnPosition = ApplyRandomCellOffset(aroundSpawnPosition, rule.randomCellOffset);
+
+                        if (!PassMinDistance(aroundSpawnPosition, 0.1f, spawnedRecords))
+                        {
+                            continue;
+                        }
+
+                        GameObject aroundPrefab = PickRandomPrefab(rule.aroundPrefabs);
+                        if (aroundPrefab == null)
+                        {
+                            continue;
+                        }
+
+                        Quaternion aroundRotation = aroundPrefab.transform.rotation;
+                        GameObject aroundObj = Instantiate(aroundPrefab, aroundSpawnPosition, aroundRotation, propsRoot);
+                        ApplyRandomTransform(aroundObj.transform, rule.randomScaleMin, rule.randomScaleMax, rule.randomFlipX);
+                        spawnedRecords.Add(new SpawnedPropRecord(aroundSpawnPosition, 0f));
+                        spawnedAround++;
+                    }
+
+                    built++;
+                }
+            }
         }
 
         private void SplitRules(List<PropSpawnRule> clusterRules, List<PropSpawnRule> singleRules)
@@ -151,6 +306,7 @@ namespace UnderTheStars.GenerationMap
         private void SpawnSingles(
             List<PropSpawnRule> singleRules,
             List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -179,8 +335,18 @@ namespace UnderTheStars.GenerationMap
                     continue;
                 }
 
+                if (!PassRequiredGround(
+                        spawnPoint.point,
+                        selectedRule.requiredGroundRadius,
+                        areaLookup,
+                        areaType => IsAreaAllowed(selectedRule, areaType)))
+                {
+                    continue;
+                }
+
                 Vector3 worldPos = referenceTilemap.GetCellCenterWorld(new Vector3Int(spawnPoint.point.x, spawnPoint.point.y, 0));
                 Vector3 spawnPosition = worldPos + selectedRule.positionOffset;
+                spawnPosition = ApplyRandomCellOffset(spawnPosition, selectedRule.randomCellOffset);
                 if (!PassMinDistance(spawnPosition, selectedRule.minDistance, spawnedRecords))
                 {
                     continue;
@@ -192,7 +358,8 @@ namespace UnderTheStars.GenerationMap
                     continue;
                 }
 
-                GameObject instance = Instantiate(selectedPrefab, spawnPosition, Quaternion.identity, propsRoot);
+                Quaternion spawnRotation = selectedPrefab.transform.rotation;
+                GameObject instance = Instantiate(selectedPrefab, spawnPosition, spawnRotation, propsRoot);
                 ApplyRandomTransform(instance.transform, selectedRule);
 
                 spawnedRecords.Add(new SpawnedPropRecord(spawnPosition, selectedRule.minDistance));
@@ -203,6 +370,7 @@ namespace UnderTheStars.GenerationMap
         private void SpawnClusters(
             List<PropSpawnRule> clusterRules,
             List<SpawnPoint> allFloorPoints,
+            Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -281,6 +449,14 @@ namespace UnderTheStars.GenerationMap
                         {
                             continue;
                         }
+                        if (!PassRequiredGround(
+                                point.point,
+                                rule.requiredGroundRadius,
+                                areaLookup,
+                                areaType => IsAreaAllowed(rule, areaType)))
+                        {
+                            continue;
+                        }
 
                         Vector2 delta = point.point - center.point;
                         float normalizedDistance = radius > 0f ? Mathf.Clamp01(delta.magnitude / radius) : 0f;
@@ -293,6 +469,7 @@ namespace UnderTheStars.GenerationMap
 
                         Vector3 worldPos = referenceTilemap.GetCellCenterWorld(new Vector3Int(point.point.x, point.point.y, 0));
                         Vector3 spawnPosition = worldPos + rule.positionOffset;
+                        spawnPosition = ApplyRandomCellOffset(spawnPosition, rule.randomCellOffset);
                         if (!PassMinDistance(spawnPosition, rule.minDistance, spawnedRecords))
                         {
                             continue;
@@ -304,7 +481,8 @@ namespace UnderTheStars.GenerationMap
                             continue;
                         }
 
-                        GameObject instance = Instantiate(selectedPrefab, spawnPosition, Quaternion.identity, propsRoot);
+                        Quaternion spawnRotation = selectedPrefab.transform.rotation;
+                        GameObject instance = Instantiate(selectedPrefab, spawnPosition, spawnRotation, propsRoot);
                         ApplyRandomTransform(instance.transform, rule);
                         spawnedRecords.Add(new SpawnedPropRecord(spawnPosition, rule.minDistance));
                         spawnedCountPerRule[rule] = GetSpawnCount(rule, spawnedCountPerRule) + 1;
@@ -363,6 +541,17 @@ namespace UnderTheStars.GenerationMap
             return result;
         }
 
+        private static Dictionary<Vector2Int, AreaType> BuildAreaLookup(List<SpawnPoint> points)
+        {
+            Dictionary<Vector2Int, AreaType> lookup = new Dictionary<Vector2Int, AreaType>(points.Count);
+            for (int i = 0; i < points.Count; i++)
+            {
+                lookup[points[i].point] = points[i].areaType;
+            }
+
+            return lookup;
+        }
+
         private List<PropSpawnRule> GetCandidateRules(List<PropSpawnRule> sourceRules, AreaType areaType, Dictionary<PropSpawnRule, int> spawnedCountPerRule)
         {
             List<PropSpawnRule> rules = new List<PropSpawnRule>();
@@ -405,6 +594,21 @@ namespace UnderTheStars.GenerationMap
             return true;
         }
 
+        private static bool IsAreaAllowed(List<AreaType> allowedAreaTypes, List<AreaType> forbiddenAreaTypes, AreaType areaType)
+        {
+            if (allowedAreaTypes != null && allowedAreaTypes.Count > 0 && !allowedAreaTypes.Contains(areaType))
+            {
+                return false;
+            }
+
+            if (forbiddenAreaTypes != null && forbiddenAreaTypes.Contains(areaType))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
         private static bool HasValidPrefabs(PropSpawnRule rule)
         {
             if (rule.prefabs == null || rule.prefabs.Count == 0)
@@ -436,6 +640,48 @@ namespace UnderTheStars.GenerationMap
                 if (rule.prefabs[i] != null)
                 {
                     validPrefabs.Add(rule.prefabs[i]);
+                }
+            }
+
+            if (validPrefabs.Count == 0)
+            {
+                return null;
+            }
+
+            return validPrefabs[UnityEngine.Random.Range(0, validPrefabs.Count)];
+        }
+
+        private static bool HasValidPrefabList(List<GameObject> prefabs)
+        {
+            if (prefabs == null || prefabs.Count == 0)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < prefabs.Count; i++)
+            {
+                if (prefabs[i] != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static GameObject PickRandomPrefab(List<GameObject> prefabs)
+        {
+            if (prefabs == null || prefabs.Count == 0)
+            {
+                return null;
+            }
+
+            List<GameObject> validPrefabs = new List<GameObject>();
+            for (int i = 0; i < prefabs.Count; i++)
+            {
+                if (prefabs[i] != null)
+                {
+                    validPrefabs.Add(prefabs[i]);
                 }
             }
 
@@ -494,31 +740,85 @@ namespace UnderTheStars.GenerationMap
             return true;
         }
 
+        private static bool PassGroupDistance(Vector3 centerWorldPos, float minGroupDistance, List<Vector3> placedCenters)
+        {
+            float minDistSq = minGroupDistance * minGroupDistance;
+            for (int i = 0; i < placedCenters.Count; i++)
+            {
+                if ((placedCenters[i] - centerWorldPos).sqrMagnitude < minDistSq)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool PassRequiredGround(
+            Vector2Int centerPoint,
+            int requiredGroundRadius,
+            Dictionary<Vector2Int, AreaType> areaLookup,
+            Func<AreaType, bool> areaPredicate)
+        {
+            if (requiredGroundRadius <= 0)
+            {
+                return true;
+            }
+
+            int radiusSq = requiredGroundRadius * requiredGroundRadius;
+            for (int x = -requiredGroundRadius; x <= requiredGroundRadius; x++)
+            {
+                for (int y = -requiredGroundRadius; y <= requiredGroundRadius; y++)
+                {
+                    if ((x * x + y * y) > radiusSq)
+                    {
+                        continue;
+                    }
+
+                    Vector2Int point = new Vector2Int(centerPoint.x + x, centerPoint.y + y);
+                    if (!areaLookup.TryGetValue(point, out AreaType areaType))
+                    {
+                        return false;
+                    }
+
+                    if (areaPredicate != null && !areaPredicate(areaType))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static Vector3 ApplyRandomCellOffset(Vector3 position, Vector2 offset)
+        {
+            float dx = UnityEngine.Random.Range(-Mathf.Abs(offset.x), Mathf.Abs(offset.x));
+            float dz = UnityEngine.Random.Range(-Mathf.Abs(offset.y), Mathf.Abs(offset.y));
+            position.x += dx;
+            position.z += dz;
+            return position;
+        }
+
         private static void ApplyRandomTransform(Transform target, PropSpawnRule rule)
         {
+            ApplyRandomTransform(target, rule.randomScaleMin, rule.randomScaleMax, rule.randomFlipX);
+        }
+
+        private static void ApplyRandomTransform(Transform target, float randomScaleMin, float randomScaleMax, bool randomFlipX)
+        {
             Vector3 scale = target.localScale;
-            float minScale = Mathf.Min(rule.randomScaleMin, rule.randomScaleMax);
-            float maxScale = Mathf.Max(rule.randomScaleMin, rule.randomScaleMax);
+            float minScale = Mathf.Min(randomScaleMin, randomScaleMax);
+            float maxScale = Mathf.Max(randomScaleMin, randomScaleMax);
             float uniformScale = UnityEngine.Random.Range(minScale, maxScale);
             scale *= uniformScale;
 
-            if (rule.randomFlipX && UnityEngine.Random.value > 0.5f)
+            if (randomFlipX && UnityEngine.Random.value > 0.5f)
             {
                 scale.x *= -1f;
             }
 
             target.localScale = scale;
-
-            Vector3 euler = target.localEulerAngles;
-            if (rule.randomRotationY)
-            {
-                euler.y = UnityEngine.Random.Range(0f, 360f);
-            }
-            if (rule.randomRotationZ)
-            {
-                euler.z = UnityEngine.Random.Range(0f, 360f);
-            }
-            target.localEulerAngles = euler;
         }
 
         private static void Shuffle(List<SpawnPoint> list)
