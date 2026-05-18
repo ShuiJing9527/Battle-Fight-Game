@@ -24,7 +24,8 @@ namespace UnderTheStars.GenerationMap
         [Header("Area Types (by tileIndex 0..8)")]
         [SerializeField] private bool useRegionAreaTypes = false;
         [SerializeField] private AreaType[] regionAreaTypes = new AreaType[9];
-        [SerializeField] private List<int> grassRegionIndices = new List<int> { 0, 1 };
+        [SerializeField] private List<int> grassRegionIndices = new List<int> { 0 };
+        [SerializeField] private List<int> forestRegionIndices = new List<int> { 1 };
 
         [Header("Player Settings")]
         [SerializeField] private PlayerMovement player; // Drag Player here in Inspector
@@ -132,6 +133,11 @@ namespace UnderTheStars.GenerationMap
             if (useRegionAreaTypes && regionAreaTypes != null && tileIndex >= 0 && tileIndex < regionAreaTypes.Length)
             {
                 return regionAreaTypes[tileIndex];
+            }
+
+            if (forestRegionIndices != null && forestRegionIndices.Contains(tileIndex))
+            {
+                return AreaType.Forest;
             }
 
             if (grassRegionIndices != null && grassRegionIndices.Contains(tileIndex))
