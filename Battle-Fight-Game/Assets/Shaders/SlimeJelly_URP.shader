@@ -28,6 +28,7 @@ Shader "UnderTheStars/Enemies/SlimeJelly_URP"
         _JellyWobbleStrength ("JellyWobbleStrength", Range(0, 0.1)) = 0.012
         _JellyWobbleSpeed ("JellyWobbleSpeed", Range(0, 8)) = 2.8
         _Transparency ("Transparency", Range(0, 1)) = 0.85
+        _ShadowAlphaCutoff("Shadow Alpha Cutoff", Range(0,1)) = 0.25
         _Metallic ("Metallic", Range(0, 1)) = 0
         _Smoothness ("Smoothness", Range(0, 1)) = 0.58
     }
@@ -197,6 +198,89 @@ Shader "UnderTheStars/Enemies/SlimeJelly_URP"
                 spatialAlpha = lerp(spatialAlpha, spatialAlpha * (0.92 + 0.08 * centerMask), 0.5);
                 half alpha = saturate(spriteColor.a * _TintColor.a * _Transparency * _AlphaStrength * spatialAlpha);
                 return half4(finalColor, alpha);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+            ZWrite On
+            ColorMask 0
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex ShadowVert
+            #pragma fragment ShadowFrag
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+            };
+
+            struct Varyings
+            {
+                float4 positionHCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+            };
+
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _RendererColor;
+                float4 _Color;
+                float4 _TintColor;
+                float _AlphaStrength;
+                float _EdgeAlphaStrength;
+                float _InnerAlphaStrength;
+                float _AlphaSoftness;
+                float _JellyWobbleStrength;
+                float _JellyWobbleSpeed;
+                float _Transparency;
+                float _ShadowAlphaCutoff;
+            CBUFFER_END
+
+            Varyings ShadowVert(Attributes IN)
+            {
+                Varyings OUT;
+                OUT.positionHCS = TransformObjectToHClip(IN.positionOS.xyz);
+                OUT.uv = TRANSFORM_TEX(IN.uv, _MainTex);
+                OUT.color = IN.color;
+                return OUT;
+            }
+
+            half4 ShadowFrag(Varyings IN) : SV_Target
+            {
+                float2 uv = IN.uv;
+                float timePhase = _Time.y * _JellyWobbleSpeed;
+                float wobbleWave = sin((uv.y * 11.0 + timePhase) * 1.1) * cos((uv.x * 9.0 + timePhase * 0.7));
+                float2 wobbleOffset = float2(wobbleWave * _JellyWobbleStrength, 0.0);
+                uv += wobbleOffset;
+
+                half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, uv);
+                half4 spriteColor = tex * IN.color * _RendererColor * _Color;
+
+                float2 centered = uv - 0.5;
+                float radial = saturate(length(centered) / 0.7071);
+                float edgeStart = lerp(0.72, 0.52, _AlphaSoftness);
+                float edgeMask = smoothstep(edgeStart, 1.0, radial);
+                float coreMask = 1.0 - edgeMask;
+                float bottomThickness = saturate(1.0 - uv.y);
+                float coreAlpha = lerp(_InnerAlphaStrength * 0.92, min(1.0, _InnerAlphaStrength + 0.12), bottomThickness);
+                float spatialAlpha = lerp(_EdgeAlphaStrength, coreAlpha, coreMask);
+                spatialAlpha = lerp(spatialAlpha, spatialAlpha * (0.92 + 0.08 * saturate(1.0 - radial)), 0.5);
+
+                half shadowAlpha = saturate(spriteColor.a * _TintColor.a * _Transparency * _AlphaStrength * spatialAlpha);
+                clip(shadowAlpha - _ShadowAlphaCutoff);
+                return 0;
             }
             ENDHLSL
         }

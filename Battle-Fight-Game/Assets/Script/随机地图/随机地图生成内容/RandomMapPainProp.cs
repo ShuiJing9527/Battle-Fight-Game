@@ -7,12 +7,13 @@ namespace UnderTheStars.GenerationMap
 {
     public enum AreaType
     {
-        Grass,
-        CoastTransition,
-        Beach,
-        Water,
-        Rock,
-        NoSpawn
+        Grass = 0,
+        CoastTransition = 1,
+        Beach = 2,
+        Water = 3,
+        Rock = 4,
+        NoSpawn = 5,
+        Forest = 6
     }
 
     [Serializable]
@@ -25,6 +26,7 @@ namespace UnderTheStars.GenerationMap
     [Serializable]
     public class PropSpawnRule
     {
+        public string ruleName;
         public List<GameObject> prefabs = new List<GameObject>();
         public SpawnMode spawnMode = SpawnMode.Single;
         [Min(0f)] public float spawnWeight = 1f;

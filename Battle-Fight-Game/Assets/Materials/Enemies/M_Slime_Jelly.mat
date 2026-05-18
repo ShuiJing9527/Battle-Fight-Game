@@ -44,9 +44,10 @@ Material:
     - _Metallic: 0
     - _RimPower: 3
     - _RimStrength: 0.25
+    - _ShadowAlphaCutoff: 0.25
     - _ShadowStrength: 0.45
     - _Smoothness: 0.6
-    - _Transparency: 1
+    - _Transparency: 0.8
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _HighlightColor: {r: 0.93, g: 1, b: 0.99, a: 1}
