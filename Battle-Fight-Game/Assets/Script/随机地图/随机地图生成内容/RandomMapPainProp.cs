@@ -84,6 +84,9 @@ namespace UnderTheStars.GenerationMap
         [Header("Container")]
         [SerializeField] private string propsRootName = "PropsRoot";
 
+        [Header("Performance")]
+        [SerializeField, Min(0.5f)] private float minDistanceGridCellSize = 2f;
+
         private Transform propsRoot;
 
         internal void InitClearProp()
@@ -144,6 +147,7 @@ namespace UnderTheStars.GenerationMap
             Shuffle(allFloorPoints);
 
             List<SpawnedPropRecord> spawnedRecords = new List<SpawnedPropRecord>();
+            SpatialSpawnIndex spawnIndex = new SpatialSpawnIndex(minDistanceGridCellSize);
             Dictionary<PropSpawnRule, int> spawnedCountPerRule = new Dictionary<PropSpawnRule, int>();
             Dictionary<Vector2Int, AreaType> areaLookup = BuildAreaLookup(allFloorPoints);
 
@@ -151,9 +155,9 @@ namespace UnderTheStars.GenerationMap
             List<PropSpawnRule> singleRules = new List<PropSpawnRule>();
             SplitRules(clusterRules, singleRules);
 
-            SpawnGroups(groupRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords);
-            SpawnClusters(clusterRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
-            SpawnSingles(singleRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnedCountPerRule);
+            SpawnGroups(groupRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex);
+            SpawnClusters(clusterRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
+            SpawnSingles(singleRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
         }
 
         private void SpawnGroups(
@@ -161,7 +165,8 @@ namespace UnderTheStars.GenerationMap
             List<SpawnPoint> allFloorPoints,
             Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
-            List<SpawnedPropRecord> spawnedRecords)
+            List<SpawnedPropRecord> spawnedRecords,
+            SpatialSpawnIndex spawnIndex)
         {
             if (rules == null || rules.Count == 0 || allFloorPoints.Count == 0)
             {
@@ -224,7 +229,7 @@ namespace UnderTheStars.GenerationMap
                     GameObject centerObj = Instantiate(centerPrefab, centerSpawnPosition, centerRotation, propsRoot);
                     ApplyRandomTransform(centerObj.transform, rule.randomScaleMin, rule.randomScaleMax, rule.randomFlipX);
                     placedGroupCenters.Add(centerSpawnPosition);
-                    spawnedRecords.Add(new SpawnedPropRecord(centerSpawnPosition, 0f));
+                    RegisterSpawn(spawnedRecords, spawnIndex, centerSpawnPosition, 0f);
 
                     float radiusMin = Mathf.Min(rule.groupRadiusMin, rule.groupRadiusMax);
                     float radiusMax = Mathf.Max(rule.groupRadiusMin, rule.groupRadiusMax);
@@ -260,7 +265,7 @@ namespace UnderTheStars.GenerationMap
                         Vector3 aroundSpawnPosition = aroundTileWorld + rule.aroundPositionOffset;
                         aroundSpawnPosition = ApplyRandomCellOffset(aroundSpawnPosition, rule.randomCellOffset);
 
-                        if (!PassMinDistance(aroundSpawnPosition, 0.1f, spawnedRecords))
+                        if (!PassMinDistance(aroundSpawnPosition, 0.1f, spawnIndex))
                         {
                             continue;
                         }
@@ -274,7 +279,7 @@ namespace UnderTheStars.GenerationMap
                         Quaternion aroundRotation = aroundPrefab.transform.rotation;
                         GameObject aroundObj = Instantiate(aroundPrefab, aroundSpawnPosition, aroundRotation, propsRoot);
                         ApplyRandomTransform(aroundObj.transform, rule.randomScaleMin, rule.randomScaleMax, rule.randomFlipX);
-                        spawnedRecords.Add(new SpawnedPropRecord(aroundSpawnPosition, 0f));
+                        RegisterSpawn(spawnedRecords, spawnIndex, aroundSpawnPosition, 0f);
                         spawnedAround++;
                     }
 
@@ -309,6 +314,7 @@ namespace UnderTheStars.GenerationMap
             Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
+            SpatialSpawnIndex spawnIndex,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
         {
             if (singleRules.Count == 0)
@@ -316,9 +322,10 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
+            List<PropSpawnRule> candidates = new List<PropSpawnRule>(singleRules.Count);
             foreach (SpawnPoint spawnPoint in allFloorPoints)
             {
-                List<PropSpawnRule> candidates = GetCandidateRules(singleRules, spawnPoint.areaType, spawnedCountPerRule);
+                FillCandidateRules(singleRules, spawnPoint.areaType, spawnedCountPerRule, candidates);
                 if (candidates.Count == 0)
                 {
                     continue;
@@ -347,7 +354,7 @@ namespace UnderTheStars.GenerationMap
                 Vector3 worldPos = referenceTilemap.GetCellCenterWorld(new Vector3Int(spawnPoint.point.x, spawnPoint.point.y, 0));
                 Vector3 spawnPosition = worldPos + selectedRule.positionOffset;
                 spawnPosition = ApplyRandomCellOffset(spawnPosition, selectedRule.randomCellOffset);
-                if (!PassMinDistance(spawnPosition, selectedRule.minDistance, spawnedRecords))
+                if (!PassMinDistance(spawnPosition, selectedRule.minDistance, spawnIndex))
                 {
                     continue;
                 }
@@ -362,7 +369,7 @@ namespace UnderTheStars.GenerationMap
                 GameObject instance = Instantiate(selectedPrefab, spawnPosition, spawnRotation, propsRoot);
                 ApplyRandomTransform(instance.transform, selectedRule);
 
-                spawnedRecords.Add(new SpawnedPropRecord(spawnPosition, selectedRule.minDistance));
+                RegisterSpawn(spawnedRecords, spawnIndex, spawnPosition, selectedRule.minDistance);
                 spawnedCountPerRule[selectedRule] = GetSpawnCount(selectedRule, spawnedCountPerRule) + 1;
             }
         }
@@ -373,6 +380,7 @@ namespace UnderTheStars.GenerationMap
             Dictionary<Vector2Int, AreaType> areaLookup,
             Tilemap referenceTilemap,
             List<SpawnedPropRecord> spawnedRecords,
+            SpatialSpawnIndex spawnIndex,
             Dictionary<PropSpawnRule, int> spawnedCountPerRule)
         {
             if (clusterRules.Count == 0 || allFloorPoints.Count == 0)
@@ -470,7 +478,7 @@ namespace UnderTheStars.GenerationMap
                         Vector3 worldPos = referenceTilemap.GetCellCenterWorld(new Vector3Int(point.point.x, point.point.y, 0));
                         Vector3 spawnPosition = worldPos + rule.positionOffset;
                         spawnPosition = ApplyRandomCellOffset(spawnPosition, rule.randomCellOffset);
-                        if (!PassMinDistance(spawnPosition, rule.minDistance, spawnedRecords))
+                        if (!PassMinDistance(spawnPosition, rule.minDistance, spawnIndex))
                         {
                             continue;
                         }
@@ -484,7 +492,7 @@ namespace UnderTheStars.GenerationMap
                         Quaternion spawnRotation = selectedPrefab.transform.rotation;
                         GameObject instance = Instantiate(selectedPrefab, spawnPosition, spawnRotation, propsRoot);
                         ApplyRandomTransform(instance.transform, rule);
-                        spawnedRecords.Add(new SpawnedPropRecord(spawnPosition, rule.minDistance));
+                        RegisterSpawn(spawnedRecords, spawnIndex, spawnPosition, rule.minDistance);
                         spawnedCountPerRule[rule] = GetSpawnCount(rule, spawnedCountPerRule) + 1;
                         clusterSpawned++;
                     }
@@ -552,9 +560,13 @@ namespace UnderTheStars.GenerationMap
             return lookup;
         }
 
-        private List<PropSpawnRule> GetCandidateRules(List<PropSpawnRule> sourceRules, AreaType areaType, Dictionary<PropSpawnRule, int> spawnedCountPerRule)
+        private void FillCandidateRules(
+            List<PropSpawnRule> sourceRules,
+            AreaType areaType,
+            Dictionary<PropSpawnRule, int> spawnedCountPerRule,
+            List<PropSpawnRule> rules)
         {
-            List<PropSpawnRule> rules = new List<PropSpawnRule>();
+            rules.Clear();
             foreach (PropSpawnRule rule in sourceRules)
             {
                 if (rule == null || !HasValidPrefabs(rule) || rule.spawnWeight <= 0f || rule.maxCount == 0)
@@ -575,8 +587,6 @@ namespace UnderTheStars.GenerationMap
 
                 rules.Add(rule);
             }
-
-            return rules;
         }
 
         private static bool IsAreaAllowed(PropSpawnRule rule, AreaType areaType)
@@ -634,21 +644,37 @@ namespace UnderTheStars.GenerationMap
                 return null;
             }
 
-            List<GameObject> validPrefabs = new List<GameObject>();
+            int validCount = 0;
             for (int i = 0; i < rule.prefabs.Count; i++)
             {
                 if (rule.prefabs[i] != null)
                 {
-                    validPrefabs.Add(rule.prefabs[i]);
+                    validCount++;
                 }
             }
 
-            if (validPrefabs.Count == 0)
+            if (validCount == 0)
             {
                 return null;
             }
 
-            return validPrefabs[UnityEngine.Random.Range(0, validPrefabs.Count)];
+            int selectedIndex = UnityEngine.Random.Range(0, validCount);
+            for (int i = 0; i < rule.prefabs.Count; i++)
+            {
+                if (rule.prefabs[i] == null)
+                {
+                    continue;
+                }
+
+                if (selectedIndex == 0)
+                {
+                    return rule.prefabs[i];
+                }
+
+                selectedIndex--;
+            }
+
+            return null;
         }
 
         private static bool HasValidPrefabList(List<GameObject> prefabs)
@@ -676,21 +702,37 @@ namespace UnderTheStars.GenerationMap
                 return null;
             }
 
-            List<GameObject> validPrefabs = new List<GameObject>();
+            int validCount = 0;
             for (int i = 0; i < prefabs.Count; i++)
             {
                 if (prefabs[i] != null)
                 {
-                    validPrefabs.Add(prefabs[i]);
+                    validCount++;
                 }
             }
 
-            if (validPrefabs.Count == 0)
+            if (validCount == 0)
             {
                 return null;
             }
 
-            return validPrefabs[UnityEngine.Random.Range(0, validPrefabs.Count)];
+            int selectedIndex = UnityEngine.Random.Range(0, validCount);
+            for (int i = 0; i < prefabs.Count; i++)
+            {
+                if (prefabs[i] == null)
+                {
+                    continue;
+                }
+
+                if (selectedIndex == 0)
+                {
+                    return prefabs[i];
+                }
+
+                selectedIndex--;
+            }
+
+            return null;
         }
 
         private static int GetSpawnCount(PropSpawnRule rule, Dictionary<PropSpawnRule, int> spawnedCountPerRule)
@@ -724,20 +766,88 @@ namespace UnderTheStars.GenerationMap
             return rules[rules.Count - 1];
         }
 
-        private static bool PassMinDistance(Vector3 worldPos, float minDistance, List<SpawnedPropRecord> spawnedRecords)
+        private static bool PassMinDistance(Vector3 worldPos, float minDistance, SpatialSpawnIndex spawnIndex)
         {
-            float minDistSq = minDistance * minDistance;
-            for (int i = 0; i < spawnedRecords.Count; i++)
+            return spawnIndex == null || spawnIndex.CanPlace(worldPos, minDistance);
+        }
+
+        private static void RegisterSpawn(
+            List<SpawnedPropRecord> spawnedRecords,
+            SpatialSpawnIndex spawnIndex,
+            Vector3 position,
+            float minDistance)
+        {
+            SpawnedPropRecord record = new SpawnedPropRecord(position, minDistance);
+            spawnedRecords.Add(record);
+            spawnIndex?.Add(record);
+        }
+
+        private sealed class SpatialSpawnIndex
+        {
+            private readonly Dictionary<Vector2Int, List<SpawnedPropRecord>> recordsByCell = new Dictionary<Vector2Int, List<SpawnedPropRecord>>();
+            private readonly float cellSize;
+            private float maxRecordMinDistance;
+
+            public SpatialSpawnIndex(float cellSize)
             {
-                float required = Mathf.Max(minDistance, spawnedRecords[i].minDistance);
-                float requiredSq = required * required;
-                if ((spawnedRecords[i].position - worldPos).sqrMagnitude < Mathf.Max(minDistSq, requiredSq))
-                {
-                    return false;
-                }
+                this.cellSize = Mathf.Max(0.5f, cellSize);
             }
 
-            return true;
+            public void Add(SpawnedPropRecord record)
+            {
+                Vector2Int cell = GetCell(record.position);
+                if (!recordsByCell.TryGetValue(cell, out List<SpawnedPropRecord> records))
+                {
+                    records = new List<SpawnedPropRecord>();
+                    recordsByCell[cell] = records;
+                }
+
+                records.Add(record);
+                maxRecordMinDistance = Mathf.Max(maxRecordMinDistance, record.minDistance);
+            }
+
+            public bool CanPlace(Vector3 worldPos, float minDistance)
+            {
+                if (recordsByCell.Count == 0)
+                {
+                    return true;
+                }
+
+                Vector2Int centerCell = GetCell(worldPos);
+                float queryDistance = Mathf.Max(minDistance, maxRecordMinDistance);
+                int cellRadius = Mathf.CeilToInt(queryDistance / cellSize);
+
+                for (int x = centerCell.x - cellRadius; x <= centerCell.x + cellRadius; x++)
+                {
+                    for (int y = centerCell.y - cellRadius; y <= centerCell.y + cellRadius; y++)
+                    {
+                        Vector2Int cell = new Vector2Int(x, y);
+                        if (!recordsByCell.TryGetValue(cell, out List<SpawnedPropRecord> records))
+                        {
+                            continue;
+                        }
+
+                        for (int i = 0; i < records.Count; i++)
+                        {
+                            float required = Mathf.Max(minDistance, records[i].minDistance);
+                            float requiredSq = required * required;
+                            if ((records[i].position - worldPos).sqrMagnitude < requiredSq)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            private Vector2Int GetCell(Vector3 position)
+            {
+                return new Vector2Int(
+                    Mathf.FloorToInt(position.x / cellSize),
+                    Mathf.FloorToInt(position.z / cellSize));
+            }
         }
 
         private static bool PassGroupDistance(Vector3 centerWorldPos, float minGroupDistance, List<Vector3> placedCenters)

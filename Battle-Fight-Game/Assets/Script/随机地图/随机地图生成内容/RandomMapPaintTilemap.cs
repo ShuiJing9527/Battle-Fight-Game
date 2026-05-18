@@ -1,6 +1,5 @@
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
-using System.Linq;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -128,7 +127,7 @@ namespace UnderTheStars.GenerationMap
 
             while (remaining.Count > 0)
             {
-                Vector2Int start = remaining.OrderBy(point => point.y).ThenBy(point => point.x).First();
+                Vector2Int start = FindFirstCell(remaining);
 
                 int width = 1;
                 while (remaining.Contains(new Vector2Int(start.x + width, start.y)))
@@ -166,6 +165,23 @@ namespace UnderTheStars.GenerationMap
 
                 yield return new RectInt(start.x, start.y, width, height);
             }
+        }
+
+        private static Vector2Int FindFirstCell(HashSet<Vector2Int> points)
+        {
+            Vector2Int best = default;
+            bool hasBest = false;
+
+            foreach (Vector2Int point in points)
+            {
+                if (!hasBest || point.y < best.y || point.y == best.y && point.x < best.x)
+                {
+                    best = point;
+                    hasBest = true;
+                }
+            }
+
+            return best;
         }
 
         private void CreateWallCollider(RectInt rect)

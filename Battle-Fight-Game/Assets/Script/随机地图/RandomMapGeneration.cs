@@ -1,5 +1,4 @@
 ﻿using Cysharp.Threading.Tasks;
-using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -29,6 +28,9 @@ namespace UnderTheStars.GenerationMap
 
         [Header("Player Settings")]
         [SerializeField] private PlayerMovement player; // Drag Player here in Inspector
+
+        [Header("Performance")]
+        [SerializeField] private bool collectGarbageAfterReset = false;
 
         private HashSet<Vector2Int>[,] floorPoints;// Floor points
         private HashSet<Vector2Int>[,] propsPoints;// Prop points
@@ -232,14 +234,25 @@ namespace UnderTheStars.GenerationMap
             InitMapSeed();
             InitMapData();
             InitMapPaint();
-            GC.Collect();
+
+            if (collectGarbageAfterReset)
+            {
+                System.GC.Collect();
+            }
         }
 
         /// <summary> Clear tile/prop painting. </summary>
         private void InitMapPaint()
         {
-            paintTilemap.InitClearTile();
-            paintProp.InitClearProp();
+            if (paintTilemap != null)
+            {
+                paintTilemap.InitClearTile();
+            }
+
+            if (paintProp != null)
+            {
+                paintProp.InitClearProp();
+            }
         }
 
         /// <summary> Clear cached point sets. </summary>

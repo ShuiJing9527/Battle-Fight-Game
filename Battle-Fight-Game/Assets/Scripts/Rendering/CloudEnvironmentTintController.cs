@@ -27,6 +27,12 @@ namespace Rendering
         [Header("Blend")]
         [SerializeField] private bool smoothBlend = true;
         [SerializeField] [Range(0.1f, 20f)] private float blendSpeed = 4f;
+
+        [Header("Performance")]
+        [SerializeField] [Min(0.02f)] private float targetRefreshInterval = 0.1f;
+        [SerializeField] [Min(0.02f)] private float applyInterval = 0.05f;
+        [SerializeField] [Min(0f)] private float colorChangeThreshold = 0.003f;
+
         [Header("Debug")]
         [SerializeField] private string currentReadMode = "None";
         [SerializeField] private Color currentSourceColor = Color.white;
@@ -36,6 +42,10 @@ namespace Rendering
 
         private MaterialPropertyBlock mpb;
         private Color currentTint = Color.white;
+        private Color targetTint = Color.white;
+        private Color lastAppliedTint = new Color(-1f, -1f, -1f, -1f);
+        private float nextTargetRefreshTime;
+        private float nextApplyTime;
 
         private void Awake()
         {
@@ -46,14 +56,21 @@ namespace Rendering
                 CacheChildRenderers();
             }
 
-            currentTint = ResolveTargetTint();
+            targetTint = ResolveTargetTint();
+            currentTint = targetTint;
             currentAppliedTint = currentTint;
             ApplyTint(currentAppliedTint);
+            lastAppliedTint = currentAppliedTint;
         }
 
         private void LateUpdate()
         {
-            Color targetTint = ResolveTargetTint();
+            if (Time.time >= nextTargetRefreshTime)
+            {
+                targetTint = ResolveTargetTint();
+                nextTargetRefreshTime = Time.time + Mathf.Max(0.02f, targetRefreshInterval);
+            }
+
             if (smoothBlend)
             {
                 currentTint = Color.Lerp(currentTint, targetTint, 1f - Mathf.Exp(-blendSpeed * Time.deltaTime));
@@ -64,7 +81,12 @@ namespace Rendering
             }
 
             currentAppliedTint = currentTint;
-            ApplyTint(currentAppliedTint);
+            if (Time.time >= nextApplyTime && HasMeaningfulColorChange(currentAppliedTint, lastAppliedTint))
+            {
+                ApplyTint(currentAppliedTint);
+                lastAppliedTint = currentAppliedTint;
+                nextApplyTime = Time.time + Mathf.Max(0.02f, applyInterval);
+            }
         }
 
         private void CacheChildRenderers()
@@ -178,6 +200,16 @@ namespace Rendering
                 mpb.SetColor(EnvironmentTintId, tint);
                 renderer.SetPropertyBlock(mpb);
             }
+        }
+
+        private bool HasMeaningfulColorChange(Color a, Color b)
+        {
+            float thresholdSq = colorChangeThreshold * colorChangeThreshold;
+            float dr = a.r - b.r;
+            float dg = a.g - b.g;
+            float db = a.b - b.b;
+            float da = a.a - b.a;
+            return dr * dr + dg * dg + db * db + da * da > thresholdSq;
         }
 
         private static bool TryReadColorByNames(object source, out Color color, params string[] memberNames)
