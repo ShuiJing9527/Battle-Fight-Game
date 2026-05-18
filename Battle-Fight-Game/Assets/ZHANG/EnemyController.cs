@@ -6,7 +6,7 @@ public class EnemyController : MonoBehaviour
     private Transform Player;
     private bool isChasing;
 
-    private float moveSpeed = 10f;
+    private float moveSpeed = 1f;
 
     void Start()
     {
