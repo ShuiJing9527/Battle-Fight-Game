@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -9,6 +9,7 @@ public class Player2PrototypeController : MonoBehaviour
     public float moveSpeed = 5f;
     public float dashDistance = 4f;
     public float dashDuration = 0.15f;
+    [SerializeField] private bool lockCharacterRotation = true;
 
     [Header("Q - 神临光剑")]
     public float qDelay = 0.35f;
@@ -25,8 +26,84 @@ public class Player2PrototypeController : MonoBehaviour
     [Header("R - 万剑神罚")]
     public int swordEnergy = 4;
 
+    [Header("Skill Effect Prefabs")]
+    public GameObject sharedSkillEffectPrefab;
+    public GameObject qSkillEffectPrefab;
+    public GameObject wSkillEffectPrefab;
+    public GameObject eSkillEffectPrefab;
+    public GameObject rSkillEffectPrefab;
+    public GameObject standbySkillEffectPrefab;
+
+    [Header("Skill Effect Visuals - Shared")]
+    public Vector3 sharedEffectScale = new Vector3(1f, 1f, 1f);
+    public float sharedEffectRotationZ = 0f;
+
+    [Header("Skill Effect Visuals - Q")]
+    public Vector3 qEffectScale = new Vector3(0.25f, 0.25f, 0.25f);
+    public float qEffectRotationZ = -90f;
+    public Vector3 qEffectOffset = Vector3.zero;
+    public Vector3 qEffectPlaneScale = new Vector3(0.25f, 0.25f, 1f);
+    public float qEffectYawOffset = 0f;
+    public float qEffectVisualPitch = 0f;
+    public float qEffectVisualYaw = 0f;
+    public float qEffectVisualRoll = 0f;
+    public bool qEffectInvertForward = false;
+
+    [Header("Skill Effect Visuals - W")]
+    public Vector3 wEffectScale = new Vector3(0.4f, 0.4f, 0.4f);
+    public float wEffectRotationZ = 0f;
+    public Vector3 wEffectOffset = new Vector3(0f, 1.2f, 1.0f);
+    public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
+    public bool wEffectVerticalRotation = true;
+    public float wEffectSpinSpeed = 120f;
+    public Vector3 wEffectSpinAxis = Vector3.up;
+    public float wEffectVisualPitch = 0f;
+    public float wEffectVisualYaw = 180f;
+    public float wEffectVisualRoll = 0f;
+
+    [Header("Skill Effect Visuals - E")]
+    public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
+    public float eEffectRotationZ = -90f;
+    public Vector3 eEffectOffset = Vector3.zero;
+    public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
+    public float eEffectYawOffset = 0f;
+    public float eEffectVisualPitch = 0f;
+    public float eEffectVisualYaw = 0f;
+    public float eEffectVisualRoll = 0f;
+
+    [Header("Skill Effect Visuals - R")]
+    public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    public float rEffectRotationZ = -90f;
+    public Vector3 rEffectOffset = Vector3.zero;
+    public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
+    public float rEffectYawOffset = 0f;
+    public float rEffectVisualPitch = 0f;
+    public float rEffectVisualYaw = 0f;
+    public float rEffectVisualRoll = 0f;
+    public bool rEffectInvertForward = false;
+
+    [Header("Skill Effect Visuals - Standby Sword")]
+    public Vector3 standbySwordScale = new Vector3(0.25f, 0.25f, 0.25f);
+    public float standbySwordRotationZ = -90f;
+    public Vector3 standbySwordPlaneScale = new Vector3(0.25f, 0.25f, 1f);
+    public Vector3 standbySwordOffset = Vector3.zero;
+    public float standbySwordVisualPitch = 90f;
+    public float standbySwordVisualYaw = 0f;
+    public float standbySwordVisualRoll = 0f;
+    public float standbySwordSpinSpeed = 120f;
+
     [Header("Refs")]
     public Rigidbody rb;
+
+    private sealed class SkillEffectRuntime : MonoBehaviour
+    {
+        public Transform visual;
+        public Vector3 baseVisualScale;
+        public Material[] materialTargets;
+        public Color[] materialBaseColors;
+        public SpriteRenderer[] spriteTargets;
+        public Color[] spriteBaseColors;
+    }
 
     private Vector3 lastMoveDir = Vector3.forward;
     private int standbySwords;
@@ -35,15 +112,12 @@ public class Player2PrototypeController : MonoBehaviour
 
     private readonly List<GameObject> standbySwordVisuals = new List<GameObject>();
 
-    private Material bodyMat;
-
-    private Sprite qSprite;
-    private Sprite wSprite;
-    private Sprite eSprite;
-    private Sprite rSprite;
+    private Quaternion initialRotation;
 
     private void Awake()
     {
+        initialRotation = transform.rotation;
+
         if (rb == null)
         {
             rb = GetComponent<Rigidbody>();
@@ -56,10 +130,14 @@ public class Player2PrototypeController : MonoBehaviour
 
         rb.useGravity = false;
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
+    }
 
-        bodyMat = CreateLitMaterial(new Color(0.25f, 0.8f, 1f));
-        ApplyBodyMaterial();
-        BuildSkillSprites();
+    private void LateUpdate()
+    {
+        if (lockCharacterRotation)
+        {
+            transform.rotation = initialRotation;
+        }
     }
 
     private void Update()
@@ -81,14 +159,11 @@ public class Player2PrototypeController : MonoBehaviour
 
         Vector2 input = ReadMoveInput();
         Vector3 moveDir = new Vector3(input.x, 0f, input.y);
-
         if (moveDir.sqrMagnitude > 0.0001f)
         {
             lastMoveDir = moveDir.normalized;
-            transform.forward = lastMoveDir;
         }
 
-        // Use direct position move to avoid rigidbody sleep/constraint side effects after runtime toggling.
         Vector3 delta = new Vector3(moveDir.x, 0f, moveDir.z) * moveSpeed * Time.fixedDeltaTime;
         transform.position += delta;
 
@@ -110,10 +185,21 @@ public class Player2PrototypeController : MonoBehaviour
 
     private void CastQ()
     {
-        Vector3 spawnPos = transform.position + Vector3.up * 1.2f + transform.right * 0.8f;
-        Vector3 qDirection = transform.forward.sqrMagnitude > 0.0001f ? transform.forward.normalized : lastMoveDir;
-        GameObject sword = SpawnSkillSprite("Q_Sword", qSprite, spawnPos, 0.9f);
-        StartCoroutine(FireAfterDelay(sword, qDirection, qDelay, qSwordSpeed));
+        Vector3 dir = ResolveFacingDirection();
+        Vector3 spawnPos = transform.position + Vector3.up * 1.2f + transform.right * 0.8f + qEffectOffset;
+        GameObject sword = CreateSkillEffectVisual(
+            "Q_Sword",
+            qSkillEffectPrefab,
+            spawnPos,
+            dir,
+            true,
+            qEffectInvertForward,
+            qEffectYawOffset,
+            qEffectVisualPitch,
+            qEffectVisualYaw,
+            qEffectVisualRoll + ResolveRotation(qEffectRotationZ),
+            ResolveVisualScale(qEffectScale, qEffectPlaneScale));
+        StartCoroutine(FireAfterDelay(sword, dir, qDelay, qSwordSpeed));
         swordEnergy += 1;
     }
 
@@ -136,26 +222,34 @@ public class Player2PrototypeController : MonoBehaviour
 
         int count = swordEnergy;
         swordEnergy = 0;
-
         for (int i = 0; i < count; i++)
         {
             float angle = Random.Range(0f, 360f);
             Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-            Vector3 spawnPos = transform.position + Vector3.up * 1.2f;
-            GameObject sword = SpawnSkillSprite("R_Sword", rSprite, spawnPos, 0.85f);
+            Vector3 spawnPos = transform.position + Vector3.up * 1.2f + rEffectOffset;
+            GameObject sword = CreateSkillEffectVisual(
+                "R_Sword",
+                rSkillEffectPrefab,
+                spawnPos,
+                dir,
+                true,
+                rEffectInvertForward,
+                rEffectYawOffset,
+                rEffectVisualPitch,
+                rEffectVisualYaw,
+                rEffectVisualRoll + ResolveRotation(rEffectRotationZ),
+                ResolveVisualScale(rEffectScale, rEffectPlaneScale));
             StartCoroutine(FireAfterDelay(sword, dir, 0.05f * i, 16f));
         }
     }
 
-    private IEnumerator FireAfterDelay(GameObject sword, Vector3 dir, float delay, float speed)
+    private IEnumerator FireAfterDelay(GameObject effectRoot, Vector3 dir, float delay, float speed)
     {
         float t = 0f;
         while (t < delay)
         {
-            if (sword == null) yield break;
+            if (effectRoot == null) yield break;
             t += Time.deltaTime;
-            sword.transform.Rotate(Vector3.forward, 360f * Time.deltaTime, Space.Self);
-            FaceCamera(sword);
             yield return null;
         }
 
@@ -163,37 +257,68 @@ public class Player2PrototypeController : MonoBehaviour
         float elapsed = 0f;
         while (elapsed < life)
         {
-            if (sword == null) yield break;
-            sword.transform.position += dir.normalized * speed * Time.deltaTime;
-            FaceCamera(sword);
+            if (effectRoot == null) yield break;
+            effectRoot.transform.position += dir.normalized * speed * Time.deltaTime;
             elapsed += Time.deltaTime;
             yield return null;
         }
 
-        if (sword != null) Destroy(sword);
+        if (effectRoot != null) Destroy(effectRoot);
     }
 
     private IEnumerator ShieldRoutine()
     {
         isShielding = true;
-        GameObject shield = SpawnSkillSprite("W_Shield", wSprite, transform.position + Vector3.up * 1.1f, 2.1f);
+        GameObject orbitRoot = new GameObject("W_OrbitRoot");
+        orbitRoot.transform.position = transform.position;
+        orbitRoot.transform.rotation = Quaternion.identity;
 
+        GameObject swordInstance = CreateEffectInstance("W_Shield", wSkillEffectPrefab, orbitRoot.transform.position, Quaternion.identity);
+        if (swordInstance == null)
+        {
+            Destroy(orbitRoot);
+            isShielding = false;
+            yield break;
+        }
+
+        swordInstance.name = "W_SwordInstance";
+        swordInstance.transform.SetParent(orbitRoot.transform, false);
+        swordInstance.transform.localPosition = wEffectOffset;
+        swordInstance.transform.localRotation = Quaternion.identity;
+        EnsureEffectVisible(swordInstance);
+
+        Transform visualTarget = FindEffectVisualTransform(swordInstance);
+        float pitch = wEffectVerticalRotation ? wEffectVisualPitch : 0f;
+        visualTarget.localRotation = Quaternion.Euler(pitch, wEffectVisualYaw, wEffectVisualRoll + ResolveRotation(wEffectRotationZ));
+        Vector3 resolvedScale = ClampVisualScale(ResolveVisualScale(wEffectScale, wEffectPlaneScale));
+        visualTarget.localScale = Vector3.Scale(visualTarget.localScale, resolvedScale);
+
+        SkillEffectRuntime runtime = orbitRoot.AddComponent<SkillEffectRuntime>();
+        runtime.visual = visualTarget;
+        runtime.baseVisualScale = visualTarget.localScale;
+        CacheFadeTargets(swordInstance, runtime);
+
+        Vector3 spinAxis = wEffectSpinAxis.sqrMagnitude > 0.0001f ? wEffectSpinAxis.normalized : Vector3.up;
         float t = 0f;
         while (t < wDuration)
         {
-            if (shield != null)
+            if (orbitRoot != null)
             {
-                shield.transform.position = transform.position + Vector3.up * 1.1f;
-                shield.transform.Rotate(Vector3.forward, 220f * Time.deltaTime, Space.Self);
-                float pulse = 1f + Mathf.Sin(Time.time * 12f) * 0.08f;
-                shield.transform.localScale = Vector3.one * (2.1f * pulse);
-                FaceCamera(shield);
+                orbitRoot.transform.position = transform.position;
+                orbitRoot.transform.Rotate(spinAxis, wEffectSpinSpeed * Time.deltaTime, Space.Self);
             }
+
+            if (runtime != null && runtime.visual != null)
+            {
+                float pulse = 1f + Mathf.Sin(Time.time * 12f) * 0.08f;
+                runtime.visual.localScale = runtime.baseVisualScale * pulse;
+            }
+
             t += Time.deltaTime;
             yield return null;
         }
 
-        if (shield != null) Destroy(shield);
+        if (orbitRoot != null) Destroy(orbitRoot);
         isShielding = false;
     }
 
@@ -212,8 +337,19 @@ public class Player2PrototypeController : MonoBehaviour
 
             if (Random.value < 0.45f)
             {
-                Vector3 trailPos = transform.position + Vector3.up * 0.5f;
-                GameObject trail = SpawnSkillSprite("E_Rail", eSprite, trailPos, 0.7f);
+                Vector3 trailPos = transform.position + Vector3.up * 0.5f + eEffectOffset;
+                GameObject trail = CreateSkillEffectVisual(
+                    "E_Rail",
+                    eSkillEffectPrefab,
+                    trailPos,
+                    dir,
+                    true,
+                    false,
+                    eEffectYawOffset,
+                    eEffectVisualPitch,
+                    eEffectVisualYaw,
+                    eEffectVisualRoll + ResolveRotation(eEffectRotationZ),
+                    ResolveVisualScale(eEffectScale, eEffectPlaneScale));
                 StartCoroutine(FadeAndDestroy(trail, eRailDuration));
             }
 
@@ -225,27 +361,21 @@ public class Player2PrototypeController : MonoBehaviour
         isDashing = false;
     }
 
-    private IEnumerator FadeAndDestroy(GameObject go, float duration)
+    private IEnumerator FadeAndDestroy(GameObject effectRoot, float duration)
     {
-        if (go == null) yield break;
-        SpriteRenderer sr = go.GetComponent<SpriteRenderer>();
-        Color baseColor = sr != null ? sr.color : Color.white;
-
+        if (effectRoot == null) yield break;
+        SkillEffectRuntime runtime = effectRoot.GetComponent<SkillEffectRuntime>();
         float t = 0f;
         while (t < duration)
         {
-            if (go == null) yield break;
-            float a = 1f - (t / duration);
-            if (sr != null)
-            {
-                sr.color = new Color(baseColor.r, baseColor.g, baseColor.b, a);
-            }
-            FaceCamera(go);
+            if (effectRoot == null) yield break;
+            float alpha = 1f - (t / duration);
+            ApplyFadeAlpha(runtime, alpha);
             t += Time.deltaTime;
             yield return null;
         }
 
-        if (go != null) Destroy(go);
+        if (effectRoot != null) Destroy(effectRoot);
     }
 
     private void AddStandbySword()
@@ -253,20 +383,37 @@ public class Player2PrototypeController : MonoBehaviour
         if (standbySwords >= maxStandbySwords) return;
 
         standbySwords += 1;
-        Vector3 offset = Quaternion.Euler(0f, standbySwords * 360f / maxStandbySwords, 0f) * Vector3.forward * 1.1f;
-        GameObject standby = SpawnSkillSprite("StandbySword", qSprite, transform.position + Vector3.up + offset, 0.7f);
+        Vector3 orbitOffset = Quaternion.Euler(0f, standbySwords * 360f / maxStandbySwords, 0f) * Vector3.forward * 1.1f;
+        GameObject standby = CreateSkillEffectVisual(
+            "StandbySword",
+            standbySkillEffectPrefab,
+            transform.position + Vector3.up + orbitOffset + standbySwordOffset,
+            orbitOffset,
+            false,
+            false,
+            0f,
+            standbySwordVisualPitch,
+            standbySwordVisualYaw,
+            standbySwordVisualRoll + ResolveRotation(standbySwordRotationZ),
+            ResolveVisualScale(standbySwordScale, standbySwordPlaneScale));
         standbySwordVisuals.Add(standby);
         StartCoroutine(OrbitStandbySword(standby, standbySwords - 1));
     }
 
     private IEnumerator OrbitStandbySword(GameObject standby, int index)
     {
+        SkillEffectRuntime runtime = standby != null ? standby.GetComponent<SkillEffectRuntime>() : null;
         while (standby != null && standbySwords > 0)
         {
             float angle = Time.time * 120f + index * 120f;
-            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * 1.1f;
-            standby.transform.position = transform.position + Vector3.up + offset;
-            FaceCamera(standby);
+            Vector3 orbitOffset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * 1.1f;
+            standby.transform.position = transform.position + Vector3.up + orbitOffset + standbySwordOffset;
+
+            if (runtime != null && runtime.visual != null && standbySwordSpinSpeed != 0f)
+            {
+                runtime.visual.Rotate(Vector3.up, standbySwordSpinSpeed * Time.deltaTime, Space.Self);
+            }
+
             yield return null;
         }
     }
@@ -276,6 +423,7 @@ public class Player2PrototypeController : MonoBehaviour
         foreach (GameObject standby in standbySwordVisuals)
         {
             if (standby == null) continue;
+            ApplyRootDirection(standby.transform, dir, true, false, 0f);
             StartCoroutine(FireAfterDelay(standby, dir, 0f, speed));
         }
 
@@ -285,114 +433,220 @@ public class Player2PrototypeController : MonoBehaviour
 
     private Vector3 ResolveFacingDirection()
     {
-        if (transform.forward.sqrMagnitude > 0.0001f) return transform.forward.normalized;
         if (lastMoveDir.sqrMagnitude > 0.0001f) return lastMoveDir.normalized;
         return Vector3.forward;
     }
 
-    private GameObject SpawnSkillSprite(string name, Sprite sprite, Vector3 pos, float scale)
+    private GameObject CreateSkillEffectVisual(
+        string name,
+        GameObject specificPrefab,
+        Vector3 worldPosition,
+        Vector3 direction,
+        bool alignToDirection,
+        bool invertForward,
+        float yawOffset,
+        float visualPitch,
+        float visualYaw,
+        float visualRoll,
+        Vector3 visualScale)
     {
-        GameObject go = new GameObject(name);
-        go.transform.position = pos;
-        go.transform.localScale = Vector3.one * scale;
-        SpriteRenderer sr = go.AddComponent<SpriteRenderer>();
-        sr.sprite = sprite;
-        sr.sortingOrder = 100;
-        sr.color = Color.white;
-        FaceCamera(go);
-        return go;
+        GameObject root = new GameObject(name);
+        root.transform.position = worldPosition;
+        ApplyRootDirection(root.transform, direction, alignToDirection, invertForward, yawOffset);
+
+        GameObject effectVisual = CreateEffectInstance(name, specificPrefab, root.transform.position, root.transform.rotation);
+        if (effectVisual == null)
+        {
+            Destroy(root);
+            return null;
+        }
+
+        // Keep world transform when parenting so instantiated prefab stays at the root skill position.
+        effectVisual.transform.SetParent(root.transform, true);
+
+        Transform visualTarget = FindEffectVisualTransform(effectVisual);
+        visualTarget.localRotation = Quaternion.Euler(visualPitch, visualYaw, visualRoll);
+        visualTarget.localScale = Vector3.Scale(visualTarget.localScale, ClampVisualScale(visualScale));
+        EnsureEffectVisible(effectVisual);
+
+        SkillEffectRuntime runtime = root.AddComponent<SkillEffectRuntime>();
+        runtime.visual = visualTarget;
+        runtime.baseVisualScale = visualTarget.localScale;
+        CacheFadeTargets(effectVisual, runtime);
+
+        return root;
     }
 
-    private void FaceCamera(GameObject go)
+    private static Vector3 ClampVisualScale(Vector3 scale)
     {
-        if (go == null || Camera.main == null) return;
-        Vector3 lookDir = go.transform.position - Camera.main.transform.position;
-        if (lookDir.sqrMagnitude > 0.001f)
+        return new Vector3(
+            ClampScaleAxis(scale.x),
+            ClampScaleAxis(scale.y),
+            ClampScaleAxis(scale.z));
+    }
+
+    private static float ClampScaleAxis(float value)
+    {
+        const float minAbs = 0.01f;
+        if (Mathf.Abs(value) >= minAbs)
         {
-            go.transform.rotation = Quaternion.LookRotation(lookDir.normalized, Vector3.up);
+            return value;
+        }
+
+        return value < 0f ? -minAbs : minAbs;
+    }
+
+    private static void EnsureEffectVisible(GameObject effectRoot)
+    {
+        if (effectRoot == null)
+        {
+            return;
+        }
+
+        effectRoot.SetActive(true);
+        Renderer[] renderers = effectRoot.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            renderers[i].enabled = true;
         }
     }
 
-    private void ApplyBodyMaterial()
+    private GameObject CreateEffectInstance(string effectName, GameObject specificPrefab, Vector3 position, Quaternion rotation)
     {
-        Renderer[] renderers = GetComponentsInChildren<Renderer>();
-        foreach (Renderer r in renderers) r.material = bodyMat;
+        if (specificPrefab != null)
+        {
+            return Instantiate(specificPrefab, position, rotation);
+        }
+
+        if (sharedSkillEffectPrefab != null)
+        {
+            return Instantiate(sharedSkillEffectPrefab, position, rotation);
+        }
+
+        Debug.LogWarning($"[Player2PrototypeController] Missing skill effect prefab for '{effectName}' on {name}. Assign specific prefab or Shared Skill Effect Prefab.", this);
+        return null;
     }
 
-    private Material CreateLitMaterial(Color color)
+    private static Transform FindEffectVisualTransform(GameObject root)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit");
-        if (shader == null) shader = Shader.Find("Standard");
-        Material mat = new Material(shader);
-        mat.color = color;
-        return mat;
+        MeshRenderer rootMesh = root.GetComponent<MeshRenderer>();
+        if (rootMesh != null) return root.transform;
+
+        MeshRenderer childMesh = root.GetComponentInChildren<MeshRenderer>(true);
+        if (childMesh != null) return childMesh.transform;
+
+        SpriteRenderer rootSprite = root.GetComponent<SpriteRenderer>();
+        if (rootSprite != null) return root.transform;
+
+        SpriteRenderer childSprite = root.GetComponentInChildren<SpriteRenderer>(true);
+        if (childSprite != null) return childSprite.transform;
+
+        return root.transform;
     }
 
-    private void BuildSkillSprites()
+    private void CacheFadeTargets(GameObject effectVisualRoot, SkillEffectRuntime runtime)
     {
-        qSprite = CreateSprite(128, (u, v) =>
-        {
-            float x = u * 2f - 1f;
-            float y = v * 2f - 1f;
-            float blade = Mathf.SmoothStep(0.08f, 0f, Mathf.Abs(x)) * Mathf.SmoothStep(1f, 0.25f, Mathf.Abs(y));
-            float tip = Mathf.SmoothStep(0.22f, 0f, Mathf.Abs(x)) * Mathf.SmoothStep(1f, 0.65f, y);
-            float glow = Mathf.Exp(-(x * x + y * y) * 4f) * 0.25f;
-            float a = Mathf.Clamp01(blade + tip + glow);
-            return new Color(1f, 0.93f, 0.35f, a);
-        });
+        List<Material> mats = new List<Material>();
+        List<Color> matColors = new List<Color>();
 
-        wSprite = CreateSprite(128, (u, v) =>
+        Renderer[] renderers = effectVisualRoot.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
         {
-            float x = u * 2f - 1f;
-            float y = v * 2f - 1f;
-            float r = Mathf.Sqrt(x * x + y * y);
-            float ring = Mathf.SmoothStep(0.95f, 0.75f, r) * (1f - Mathf.SmoothStep(0.65f, 0.5f, r));
-            float core = Mathf.Exp(-r * r * 9f) * 0.4f;
-            float a = Mathf.Clamp01(ring + core);
-            return new Color(0.45f, 1f, 0.95f, a);
-        });
-
-        eSprite = CreateSprite(128, (u, v) =>
-        {
-            float x = u * 2f - 1f;
-            float y = v * 2f - 1f;
-            float streak = Mathf.Exp(-x * x * 18f) * Mathf.SmoothStep(1f, 0.2f, Mathf.Abs(y));
-            float tail = Mathf.Exp(-((x + 0.45f) * (x + 0.45f) * 8f + y * y * 18f)) * 0.8f;
-            float a = Mathf.Clamp01(streak + tail);
-            return new Color(1f, 0.65f, 0.15f, a);
-        });
-
-        rSprite = CreateSprite(128, (u, v) =>
-        {
-            float x = u * 2f - 1f;
-            float y = v * 2f - 1f;
-            float r = Mathf.Sqrt(x * x + y * y);
-            float burst = Mathf.Exp(-r * r * 6f);
-            float rays = Mathf.Abs(Mathf.Sin(Mathf.Atan2(y, x) * 6f)) * Mathf.SmoothStep(1f, 0.2f, r);
-            float a = Mathf.Clamp01(burst * 0.7f + rays * 0.55f);
-            return new Color(1f, 0.35f, 0.22f, a);
-        });
-    }
-
-    private Sprite CreateSprite(int size, System.Func<float, float, Color> painter)
-    {
-        Texture2D tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
-        tex.filterMode = FilterMode.Bilinear;
-        tex.wrapMode = TextureWrapMode.Clamp;
-
-        Color[] pixels = new Color[size * size];
-        for (int y = 0; y < size; y++)
-        {
-            for (int x = 0; x < size; x++)
+            Material[] instanceMats = renderers[i].materials;
+            for (int m = 0; m < instanceMats.Length; m++)
             {
-                float u = (x + 0.5f) / size;
-                float v = (y + 0.5f) / size;
-                pixels[y * size + x] = painter(u, v);
+                Material mat = instanceMats[m];
+                if (mat == null) continue;
+                mats.Add(mat);
+                matColors.Add(GetMaterialColor(mat));
             }
         }
 
-        tex.SetPixels(pixels);
-        tex.Apply();
-        return Sprite.Create(tex, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), size);
+        runtime.materialTargets = mats.ToArray();
+        runtime.materialBaseColors = matColors.ToArray();
+
+        runtime.spriteTargets = effectVisualRoot.GetComponentsInChildren<SpriteRenderer>(true);
+        runtime.spriteBaseColors = new Color[runtime.spriteTargets.Length];
+        for (int i = 0; i < runtime.spriteTargets.Length; i++)
+        {
+            runtime.spriteBaseColors[i] = runtime.spriteTargets[i].color;
+        }
+    }
+
+    private static void ApplyFadeAlpha(SkillEffectRuntime runtime, float alpha)
+    {
+        if (runtime == null)
+        {
+            return;
+        }
+
+        if (runtime.materialTargets != null)
+        {
+            for (int i = 0; i < runtime.materialTargets.Length; i++)
+            {
+                Material mat = runtime.materialTargets[i];
+                if (mat == null) continue;
+                Color baseColor = i < runtime.materialBaseColors.Length ? runtime.materialBaseColors[i] : Color.white;
+                SetMaterialColor(mat, new Color(baseColor.r, baseColor.g, baseColor.b, baseColor.a * alpha));
+            }
+        }
+
+        if (runtime.spriteTargets != null)
+        {
+            for (int i = 0; i < runtime.spriteTargets.Length; i++)
+            {
+                SpriteRenderer sr = runtime.spriteTargets[i];
+                if (sr == null) continue;
+                Color baseColor = i < runtime.spriteBaseColors.Length ? runtime.spriteBaseColors[i] : Color.white;
+                sr.color = new Color(baseColor.r, baseColor.g, baseColor.b, baseColor.a * alpha);
+            }
+        }
+    }
+
+    private static void ApplyRootDirection(Transform root, Vector3 direction, bool alignToDirection, bool invertForward, float yawOffset)
+    {
+        float yaw = 0f;
+        if (alignToDirection && direction.sqrMagnitude > 0.0001f)
+        {
+            yaw = Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+        }
+
+        if (invertForward)
+        {
+            yaw += 180f;
+        }
+
+        root.rotation = Quaternion.Euler(0f, yaw + yawOffset, 0f);
+    }
+
+    private Vector3 ResolveVisualScale(Vector3 specificScale, Vector3 planeScale)
+    {
+        Vector3 baseScale = sharedEffectScale;
+        Vector3 roleScale = specificScale.sqrMagnitude > 0.0001f ? specificScale : Vector3.one;
+        Vector3 quadScale = planeScale.sqrMagnitude > 0.0001f ? planeScale : Vector3.one;
+        return new Vector3(
+            baseScale.x * roleScale.x * quadScale.x,
+            baseScale.y * roleScale.y * quadScale.y,
+            baseScale.z * roleScale.z * quadScale.z);
+    }
+
+    private float ResolveRotation(float specificRotationZ)
+    {
+        return sharedEffectRotationZ + specificRotationZ;
+    }
+
+    private static Color GetMaterialColor(Material mat)
+    {
+        if (mat == null) return Color.white;
+        if (mat.HasProperty("_BaseColor")) return mat.GetColor("_BaseColor");
+        if (mat.HasProperty("_Color")) return mat.GetColor("_Color");
+        return Color.white;
+    }
+
+    private static void SetMaterialColor(Material mat, Color color)
+    {
+        if (mat == null) return;
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+        if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
     }
 }
