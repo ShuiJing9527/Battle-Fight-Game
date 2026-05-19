@@ -17,6 +17,7 @@ public class SettingsUI : MonoBehaviour
     void RefreshUI()
     {
         var gm = GameManager.Instance;
+
         musicSlider.value = gm.settings.musicVolume;
         sfxSlider.value = gm.settings.sfxVolume;
         fullscreenToggle.isOn = gm.settings.fullscreen;
@@ -31,6 +32,7 @@ public class SettingsUI : MonoBehaviour
     public void SaveSetting()
     {
         var gm = GameManager.Instance;
+
         gm.settings.musicVolume = musicSlider.value;
         gm.settings.sfxVolume = sfxSlider.value;
         gm.settings.fullscreen = fullscreenToggle.isOn;
