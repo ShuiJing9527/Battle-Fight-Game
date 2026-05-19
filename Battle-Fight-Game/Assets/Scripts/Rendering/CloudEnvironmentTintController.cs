@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text;
 using UnityEngine;
 
 namespace Rendering
@@ -27,6 +28,12 @@ namespace Rendering
         [Header("Blend")]
         [SerializeField] private bool smoothBlend = true;
         [SerializeField] [Range(0.1f, 20f)] private float blendSpeed = 4f;
+        [SerializeField] [Range(0f, 1f)] public float dayNightTintStrength = 0.15f;
+        [SerializeField] [Range(0f, 1f)] public float environmentTintStrength = 0.08f;
+        [SerializeField] [Range(0f, 2f)] public float cloudBrightnessBoost = 1.25f;
+        [SerializeField] [Range(0f, 1f)] public float maxTintSaturation = 0.2f;
+        [SerializeField] [Range(0f, 1f)] public float minCloudBrightness = 0.75f;
+        [SerializeField] [Range(0f, 1f)] public float minCloudAlpha = 0.9f;
 
         [Header("Performance")]
         [SerializeField] [Min(0.02f)] private float targetRefreshInterval = 0.1f;
@@ -34,37 +41,80 @@ namespace Rendering
         [SerializeField] [Min(0f)] private float colorChangeThreshold = 0.003f;
 
         [Header("Debug")]
+        [SerializeField] private bool forceVisibleCloudDebug = true;
+        [SerializeField] [Min(0.1f)] private float debugLogInterval = 1f;
+        [SerializeField] [Range(0.1f, 1f)] private float debugForcedAlpha = 0.85f;
+        [SerializeField] [Range(0.1f, 2f)] private float debugForcedOpacity = 0.9f;
+        [SerializeField] [Range(0.1f, 2f)] private float debugForcedDensity = 1f;
+        [SerializeField] [Range(0.1f, 2f)] private float debugForcedStrength = 1f;
+        [SerializeField] private int debugForcedRenderQueue = 3000;
         [SerializeField] private string currentReadMode = "None";
         [SerializeField] private Color currentSourceColor = Color.white;
         [SerializeField] private Color currentAppliedTint = Color.white;
 
-        private static readonly int EnvironmentTintId = Shader.PropertyToID("_EnvironmentTint");
-
-        private MaterialPropertyBlock mpb;
         private Color currentTint = Color.white;
         private Color targetTint = Color.white;
         private Color lastAppliedTint = new Color(-1f, -1f, -1f, -1f);
         private float nextTargetRefreshTime;
         private float nextApplyTime;
+        private float nextDebugLogTime;
+
+        private static readonly string[] TintPropertyNames =
+        {
+            "_EnvironmentTint", "_TintColor", "_Tint", "_BaseColor", "_Color", "_CloudColor"
+        };
+
+        private static readonly string[] AlphaPropertyNames =
+        {
+            "_Alpha", "_Opacity", "_Transparency", "_AlphaStrength", "_CloudOpacity", "_CloudAlpha"
+        };
+
+        private static readonly string[] DensityPropertyNames =
+        {
+            "_Density", "_CloudDensity", "_FogDensity"
+        };
+
+        private static readonly string[] StrengthPropertyNames =
+        {
+            "_Strength", "_CloudStrength", "_LightStrength"
+        };
+
+        private const float NormalMinAlphaValue = 0.75f;
+        private const float NormalMinOpacityValue = 0.75f;
+        private const float NormalMinDensityValue = 0.6f;
+        private const float NormalMinStrengthValue = 0.6f;
 
         private void Awake()
         {
-            mpb = new MaterialPropertyBlock();
-
             if (includeChildrenOnAwake)
             {
                 CacheChildRenderers();
             }
 
+            if (forceVisibleCloudDebug)
+            {
+                currentReadMode = "ForceVisibleCloudDebug";
+                currentSourceColor = Color.white;
+                currentAppliedTint = Color.white;
+                ForceVisibleCloudsAndLog("Awake", true);
+                return;
+            }
+
             targetTint = ResolveTargetTint();
             currentTint = targetTint;
-            currentAppliedTint = currentTint;
+            currentAppliedTint = BuildSafeCloudTint(currentTint);
             ApplyTint(currentAppliedTint);
             lastAppliedTint = currentAppliedTint;
         }
 
         private void LateUpdate()
         {
+            if (forceVisibleCloudDebug)
+            {
+                ForceVisibleCloudsAndLog("LateUpdate", false);
+                return;
+            }
+
             if (Time.time >= nextTargetRefreshTime)
             {
                 targetTint = ResolveTargetTint();
@@ -80,7 +130,7 @@ namespace Rendering
                 currentTint = targetTint;
             }
 
-            currentAppliedTint = currentTint;
+            currentAppliedTint = BuildSafeCloudTint(currentTint);
             if (Time.time >= nextApplyTime && HasMeaningfulColorChange(currentAppliedTint, lastAppliedTint))
             {
                 ApplyTint(currentAppliedTint);
@@ -101,54 +151,250 @@ namespace Rendering
             }
         }
 
+        private void ForceVisibleCloudsAndLog(string sourceStage, bool forceLogNow)
+        {
+            if (targetRenderers.Count == 0 && includeChildrenOnAwake)
+            {
+                CacheChildRenderers();
+            }
+
+            for (int i = 0; i < targetRenderers.Count; i++)
+            {
+                Renderer renderer = targetRenderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                renderer.enabled = true;
+
+                Material[] materials = renderer.materials;
+                for (int m = 0; m < materials.Length; m++)
+                {
+                    Material material = materials[m];
+                    if (material == null)
+                    {
+                        continue;
+                    }
+
+                    if (debugForcedRenderQueue >= 0)
+                    {
+                        material.renderQueue = debugForcedRenderQueue;
+                    }
+
+                    SetColorIfPresent(material, Color.white, TintPropertyNames);
+                    SetFloatIfPresent(material, debugForcedAlpha, AlphaPropertyNames);
+                    SetFloatIfPresent(material, debugForcedOpacity, "_Opacity", "_Transparency");
+                    SetFloatIfPresent(material, debugForcedDensity, DensityPropertyNames);
+                    SetFloatIfPresent(material, debugForcedStrength, StrengthPropertyNames);
+                }
+            }
+
+            if (!forceLogNow && Time.unscaledTime < nextDebugLogTime)
+            {
+                return;
+            }
+
+            nextDebugLogTime = Time.unscaledTime + Mathf.Max(0.1f, debugLogInterval);
+            LogCloudStatus(sourceStage);
+        }
+
+        private void LogCloudStatus(string sourceStage)
+        {
+            if (targetRenderers.Count == 0)
+            {
+                Debug.LogWarning($"[CloudEnvironmentTintController] {sourceStage} no cloud renderers bound.", this);
+                return;
+            }
+
+            for (int i = 0; i < targetRenderers.Count; i++)
+            {
+                Renderer renderer = targetRenderers[i];
+                if (renderer == null)
+                {
+                    Debug.LogWarning($"[CloudEnvironmentTintController] {sourceStage} targetRenderers[{i}] is null.", this);
+                    continue;
+                }
+
+                Material[] mats = renderer.materials;
+                for (int m = 0; m < mats.Length; m++)
+                {
+                    Material mat = mats[m];
+                    if (mat == null)
+                    {
+                        Debug.LogWarning($"[CloudEnvironmentTintController] {sourceStage} renderer={renderer.name} material[{m}] is null.", renderer);
+                        continue;
+                    }
+
+                    StringBuilder sb = new StringBuilder(512);
+                    sb.Append("[CloudEnvironmentTintController] ").Append(sourceStage)
+                        .Append(" renderer=").Append(renderer.name)
+                        .Append(" renderer.enabled=").Append(renderer.enabled)
+                        .Append(" material=").Append(mat.name)
+                        .Append(" renderQueue=").Append(mat.renderQueue);
+
+                    AppendColorState(sb, mat, "Tint", "_TintColor");
+                    AppendColorState(sb, mat, "BaseColor", "_BaseColor");
+                    AppendColorState(sb, mat, "Color", "_Color");
+                    AppendFloatState(sb, mat, "Alpha", "_Alpha");
+                    AppendFloatState(sb, mat, "Opacity", "_Opacity");
+                    AppendFloatState(sb, mat, "Density", "_Density");
+                    AppendFloatState(sb, mat, "Strength", "_Strength");
+                    AppendFloatState(sb, mat, "Transparency", "_Transparency");
+                    AppendFloatState(sb, mat, "AlphaStrength", "_AlphaStrength");
+                    AppendColorState(sb, mat, "EnvironmentTint", "_EnvironmentTint");
+
+                    Debug.Log(sb.ToString(), renderer);
+                }
+            }
+        }
+
+        private static void SetColorIfPresent(Material material, Color value, params string[] propertyNames)
+        {
+            for (int i = 0; i < propertyNames.Length; i++)
+            {
+                string propertyName = propertyNames[i];
+                if (material.HasProperty(propertyName))
+                {
+                    Color forced = value;
+                    Color current = material.GetColor(propertyName);
+                    forced.a = Mathf.Max(current.a, value.a);
+                    material.SetColor(propertyName, forced);
+                }
+            }
+        }
+
+        private static void SetFloatIfPresent(Material material, float value, params string[] propertyNames)
+        {
+            for (int i = 0; i < propertyNames.Length; i++)
+            {
+                string propertyName = propertyNames[i];
+                if (material.HasProperty(propertyName))
+                {
+                    material.SetFloat(propertyName, value);
+                }
+            }
+        }
+
+        private static void EnsureMinimumFloat(Material material, float minValue, params string[] propertyNames)
+        {
+            for (int i = 0; i < propertyNames.Length; i++)
+            {
+                string propertyName = propertyNames[i];
+                if (!material.HasProperty(propertyName))
+                {
+                    continue;
+                }
+
+                float current = material.GetFloat(propertyName);
+                if (current < minValue)
+                {
+                    material.SetFloat(propertyName, minValue);
+                }
+            }
+        }
+
+        private static void AppendColorState(StringBuilder sb, Material mat, string label, string propertyName)
+        {
+            sb.Append(" | ").Append(label).Append('(').Append(propertyName).Append(")=");
+            if (!mat.HasProperty(propertyName))
+            {
+                sb.Append("N/A");
+                return;
+            }
+
+            Color color = mat.GetColor(propertyName);
+            sb.Append('(')
+                .Append(color.r.ToString("0.###")).Append(',')
+                .Append(color.g.ToString("0.###")).Append(',')
+                .Append(color.b.ToString("0.###")).Append(',')
+                .Append(color.a.ToString("0.###")).Append(')');
+        }
+
+        private static void AppendFloatState(StringBuilder sb, Material mat, string label, string propertyName)
+        {
+            sb.Append(" | ").Append(label).Append('(').Append(propertyName).Append(")=");
+            if (!mat.HasProperty(propertyName))
+            {
+                sb.Append("N/A");
+                return;
+            }
+
+            sb.Append(mat.GetFloat(propertyName).ToString("0.###"));
+        }
+
         private Color ResolveTargetTint()
         {
+            float nightAmount = Mathf.Clamp01(debugNightAmount);
+            bool hasNightAmountFromTod = false;
+            bool hasEnvironmentColor = false;
+            Color environmentColor = Color.white;
+            object source = null;
+
             if (forceFallbackTint)
             {
-                Color fallback = Color.Lerp(dayTint, nightTint, Mathf.Clamp01(debugNightAmount));
-                fallback.a = 1f;
-                currentReadMode = "ForceFallback";
-                currentSourceColor = fallback;
-                return fallback;
+                currentReadMode = "ForceFallback(DayNightOnly)";
             }
-
-            object source = ResolveReadSource();
-            if (source == null)
+            else
             {
-                currentReadMode = "Fallback(No Source)";
-                currentSourceColor = dayTint;
-                return dayTint;
+                source = ResolveReadSource();
+                if (source != null)
+                {
+                    if (TryReadFloatByNames(source, out float dayNight, "DayOrNight", "dayOrNight", "_dayOrNight"))
+                    {
+                        nightAmount = Mathf.Clamp01(dayNight);
+                        hasNightAmountFromTod = true;
+                    }
+
+                    if (TryReadColorByNames(source, out Color fogColor, "FogLightColor", "fogLightColor", "_fogLightColor"))
+                    {
+                        environmentColor = fogColor;
+                        environmentColor.a = 1f;
+                        hasEnvironmentColor = true;
+                    }
+                    else if (TryReadColorByNames(source, out Color mainLightColor, "MainlightColor", "mainlightColor", "_mainlightColor"))
+                    {
+                        environmentColor = mainLightColor;
+                        environmentColor.a = 1f;
+                        hasEnvironmentColor = true;
+                    }
+                }
+
+                if (source == null)
+                {
+                    currentReadMode = "Fallback(DebugNightOnly)";
+                }
             }
 
-            if (TryReadColorByNames(source, out Color fogColor, "FogLightColor", "fogLightColor", "_fogLightColor"))
+            Color cloudWhite = Color.white * Mathf.Max(0f, cloudBrightnessBoost);
+            cloudWhite.a = 1f;
+
+            Color baseTint = Color.Lerp(dayTint, nightTint, nightAmount);
+            baseTint.a = 1f;
+            Color desaturatedDayNight = Color.Lerp(Color.white, baseTint, Mathf.Clamp01(maxTintSaturation));
+            desaturatedDayNight.a = 1f;
+            Color tintAfterDayNight = Color.Lerp(cloudWhite, desaturatedDayNight, Mathf.Clamp01(dayNightTintStrength));
+            tintAfterDayNight.a = 1f;
+
+            if (!forceFallbackTint && hasEnvironmentColor)
             {
-                fogColor.a = 1f;
-                currentReadMode = "TOD.FogLightColor";
-                currentSourceColor = fogColor;
-                return fogColor;
+                Color desaturatedEnv = Color.Lerp(Color.white, environmentColor, Mathf.Clamp01(maxTintSaturation));
+                desaturatedEnv.a = 1f;
+                Color finalTint = Color.Lerp(tintAfterDayNight, desaturatedEnv, Mathf.Clamp01(environmentTintStrength));
+                finalTint.a = 1f;
+
+                currentReadMode = hasNightAmountFromTod ? "TOD.DayNight+Env(Soft)" : "DebugNight+Env(Soft)";
+                currentSourceColor = environmentColor;
+                return finalTint;
             }
 
-            if (TryReadColorByNames(source, out Color mainLightColor, "MainlightColor", "mainlightColor", "_mainlightColor"))
+            if (!forceFallbackTint && hasNightAmountFromTod)
             {
-                mainLightColor.a = 1f;
-                currentReadMode = "TOD.MainlightColor";
-                currentSourceColor = mainLightColor;
-                return mainLightColor;
+                currentReadMode = "TOD.DayNightOnly(Soft)";
             }
 
-            if (TryReadFloatByNames(source, out float dayNight, "DayOrNight", "dayOrNight", "_dayOrNight"))
-            {
-                float t = Mathf.Clamp01(dayNight);
-                Color fallback = Color.Lerp(dayTint, nightTint, t);
-                fallback.a = 1f;
-                currentReadMode = "TOD._dayOrNight Fallback";
-                currentSourceColor = fallback;
-                return fallback;
-            }
-
-            currentReadMode = "Fallback(Default DayTint)";
-            currentSourceColor = dayTint;
-            return dayTint;
+            currentSourceColor = baseTint;
+            return tintAfterDayNight;
         }
 
         private object ResolveReadSource()
@@ -180,6 +426,16 @@ namespace Rendering
             return todSource;
         }
 
+        private Color BuildSafeCloudTint(Color sourceColor)
+        {
+            Color mixedTint = sourceColor;
+            mixedTint.r = Mathf.Max(mixedTint.r, minCloudBrightness);
+            mixedTint.g = Mathf.Max(mixedTint.g, minCloudBrightness);
+            mixedTint.b = Mathf.Max(mixedTint.b, minCloudBrightness);
+            mixedTint.a = Mathf.Max(mixedTint.a, minCloudAlpha);
+            return mixedTint;
+        }
+
         private void ApplyTint(Color tint)
         {
             for (int i = 0; i < targetRenderers.Count; i++)
@@ -190,15 +446,22 @@ namespace Rendering
                     continue;
                 }
 
-                Material shared = renderer.sharedMaterial;
-                if (shared == null || !shared.HasProperty(EnvironmentTintId))
+                renderer.enabled = true;
+                Material[] materials = renderer.materials;
+                for (int m = 0; m < materials.Length; m++)
                 {
-                    continue;
-                }
+                    Material material = materials[m];
+                    if (material == null)
+                    {
+                        continue;
+                    }
 
-                renderer.GetPropertyBlock(mpb);
-                mpb.SetColor(EnvironmentTintId, tint);
-                renderer.SetPropertyBlock(mpb);
+                    SetColorIfPresent(material, tint, TintPropertyNames);
+                    EnsureMinimumFloat(material, NormalMinAlphaValue, "_Alpha", "_Transparency", "_AlphaStrength", "_CloudAlpha");
+                    EnsureMinimumFloat(material, NormalMinOpacityValue, "_Opacity", "_CloudOpacity");
+                    EnsureMinimumFloat(material, NormalMinDensityValue, DensityPropertyNames);
+                    EnsureMinimumFloat(material, NormalMinStrengthValue, StrengthPropertyNames);
+                }
             }
         }
 
