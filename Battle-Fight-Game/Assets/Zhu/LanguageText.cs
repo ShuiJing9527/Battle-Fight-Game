@@ -1,7 +1,6 @@
 using UnityEngine;
 using TMPro;
 
-[RequireComponent(typeof(TextMeshProUGUI))]
 public class LanguageText : MonoBehaviour
 {
     public string key;
@@ -14,19 +13,10 @@ public class LanguageText : MonoBehaviour
 
     void OnEnable()
     {
-        if (GameManager.Instance == null) return;
-
-        UpdateText();
-        GameManager.Instance.OnLanguageChanged += UpdateText;
+        TryRefresh();
     }
 
-    void OnDisable()
-    {
-        if (GameManager.Instance == null) return;
-        GameManager.Instance.OnLanguageChanged -= UpdateText;
-    }
-
-    void UpdateText()
+    void TryRefresh()
     {
         if (GameManager.Instance == null || tmp == null)
             return;

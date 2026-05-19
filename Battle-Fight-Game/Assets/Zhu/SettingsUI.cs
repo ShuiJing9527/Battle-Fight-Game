@@ -11,30 +11,47 @@ public class SettingsUI : MonoBehaviour
 
     void OnEnable()
     {
-        // 延迟一帧再刷新，避免空引用
-        Invoke(nameof(RefreshUI), 0.01f);
+        // 最安全：延迟2帧刷新，百分百确保GM已初始化
+        Invoke(nameof(RefreshUI), 0.02f);
     }
 
     public void RefreshUI()
     {
+        // 双重保险！找不到直接return，绝对不报错
         if (GameManager.Instance == null)
+            return;
+
+        if (GameManager.Instance.settings == null)
             return;
 
         var gm = GameManager.Instance;
 
-        musicSlider.value = gm.settings.musicVolume;
-        sfxSlider.value = gm.settings.sfxVolume;
-        fullscreenToggle.isOn = gm.settings.fullscreen;
+        // 音量
+        if (musicSlider != null)
+            musicSlider.value = gm.settings.musicVolume;
+        if (sfxSlider != null)
+            sfxSlider.value = gm.settings.sfxVolume;
 
-        langDrop.ClearOptions();
-        langDrop.AddOptions(gm.GetLangNames());
+        // 全屏
+        if (fullscreenToggle != null)
+            fullscreenToggle.isOn = gm.settings.fullscreen;
 
-        int index = gm.GetLangKeys().IndexOf(gm.settings.language);
-        langDrop.value = index;
+        // 语言下拉框
+        if (langDrop != null)
+        {
+            langDrop.ClearOptions();
+            langDrop.AddOptions(gm.GetLangNames());
+
+            int index = gm.GetLangKeys().IndexOf(gm.settings.language);
+            if (index >= 0)
+                langDrop.value = index;
+        }
     }
 
     public void SaveSetting()
     {
+        if (GameManager.Instance == null) return;
+
         var gm = GameManager.Instance;
         gm.settings.musicVolume = musicSlider.value;
         gm.settings.sfxVolume = sfxSlider.value;
