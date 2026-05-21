@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.Serialization;
 
 public class Player2PrototypeController : MonoBehaviour
 {
@@ -35,6 +36,9 @@ public class Player2PrototypeController : MonoBehaviour
     public GameObject standbySkillEffectPrefab;
 
     [Header("Skill Effect Visuals - Shared")]
+    public bool useRawPrefabRotationForSkillEffects = true;
+    public Vector3 skillEffectPrefabBaseRotation = new Vector3(180.618f, 91.603f, -89.927f);
+    public float skillEffectPrefabScaleMultiplier = 1f;
     public Vector3 sharedEffectScale = new Vector3(1f, 1f, 1f);
     public float sharedEffectRotationZ = 0f;
 
@@ -52,14 +56,23 @@ public class Player2PrototypeController : MonoBehaviour
     [Header("Skill Effect Visuals - W")]
     public Vector3 wEffectScale = new Vector3(0.4f, 0.4f, 0.4f);
     public float wEffectRotationZ = 0f;
-    public Vector3 wEffectOffset = new Vector3(0f, 1.2f, 1.0f);
+    public Vector3 wEffectOffset = Vector3.zero;
     public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
+    public float wEffectScaleMultiplier = 1f;
     public bool wEffectVerticalRotation = true;
-    public float wEffectSpinSpeed = 120f;
     public Vector3 wEffectSpinAxis = Vector3.up;
     public float wEffectVisualPitch = 0f;
-    public float wEffectVisualYaw = 180f;
+    public float wEffectVisualYaw = 0f;
     public float wEffectVisualRoll = 0f;
+
+    [Header("W Orbit Settings")]
+    public int wSwordCount = 3;
+    public float wEffectOrbitRadius = 1.2f;
+    public float wEffectHeight = 1.1f;
+    public float wEffectOrbitSpeed = 80f;
+    public bool wEffectFaceCamera = true;
+    [FormerlySerializedAs("wEffectSpinSpeed")]
+    public float wEffectSelfSpinSpeed = 0f;
 
     [Header("Skill Effect Visuals - E")]
     public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
@@ -109,6 +122,10 @@ public class Player2PrototypeController : MonoBehaviour
     private int standbySwords;
     private bool isDashing;
     private bool isShielding;
+    private float wOrbitAngle;
+    private Coroutine wSkillRoutine;
+    private GameObject activeWOrbitVisualRoot;
+    private readonly List<GameObject> activeWSwords = new List<GameObject>();
 
     private readonly List<GameObject> standbySwordVisuals = new List<GameObject>();
 
@@ -205,8 +222,14 @@ public class Player2PrototypeController : MonoBehaviour
 
     private void CastW()
     {
-        if (!isShielding) StartCoroutine(ShieldRoutine());
-        AddStandbySword();
+        if (wSkillRoutine != null)
+        {
+            StopCoroutine(wSkillRoutine);
+            wSkillRoutine = null;
+        }
+
+        CleanupWVisuals();
+        wSkillRoutine = StartCoroutine(ShieldRoutine());
     }
 
     private void CastE()
@@ -269,57 +292,147 @@ public class Player2PrototypeController : MonoBehaviour
     private IEnumerator ShieldRoutine()
     {
         isShielding = true;
-        GameObject orbitRoot = new GameObject("W_OrbitRoot");
+        GameObject orbitRoot = new GameObject("W_OrbitVisualRoot");
         orbitRoot.transform.position = transform.position;
         orbitRoot.transform.rotation = Quaternion.identity;
+        activeWOrbitVisualRoot = orbitRoot;
 
-        GameObject swordInstance = CreateEffectInstance("W_Shield", wSkillEffectPrefab, orbitRoot.transform.position, Quaternion.identity);
-        if (swordInstance == null)
+        activeWSwords.Clear();
+        int swordCount = 3;
+        wSwordCount = 3;
+        for (int i = 0; i < swordCount; i++)
         {
-            Destroy(orbitRoot);
+            float angle = i * (360f / swordCount);
+            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * wEffectOrbitRadius;
+            Vector3 spawnPos = transform.position + new Vector3(offset.x, wEffectHeight, offset.z) + wEffectOffset;
+
+            GameObject sword = CreateSkillEffectVisual(
+                $"W_Sword_{i}",
+                ResolveWVisualPrefab(),
+                spawnPos,
+                offset,
+                false,
+                false,
+                0f,
+                standbySwordVisualPitch,
+                standbySwordVisualYaw,
+                standbySwordVisualRoll + ResolveRotation(standbySwordRotationZ),
+                ResolveVisualScale(standbySwordScale, standbySwordPlaneScale));
+
+            if (sword == null)
+            {
+                continue;
+            }
+
+            sword.transform.SetParent(orbitRoot.transform, true);
+            activeWSwords.Add(sword);
+        }
+
+        Debug.Log($"[W Skill] Spawned sword count = {activeWSwords.Count}", this);
+        if (activeWSwords.Count > 3)
+        {
+            Debug.LogWarning($"[W Skill] Spawned sword count exceeded expected 3: {activeWSwords.Count}", this);
+        }
+
+        if (activeWSwords.Count == 0)
+        {
+            CleanupWVisuals();
             isShielding = false;
             yield break;
         }
 
-        swordInstance.name = "W_SwordInstance";
-        swordInstance.transform.SetParent(orbitRoot.transform, false);
-        swordInstance.transform.localPosition = wEffectOffset;
-        swordInstance.transform.localRotation = Quaternion.identity;
-        EnsureEffectVisible(swordInstance);
-
-        Transform visualTarget = FindEffectVisualTransform(swordInstance);
-        float pitch = wEffectVerticalRotation ? wEffectVisualPitch : 0f;
-        visualTarget.localRotation = Quaternion.Euler(pitch, wEffectVisualYaw, wEffectVisualRoll + ResolveRotation(wEffectRotationZ));
-        Vector3 resolvedScale = ClampVisualScale(ResolveVisualScale(wEffectScale, wEffectPlaneScale));
-        visualTarget.localScale = Vector3.Scale(visualTarget.localScale, resolvedScale);
-
-        SkillEffectRuntime runtime = orbitRoot.AddComponent<SkillEffectRuntime>();
-        runtime.visual = visualTarget;
-        runtime.baseVisualScale = visualTarget.localScale;
-        CacheFadeTargets(swordInstance, runtime);
-
-        Vector3 spinAxis = wEffectSpinAxis.sqrMagnitude > 0.0001f ? wEffectSpinAxis.normalized : Vector3.up;
+        wOrbitAngle = 0f;
         float t = 0f;
         while (t < wDuration)
         {
-            if (orbitRoot != null)
-            {
-                orbitRoot.transform.position = transform.position;
-                orbitRoot.transform.Rotate(spinAxis, wEffectSpinSpeed * Time.deltaTime, Space.Self);
-            }
+            orbitRoot.transform.position = transform.position;
+            orbitRoot.transform.rotation = Quaternion.identity;
 
-            if (runtime != null && runtime.visual != null)
+            wOrbitAngle += wEffectOrbitSpeed * Time.deltaTime;
+
+            for (int i = 0; i < activeWSwords.Count; i++)
             {
-                float pulse = 1f + Mathf.Sin(Time.time * 12f) * 0.08f;
-                runtime.visual.localScale = runtime.baseVisualScale * pulse;
+                GameObject sword = activeWSwords[i];
+                if (sword == null)
+                {
+                    continue;
+                }
+
+                float baseAngle = wOrbitAngle + i * (360f / swordCount);
+                float rad = baseAngle * Mathf.Deg2Rad;
+                Vector3 offset = new Vector3(
+                    Mathf.Cos(rad) * wEffectOrbitRadius,
+                    wEffectHeight,
+                    Mathf.Sin(rad) * wEffectOrbitRadius);
+
+                sword.transform.position = transform.position + offset + wEffectOffset;
             }
 
             t += Time.deltaTime;
             yield return null;
         }
 
-        if (orbitRoot != null) Destroy(orbitRoot);
+        CleanupWVisuals();
         isShielding = false;
+        wSkillRoutine = null;
+    }
+
+    private void CleanupWVisuals()
+    {
+        for (int i = 0; i < activeWSwords.Count; i++)
+        {
+            GameObject sword = activeWSwords[i];
+            if (sword != null)
+            {
+                Destroy(sword);
+            }
+        }
+        activeWSwords.Clear();
+
+        if (activeWOrbitVisualRoot != null)
+        {
+            Destroy(activeWOrbitVisualRoot);
+            activeWOrbitVisualRoot = null;
+        }
+
+        // Clean legacy/temporary W visuals that may have been spawned by older logic.
+        Transform[] allTransforms = FindObjectsOfType<Transform>(true);
+        for (int i = 0; i < allTransforms.Length; i++)
+        {
+            Transform tr = allTransforms[i];
+            if (tr == null) continue;
+            string n = tr.name;
+            bool isLegacyW =
+                n == "W_OrbitRoot" ||
+                n == "W_OrbitVisualRoot" ||
+                n == "W_Sword" ||
+                n == "W_SwordInstance" ||
+                n.StartsWith("W_Sword_") ||
+                n.StartsWith("W_SwordPivot_");
+
+            if (isLegacyW)
+            {
+                Destroy(tr.gameObject);
+            }
+        }
+
+        standbySwords = 0;
+        isShielding = false;
+    }
+
+    private GameObject ResolveWVisualPrefab()
+    {
+        if (standbySkillEffectPrefab != null)
+        {
+            return standbySkillEffectPrefab;
+        }
+
+        if (wSkillEffectPrefab != null)
+        {
+            return wSkillEffectPrefab;
+        }
+
+        return sharedSkillEffectPrefab;
     }
 
     private IEnumerator DashRoutine()
@@ -423,7 +536,10 @@ public class Player2PrototypeController : MonoBehaviour
         foreach (GameObject standby in standbySwordVisuals)
         {
             if (standby == null) continue;
-            ApplyRootDirection(standby.transform, dir, true, false, 0f);
+            if (!useRawPrefabRotationForSkillEffects)
+            {
+                ApplyRootDirection(standby.transform, dir, true, false, 0f);
+            }
             StartCoroutine(FireAfterDelay(standby, dir, 0f, speed));
         }
 
@@ -452,9 +568,16 @@ public class Player2PrototypeController : MonoBehaviour
     {
         GameObject root = new GameObject(name);
         root.transform.position = worldPosition;
-        ApplyRootDirection(root.transform, direction, alignToDirection, invertForward, yawOffset);
+        if (useRawPrefabRotationForSkillEffects)
+        {
+            root.transform.rotation = Quaternion.Euler(skillEffectPrefabBaseRotation);
+        }
+        else
+        {
+            ApplyRootDirection(root.transform, direction, alignToDirection, invertForward, yawOffset);
+        }
 
-        GameObject effectVisual = CreateEffectInstance(name, specificPrefab, root.transform.position, root.transform.rotation);
+        GameObject effectVisual = CreateEffectInstance(name, specificPrefab, root.transform.position, root.transform.rotation, useRawPrefabRotationForSkillEffects);
         if (effectVisual == null)
         {
             Destroy(root);
@@ -465,8 +588,17 @@ public class Player2PrototypeController : MonoBehaviour
         effectVisual.transform.SetParent(root.transform, true);
 
         Transform visualTarget = FindEffectVisualTransform(effectVisual);
-        visualTarget.localRotation = Quaternion.Euler(visualPitch, visualYaw, visualRoll);
-        visualTarget.localScale = Vector3.Scale(visualTarget.localScale, ClampVisualScale(visualScale));
+        if (useRawPrefabRotationForSkillEffects)
+        {
+            effectVisual.transform.rotation = Quaternion.Euler(skillEffectPrefabBaseRotation);
+            float rawScaleMultiplier = Mathf.Max(0.01f, skillEffectPrefabScaleMultiplier);
+            effectVisual.transform.localScale = effectVisual.transform.localScale * rawScaleMultiplier;
+        }
+        else
+        {
+            visualTarget.localRotation = Quaternion.Euler(visualPitch, visualYaw, visualRoll);
+            visualTarget.localScale = Vector3.Scale(visualTarget.localScale, ClampVisualScale(visualScale));
+        }
         EnsureEffectVisible(effectVisual);
 
         SkillEffectRuntime runtime = root.AddComponent<SkillEffectRuntime>();
@@ -511,16 +643,47 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
-    private GameObject CreateEffectInstance(string effectName, GameObject specificPrefab, Vector3 position, Quaternion rotation)
+    private static void TrySetDoubleSidedIfSupported(GameObject effectRoot)
     {
-        if (specificPrefab != null)
+        if (effectRoot == null)
         {
-            return Instantiate(specificPrefab, position, rotation);
+            return;
         }
 
-        if (sharedSkillEffectPrefab != null)
+        Renderer[] renderers = effectRoot.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
         {
-            return Instantiate(sharedSkillEffectPrefab, position, rotation);
+            Material[] mats = renderers[i].materials;
+            for (int m = 0; m < mats.Length; m++)
+            {
+                Material mat = mats[m];
+                if (mat == null || !mat.HasProperty("_Cull"))
+                {
+                    continue;
+                }
+
+                mat.SetFloat("_Cull", 0f);
+            }
+        }
+    }
+
+    private GameObject CreateEffectInstance(string effectName, GameObject specificPrefab, Vector3 position, Quaternion rotation, bool preservePrefabRotation)
+    {
+        GameObject sourcePrefab = specificPrefab != null ? specificPrefab : sharedSkillEffectPrefab;
+        if (sourcePrefab != null)
+        {
+            GameObject instance;
+            if (preservePrefabRotation)
+            {
+                instance = Instantiate(sourcePrefab);
+                instance.transform.position = position;
+            }
+            else
+            {
+                instance = Instantiate(sourcePrefab, position, rotation);
+            }
+
+            return instance;
         }
 
         Debug.LogWarning($"[Player2PrototypeController] Missing skill effect prefab for '{effectName}' on {name}. Assign specific prefab or Shared Skill Effect Prefab.", this);

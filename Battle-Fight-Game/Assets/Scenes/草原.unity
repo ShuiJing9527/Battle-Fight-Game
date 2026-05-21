@@ -6438,7 +6438,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &493982237
 Transform:
   m_ObjectHideFlags: 0
@@ -6547,7 +6547,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!4 &979945786
 Transform:
   m_ObjectHideFlags: 0
@@ -8360,7 +8360,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1331355771}
+  m_CustomBakedTexture: {fileID: 1801627699}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -9735,43 +9735,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!84 &1331355771
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1373474694
 GameObject:
   m_ObjectHideFlags: 0
@@ -10025,7 +9988,7 @@ Transform:
   m_GameObject: {fileID: 1414717678}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0.3, y: 0.75, z: 0}
+  m_LocalPosition: {x: -0.77, y: 0.75, z: 0}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -10845,6 +10808,43 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistancePostion
   footTransform: {fileID: 1665794655}
+--- !u!84 &1801627699
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1809271588
 GameObject:
   m_ObjectHideFlags: 0
@@ -11083,6 +11083,63 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!1001 &1905824859
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_Name
+      value: Skill Effect Sprite
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0.8
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: -0.7071068
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 90
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 180
+      objectReference: {fileID: 0}
+    - target: {fileID: 6421053766698204874, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
 --- !u!1 &1959916819
 GameObject:
   m_ObjectHideFlags: 0
@@ -12083,12 +12140,18 @@ MonoBehaviour:
   wEffectRotationZ: -90
   wEffectOffset: {x: 0, y: 0, z: 0}
   wEffectPlaneScale: {x: 0.25, y: 0.25, z: 1}
+  wEffectScaleMultiplier: 1
   wEffectVerticalRotation: 1
-  wEffectSpinSpeed: 180
   wEffectSpinAxis: {x: 0, y: 1, z: 0}
-  wEffectVisualPitch: 90
-  wEffectVisualYaw: 0
-  wEffectVisualRoll: 0
+  wEffectVisualPitch: 0
+  wEffectVisualYaw: 180
+  wEffectVisualRoll: 180
+  wSwordCount: 3
+  wEffectOrbitRadius: 1.2
+  wEffectHeight: 1.1
+  wEffectOrbitSpeed: 80
+  wEffectFaceCamera: 1
+  wEffectSelfSpinSpeed: 0
   eEffectScale: {x: 0.35, y: 0.35, z: 0.35}
   eEffectRotationZ: 0
   eEffectOffset: {x: 0, y: 0, z: 0}
@@ -14037,15 +14100,15 @@ PrefabInstance:
     m_Modifications:
     - target: {fileID: 6587736263089903195, guid: db8555b0844b6e44bbf5676127b1efc7, type: 3}
       propertyPath: m_LocalPosition.x
-      value: 0.72879
+      value: -1.668
       objectReference: {fileID: 0}
     - target: {fileID: 6587736263089903195, guid: db8555b0844b6e44bbf5676127b1efc7, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 3.93542
+      value: 0.288
       objectReference: {fileID: 0}
     - target: {fileID: 6587736263089903195, guid: db8555b0844b6e44bbf5676127b1efc7, type: 3}
       propertyPath: m_LocalPosition.z
-      value: -6.69299
+      value: -1.498
       objectReference: {fileID: 0}
     - target: {fileID: 6587736263089903195, guid: db8555b0844b6e44bbf5676127b1efc7, type: 3}
       propertyPath: m_LocalRotation.w
@@ -14105,3 +14168,4 @@ SceneRoots:
   - {fileID: 362345126}
   - {fileID: 176109629}
   - {fileID: 1809271592}
+  - {fileID: 1905824859}
