@@ -1,30 +1,33 @@
 ﻿using UnityEngine;
 using TMPro;
 
+[RequireComponent(typeof(TextMeshProUGUI))]
 public class LocalizedText : MonoBehaviour
 {
     public string key;
-    private TextMeshProUGUI tmp;
+    private TextMeshProUGUI text;
+
+    void Awake()
+    {
+        text = GetComponent<TextMeshProUGUI>();
+    }
 
     void OnEnable()
     {
-        tmp = GetComponent<TextMeshProUGUI>();
+        UpdateText();
         if (GameManager.Instance != null)
-        {
-            GameManager.Instance.OnLanguageChanged += Refresh;
-            Refresh();
-        }
+            GameManager.Instance.OnLanguageChanged += UpdateText;
     }
 
     void OnDisable()
     {
         if (GameManager.Instance != null)
-            GameManager.Instance.OnLanguageChanged -= Refresh;
+            GameManager.Instance.OnLanguageChanged -= UpdateText;
     }
 
-    void Refresh()
+    void UpdateText()
     {
-        if (tmp != null)
-            tmp.text = GameManager.Instance.GetText(key);
+        if (GameManager.Instance == null) return;
+        text.text = GameManager.Instance.GetText(key);
     }
 }

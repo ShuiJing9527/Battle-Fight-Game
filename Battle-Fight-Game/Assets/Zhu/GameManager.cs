@@ -4,7 +4,7 @@ using System.IO;
 using System.Security.Cryptography;
 using System.Text;
 using UnityEngine;
-using UnityEngine.SceneManagement;
+using UnityEngine.SceneManagement; // 这里修复了！
 
 public class GameManager : MonoBehaviour
 {
@@ -13,7 +13,7 @@ public class GameManager : MonoBehaviour
 
     public GameObject settingsPanel;
 
-    private readonly List<KeyValuePair<string, string>> supportedLanguages = new List<KeyValuePair<string, string>>
+    private readonly List<KeyValuePair<string, string>> supportedLanguages = new List<KeyValuePair<string, string>>()
     {
         new KeyValuePair<string, string>("en", "English"),
         new KeyValuePair<string, string>("zh", "中文"),
@@ -48,21 +48,19 @@ public class GameManager : MonoBehaviour
         LoadSettings();
         OnLanguageChanged?.Invoke();
         if (settingsPanel != null) settingsPanel.SetActive(false);
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayMenuBGM();
     }
 
-    // ======================
-    // 按钮绑定用
-    // ======================
     public void ToggleSettingsPanel()
     {
-        Debug.Log("设置按钮点击");
         if (settingsPanel != null)
             settingsPanel.SetActive(!settingsPanel.activeSelf);
     }
 
     public void ExitGame()
     {
-        Debug.Log("退出按钮点击");
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
@@ -70,61 +68,58 @@ public class GameManager : MonoBehaviour
 #endif
     }
 
-    // ======================
-    // 多语言
-    // ======================
     private void InitializeLocalization()
     {
+        AddLocalized("button_start", "Start", "开始", "スタート");
+        AddLocalized("button_settings", "Settings", "设置", "設定");
+        AddLocalized("button_exit", "Exit", "退出", "終了");
         AddLocalized("label_music", "Music", "音乐", "音楽");
         AddLocalized("label_sfx", "SFX", "音效", "効果音");
         AddLocalized("label_fullscreen", "Fullscreen", "全屏", "全画面");
         AddLocalized("label_language", "Language", "语言", "言語");
+        AddLocalized("button_save", "Save", "保存", "保存");
         AddLocalized("button_close", "Close", "关闭", "閉じる");
     }
 
     private void AddLocalized(string key, string en, string zh, string ja)
     {
-        localization[key] = new Dictionary<string, string>
+        localization[key] = new Dictionary<string, string>()
         {
-            { "en", en }, { "zh", zh }, { "ja", ja }
+            { "en", en },
+            { "zh", zh },
+            { "ja", ja }
         };
     }
 
     public string GetText(string key)
     {
-        string lang = settings.language ?? "en";
+        string lang = settings.language ?? "zh";
         if (localization.ContainsKey(key) && localization[key].ContainsKey(lang))
             return localization[key][lang];
         return key;
     }
 
-    public List<string> GetLangNames() => GetSupportedLanguageDisplayNames();
-    public List<string> GetLangKeys() => GetSupportedLanguageCodes();
-
-    public List<string> GetSupportedLanguageCodes()
+    public List<string> GetLangNames()
     {
-        var list = new List<string>();
-        foreach (var kv in supportedLanguages) list.Add(kv.Key);
+        List<string> list = new List<string>();
+        foreach (var item in supportedLanguages) list.Add(item.Value);
         return list;
     }
 
-    public List<string> GetSupportedLanguageDisplayNames()
+    public List<string> GetLangKeys()
     {
-        var list = new List<string>();
-        foreach (var kv in supportedLanguages) list.Add(kv.Value);
+        List<string> list = new List<string>();
+        foreach (var item in supportedLanguages) list.Add(item.Key);
         return list;
     }
 
-    public void SetLanguage(string languageCode)
+    public void SetLanguage(string lang)
     {
-        settings.language = languageCode;
+        settings.language = lang;
         SaveSettings();
         OnLanguageChanged?.Invoke();
     }
 
-    // ======================
-    // 设置
-    // ======================
     public void LoadSettings()
     {
         if (File.Exists(settingsPath))
@@ -133,8 +128,7 @@ public class GameManager : MonoBehaviour
             {
                 string enc = File.ReadAllText(settingsPath);
                 string json = DecryptString(enc);
-                var s = JsonUtility.FromJson<SettingsData>(json);
-                if (s != null) gameData.settings = s;
+                gameData.settings = JsonUtility.FromJson<SettingsData>(json);
             }
             catch { }
         }
@@ -155,14 +149,11 @@ public class GameManager : MonoBehaviour
 
     public void ApplySettings()
     {
-        AudioListener.volume = gameData.settings.musicVolume;
-        Screen.fullScreen = gameData.settings.fullscreen;
+        AudioListener.volume = settings.musicVolume;
+        Screen.fullScreen = settings.fullscreen;
     }
 
-    // ======================
-    // 加密
-    // ======================
-    private string EncryptString(string t)
+    private string EncryptString(string str)
     {
         using (Aes aes = Aes.Create())
         {
@@ -170,16 +161,15 @@ public class GameManager : MonoBehaviour
             aes.IV = Encoding.UTF8.GetBytes(ENCRYPTION_IV.PadRight(16)[..16]);
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
-
             using var ms = new MemoryStream();
             using var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
             using var sw = new StreamWriter(cs);
-            sw.Write(t);
+            sw.Write(str);
             return Convert.ToBase64String(ms.ToArray());
         }
     }
 
-    private string DecryptString(string t)
+    private string DecryptString(string str)
     {
         using (Aes aes = Aes.Create())
         {
@@ -187,8 +177,7 @@ public class GameManager : MonoBehaviour
             aes.IV = Encoding.UTF8.GetBytes(ENCRYPTION_IV.PadRight(16)[..16]);
             aes.Mode = CipherMode.CBC;
             aes.Padding = PaddingMode.PKCS7;
-
-            using var ms = new MemoryStream(Convert.FromBase64String(t));
+            using var ms = new MemoryStream(Convert.FromBase64String(str));
             using var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read);
             using var sr = new StreamReader(cs);
             return sr.ReadToEnd();
@@ -208,13 +197,5 @@ public class SettingsData
     public float musicVolume = 1f;
     public float sfxVolume = 1f;
     public bool fullscreen = false;
-    public int qualityLevel = 2;
     public string language = "zh";
-}
-
-[Serializable]
-public class SaveData
-{
-    public string currentScene = "";
-    public Vector3 position;
 }
