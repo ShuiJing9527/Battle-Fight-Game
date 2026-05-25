@@ -46,11 +46,21 @@ public class CombatHealth : MonoBehaviour
         if (resourceBank != null)
         {
             finalDamage = resourceBank.AbsorbDamage(finalDamage);
+            Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
+            if (player2 != null)
+            {
+                finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
+            }
             resourceBank.currentHealth = Mathf.Max(0f, resourceBank.currentHealth - finalDamage);
             currentHealth = resourceBank.currentHealth;
         }
         else
         {
+            Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
+            if (player2 != null)
+            {
+                finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
+            }
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
         }
 
