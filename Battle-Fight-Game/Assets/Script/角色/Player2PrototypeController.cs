@@ -20,12 +20,25 @@ public class Player2PrototypeController : MonoBehaviour
     public float wDuration = 1.5f;
     public float wDamageReduction = 0.4f;
     public int maxStandbySwords = 3;
+    [Header("W 防御加成")]
+    [InspectorName("W 每把剑减伤加成")]
+    public float wDamageReductionPerSword = 0.03f;
+    [InspectorName("W 最大减伤")]
+    public float wMaxDamageReduction = 0.8f;
+    [InspectorName("W 反击伤害比例")]
+    public float wCounterDamageRatio = 0.5f;
 
     [Header("E - 天轨换位")]
     public float eRailDuration = 0.6f;
 
+    [Header("剑气值")]
+    [InspectorName("当前剑气值")]
+    public int currentSwordEnergy = 0;
+
     [Header("R - 万剑神罚")]
-    public int swordEnergy = 4;
+    [FormerlySerializedAs("swordEnergy")]
+    [InspectorName("R 初始剑数量")]
+    public int rBaseSwordCount = 1;
 
     [Header("Skill Effect Prefabs")]
     public GameObject sharedSkillEffectPrefab;
@@ -58,6 +71,7 @@ public class Player2PrototypeController : MonoBehaviour
     public float wEffectRotationZ = 0f;
     public Vector3 wEffectOffset = Vector3.zero;
     public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
+    [Tooltip("W 剑大小仅使用这个倍率。W Effect Scale / W Effect Plane Scale 不再参与 W 缩放。")]
     public float wEffectScaleMultiplier = 1f;
     public bool wEffectVerticalRotation = true;
     public Vector3 wEffectSpinAxis = Vector3.up;
@@ -67,12 +81,47 @@ public class Player2PrototypeController : MonoBehaviour
 
     [Header("W Orbit Settings")]
     public int wSwordCount = 3;
+    [InspectorName("W 初始剑数量")]
+    public int baseWSwordCount = 3;
+    [InspectorName("W 使用剑气值")]
+    public bool useSwordEnergyForW = true;
+    [InspectorName("W 最大剑数量")]
+    public int maxWSwordCount = 15;
     public float wEffectOrbitRadius = 1.2f;
     public float wEffectHeight = 1.1f;
     public float wEffectOrbitSpeed = 80f;
     public bool wEffectFaceCamera = true;
     [FormerlySerializedAs("wEffectSpinSpeed")]
     public float wEffectSelfSpinSpeed = 0f;
+    [Header("W SwordEnergy Bonuses")]
+    public float wDurationPerSwordEnergy = 0f;
+    public float wMaxDurationBonus = 0f;
+    public float wOrbitSpeedPerSwordEnergy = 0f;
+    public float wMaxOrbitSpeedBonus = 0f;
+    public float wRadiusPerSwordEnergy = 0f;
+    public float wMaxRadiusBonus = 0f;
+    [Header("W 剑群漩涡")]
+    public float wOrbitRadiusMin = 0.9f;
+    public float wOrbitRadiusMax = 1.8f;
+    public float wHeightMin = 0.2f;
+    public float wHeightMax = 1.2f;
+    public float wOrbitSpeedMin = 60f;
+    public float wOrbitSpeedMax = 120f;
+    public float wBobAmplitudeMin = 0.05f;
+    public float wBobAmplitudeMax = 0.25f;
+    public float wBobFrequencyMin = 0.8f;
+    public float wBobFrequencyMax = 2.0f;
+    public float wSwingAngleMin = 3f;
+    public float wSwingAngleMax = 12f;
+    public float wRadiusJitter = 0.12f;
+    public float wAngularJitter = 10f;
+    public bool wClockwise = true;
+    [Header("W 剑群朝向")]
+    public bool wFaceOrbitDirection = true;
+    public float wOrbitDirectionYawOffset = 0f;
+    public float wOrbitDirectionPitchOffset = 0f;
+    public float wOrbitDirectionRollOffset = 0f;
+    public bool wKeepSwordVisibleToCamera = true;
 
     [Header("Skill Effect Visuals - E")]
     public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
@@ -94,6 +143,32 @@ public class Player2PrototypeController : MonoBehaviour
     public float rEffectVisualYaw = 0f;
     public float rEffectVisualRoll = 0f;
     public bool rEffectInvertForward = false;
+    [Header("R 万剑漩涡")]
+    public float rSwarmDuration = 2.0f;
+    public float rSwarmRadiusMin = 0.8f;
+    public float rSwarmRadiusMax = 3.2f;
+    public float rSwarmHeightMin = 0.4f;
+    public float rSwarmHeightMax = 3.0f;
+    public float rSwarmSpeedMin = 120f;
+    public float rSwarmSpeedMax = 300f;
+    public float rSwarmBobAmplitudeMin = 0.05f;
+    public float rSwarmBobAmplitudeMax = 0.35f;
+    public float rSwarmBobFrequencyMin = 0.8f;
+    public float rSwarmBobFrequencyMax = 2.5f;
+    public float rSwarmRadiusJitter = 0.25f;
+    public bool rSwarmClockwise = true;
+    public float rSwarmForwardOffset = 2.0f;
+    public float rSwarmYawOffset = 0f;
+    [Header("R 剑自身旋转")]
+    public bool rEnableSwordSelfSpin = true;
+    public float rSwordSelfSpinMin = 30f;
+    public float rSwordSelfSpinMax = 120f;
+    public Vector3 rSwordLengthLocalAxis = Vector3.up;
+    [Header("R 万剑漩涡伤害")]
+    public float rSwarmDamageRadius = 3.0f;
+    public float rSwarmDamageInterval = 0.25f;
+    public float rSwarmDamagePerTick = 2.0f;
+    public LayerMask rSwarmEnemyLayer = ~0;
 
     [Header("Skill Effect Visuals - Standby Sword")]
     public Vector3 standbySwordScale = new Vector3(0.25f, 0.25f, 0.25f);
@@ -118,14 +193,38 @@ public class Player2PrototypeController : MonoBehaviour
         public Color[] spriteBaseColors;
     }
 
+    private sealed class RSwarmSwordData
+    {
+        public GameObject sword;
+        public float baseAngle;
+        public float radius;
+        public float height;
+        public float orbitSpeed;
+        public float bobAmplitude;
+        public float bobFrequency;
+        public float phase;
+        public float layerOffset;
+        public SkillEffectRuntime runtime;
+        public Transform visualTransform;
+        public Quaternion baseVisibleLocalRotation;
+        public float selfSpinSpeed;
+        public float selfSpinAngle;
+    }
+
     private Vector3 lastMoveDir = Vector3.forward;
     private int standbySwords;
     private bool isDashing;
     private bool isShielding;
+    private bool isWGuardActive;
     private float wOrbitAngle;
     private Coroutine wSkillRoutine;
+    private Coroutine rSwarmRoutine;
     private GameObject activeWOrbitVisualRoot;
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
+    private GameObject activeRSwarmRoot;
+    private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
+    private int currentWSwordCount;
+    private float currentWFinalDamageReduction;
 
     private readonly List<GameObject> standbySwordVisuals = new List<GameObject>();
 
@@ -217,7 +316,7 @@ public class Player2PrototypeController : MonoBehaviour
             qEffectVisualRoll + ResolveRotation(qEffectRotationZ),
             ResolveVisualScale(qEffectScale, qEffectPlaneScale));
         StartCoroutine(FireAfterDelay(sword, dir, qDelay, qSwordSpeed));
-        swordEnergy += 1;
+        currentSwordEnergy += 1;
     }
 
     private void CastW()
@@ -241,29 +340,157 @@ public class Player2PrototypeController : MonoBehaviour
 
     private void CastR()
     {
-        if (swordEnergy <= 0) return;
+        if (rSwarmRoutine != null)
+        {
+            StopCoroutine(rSwarmRoutine);
+            rSwarmRoutine = null;
+        }
+        CleanupRSwarmVisuals();
 
-        int count = swordEnergy;
-        swordEnergy = 0;
+        int energyForR = Mathf.Max(0, currentSwordEnergy);
+        int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
+        if (count <= 0) return;
+        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}", this);
+        currentSwordEnergy = 0;
+        rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+    }
+
+    private IEnumerator RSwarmRoutine(int count)
+    {
+        Vector3 attackDir = ResolveFacingDirection();
+        Vector3 center = transform.position + attackDir.normalized * rSwarmForwardOffset + rEffectOffset;
+
+        GameObject swarmRoot = new GameObject("R_SwarmVisualRoot");
+        swarmRoot.transform.position = center;
+        swarmRoot.transform.rotation = Quaternion.identity;
+        activeRSwarmRoot = swarmRoot;
+        activeRSwarmSwords.Clear();
+
         for (int i = 0; i < count; i++)
         {
-            float angle = Random.Range(0f, 360f);
-            Vector3 dir = Quaternion.Euler(0f, angle, 0f) * Vector3.forward;
-            Vector3 spawnPos = transform.position + Vector3.up * 1.2f + rEffectOffset;
+            float baseAngle = i * (360f / Mathf.Max(1, count)) + Random.Range(-30f, 30f);
+            float radius = Random.Range(Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax), Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax));
+            float height = Random.Range(Mathf.Min(rSwarmHeightMin, rSwarmHeightMax), Mathf.Max(rSwarmHeightMin, rSwarmHeightMax));
+            float orbitSpeed = Random.Range(Mathf.Min(rSwarmSpeedMin, rSwarmSpeedMax), Mathf.Max(rSwarmSpeedMin, rSwarmSpeedMax));
+            float bobAmplitude = Random.Range(Mathf.Min(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax), Mathf.Max(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax));
+            float bobFrequency = Random.Range(Mathf.Min(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax), Mathf.Max(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax));
+            float phase = Random.Range(0f, Mathf.PI * 2f);
+
+            float rad = baseAngle * Mathf.Deg2Rad;
+            Vector3 spawnOffset = new Vector3(
+                Mathf.Cos(rad) * radius,
+                height,
+                Mathf.Sin(rad) * radius);
+
             GameObject sword = CreateSkillEffectVisual(
-                "R_Sword",
+                $"R_SwarmSword_{i}",
                 rSkillEffectPrefab,
-                spawnPos,
-                dir,
-                true,
-                rEffectInvertForward,
-                rEffectYawOffset,
+                center + spawnOffset,
+                spawnOffset,
+                false,
+                false,
+                0f,
                 rEffectVisualPitch,
                 rEffectVisualYaw,
                 rEffectVisualRoll + ResolveRotation(rEffectRotationZ),
                 ResolveVisualScale(rEffectScale, rEffectPlaneScale));
-            StartCoroutine(FireAfterDelay(sword, dir, 0.05f * i, 16f));
+
+            if (sword == null)
+            {
+                continue;
+            }
+
+            sword.transform.SetParent(swarmRoot.transform, true);
+            SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
+            Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : null;
+            Quaternion baseVisualLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity;
+            float selfSpinSpeed = Random.Range(Mathf.Min(rSwordSelfSpinMin, rSwordSelfSpinMax), Mathf.Max(rSwordSelfSpinMin, rSwordSelfSpinMax));
+            activeRSwarmSwords.Add(new RSwarmSwordData
+            {
+                sword = sword,
+                baseAngle = baseAngle,
+                radius = radius,
+                height = height,
+                orbitSpeed = orbitSpeed,
+                bobAmplitude = bobAmplitude,
+                bobFrequency = bobFrequency,
+                phase = phase,
+                layerOffset = Random.Range(-0.25f, 0.25f),
+                runtime = runtime,
+                visualTransform = visualTransform,
+                baseVisibleLocalRotation = baseVisualLocalRotation,
+                selfSpinSpeed = selfSpinSpeed,
+                selfSpinAngle = Random.Range(0f, 360f)
+            });
         }
+
+        float elapsed = 0f;
+        float damageTickTimer = 0f;
+        float safeDamageInterval = Mathf.Max(0.05f, rSwarmDamageInterval);
+        while (elapsed < rSwarmDuration)
+        {
+            center = transform.position + attackDir.normalized * rSwarmForwardOffset + rEffectOffset;
+            swarmRoot.transform.position = center;
+
+            float dirSign = rSwarmClockwise ? -1f : 1f;
+            for (int i = 0; i < activeRSwarmSwords.Count; i++)
+            {
+                RSwarmSwordData data = activeRSwarmSwords[i];
+                if (data == null || data.sword == null)
+                {
+                    continue;
+                }
+
+                float angle = data.baseAngle + dirSign * data.orbitSpeed * elapsed;
+                float rad = angle * Mathf.Deg2Rad;
+                float dynamicRadius = data.radius + Mathf.Sin(elapsed * 1.7f + data.phase) * rSwarmRadiusJitter;
+                float dynamicHeight = data.height + data.layerOffset + Mathf.Sin(elapsed * data.bobFrequency + data.phase) * data.bobAmplitude;
+                Vector3 offset = new Vector3(
+                    Mathf.Cos(rad) * dynamicRadius,
+                    dynamicHeight,
+                    Mathf.Sin(rad) * dynamicRadius);
+
+                data.sword.transform.position = center + offset;
+
+                Vector3 tangent = new Vector3(-Mathf.Sin(rad), 0f, Mathf.Cos(rad));
+                if (rSwarmClockwise)
+                {
+                    tangent = -tangent;
+                }
+
+                if (tangent.sqrMagnitude > 0.0001f)
+                {
+                    Quaternion orbitFacing = Quaternion.LookRotation(tangent.normalized, Vector3.up) * Quaternion.Euler(0f, rSwarmYawOffset, 0f);
+                    data.sword.transform.rotation = orbitFacing;
+                }
+
+                if (data.visualTransform != null)
+                {
+                    Quaternion selfSpin = Quaternion.identity;
+                    if (rEnableSwordSelfSpin)
+                    {
+                        data.selfSpinAngle += data.selfSpinSpeed * Time.deltaTime;
+                        Vector3 spinAxis = rSwordLengthLocalAxis.sqrMagnitude > 0.0001f ? rSwordLengthLocalAxis.normalized : Vector3.up;
+                        selfSpin = Quaternion.AngleAxis(data.selfSpinAngle, spinAxis);
+                    }
+
+                    data.visualTransform.localRotation = data.baseVisibleLocalRotation * selfSpin;
+                }
+            }
+
+            damageTickTimer -= Time.deltaTime;
+            if (damageTickTimer <= 0f)
+            {
+                ApplyRSwarmTickDamage(center);
+                damageTickTimer += safeDamageInterval;
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        CleanupRSwarmVisuals();
+        rSwarmRoutine = null;
     }
 
     private IEnumerator FireAfterDelay(GameObject effectRoot, Vector3 dir, float delay, float speed)
@@ -297,13 +524,24 @@ public class Player2PrototypeController : MonoBehaviour
         orbitRoot.transform.rotation = Quaternion.identity;
         activeWOrbitVisualRoot = orbitRoot;
 
+        int energyForW = useSwordEnergyForW ? Mathf.Max(0, currentSwordEnergy) : 0;
+        int swordCount = baseWSwordCount;
+        if (useSwordEnergyForW)
+        {
+            swordCount += energyForW;
+        }
+        swordCount = Mathf.Clamp(swordCount, baseWSwordCount, maxWSwordCount);
+        wSwordCount = swordCount;
+
+        float finalDuration = wDuration + Mathf.Min(energyForW * wDurationPerSwordEnergy, wMaxDurationBonus);
+        float finalOrbitSpeed = wEffectOrbitSpeed + Mathf.Min(energyForW * wOrbitSpeedPerSwordEnergy, wMaxOrbitSpeedBonus);
+        float finalRadius = wEffectOrbitRadius + Mathf.Min(energyForW * wRadiusPerSwordEnergy, wMaxRadiusBonus);
+
         activeWSwords.Clear();
-        int swordCount = 3;
-        wSwordCount = 3;
         for (int i = 0; i < swordCount; i++)
         {
             float angle = i * (360f / swordCount);
-            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * wEffectOrbitRadius;
+            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * finalRadius;
             Vector3 spawnPos = transform.position + new Vector3(offset.x, wEffectHeight, offset.z) + wEffectOffset;
 
             GameObject sword = CreateSkillEffectVisual(
@@ -324,14 +562,32 @@ public class Player2PrototypeController : MonoBehaviour
                 continue;
             }
 
+            Quaternion extraRot = Quaternion.Euler(
+                wEffectVisualPitch,
+                wEffectVisualYaw,
+                wEffectVisualRoll);
+            sword.transform.rotation = sword.transform.rotation * extraRot;
+
             sword.transform.SetParent(orbitRoot.transform, true);
+
+            // W size control: only use W Effect Scale Multiplier on top of the correctly displayed base scale.
+            Vector3 baseScale = sword.transform.localScale;
+            float sizeMul = Mathf.Max(0.01f, wEffectScaleMultiplier);
+            Vector3 finalScale = baseScale * sizeMul;
+            sword.transform.localScale = finalScale;
+            Debug.Log($"[W Skill Scale] sword={sword.name}, baseScale={baseScale}, multiplier={sizeMul:F2}, finalScale={finalScale}", this);
+
             activeWSwords.Add(sword);
         }
 
-        Debug.Log($"[W Skill] Spawned sword count = {activeWSwords.Count}", this);
-        if (activeWSwords.Count > 3)
+        currentWSwordCount = activeWSwords.Count;
+        currentWFinalDamageReduction = ComputeWFinalDamageReduction(currentWSwordCount);
+        isWGuardActive = true;
+
+        Debug.Log($"[W Skill] Base={baseWSwordCount}, CurrentSwordEnergy={energyForW}, Spawned={activeWSwords.Count}, Duration={finalDuration:F2}, OrbitSpeed={finalOrbitSpeed:F2}, Radius={finalRadius:F2}, DamageReduction={currentWFinalDamageReduction:F2}", this);
+        if (activeWSwords.Count > swordCount)
         {
-            Debug.LogWarning($"[W Skill] Spawned sword count exceeded expected 3: {activeWSwords.Count}", this);
+            Debug.LogWarning($"[W Skill] Spawned sword count exceeded expected {swordCount}: {activeWSwords.Count}", this);
         }
 
         if (activeWSwords.Count == 0)
@@ -343,13 +599,12 @@ public class Player2PrototypeController : MonoBehaviour
 
         wOrbitAngle = 0f;
         float t = 0f;
-        while (t < wDuration)
+        while (t < finalDuration)
         {
             orbitRoot.transform.position = transform.position;
             orbitRoot.transform.rotation = Quaternion.identity;
 
-            wOrbitAngle += wEffectOrbitSpeed * Time.deltaTime;
-
+            wOrbitAngle += finalOrbitSpeed * Time.deltaTime;
             for (int i = 0; i < activeWSwords.Count; i++)
             {
                 GameObject sword = activeWSwords[i];
@@ -361,9 +616,9 @@ public class Player2PrototypeController : MonoBehaviour
                 float baseAngle = wOrbitAngle + i * (360f / swordCount);
                 float rad = baseAngle * Mathf.Deg2Rad;
                 Vector3 offset = new Vector3(
-                    Mathf.Cos(rad) * wEffectOrbitRadius,
+                    Mathf.Cos(rad) * finalRadius,
                     wEffectHeight,
-                    Mathf.Sin(rad) * wEffectOrbitRadius);
+                    Mathf.Sin(rad) * finalRadius);
 
                 sword.transform.position = transform.position + offset + wEffectOffset;
             }
@@ -418,6 +673,67 @@ public class Player2PrototypeController : MonoBehaviour
 
         standbySwords = 0;
         isShielding = false;
+        isWGuardActive = false;
+        currentWSwordCount = 0;
+        currentWFinalDamageReduction = 0f;
+    }
+
+    private void CleanupRSwarmVisuals()
+    {
+        for (int i = 0; i < activeRSwarmSwords.Count; i++)
+        {
+            RSwarmSwordData data = activeRSwarmSwords[i];
+            if (data != null && data.sword != null)
+            {
+                Destroy(data.sword);
+            }
+        }
+        activeRSwarmSwords.Clear();
+
+        if (activeRSwarmRoot != null)
+        {
+            Destroy(activeRSwarmRoot);
+            activeRSwarmRoot = null;
+        }
+    }
+
+    private void ApplyRSwarmTickDamage(Vector3 center)
+    {
+        if (rSwarmDamagePerTick <= 0f || rSwarmDamageRadius <= 0f)
+        {
+            return;
+        }
+
+        Collider[] hits = Physics.OverlapSphere(center, rSwarmDamageRadius, rSwarmEnemyLayer);
+        HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+            if (hit == null)
+            {
+                continue;
+            }
+
+            Transform targetRoot = hit.transform.root;
+            if (targetRoot == null || targetRoot.gameObject == gameObject || !damagedRoots.Add(targetRoot.gameObject))
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
+            if (combatHealth != null && combatHealth.gameObject != gameObject)
+            {
+                combatHealth.TakeDamage(new BattleDamage(rSwarmDamagePerTick, BattleDamageType.Physical, gameObject));
+                continue;
+            }
+
+            EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
+            if (enemyHealth != null && enemyHealth.gameObject != gameObject)
+            {
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(rSwarmDamagePerTick));
+                enemyHealth.TakeDamage(damageInt, gameObject);
+            }
+        }
     }
 
     private GameObject ResolveWVisualPrefab()
@@ -433,6 +749,66 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         return sharedSkillEffectPrefab;
+    }
+
+    private float ComputeWFinalDamageReduction(int wSwordCountAtCast)
+    {
+        float reduction = wDamageReduction + Mathf.Max(0, wSwordCountAtCast) * wDamageReductionPerSword;
+        return Mathf.Clamp(reduction, 0f, wMaxDamageReduction);
+    }
+
+    public float ProcessIncomingDamageWithWGuard(float rawDamage, BattleDamage incomingDamage)
+    {
+        float clampedRaw = Mathf.Max(0f, rawDamage);
+        if (!isWGuardActive)
+        {
+            return clampedRaw;
+        }
+
+        float blockedDamage = clampedRaw * currentWFinalDamageReduction;
+        float damageAfterReduction = clampedRaw - blockedDamage;
+        float counterDamage = blockedDamage * wCounterDamageRatio;
+
+        Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Counter={counterDamage:F2}", this);
+        ApplyWCounterDamage(incomingDamage, counterDamage);
+        return Mathf.Max(0f, damageAfterReduction);
+    }
+
+    private void ApplyWCounterDamage(BattleDamage incomingDamage, float counterDamage)
+    {
+        if (counterDamage <= 0f)
+        {
+            return;
+        }
+
+        GameObject attacker = incomingDamage.source;
+        if (attacker == null)
+        {
+            Debug.LogWarning("[W Guard] Counter requires attacker/source reference in BattleDamage.", this);
+            return;
+        }
+
+        if (attacker == gameObject)
+        {
+            return;
+        }
+
+        CombatHealth attackerCombatHealth = attacker.GetComponentInParent<CombatHealth>();
+        if (attackerCombatHealth != null && attackerCombatHealth.gameObject != gameObject)
+        {
+            attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject));
+            return;
+        }
+
+        EnemyHealth attackerEnemyHealth = attacker.GetComponentInParent<EnemyHealth>();
+        if (attackerEnemyHealth != null && attackerEnemyHealth.gameObject != gameObject)
+        {
+            int roundedDamage = Mathf.Max(1, Mathf.RoundToInt(counterDamage));
+            attackerEnemyHealth.TakeDamage(roundedDamage, gameObject);
+            return;
+        }
+
+        Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth/EnemyHealth for counter damage.", this);
     }
 
     private IEnumerator DashRoutine()

@@ -8360,7 +8360,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1801627699}
+  m_CustomBakedTexture: {fileID: 1900543521}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -10808,43 +10808,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistancePostion
   footTransform: {fileID: 1665794655}
---- !u!84 &1801627699
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1809271588
 GameObject:
   m_ObjectHideFlags: 0
@@ -11083,6 +11046,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &1900543521
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1001 &1905824859
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12117,14 +12117,21 @@ MonoBehaviour:
   wDuration: 1.5
   wDamageReduction: 0.4
   maxStandbySwords: 3
+  wDamageReductionPerSword: 0.03
+  wMaxDamageReduction: 0.8
+  wCounterDamageRatio: 0.5
   eRailDuration: 0.6
-  swordEnergy: 5
+  currentSwordEnergy: 1
+  rBaseSwordCount: 5
   sharedSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   qSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   wSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   eSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   rSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   standbySkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
+  useRawPrefabRotationForSkillEffects: 1
+  skillEffectPrefabBaseRotation: {x: 180, y: 90, z: -90}
+  skillEffectPrefabScaleMultiplier: 1
   sharedEffectScale: {x: 1, y: 1, z: 1}
   sharedEffectRotationZ: 0
   qEffectScale: {x: 0.25, y: 0.25, z: 0.25}
@@ -12144,14 +12151,43 @@ MonoBehaviour:
   wEffectVerticalRotation: 1
   wEffectSpinAxis: {x: 0, y: 1, z: 0}
   wEffectVisualPitch: 0
-  wEffectVisualYaw: 180
-  wEffectVisualRoll: 180
+  wEffectVisualYaw: 90
+  wEffectVisualRoll: 0
   wSwordCount: 3
+  baseWSwordCount: 3
+  useSwordEnergyForW: 1
+  maxWSwordCount: 15
   wEffectOrbitRadius: 1.2
-  wEffectHeight: 1.1
+  wEffectHeight: 0.5
   wEffectOrbitSpeed: 80
   wEffectFaceCamera: 1
   wEffectSelfSpinSpeed: 0
+  wDurationPerSwordEnergy: 0.25
+  wMaxDurationBonus: 3
+  wOrbitSpeedPerSwordEnergy: 8
+  wMaxOrbitSpeedBonus: 80
+  wRadiusPerSwordEnergy: 0.08
+  wMaxRadiusBonus: 1
+  wOrbitRadiusMin: 0.9
+  wOrbitRadiusMax: 1.8
+  wHeightMin: 0.2
+  wHeightMax: 1.2
+  wOrbitSpeedMin: 60
+  wOrbitSpeedMax: 120
+  wBobAmplitudeMin: 0.05
+  wBobAmplitudeMax: 0.25
+  wBobFrequencyMin: 0.8
+  wBobFrequencyMax: 2
+  wSwingAngleMin: 3
+  wSwingAngleMax: 12
+  wRadiusJitter: 0.12
+  wAngularJitter: 10
+  wClockwise: 1
+  wFaceOrbitDirection: 1
+  wOrbitDirectionYawOffset: 0
+  wOrbitDirectionPitchOffset: 0
+  wOrbitDirectionRollOffset: 0
+  wKeepSwordVisibleToCamera: 1
   eEffectScale: {x: 0.35, y: 0.35, z: 0.35}
   eEffectRotationZ: 0
   eEffectOffset: {x: 0, y: 0, z: 0}
@@ -12169,6 +12205,31 @@ MonoBehaviour:
   rEffectVisualYaw: 0
   rEffectVisualRoll: 0
   rEffectInvertForward: 0
+  rSwarmDuration: 5
+  rSwarmRadiusMin: 0.8
+  rSwarmRadiusMax: 3
+  rSwarmHeightMin: 0.2
+  rSwarmHeightMax: 2
+  rSwarmSpeedMin: 120
+  rSwarmSpeedMax: 260
+  rSwarmBobAmplitudeMin: 0.05
+  rSwarmBobAmplitudeMax: 0.35
+  rSwarmBobFrequencyMin: 0.8
+  rSwarmBobFrequencyMax: 2.5
+  rSwarmRadiusJitter: 0.25
+  rSwarmClockwise: 1
+  rSwarmForwardOffset: 2
+  rSwarmYawOffset: 0
+  rEnableSwordSelfSpin: 1
+  rSwordSelfSpinMin: 30
+  rSwordSelfSpinMax: 120
+  rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
+  rSwarmDamageRadius: 3
+  rSwarmDamageInterval: 0.25
+  rSwarmDamagePerTick: 2
+  rSwarmEnemyLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
   standbySwordScale: {x: 0.25, y: 0.25, z: 0.25}
   standbySwordRotationZ: -90
   standbySwordPlaneScale: {x: 0.25, y: 0.25, z: 1}
