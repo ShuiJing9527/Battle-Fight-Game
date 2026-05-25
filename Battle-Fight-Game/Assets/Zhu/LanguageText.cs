@@ -18,7 +18,8 @@ public class LanguageText : MonoBehaviour
 
     void TryRefresh()
     {
-        if (GameManager.Instance == null || tmp == null)
+        // 👇 超强防御：key为空 直接跳过，绝不报错！
+        if (GameManager.Instance == null || tmp == null || string.IsNullOrEmpty(key))
             return;
 
         tmp.text = GameManager.Instance.GetText(key);

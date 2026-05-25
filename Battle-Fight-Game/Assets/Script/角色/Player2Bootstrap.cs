@@ -93,7 +93,6 @@ public class Player2Bootstrap : MonoBehaviour
 
         if (player1 == null || player2 == null)
         {
-            Debug.LogError($"[PLAYER2] Could not find scene players. player1={player01Name}, player2={player02Name}", this);
             return;
         }
 

@@ -1,10 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Security.Cryptography;
-using System.Text;
 using UnityEngine;
-using UnityEngine.SceneManagement; // 这里修复了！
 
 public class GameManager : MonoBehaviour
 {
@@ -13,20 +9,15 @@ public class GameManager : MonoBehaviour
 
     public GameObject settingsPanel;
 
-    private readonly List<KeyValuePair<string, string>> supportedLanguages = new List<KeyValuePair<string, string>>()
+    private List<(string key, string name)> languages = new List<(string, string)>
     {
-        new KeyValuePair<string, string>("en", "English"),
-        new KeyValuePair<string, string>("zh", "中文"),
-        new KeyValuePair<string, string>("ja", "日本語")
+        ("zh", "中文"),
+        ("en", "English"),
+        ("ja", "日本語")
     };
 
-    private Dictionary<string, Dictionary<string, string>> localization = new Dictionary<string, Dictionary<string, string>>();
-    public GameData gameData = new GameData();
-    public SettingsData settings => gameData.settings;
-
-    private const string ENCRYPTION_KEY = "MySecretKey123456";
-    private const string ENCRYPTION_IV = "InitialVector1234";
-    private string settingsPath => Path.Combine(Application.persistentDataPath, "settings.dat");
+    private Dictionary<string, Dictionary<string, string>> texts = new Dictionary<string, Dictionary<string, string>>();
+    public SettingsData settings = new SettingsData();
 
     void Awake()
     {
@@ -34,26 +25,77 @@ public class GameManager : MonoBehaviour
         {
             Instance = this;
             DontDestroyOnLoad(gameObject);
-            InitData();
         }
         else
         {
             Destroy(gameObject);
         }
+        InitLanguage();
     }
 
-    void InitData()
+    void Start()
     {
-        InitializeLocalization();
-        LoadSettings();
-        OnLanguageChanged?.Invoke();
-        if (settingsPanel != null) settingsPanel.SetActive(false);
+        if (settingsPanel != null)
+            settingsPanel.SetActive(false);
 
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayMenuBGM();
     }
 
-    public void ToggleSettingsPanel()
+    void InitLanguage()
+    {
+        AddText("start", "开始游戏", "Start Game", "ゲーム開始");
+        AddText("setting", "设置", "Settings", "設定");
+        AddText("exit", "退出", "Exit", "終了");
+        AddText("music", "音乐", "Music", "音楽");
+        AddText("sfx", "音效", "SFX", "効果音");
+        AddText("fullscreen", "全屏", "Fullscreen", "全画面");
+        AddText("language", "语言", "Language", "言語");
+        AddText("close", "关闭", "Close", "閉じる");
+        AddText("save", "保存", "Save", "保存");
+        AddText("title", "Battle Fight Game", "Battle Fight Game", "バトルゲーム");
+        AddText("loading", "加载中", "Loading...", "読み込み中");
+    }
+
+    void AddText(string key, string zh, string en, string ja)
+    {
+        texts[key] = new Dictionary<string, string>
+        {
+            { "zh", zh },
+            { "en", en },
+            { "ja", ja }
+        };
+    }
+
+    public string GetText(string key)
+    {
+        if (string.IsNullOrEmpty(key)) return "";
+        if (texts.ContainsKey(key) && texts[key].ContainsKey(settings.language))
+            return texts[key][settings.language];
+        return key;
+    }
+
+    public void SwitchLanguage(string lang)
+    {
+        settings.language = lang;
+        OnLanguageChanged?.Invoke(); // 这里会通知所有文字刷新
+    }
+
+    public List<string> GetLangNames()
+    {
+        var list = new List<string>();
+        foreach (var l in languages) list.Add(l.name);
+        return list;
+    }
+
+    public List<string> GetLangKeys()
+    {
+        var list = new List<string>();
+        foreach (var l in languages) list.Add(l.key);
+        return list;
+    }
+
+    public void ToggleSettings()
     {
         if (settingsPanel != null)
             settingsPanel.SetActive(!settingsPanel.activeSelf);
@@ -67,135 +109,13 @@ public class GameManager : MonoBehaviour
         Application.Quit();
 #endif
     }
-
-    private void InitializeLocalization()
-    {
-        AddLocalized("button_start", "Start", "开始", "スタート");
-        AddLocalized("button_settings", "Settings", "设置", "設定");
-        AddLocalized("button_exit", "Exit", "退出", "終了");
-        AddLocalized("label_music", "Music", "音乐", "音楽");
-        AddLocalized("label_sfx", "SFX", "音效", "効果音");
-        AddLocalized("label_fullscreen", "Fullscreen", "全屏", "全画面");
-        AddLocalized("label_language", "Language", "语言", "言語");
-        AddLocalized("button_save", "Save", "保存", "保存");
-        AddLocalized("button_close", "Close", "关闭", "閉じる");
-    }
-
-    private void AddLocalized(string key, string en, string zh, string ja)
-    {
-        localization[key] = new Dictionary<string, string>()
-        {
-            { "en", en },
-            { "zh", zh },
-            { "ja", ja }
-        };
-    }
-
-    public string GetText(string key)
-    {
-        string lang = settings.language ?? "zh";
-        if (localization.ContainsKey(key) && localization[key].ContainsKey(lang))
-            return localization[key][lang];
-        return key;
-    }
-
-    public List<string> GetLangNames()
-    {
-        List<string> list = new List<string>();
-        foreach (var item in supportedLanguages) list.Add(item.Value);
-        return list;
-    }
-
-    public List<string> GetLangKeys()
-    {
-        List<string> list = new List<string>();
-        foreach (var item in supportedLanguages) list.Add(item.Key);
-        return list;
-    }
-
-    public void SetLanguage(string lang)
-    {
-        settings.language = lang;
-        SaveSettings();
-        OnLanguageChanged?.Invoke();
-    }
-
-    public void LoadSettings()
-    {
-        if (File.Exists(settingsPath))
-        {
-            try
-            {
-                string enc = File.ReadAllText(settingsPath);
-                string json = DecryptString(enc);
-                gameData.settings = JsonUtility.FromJson<SettingsData>(json);
-            }
-            catch { }
-        }
-        ApplySettings();
-    }
-
-    public void SaveSettings()
-    {
-        try
-        {
-            string json = JsonUtility.ToJson(gameData.settings);
-            string enc = EncryptString(json);
-            File.WriteAllText(settingsPath, enc);
-        }
-        catch { }
-        ApplySettings();
-    }
-
-    public void ApplySettings()
-    {
-        AudioListener.volume = settings.musicVolume;
-        Screen.fullScreen = settings.fullscreen;
-    }
-
-    private string EncryptString(string str)
-    {
-        using (Aes aes = Aes.Create())
-        {
-            aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(16)[..16]);
-            aes.IV = Encoding.UTF8.GetBytes(ENCRYPTION_IV.PadRight(16)[..16]);
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
-            using var ms = new MemoryStream();
-            using var cs = new CryptoStream(ms, aes.CreateEncryptor(), CryptoStreamMode.Write);
-            using var sw = new StreamWriter(cs);
-            sw.Write(str);
-            return Convert.ToBase64String(ms.ToArray());
-        }
-    }
-
-    private string DecryptString(string str)
-    {
-        using (Aes aes = Aes.Create())
-        {
-            aes.Key = Encoding.UTF8.GetBytes(ENCRYPTION_KEY.PadRight(16)[..16]);
-            aes.IV = Encoding.UTF8.GetBytes(ENCRYPTION_IV.PadRight(16)[..16]);
-            aes.Mode = CipherMode.CBC;
-            aes.Padding = PaddingMode.PKCS7;
-            using var ms = new MemoryStream(Convert.FromBase64String(str));
-            using var cs = new CryptoStream(ms, aes.CreateDecryptor(), CryptoStreamMode.Read);
-            using var sr = new StreamReader(cs);
-            return sr.ReadToEnd();
-        }
-    }
-}
-
-[Serializable]
-public class GameData
-{
-    public SettingsData settings = new SettingsData();
 }
 
 [Serializable]
 public class SettingsData
 {
-    public float musicVolume = 1f;
-    public float sfxVolume = 1f;
+    public float musicVolume = 1;
+    public float sfxVolume = 1;
     public bool fullscreen = false;
     public string language = "zh";
 }
