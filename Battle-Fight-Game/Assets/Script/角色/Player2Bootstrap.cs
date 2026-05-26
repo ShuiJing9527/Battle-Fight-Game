@@ -26,30 +26,6 @@ public class Player2Bootstrap : MonoBehaviour
     private Animator player2Animator;
     private bool initialized;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-    private static void AutoCreateBeforeSceneLoad()
-    {
-        EnsureBootstrapExists();
-    }
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void AutoCreateAfterSceneLoad()
-    {
-        EnsureBootstrapExists();
-    }
-
-    private static void EnsureBootstrapExists()
-    {
-        if (FindObjectOfType<Player2Bootstrap>() != null)
-        {
-            return;
-        }
-
-        GameObject bootstrap = new GameObject("PLAYER2_Bootstrap");
-        bootstrap.AddComponent<Player2Bootstrap>();
-        DontDestroyOnLoad(bootstrap);
-    }
-
     private void Start()
     {
         InitializePartyIfNeeded();
