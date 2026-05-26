@@ -40,7 +40,10 @@ public class Player2Bootstrap : MonoBehaviour
 
     private static void EnsureBootstrapExists()
     {
-        if (FindObjectOfType<Player2Bootstrap>() != null) return;
+        if (FindObjectOfType<Player2Bootstrap>() != null)
+        {
+            return;
+        }
 
         GameObject bootstrap = new GameObject("PLAYER2_Bootstrap");
         bootstrap.AddComponent<Player2Bootstrap>();
@@ -94,6 +97,7 @@ public class Player2Bootstrap : MonoBehaviour
         if (player01 == null || player02 == null)
         {
             Debug.LogError($"[PARTY] Could not resolve players. player01={player01Name}, player02={player02Name}", this);
+            return;
         }
 
         if (player1Animator == null && player01 != null)
@@ -111,6 +115,7 @@ public class Player2Bootstrap : MonoBehaviour
     {
         InitializePartyIfNeeded();
         ResolvePlayers();
+
         if (player01 == null || player02 == null)
         {
             return;
@@ -128,12 +133,14 @@ public class Player2Bootstrap : MonoBehaviour
 
         GameObject next = CurrentPlayer == player01 ? player02 : player01;
         SetActivePlayer(next);
+
         Debug.Log($"[PARTY] Switched current player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
     }
 
     private void SetActivePlayer(GameObject nextActive)
     {
         ResolvePlayers();
+
         if (player01 == null || player02 == null || nextActive == null)
         {
             return;
@@ -245,8 +252,14 @@ public class Player2Bootstrap : MonoBehaviour
         RuntimeAnimatorController player2ControllerAsset = player2Animator.runtimeAnimatorController;
         RuntimeAnimatorController player1ControllerAsset = player1Animator != null ? player1Animator.runtimeAnimatorController : null;
 
-        bool sharedWithPlayer1 = player2ControllerAsset != null && player1ControllerAsset != null && player2ControllerAsset == player1ControllerAsset;
-        bool likelyPlayer01Controller = player2ControllerAsset != null && player2ControllerAsset.name == "Player";
+        bool sharedWithPlayer1 =
+            player2ControllerAsset != null &&
+            player1ControllerAsset != null &&
+            player2ControllerAsset == player1ControllerAsset;
+
+        bool likelyPlayer01Controller =
+            player2ControllerAsset != null &&
+            player2ControllerAsset.name == "Player";
 
         if (sharedWithPlayer1 || likelyPlayer01Controller)
         {
@@ -263,9 +276,11 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         GameObject[] all = Resources.FindObjectsOfTypeAll<GameObject>();
+
         for (int i = 0; i < all.Length; i++)
         {
             GameObject go = all[i];
+
             if (go == null)
             {
                 continue;
