@@ -7,7 +7,7 @@ using UnityEngine.Serialization;
 public class Player2PrototypeController : MonoBehaviour
 {
     [Header("Move")]
-    public float moveSpeed = 5f;
+    [HideInInspector] public float moveSpeed = 5f;
     public float dashDistance = 4f;
     public float dashDuration = 0.15f;
     [SerializeField] private bool lockCharacterRotation = true;
@@ -17,9 +17,12 @@ public class Player2PrototypeController : MonoBehaviour
     public float qSwordSpeed = 14f;
 
     [Header("W - 圣轮偏转")]
+    [InspectorName("W 持续时间")]
     public float wDuration = 1.5f;
+    [InspectorName("W 基础减伤")]
     public float wDamageReduction = 0.4f;
-    public int maxStandbySwords = 3;
+    [HideInInspector] public int maxStandbySwords = 3;
+
     [Header("W 防御加成")]
     [InspectorName("W 每把剑减伤加成")]
     public float wDamageReductionPerSword = 0.03f;
@@ -67,61 +70,70 @@ public class Player2PrototypeController : MonoBehaviour
     public bool qEffectInvertForward = false;
 
     [Header("Skill Effect Visuals - W")]
-    public Vector3 wEffectScale = new Vector3(0.4f, 0.4f, 0.4f);
-    public float wEffectRotationZ = 0f;
-    public Vector3 wEffectOffset = Vector3.zero;
-    public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
-    [Tooltip("W 剑大小仅使用这个倍率。W Effect Scale / W Effect Plane Scale 不再参与 W 缩放。")]
-    public float wEffectScaleMultiplier = 1f;
-    public bool wEffectVerticalRotation = true;
-    public Vector3 wEffectSpinAxis = Vector3.up;
-    public float wEffectVisualPitch = 0f;
-    public float wEffectVisualYaw = 0f;
-    public float wEffectVisualRoll = 0f;
+    [HideInInspector] public Vector3 wEffectScale = new Vector3(0.4f, 0.4f, 0.4f);
+    [HideInInspector] public float wEffectRotationZ = 0f;
+    [HideInInspector] public Vector3 wEffectOffset = Vector3.zero;
+    [HideInInspector] public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
 
-    [Header("W Orbit Settings")]
-    public int wSwordCount = 3;
+    [Header("W 剑阵设置")]
+    [InspectorName("W 尺寸倍率")]
+    public float wEffectScaleMultiplier = 1f;
+    [HideInInspector] public bool wEffectVerticalRotation = true;
+    [HideInInspector] public Vector3 wEffectSpinAxis = Vector3.up;
+    [HideInInspector] public float wEffectVisualPitch = 0f;
+    [HideInInspector] public float wEffectVisualYaw = 0f;
+    [HideInInspector] public float wEffectVisualRoll = 0f;
+    [HideInInspector] public int wSwordCount = 3;
     [InspectorName("W 初始剑数量")]
     public int baseWSwordCount = 3;
     [InspectorName("W 使用剑气值")]
     public bool useSwordEnergyForW = true;
     [InspectorName("W 最大剑数量")]
     public int maxWSwordCount = 15;
+    [InspectorName("W 环绕半径")]
     public float wEffectOrbitRadius = 1.2f;
+    [InspectorName("W 高度")]
     public float wEffectHeight = 1.1f;
+    [InspectorName("W 环绕速度")]
     public float wEffectOrbitSpeed = 80f;
-    public bool wEffectFaceCamera = true;
+    [HideInInspector] public bool wEffectFaceCamera = true;
     [FormerlySerializedAs("wEffectSpinSpeed")]
-    public float wEffectSelfSpinSpeed = 0f;
-    [Header("W SwordEnergy Bonuses")]
+    [HideInInspector] public float wEffectSelfSpinSpeed = 0f;
+
+    [Header("W 剑气加成")]
+    [InspectorName("W 每点剑气增加持续时间")]
     public float wDurationPerSwordEnergy = 0f;
+    [InspectorName("W 最大持续时间加成")]
     public float wMaxDurationBonus = 0f;
+    [InspectorName("W 每点剑气增加环绕速度")]
     public float wOrbitSpeedPerSwordEnergy = 0f;
+    [InspectorName("W 最大环绕速度加成")]
     public float wMaxOrbitSpeedBonus = 0f;
+    [InspectorName("W 每点剑气增加半径")]
     public float wRadiusPerSwordEnergy = 0f;
+    [InspectorName("W 最大半径加成")]
     public float wMaxRadiusBonus = 0f;
-    [Header("W 剑群漩涡")]
-    public float wOrbitRadiusMin = 0.9f;
-    public float wOrbitRadiusMax = 1.8f;
-    public float wHeightMin = 0.2f;
-    public float wHeightMax = 1.2f;
-    public float wOrbitSpeedMin = 60f;
-    public float wOrbitSpeedMax = 120f;
-    public float wBobAmplitudeMin = 0.05f;
-    public float wBobAmplitudeMax = 0.25f;
-    public float wBobFrequencyMin = 0.8f;
-    public float wBobFrequencyMax = 2.0f;
-    public float wSwingAngleMin = 3f;
-    public float wSwingAngleMax = 12f;
-    public float wRadiusJitter = 0.12f;
-    public float wAngularJitter = 10f;
-    public bool wClockwise = true;
-    [Header("W 剑群朝向")]
-    public bool wFaceOrbitDirection = true;
-    public float wOrbitDirectionYawOffset = 0f;
-    public float wOrbitDirectionPitchOffset = 0f;
-    public float wOrbitDirectionRollOffset = 0f;
-    public bool wKeepSwordVisibleToCamera = true;
+
+    [HideInInspector] public float wOrbitRadiusMin = 0.9f;
+    [HideInInspector] public float wOrbitRadiusMax = 1.8f;
+    [HideInInspector] public float wHeightMin = 0.2f;
+    [HideInInspector] public float wHeightMax = 1.2f;
+    [HideInInspector] public float wOrbitSpeedMin = 60f;
+    [HideInInspector] public float wOrbitSpeedMax = 120f;
+    [HideInInspector] public float wBobAmplitudeMin = 0.05f;
+    [HideInInspector] public float wBobAmplitudeMax = 0.25f;
+    [HideInInspector] public float wBobFrequencyMin = 0.8f;
+    [HideInInspector] public float wBobFrequencyMax = 2.0f;
+    [HideInInspector] public float wSwingAngleMin = 3f;
+    [HideInInspector] public float wSwingAngleMax = 12f;
+    [HideInInspector] public float wRadiusJitter = 0.12f;
+    [HideInInspector] public float wAngularJitter = 10f;
+    [HideInInspector] public bool wClockwise = true;
+    [HideInInspector] public bool wFaceOrbitDirection = true;
+    [HideInInspector] public float wOrbitDirectionYawOffset = 0f;
+    [HideInInspector] public float wOrbitDirectionPitchOffset = 0f;
+    [HideInInspector] public float wOrbitDirectionRollOffset = 0f;
+    [HideInInspector] public bool wKeepSwordVisibleToCamera = true;
 
     [Header("Skill Effect Visuals - E")]
     public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
@@ -133,41 +145,96 @@ public class Player2PrototypeController : MonoBehaviour
     public float eEffectVisualYaw = 0f;
     public float eEffectVisualRoll = 0f;
 
-    [Header("Skill Effect Visuals - R")]
+    [Header("R 特效显示")]
+    [InspectorName("R 尺寸")]
     public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-    public float rEffectRotationZ = -90f;
-    public Vector3 rEffectOffset = Vector3.zero;
-    public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
-    public float rEffectYawOffset = 0f;
-    public float rEffectVisualPitch = 0f;
+    [HideInInspector] public float rEffectRotationZ = -90f;
+    [HideInInspector] public Vector3 rEffectOffset = Vector3.zero;
+    [HideInInspector] public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
+    [HideInInspector] public float rEffectYawOffset = 0f;
+    [InspectorName("R 显示 Pitch")]
+    public float rEffectVisualPitch = 90f;
+    [InspectorName("R 显示 Yaw")]
     public float rEffectVisualYaw = 0f;
+    [InspectorName("R 显示 Roll")]
     public float rEffectVisualRoll = 0f;
-    public bool rEffectInvertForward = false;
+    [HideInInspector] public bool rEffectInvertForward = false;
     [Header("R 万剑漩涡")]
+    [InspectorName("R 持续时间")]
     public float rSwarmDuration = 2.0f;
+    [InspectorName("R 最小半径")]
     public float rSwarmRadiusMin = 0.8f;
+    [InspectorName("R 最大半径")]
     public float rSwarmRadiusMax = 3.2f;
+    [InspectorName("R 最低高度")]
     public float rSwarmHeightMin = 0.4f;
+    [InspectorName("R 最高高度")]
     public float rSwarmHeightMax = 3.0f;
+    [InspectorName("R 最小旋转速度")]
     public float rSwarmSpeedMin = 120f;
+    [InspectorName("R 最大旋转速度")]
     public float rSwarmSpeedMax = 300f;
+    [InspectorName("R 最小起伏幅度")]
     public float rSwarmBobAmplitudeMin = 0.05f;
+    [InspectorName("R 最大起伏幅度")]
     public float rSwarmBobAmplitudeMax = 0.35f;
+    [InspectorName("R 最小起伏频率")]
     public float rSwarmBobFrequencyMin = 0.8f;
+    [InspectorName("R 最大起伏频率")]
     public float rSwarmBobFrequencyMax = 2.5f;
+    [InspectorName("R 半径扰动")]
     public float rSwarmRadiusJitter = 0.25f;
+    [InspectorName("R 顺时针")]
     public bool rSwarmClockwise = true;
+    [InspectorName("R 前方偏移")]
     public float rSwarmForwardOffset = 2.0f;
+    [Header("R 漩涡中心")]
+    [InspectorName("R 剑尖方向偏移")]
     public float rSwarmYawOffset = 0f;
+    [InspectorName("R 像角色一样面向镜头")]
+    public bool rBillboardLikePlayer = true;
+    [InspectorName("R 渲染相机")]
+    public Camera rRenderCamera;
+    [InspectorName("R 自动查找相机")]
+    public bool rAutoResolveRenderCamera = true;
+    [InspectorName("R 使用相机前方")]
+    public bool rSwarmUseCameraForward = true;
+    [InspectorName("R 围绕角色中心")]
+    public bool rSwarmCenterOnPlayer = false;
+    [InspectorName("R 应用特效偏移到中心")]
+    public bool rApplyEffectOffsetToSwarmCenter = false;
+    [HideInInspector] public bool rUseTangentFacing = true;
+    [InspectorName("R 平面竖直角度")]
+    public Vector3 rPlaneUprightEuler = new Vector3(90f, 0f, 0f);
+    [InspectorName("R 面向相机角度")]
+    public Vector3 rPlaneFaceCameraEuler = new Vector3(0f, 90f, 0f);
+    [Header("R 显示正反修正")]
+    [InspectorName("R 翻转正反面")]
+    public bool rFlipPlaneFrontBack = true;
+    [InspectorName("R 正反面翻转角度")]
+    public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
+    [HideInInspector] public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
+    [Header("R 调试")]
+    [HideInInspector] public bool rDebugSwordVelocityFacing = false;
+    [HideInInspector] public float rFacingLookAheadTime = 0.05f;
+    [HideInInspector] public bool rDebugFacingScreenAngle = false;
+    [InspectorName("R 使用玩家图层")]
+    public bool rUsePlayerLayerForR = true;
+    [InspectorName("R 双面显示")]
+    public bool rForceDoubleSided = true;
     [Header("R 剑自身旋转")]
-    public bool rEnableSwordSelfSpin = true;
-    public float rSwordSelfSpinMin = 30f;
-    public float rSwordSelfSpinMax = 120f;
-    public Vector3 rSwordLengthLocalAxis = Vector3.up;
+    [HideInInspector] public bool rEnableSwordSelfSpin = false;
+    [HideInInspector] public float rSwordSelfSpinMin = 30f;
+    [HideInInspector] public float rSwordSelfSpinMax = 120f;
+    [HideInInspector] public Vector3 rSwordLengthLocalAxis = Vector3.up;
     [Header("R 万剑漩涡伤害")]
+    [InspectorName("R 伤害半径")]
     public float rSwarmDamageRadius = 3.0f;
+    [InspectorName("R 伤害间隔")]
     public float rSwarmDamageInterval = 0.25f;
+    [InspectorName("R 每次伤害")]
     public float rSwarmDamagePerTick = 2.0f;
+    [InspectorName("R 敌人层")]
     public LayerMask rSwarmEnemyLayer = ~0;
 
     [Header("Skill Effect Visuals - Standby Sword")]
@@ -209,6 +276,8 @@ public class Player2PrototypeController : MonoBehaviour
         public Quaternion baseVisibleLocalRotation;
         public float selfSpinSpeed;
         public float selfSpinAngle;
+        public Vector3 previousPosition;
+        public bool hasPreviousPosition;
     }
 
     private Vector3 lastMoveDir = Vector3.forward;
@@ -223,12 +292,51 @@ public class Player2PrototypeController : MonoBehaviour
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
     private GameObject activeRSwarmRoot;
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
+    private Camera resolvedRRenderCamera;
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
 
     private readonly List<GameObject> standbySwordVisuals = new List<GameObject>();
+    private readonly List<GameObject> runtimeSkillVisualRoots = new List<GameObject>();
 
     private Quaternion initialRotation;
+
+    public bool HasActiveRuntimeSkill
+    {
+        get
+        {
+            if (wSkillRoutine != null || rSwarmRoutine != null)
+            {
+                return true;
+            }
+
+            if (isDashing || isShielding || isWGuardActive)
+            {
+                return true;
+            }
+
+            if (activeWOrbitVisualRoot != null || activeRSwarmRoot != null)
+            {
+                return true;
+            }
+
+            if (HasAliveObjects(activeWSwords) || HasAliveObjects(standbySwordVisuals) || HasAliveObjects(runtimeSkillVisualRoots))
+            {
+                return true;
+            }
+
+            for (int i = 0; i < activeRSwarmSwords.Count; i++)
+            {
+                RSwarmSwordData data = activeRSwarmSwords[i];
+                if (data != null && data.sword != null)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
 
     private void Awake()
     {
@@ -246,6 +354,54 @@ public class Player2PrototypeController : MonoBehaviour
 
         rb.useGravity = false;
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
+
+        ResolveRRenderCamera();
+    }
+
+    public void ClearRuntimeSkillVisualsForSwitch()
+    {
+        if (wSkillRoutine != null)
+        {
+            StopCoroutine(wSkillRoutine);
+            wSkillRoutine = null;
+        }
+
+        if (rSwarmRoutine != null)
+        {
+            StopCoroutine(rSwarmRoutine);
+            rSwarmRoutine = null;
+        }
+
+        StopAllCoroutines();
+        CleanupWVisuals();
+        CleanupRSwarmVisuals();
+
+        for (int i = 0; i < standbySwordVisuals.Count; i++)
+        {
+            GameObject standby = standbySwordVisuals[i];
+            if (standby != null)
+            {
+                Destroy(standby);
+            }
+        }
+        standbySwordVisuals.Clear();
+        standbySwords = 0;
+
+        for (int i = 0; i < runtimeSkillVisualRoots.Count; i++)
+        {
+            GameObject root = runtimeSkillVisualRoots[i];
+            if (root != null)
+            {
+                Destroy(root);
+            }
+        }
+        runtimeSkillVisualRoots.Clear();
+
+        isDashing = false;
+        isShielding = false;
+        isWGuardActive = false;
+        currentWSwordCount = 0;
+        currentWFinalDamageReduction = 0f;
     }
 
     private void LateUpdate()
@@ -267,36 +423,6 @@ public class Player2PrototypeController : MonoBehaviour
         if (Keyboard.current.wKey.wasPressedThisFrame) CastW();
         if (Keyboard.current.eKey.wasPressedThisFrame) CastE();
         if (Keyboard.current.rKey.wasPressedThisFrame) CastR();
-    }
-
-    private void FixedUpdate()
-    {
-        if (isDashing) return;
-
-        Vector2 input = ReadMoveInput();
-        Vector3 moveDir = new Vector3(input.x, 0f, input.y);
-        if (moveDir.sqrMagnitude > 0.0001f)
-        {
-            lastMoveDir = moveDir.normalized;
-        }
-
-        Vector3 delta = new Vector3(moveDir.x, 0f, moveDir.z) * moveSpeed * Time.fixedDeltaTime;
-        transform.position += delta;
-
-        if (rb != null)
-        {
-            rb.linearVelocity = Vector3.zero;
-        }
-    }
-
-    private Vector2 ReadMoveInput()
-    {
-        Vector2 input = Vector2.zero;
-        if (Keyboard.current.leftArrowKey.isPressed) input.x -= 1f;
-        if (Keyboard.current.rightArrowKey.isPressed) input.x += 1f;
-        if (Keyboard.current.downArrowKey.isPressed) input.y -= 1f;
-        if (Keyboard.current.upArrowKey.isPressed) input.y += 1f;
-        return Vector2.ClampMagnitude(input, 1f);
     }
 
     private void CastQ()
@@ -350,15 +476,16 @@ public class Player2PrototypeController : MonoBehaviour
         int energyForR = Mathf.Max(0, currentSwordEnergy);
         int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
         if (count <= 0) return;
-        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}", this);
+        Camera renderCamera = ResolveRRenderCamera();
+        Vector3 previewCenter = ResolveRSwarmCenter();
+        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
         currentSwordEnergy = 0;
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
     }
 
     private IEnumerator RSwarmRoutine(int count)
     {
-        Vector3 attackDir = ResolveFacingDirection();
-        Vector3 center = transform.position + attackDir.normalized * rSwarmForwardOffset + rEffectOffset;
+        Vector3 center = ResolveRSwarmCenter();
 
         GameObject swarmRoot = new GameObject("R_SwarmVisualRoot");
         swarmRoot.transform.position = center;
@@ -400,11 +527,21 @@ public class Player2PrototypeController : MonoBehaviour
                 continue;
             }
 
+            if (rUsePlayerLayerForR)
+            {
+                SetLayerRecursively(sword, gameObject.layer);
+            }
+
+            if (rForceDoubleSided)
+            {
+                TrySetDoubleSidedIfSupported(sword);
+            }
+
+            EnsureEffectVisible(sword);
             sword.transform.SetParent(swarmRoot.transform, true);
             SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
             Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : null;
             Quaternion baseVisualLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity;
-            float selfSpinSpeed = Random.Range(Mathf.Min(rSwordSelfSpinMin, rSwordSelfSpinMax), Mathf.Max(rSwordSelfSpinMin, rSwordSelfSpinMax));
             activeRSwarmSwords.Add(new RSwarmSwordData
             {
                 sword = sword,
@@ -419,8 +556,8 @@ public class Player2PrototypeController : MonoBehaviour
                 runtime = runtime,
                 visualTransform = visualTransform,
                 baseVisibleLocalRotation = baseVisualLocalRotation,
-                selfSpinSpeed = selfSpinSpeed,
-                selfSpinAngle = Random.Range(0f, 360f)
+                selfSpinSpeed = 0f,
+                selfSpinAngle = 0f
             });
         }
 
@@ -429,7 +566,7 @@ public class Player2PrototypeController : MonoBehaviour
         float safeDamageInterval = Mathf.Max(0.05f, rSwarmDamageInterval);
         while (elapsed < rSwarmDuration)
         {
-            center = transform.position + attackDir.normalized * rSwarmForwardOffset + rEffectOffset;
+            center = ResolveRSwarmCenter();
             swarmRoot.transform.position = center;
 
             float dirSign = rSwarmClockwise ? -1f : 1f;
@@ -445,12 +582,13 @@ public class Player2PrototypeController : MonoBehaviour
                 float rad = angle * Mathf.Deg2Rad;
                 float dynamicRadius = data.radius + Mathf.Sin(elapsed * 1.7f + data.phase) * rSwarmRadiusJitter;
                 float dynamicHeight = data.height + data.layerOffset + Mathf.Sin(elapsed * data.bobFrequency + data.phase) * data.bobAmplitude;
+
                 Vector3 offset = new Vector3(
                     Mathf.Cos(rad) * dynamicRadius,
                     dynamicHeight,
                     Mathf.Sin(rad) * dynamicRadius);
-
-                data.sword.transform.position = center + offset;
+                Vector3 currentPosition = center + offset;
+                data.sword.transform.position = currentPosition;
 
                 Vector3 tangent = new Vector3(-Mathf.Sin(rad), 0f, Mathf.Cos(rad));
                 if (rSwarmClockwise)
@@ -458,23 +596,16 @@ public class Player2PrototypeController : MonoBehaviour
                     tangent = -tangent;
                 }
 
-                if (tangent.sqrMagnitude > 0.0001f)
-                {
-                    Quaternion orbitFacing = Quaternion.LookRotation(tangent.normalized, Vector3.up) * Quaternion.Euler(0f, rSwarmYawOffset, 0f);
-                    data.sword.transform.rotation = orbitFacing;
-                }
-
                 if (data.visualTransform != null)
                 {
-                    Quaternion selfSpin = Quaternion.identity;
-                    if (rEnableSwordSelfSpin)
-                    {
-                        data.selfSpinAngle += data.selfSpinSpeed * Time.deltaTime;
-                        Vector3 spinAxis = rSwordLengthLocalAxis.sqrMagnitude > 0.0001f ? rSwordLengthLocalAxis.normalized : Vector3.up;
-                        selfSpin = Quaternion.AngleAxis(data.selfSpinAngle, spinAxis);
-                    }
-
-                    data.visualTransform.localRotation = data.baseVisibleLocalRotation * selfSpin;
+                    float yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg + rSwarmYawOffset;
+                    Quaternion visibleBase =
+                        Quaternion.Euler(rPlaneUprightEuler) *
+                        Quaternion.Euler(rPlaneFaceCameraEuler) *
+                        (rFlipPlaneFrontBack ? Quaternion.Euler(rPlaneFrontBackFlipEuler) : Quaternion.identity) *
+                        Quaternion.Euler(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
+                    Quaternion yawRot = Quaternion.Euler(0f, yaw, 0f);
+                    data.visualTransform.rotation = yawRot * visibleBase;
                 }
             }
 
@@ -925,8 +1056,142 @@ public class Player2PrototypeController : MonoBehaviour
 
     private Vector3 ResolveFacingDirection()
     {
-        if (lastMoveDir.sqrMagnitude > 0.0001f) return lastMoveDir.normalized;
+        if (rb != null && rb.linearVelocity.sqrMagnitude > 0.0001f)
+        {
+            Vector3 v = rb.linearVelocity;
+            v.y = 0f;
+            if (v.sqrMagnitude > 0.0001f)
+            {
+                lastMoveDir = v.normalized;
+                return lastMoveDir;
+            }
+        }
+
+        if (lastMoveDir.sqrMagnitude > 0.0001f)
+        {
+            return lastMoveDir.normalized;
+        }
+
+        Vector3 forward = transform.forward;
+        forward.y = 0f;
+        if (forward.sqrMagnitude > 0.0001f)
+        {
+            return forward.normalized;
+        }
+
         return Vector3.forward;
+    }
+
+    private Vector3 ResolveRSwarmForward()
+    {
+        Vector3 forward = Vector3.forward;
+        Camera renderCamera = ResolveRRenderCamera();
+        if (rSwarmUseCameraForward && renderCamera != null)
+        {
+            forward = renderCamera.transform.forward;
+        }
+        else
+        {
+            forward = transform.forward;
+        }
+
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.001f)
+        {
+            forward = ResolveFacingDirection();
+            forward.y = 0f;
+        }
+
+        if (forward.sqrMagnitude < 0.001f)
+        {
+            forward = Vector3.forward;
+        }
+
+        return forward.normalized;
+    }
+
+    private Vector3 ResolveRSwarmCenter()
+    {
+        Vector3 center = transform.position;
+        if (rApplyEffectOffsetToSwarmCenter)
+        {
+            center += rEffectOffset;
+        }
+
+        if (!rSwarmCenterOnPlayer)
+        {
+            center += ResolveRSwarmForward() * rSwarmForwardOffset;
+        }
+
+        return center;
+    }
+
+    private Camera ResolveRRenderCamera()
+    {
+        if (rRenderCamera != null && rRenderCamera.isActiveAndEnabled)
+        {
+            resolvedRRenderCamera = rRenderCamera;
+            return resolvedRRenderCamera;
+        }
+
+        if (!rAutoResolveRenderCamera)
+        {
+            return resolvedRRenderCamera;
+        }
+
+        if (resolvedRRenderCamera != null && resolvedRRenderCamera.isActiveAndEnabled)
+        {
+            return resolvedRRenderCamera;
+        }
+
+        PlayerCameraRig cameraRig = FindObjectOfType<PlayerCameraRig>();
+        if (cameraRig != null)
+        {
+            Camera rigCamera = cameraRig.GetComponent<Camera>();
+            if (rigCamera == null)
+            {
+                rigCamera = cameraRig.GetComponentInChildren<Camera>(true);
+            }
+
+            if (rigCamera != null && rigCamera.isActiveAndEnabled)
+            {
+                resolvedRRenderCamera = rigCamera;
+                return resolvedRRenderCamera;
+            }
+        }
+
+        if (Camera.main != null && Camera.main.isActiveAndEnabled)
+        {
+            resolvedRRenderCamera = Camera.main;
+            return resolvedRRenderCamera;
+        }
+
+        Camera[] allCameras = Camera.allCameras;
+        for (int i = 0; i < allCameras.Length; i++)
+        {
+            Camera cam = allCameras[i];
+            if (cam != null && cam.isActiveAndEnabled && cam.cameraType == CameraType.Game)
+            {
+                resolvedRRenderCamera = cam;
+                return resolvedRRenderCamera;
+            }
+        }
+
+        return resolvedRRenderCamera;
+    }
+
+    private static void SetLayerRecursively(GameObject root, int layer)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Transform[] all = root.GetComponentsInChildren<Transform>(true);
+        for (int i = 0; i < all.Length; i++)
+        {
+            all[i].gameObject.layer = layer;
+        }
     }
 
     private GameObject CreateSkillEffectVisual(
@@ -981,6 +1246,7 @@ public class Player2PrototypeController : MonoBehaviour
         runtime.visual = visualTarget;
         runtime.baseVisualScale = visualTarget.localScale;
         CacheFadeTargets(effectVisual, runtime);
+        runtimeSkillVisualRoots.Add(root);
 
         return root;
     }
@@ -1002,6 +1268,19 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         return value < 0f ? -minAbs : minAbs;
+    }
+
+    private static bool HasAliveObjects(List<GameObject> objects)
+    {
+        for (int i = 0; i < objects.Count; i++)
+        {
+            if (objects[i] != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static void EnsureEffectVisible(GameObject effectRoot)
@@ -1189,3 +1468,5 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
     }
 }
+
+

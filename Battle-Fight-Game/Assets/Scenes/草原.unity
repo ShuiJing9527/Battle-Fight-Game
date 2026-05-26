@@ -6438,7 +6438,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &493982237
 Transform:
   m_ObjectHideFlags: 0
@@ -6468,6 +6468,43 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5774441142561779890, guid: fb15bfa8f6fb5c445814a8d4d234a0e3, type: 3}
   m_PrefabInstance: {fileID: 8272233861042045491}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &669459443
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!4 &702759844 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8375309905221334259, guid: d40ec3389589e144aa0cac00d07b1353, type: 3}
@@ -6547,7 +6584,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &979945786
 Transform:
   m_ObjectHideFlags: 0
@@ -7486,6 +7523,7 @@ GameObject:
   - component: {fileID: 1103478509}
   - component: {fileID: 1103478512}
   - component: {fileID: 1103478511}
+  - component: {fileID: 1103478513}
   m_Layer: 0
   m_Name: MapGeneration
   m_TagString: Untagged
@@ -8113,6 +8151,24 @@ MonoBehaviour:
   wallColliderTilemap: {fileID: 174403698}
   wallColliderHeight: 2
   wallColliderRootName: Merged Wall Colliders
+--- !u!114 &1103478513
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1103478508}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: bcc453e2091a4594f8cf64efb32a44c6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player2Bootstrap
+  player01: {fileID: 1414717678}
+  player02: {fileID: 1990323128}
+  partyLeader: {fileID: 1990323128}
+  player01Name: Player01
+  player02Name: Player02
+  showSwitchHint: 1
 --- !u!1 &1119862288
 GameObject:
   m_ObjectHideFlags: 0
@@ -8360,7 +8416,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1900543521}
+  m_CustomBakedTexture: {fileID: 669459443}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -9764,7 +9820,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.28799227, g: 0.06267117, b: 0.22144173, a: 0}
+  m_Color: {r: 0.09233434, g: 0.11089542, b: 0.30888012, a: 0}
   m_Intensity: 0
   m_Range: 10
   m_SpotAngle: 30
@@ -11046,43 +11102,6 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
---- !u!84 &1900543521
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1001 &1905824859
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -12201,7 +12220,7 @@ MonoBehaviour:
   rEffectOffset: {x: 0, y: 0, z: 0}
   rEffectPlaneScale: {x: 0.3, y: 0.3, z: 1}
   rEffectYawOffset: 0
-  rEffectVisualPitch: 0
+  rEffectVisualPitch: 90
   rEffectVisualYaw: 0
   rEffectVisualRoll: 0
   rEffectInvertForward: 0
@@ -12220,6 +12239,23 @@ MonoBehaviour:
   rSwarmClockwise: 1
   rSwarmForwardOffset: 2
   rSwarmYawOffset: 0
+  rBillboardLikePlayer: 1
+  rRenderCamera: {fileID: 1959916821}
+  rAutoResolveRenderCamera: 1
+  rSwarmUseCameraForward: 1
+  rSwarmCenterOnPlayer: 0
+  rApplyEffectOffsetToSwarmCenter: 0
+  rUseTangentFacing: 1
+  rPlaneUprightEuler: {x: 90, y: 0, z: 0}
+  rPlaneFaceCameraEuler: {x: 0, y: -90, z: 180}
+  rFlipPlaneFrontBack: 1
+  rPlaneFrontBackFlipEuler: {x: 0, y: 180, z: 0}
+  rInPlaneRotationAxis: {x: 0, y: 0, z: 1}
+  rDebugSwordVelocityFacing: 0
+  rFacingLookAheadTime: 0.05
+  rDebugFacingScreenAngle: 0
+  rUsePlayerLayerForR: 1
+  rForceDoubleSided: 1
   rEnableSwordSelfSpin: 1
   rSwordSelfSpinMin: 30
   rSwordSelfSpinMax: 120

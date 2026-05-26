@@ -150,11 +150,14 @@ namespace UnderTheStars.GenerationMap
 
         private void PlacePlayerOnMap()
         {
-            if (player == null || floorPoints == null) return;
+            if (floorPoints == null) return;
 
             // Get reference Tilemap
             Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
             if (refTilemap == null) return;
+
+            Transform spawnTarget = ResolveSpawnTargetTransform();
+            if (spawnTarget == null) return;
 
             Vector2Int spawnCoord = Vector2Int.zero;
             bool found = false;
@@ -179,15 +182,46 @@ namespace UnderTheStars.GenerationMap
                 Vector3 worldSpawnPos = refTilemap.GetCellCenterWorld(cellPos);
 
                 // Teleport player.
-                // Use rb.linearVelocity instead of velocity (Unity 6 recommendation).
-                player.rb.linearVelocity = Vector3.zero;
+                Rigidbody targetRb = spawnTarget.GetComponent<Rigidbody>();
+                if (targetRb != null)
+                {
+                    targetRb.linearVelocity = Vector3.zero;
+                }
 
-                // Lift Y a little to avoid clipping into ground.
-                // worldSpawnPos already contains the correct 3D position.
-                player.transform.position = worldSpawnPos + Vector3.up * 1.0f;
+                PlayerMovement targetMovement = spawnTarget.GetComponent<PlayerMovement>();
+                if (targetMovement != null && targetMovement.rb != null)
+                {
+                    targetMovement.rb.linearVelocity = Vector3.zero;
+                }
+
+                // Keep current standing height and only update X/Z to spawn cell center.
+                // This avoids "spawn high then fall" behavior.
+                Vector3 current = spawnTarget.position;
+                spawnTarget.position = new Vector3(worldSpawnPos.x, current.y, worldSpawnPos.z);
 
                 Debug.Log($"Player placed. Cell:{cellPos} -> World:{worldSpawnPos}");
+                Debug.Log($"[SPAWN] Spawn target = {spawnTarget.name}");
             }
+        }
+
+        private Transform ResolveSpawnTargetTransform()
+        {
+            Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+            if (bootstrap != null)
+            {
+                bootstrap.EnsureInitializedForSpawn();
+            }
+            Transform fromBootstrapCurrent = bootstrap != null ? bootstrap.CurrentPlayerTransform : null;
+            Transform fromBootstrapLeader = bootstrap != null && bootstrap.PartyLeader != null ? bootstrap.PartyLeader.transform : null;
+            Transform fromFallback = player != null ? player.transform : null;
+
+            Transform spawnTarget = fromBootstrapCurrent ?? fromBootstrapLeader ?? fromFallback;
+            if (spawnTarget == null)
+            {
+                Debug.LogWarning("[SPAWN] Could not resolve spawn target.");
+            }
+
+            return spawnTarget;
         }
 
         #region Region Generation
