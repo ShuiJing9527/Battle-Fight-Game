@@ -6301,6 +6301,43 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7509995362207881944, guid: 6b5249f9483ff2345927916f027d6401, type: 3}
   m_PrefabInstance: {fileID: 3688291761417147732}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &356521983
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &362345122
 GameObject:
   m_ObjectHideFlags: 0
@@ -6468,43 +6505,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5774441142561779890, guid: fb15bfa8f6fb5c445814a8d4d234a0e3, type: 3}
   m_PrefabInstance: {fileID: 8272233861042045491}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &669459443
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!4 &702759844 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 8375309905221334259, guid: d40ec3389589e144aa0cac00d07b1353, type: 3}
@@ -8168,7 +8168,9 @@ MonoBehaviour:
   partyLeader: {fileID: 1990323128}
   player01Name: Player01
   player02Name: Player02
+  partyLeaderName: Player02
   showSwitchHint: 1
+  disablePlayer2AnimatorIfSharedController: 1
 --- !u!1 &1119862288
 GameObject:
   m_ObjectHideFlags: 0
@@ -8416,7 +8418,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 669459443}
+  m_CustomBakedTexture: {fileID: 356521983}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -12140,8 +12142,23 @@ MonoBehaviour:
   wMaxDamageReduction: 0.8
   wCounterDamageRatio: 0.5
   eRailDuration: 0.6
+  eEnableStarFall: 1
+  eStarFallBladeCount: 7
+  eStarFallRadius: 2.5
+  eStarFallSpawnHeight: 4
+  eStarFallFallSpeed: 10
+  eStarFallRandomDelay: 0.08
+  eStarFallDamageRadius: 0.8
+  eStarFallDamageMultiplier: 0.5
+  eEnableStarFallDamage: 0
+  eStarFallUseForcedVisualRotation: 1
+  eStarFallForcedVisualEuler: {x: 90, y: 90, z: 90}
+  eStarFallVisualEulerOffset: {x: 0, y: 0, z: 0}
+  eStarFallUseDashPath: 1
+  eStarFallPathJitter: 0.25
+  eStarFallSequentialDelay: 0.07
   currentSwordEnergy: 1
-  rBaseSwordCount: 5
+  rBaseSwordCount: 7
   sharedSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   qSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
   wSkillEffectPrefab: {fileID: 4621521378024335642, guid: fdde37efb64d97d448cd63031d8cba25, type: 3}
@@ -12179,6 +12196,7 @@ MonoBehaviour:
   wEffectOrbitRadius: 1.2
   wEffectHeight: 0.5
   wEffectOrbitSpeed: 80
+  wSwordOrbitYawOffset: -90
   wEffectFaceCamera: 1
   wEffectSelfSpinSpeed: 0
   wDurationPerSwordEnergy: 0.25
@@ -12266,6 +12284,21 @@ MonoBehaviour:
   rSwarmEnemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295
+  rRiseDuration: 0.45
+  rRiseHeight: 4
+  rStarRainDuration: 1.2
+  rStarRainSpawnHeight: 5
+  rStarRainRadius: 5
+  rStarRainFallSpeed: 10
+  rStarRainRandomDelay: 0.15
+  rStarRainDamageRadius: 1.2
+  rStarRainStartRatio: 0.5
+  rStarRainInterval: 0.12
+  rStarRainBladesPerWave: 2
+  rStarRainVisualEulerOffset: {x: 90, y: 0, z: 0}
+  rStarRainUseForcedVisualRotation: 1
+  rStarRainForcedVisualEuler: {x: 0, y: 0, z: 0}
+  rStarRainDamageMultiplier: 0.6
   standbySwordScale: {x: 0.25, y: 0.25, z: 0.25}
   standbySwordRotationZ: -90
   standbySwordPlaneScale: {x: 0.25, y: 0.25, z: 1}

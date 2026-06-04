@@ -33,12 +33,42 @@ public class Player2PrototypeController : MonoBehaviour
 
     [Header("E - 天轨换位")]
     public float eRailDuration = 0.6f;
+    [InspectorName("E StarFall Enabled")]
+    public bool eEnableStarFall = true;
+    [InspectorName("E StarFall Blade Count")]
+    public int eStarFallBladeCount = 7;
+    [InspectorName("E StarFall Radius")]
+    public float eStarFallRadius = 2.5f;
+    [InspectorName("E StarFall Spawn Height")]
+    public float eStarFallSpawnHeight = 4f;
+    [InspectorName("E StarFall Fall Speed")]
+    public float eStarFallFallSpeed = 10f;
+    [InspectorName("E StarFall Random Delay")]
+    public float eStarFallRandomDelay = 0.08f;
+    [InspectorName("E StarFall Damage Radius")]
+    public float eStarFallDamageRadius = 0.8f;
+    [InspectorName("E StarFall Damage Multiplier")]
+    public float eStarFallDamageMultiplier = 0.5f;
+    [InspectorName("E StarFall Enable Damage")]
+    public bool eEnableStarFallDamage = false;
+    [InspectorName("E StarFall Use Forced Visual Rotation")]
+    public bool eStarFallUseForcedVisualRotation = true;
+    [InspectorName("E StarFall Forced Visual Euler")]
+    public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
+    [InspectorName("E StarFall Visual Euler Offset")]
+    public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
+    [InspectorName("E StarFall Use Dash Path")]
+    public bool eStarFallUseDashPath = true;
+    [InspectorName("E StarFall Path Jitter")]
+    public float eStarFallPathJitter = 0.35f;
+    [InspectorName("E StarFall Sequential Delay")]
+    public float eStarFallSequentialDelay = 0.06f;
 
-    [Header("剑气值")]
-    [InspectorName("当前剑气值")]
+    [Header("神印点")]
+    [InspectorName("Current Divine Mark")]
     public int currentSwordEnergy = 0;
 
-    [Header("R - 万剑神罚")]
+    [Header("R - 神眷星雨")]
     [FormerlySerializedAs("swordEnergy")]
     [InspectorName("R 初始剑数量")]
     public int rBaseSwordCount = 1;
@@ -96,6 +126,8 @@ public class Player2PrototypeController : MonoBehaviour
     public float wEffectHeight = 1.1f;
     [InspectorName("W 环绕速度")]
     public float wEffectOrbitSpeed = 80f;
+    [InspectorName("W 切线偏移角")]
+    public float wSwordOrbitYawOffset = 90f;
     [HideInInspector] public bool wEffectFaceCamera = true;
     [FormerlySerializedAs("wEffectSpinSpeed")]
     [HideInInspector] public float wEffectSelfSpinSpeed = 0f;
@@ -145,7 +177,7 @@ public class Player2PrototypeController : MonoBehaviour
     public float eEffectVisualYaw = 0f;
     public float eEffectVisualRoll = 0f;
 
-    [Header("R 特效显示")]
+    [Header("R - 神眷星雨")]
     [InspectorName("R 尺寸")]
     public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector] public float rEffectRotationZ = -90f;
@@ -159,7 +191,7 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R 显示 Roll")]
     public float rEffectVisualRoll = 0f;
     [HideInInspector] public bool rEffectInvertForward = false;
-    [Header("R 万剑漩涡")]
+    [Header("R 星雨参数")]
     [InspectorName("R 持续时间")]
     public float rSwarmDuration = 2.0f;
     [InspectorName("R 最小半径")]
@@ -189,7 +221,7 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R 前方偏移")]
     public float rSwarmForwardOffset = 2.0f;
     [Header("R 漩涡中心")]
-    [InspectorName("R 剑尖方向偏移")]
+    [InspectorName("R 切线偏移角")]
     public float rSwarmYawOffset = 0f;
     [InspectorName("R 像角色一样面向镜头")]
     public bool rBillboardLikePlayer = true;
@@ -222,12 +254,12 @@ public class Player2PrototypeController : MonoBehaviour
     public bool rUsePlayerLayerForR = true;
     [InspectorName("R 双面显示")]
     public bool rForceDoubleSided = true;
-    [Header("R 剑自身旋转")]
+    [Header("R 自转")]
     [HideInInspector] public bool rEnableSwordSelfSpin = false;
     [HideInInspector] public float rSwordSelfSpinMin = 30f;
     [HideInInspector] public float rSwordSelfSpinMax = 120f;
     [HideInInspector] public Vector3 rSwordLengthLocalAxis = Vector3.up;
-    [Header("R 万剑漩涡伤害")]
+    [Header("R 星雨伤害")]
     [InspectorName("R 伤害半径")]
     public float rSwarmDamageRadius = 3.0f;
     [InspectorName("R 伤害间隔")]
@@ -236,6 +268,47 @@ public class Player2PrototypeController : MonoBehaviour
     public float rSwarmDamagePerTick = 2.0f;
     [InspectorName("R 敌人层")]
     public LayerMask rSwarmEnemyLayer = ~0;
+
+    [Header("R 星雨阶段")]
+    [InspectorName("R 上升时间")]
+    public float rRiseDuration = 0.45f;
+    [InspectorName("R 上升高度")]
+    public float rRiseHeight = 4f;
+    [InspectorName("R 星雨持续时间")]
+    public float rStarRainDuration = 1.2f;
+    [InspectorName("R 星雨生成高度")]
+    public float rStarRainSpawnHeight = 5f;
+    [InspectorName("R 星雨范围半径")]
+    public float rStarRainRadius = 5f;
+    [InspectorName("R 星雨落下速度")]
+    public float rStarRainFallSpeed = 10f;
+    [InspectorName("R 星雨随机延迟")]
+    public float rStarRainRandomDelay = 0.15f;
+    [InspectorName("R 星雨伤害半径")]
+    public float rStarRainDamageRadius = 1.2f;
+
+    [InspectorName("R StarRain Start Ratio")]
+    public float rStarRainStartRatio = 0.5f;
+    [InspectorName("R StarRain Interval")]
+    public float rStarRainInterval = 0.12f;
+    [InspectorName("R StarRain Blades Per Wave")]
+    public int rStarRainBladesPerWave = 2;
+    [InspectorName("R StarRain Visual Euler Offset")]
+    public Vector3 rStarRainVisualEulerOffset = new Vector3(90f, 0f, 0f);
+    [InspectorName("R StarRain Use Forced Visual Rotation")]
+    public bool rStarRainUseForcedVisualRotation = true;
+    [InspectorName("R StarRain Forced Visual Euler")]
+    public Vector3 rStarRainForcedVisualEuler = new Vector3(90f, 180f, 0f);
+    [InspectorName("R StarRain Damage Multiplier")]
+    public float rStarRainDamageMultiplier = 0.6f;
+    [InspectorName("R StarRain Continue After Orbit")]
+    public bool rStarRainContinueAfterOrbit = true;
+    [InspectorName("R StarRain Extra Duration After Orbit")]
+    public float rStarRainExtraDurationAfterOrbit = 0.6f;
+    [InspectorName("R Orbit Clear When Orbit Ends")]
+    public bool rOrbitClearWhenOrbitEnds = true;
+    [InspectorName("R Orbit Fade Out Duration")]
+    public float rOrbitFadeOutDuration = 0.15f;
 
     [Header("Skill Effect Visuals - Standby Sword")]
     public Vector3 standbySwordScale = new Vector3(0.25f, 0.25f, 0.25f);
@@ -249,11 +322,11 @@ public class Player2PrototypeController : MonoBehaviour
 
     [Header("Refs")]
     public Rigidbody rb;
-
     private sealed class SkillEffectRuntime : MonoBehaviour
     {
         public Transform visual;
         public Vector3 baseVisualScale;
+        public Quaternion baseVisualRotation = Quaternion.identity;
         public Material[] materialTargets;
         public Color[] materialBaseColors;
         public SpriteRenderer[] spriteTargets;
@@ -278,6 +351,40 @@ public class Player2PrototypeController : MonoBehaviour
         public float selfSpinAngle;
         public Vector3 previousPosition;
         public bool hasPreviousPosition;
+        public Vector3 orbitEndPosition;
+        public Vector3 riseEndPosition;
+        public Vector3 rainStartPosition;
+        public Vector3 rainTargetPosition;
+        public float rainDelay;
+        public float rainFallDuration;
+        public bool rainImpactApplied;
+    }
+
+    private sealed class RStarRainBladeData
+    {
+        public GameObject sword;
+        public SkillEffectRuntime runtime;
+        public Transform visualTransform;
+        public Quaternion baseVisibleLocalRotation;
+        public Vector3 spawnPosition;
+        public Vector3 targetPosition;
+        public float delay;
+        public float fallDuration;
+        public float elapsed;
+        public bool impactApplied;
+    }
+
+    private sealed class EStarFallBladeData
+    {
+        public GameObject sword;
+        public SkillEffectRuntime runtime;
+        public Transform visualTransform;
+        public Vector3 spawnPosition;
+        public Vector3 targetPosition;
+        public float delay;
+        public float fallDuration;
+        public float elapsed;
+        public bool impactApplied;
     }
 
     private Vector3 lastMoveDir = Vector3.forward;
@@ -292,12 +399,14 @@ public class Player2PrototypeController : MonoBehaviour
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
     private GameObject activeRSwarmRoot;
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
+    private readonly List<RStarRainBladeData> activeRStarRainBlades = new List<RStarRainBladeData>();
     private Camera resolvedRRenderCamera;
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
 
     private readonly List<GameObject> standbySwordVisuals = new List<GameObject>();
     private readonly List<GameObject> runtimeSkillVisualRoots = new List<GameObject>();
+    private readonly List<EStarFallBladeData> activeEStarFallBlades = new List<EStarFallBladeData>();
 
     private Quaternion initialRotation;
 
@@ -325,9 +434,23 @@ public class Player2PrototypeController : MonoBehaviour
                 return true;
             }
 
+            if (HasAliveEStarFallBlades())
+            {
+                return true;
+            }
+
             for (int i = 0; i < activeRSwarmSwords.Count; i++)
             {
                 RSwarmSwordData data = activeRSwarmSwords[i];
+                if (data != null && data.sword != null)
+                {
+                    return true;
+                }
+            }
+
+            for (int i = 0; i < activeRStarRainBlades.Count; i++)
+            {
+                RStarRainBladeData data = activeRStarRainBlades[i];
                 if (data != null && data.sword != null)
                 {
                     return true;
@@ -460,8 +583,6 @@ public class Player2PrototypeController : MonoBehaviour
     private void CastE()
     {
         if (!isDashing) StartCoroutine(DashRoutine());
-        Vector3 eDirection = ResolveFacingDirection();
-        LaunchStandbySwords(eDirection, 18f);
     }
 
     private void CastR()
@@ -486,16 +607,16 @@ public class Player2PrototypeController : MonoBehaviour
     private IEnumerator RSwarmRoutine(int count)
     {
         Vector3 center = ResolveRSwarmCenter();
-
         GameObject swarmRoot = new GameObject("R_SwarmVisualRoot");
         swarmRoot.transform.position = center;
         swarmRoot.transform.rotation = Quaternion.identity;
         activeRSwarmRoot = swarmRoot;
         activeRSwarmSwords.Clear();
 
-        for (int i = 0; i < count; i++)
+        int swordCount = Mathf.Max(0, count);
+        for (int i = 0; i < swordCount; i++)
         {
-            float baseAngle = i * (360f / Mathf.Max(1, count)) + Random.Range(-30f, 30f);
+            float baseAngle = i * (360f / Mathf.Max(1, swordCount)) + Random.Range(-30f, 30f);
             float radius = Random.Range(Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax), Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax));
             float height = Random.Range(Mathf.Min(rSwarmHeightMin, rSwarmHeightMax), Mathf.Max(rSwarmHeightMin, rSwarmHeightMax));
             float orbitSpeed = Random.Range(Mathf.Min(rSwarmSpeedMin, rSwarmSpeedMax), Mathf.Max(rSwarmSpeedMin, rSwarmSpeedMax));
@@ -503,16 +624,13 @@ public class Player2PrototypeController : MonoBehaviour
             float bobFrequency = Random.Range(Mathf.Min(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax), Mathf.Max(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax));
             float phase = Random.Range(0f, Mathf.PI * 2f);
 
-            float rad = baseAngle * Mathf.Deg2Rad;
-            Vector3 spawnOffset = new Vector3(
-                Mathf.Cos(rad) * radius,
-                height,
-                Mathf.Sin(rad) * radius);
+            Vector3 spawnOffset = GetOrbitPositionXZ(baseAngle, radius, height);
+            Vector3 spawnPosition = center + spawnOffset;
 
             GameObject sword = CreateSkillEffectVisual(
                 $"R_SwarmSword_{i}",
                 rSkillEffectPrefab,
-                center + spawnOffset,
+                spawnPosition,
                 spawnOffset,
                 false,
                 false,
@@ -557,66 +675,109 @@ public class Player2PrototypeController : MonoBehaviour
                 visualTransform = visualTransform,
                 baseVisibleLocalRotation = baseVisualLocalRotation,
                 selfSpinSpeed = 0f,
-                selfSpinAngle = 0f
+                selfSpinAngle = 0f,
+                previousPosition = spawnPosition,
+                hasPreviousPosition = true
             });
         }
 
-        float elapsed = 0f;
+        float orbitElapsed = 0f;
         float damageTickTimer = 0f;
+        float orbitDuration = Mathf.Max(0.05f, rSwarmDuration);
         float safeDamageInterval = Mathf.Max(0.05f, rSwarmDamageInterval);
-        while (elapsed < rSwarmDuration)
+        float rainStartTime = Mathf.Clamp01(rStarRainStartRatio) * orbitDuration;
+        float rainSpawnEndTime = orbitDuration;
+        if (rStarRainContinueAfterOrbit)
+        {
+            rainSpawnEndTime += Mathf.Max(0f, rStarRainExtraDurationAfterOrbit);
+        }
+        float rainSpawnInterval = Mathf.Max(0.01f, rStarRainInterval);
+        float rainSpawnAccumulator = 0f;
+        float totalElapsed = 0f;
+        bool orbitCleared = false;
+
+        while (totalElapsed < rainSpawnEndTime || HasAliveRStarRainBlades())
         {
             center = ResolveRSwarmCenter();
-            swarmRoot.transform.position = center;
-
-            float dirSign = rSwarmClockwise ? -1f : 1f;
-            for (int i = 0; i < activeRSwarmSwords.Count; i++)
+            if (!orbitCleared && swarmRoot != null)
             {
-                RSwarmSwordData data = activeRSwarmSwords[i];
-                if (data == null || data.sword == null)
+                swarmRoot.transform.position = center;
+            }
+
+            if (orbitElapsed < orbitDuration)
+            {
+                float dirSign = rSwarmClockwise ? -1f : 1f;
+                for (int i = 0; i < activeRSwarmSwords.Count; i++)
                 {
-                    continue;
+                    RSwarmSwordData data = activeRSwarmSwords[i];
+                    if (data == null || data.sword == null)
+                    {
+                        continue;
+                    }
+
+                    float angle = data.baseAngle + dirSign * data.orbitSpeed * orbitElapsed;
+                    float rad = angle * Mathf.Deg2Rad;
+                    float dynamicRadius = data.radius + Mathf.Sin(orbitElapsed * 1.7f + data.phase) * rSwarmRadiusJitter;
+                    float dynamicHeight = data.height + data.layerOffset + Mathf.Sin(orbitElapsed * data.bobFrequency + data.phase) * data.bobAmplitude;
+
+                    Vector3 offset = new Vector3(
+                        Mathf.Cos(rad) * dynamicRadius,
+                        dynamicHeight,
+                        Mathf.Sin(rad) * dynamicRadius);
+                    Vector3 currentPosition = center + offset;
+                    data.sword.transform.position = currentPosition;
+                    data.orbitEndPosition = currentPosition;
+
+                    Vector3 tangent = new Vector3(-Mathf.Sin(rad), 0f, Mathf.Cos(rad));
+                    if (rSwarmClockwise)
+                    {
+                        tangent = -tangent;
+                    }
+
+                    if (data.visualTransform != null)
+                    {
+                        float yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg + rSwarmYawOffset;
+                        ApplyRSwarmVisualRotation(data, yaw);
+                    }
                 }
 
-                float angle = data.baseAngle + dirSign * data.orbitSpeed * elapsed;
-                float rad = angle * Mathf.Deg2Rad;
-                float dynamicRadius = data.radius + Mathf.Sin(elapsed * 1.7f + data.phase) * rSwarmRadiusJitter;
-                float dynamicHeight = data.height + data.layerOffset + Mathf.Sin(elapsed * data.bobFrequency + data.phase) * data.bobAmplitude;
-
-                Vector3 offset = new Vector3(
-                    Mathf.Cos(rad) * dynamicRadius,
-                    dynamicHeight,
-                    Mathf.Sin(rad) * dynamicRadius);
-                Vector3 currentPosition = center + offset;
-                data.sword.transform.position = currentPosition;
-
-                Vector3 tangent = new Vector3(-Mathf.Sin(rad), 0f, Mathf.Cos(rad));
-                if (rSwarmClockwise)
+                damageTickTimer -= Time.deltaTime;
+                if (damageTickTimer <= 0f)
                 {
-                    tangent = -tangent;
+                    ApplyRSwarmTickDamage(center);
+                    damageTickTimer += safeDamageInterval;
                 }
+                orbitElapsed = Mathf.Min(orbitElapsed + Time.deltaTime, orbitDuration);
+            }
 
-                if (data.visualTransform != null)
+            if (!orbitCleared && orbitElapsed >= orbitDuration)
+            {
+                orbitCleared = true;
+                if (rOrbitClearWhenOrbitEnds)
                 {
-                    float yaw = Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg + rSwarmYawOffset;
-                    Quaternion visibleBase =
-                        Quaternion.Euler(rPlaneUprightEuler) *
-                        Quaternion.Euler(rPlaneFaceCameraEuler) *
-                        (rFlipPlaneFrontBack ? Quaternion.Euler(rPlaneFrontBackFlipEuler) : Quaternion.identity) *
-                        Quaternion.Euler(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
-                    Quaternion yawRot = Quaternion.Euler(0f, yaw, 0f);
-                    data.visualTransform.rotation = yawRot * visibleBase;
+                    CleanupRSwarmOrbitVisuals();
                 }
             }
 
-            damageTickTimer -= Time.deltaTime;
-            if (damageTickTimer <= 0f)
+            if (totalElapsed >= rainStartTime && totalElapsed <= rainSpawnEndTime)
             {
-                ApplyRSwarmTickDamage(center);
-                damageTickTimer += safeDamageInterval;
+                rainSpawnAccumulator += Time.deltaTime;
+                while (rainSpawnAccumulator >= rainSpawnInterval)
+                {
+                    SpawnRStarRainWave(center);
+                    rainSpawnAccumulator -= rainSpawnInterval;
+                }
             }
 
-            elapsed += Time.deltaTime;
+            UpdateRStarRainBlades(Time.deltaTime);
+
+            totalElapsed += Time.deltaTime;
+
+            if (totalElapsed >= rainSpawnEndTime && !HasAliveRStarRainBlades())
+            {
+                break;
+            }
+
             yield return null;
         }
 
@@ -672,8 +833,8 @@ public class Player2PrototypeController : MonoBehaviour
         for (int i = 0; i < swordCount; i++)
         {
             float angle = i * (360f / swordCount);
-            Vector3 offset = Quaternion.Euler(0f, angle, 0f) * Vector3.forward * finalRadius;
-            Vector3 spawnPos = transform.position + new Vector3(offset.x, wEffectHeight, offset.z) + wEffectOffset;
+            Vector3 offset = GetOrbitPositionXZ(angle, finalRadius, wEffectHeight);
+            Vector3 spawnPos = transform.position + offset + wEffectOffset;
 
             GameObject sword = CreateSkillEffectVisual(
                 $"W_Sword_{i}",
@@ -702,6 +863,12 @@ public class Player2PrototypeController : MonoBehaviour
             sword.transform.SetParent(orbitRoot.transform, true);
 
             // W size control: only use W Effect Scale Multiplier on top of the correctly displayed base scale.
+            SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
+            if (runtime != null && runtime.visual != null)
+            {
+                runtime.baseVisualRotation = runtime.visual.rotation;
+            }
+
             Vector3 baseScale = sword.transform.localScale;
             float sizeMul = Mathf.Max(0.01f, wEffectScaleMultiplier);
             Vector3 finalScale = baseScale * sizeMul;
@@ -745,13 +912,15 @@ public class Player2PrototypeController : MonoBehaviour
                 }
 
                 float baseAngle = wOrbitAngle + i * (360f / swordCount);
-                float rad = baseAngle * Mathf.Deg2Rad;
-                Vector3 offset = new Vector3(
-                    Mathf.Cos(rad) * finalRadius,
-                    wEffectHeight,
-                    Mathf.Sin(rad) * finalRadius);
-
+                Vector3 offset = GetOrbitPositionXZ(baseAngle, finalRadius, wEffectHeight);
                 sword.transform.position = transform.position + offset + wEffectOffset;
+
+                SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
+                if (runtime != null && runtime.visual != null)
+                {
+                    float yaw = GetOrbitTangentYawXZ(baseAngle) + wSwordOrbitYawOffset;
+                    runtime.visual.rotation = Quaternion.Euler(0f, yaw, 0f) * runtime.baseVisualRotation;
+                }
             }
 
             t += Time.deltaTime;
@@ -809,6 +978,118 @@ public class Player2PrototypeController : MonoBehaviour
         currentWFinalDamageReduction = 0f;
     }
 
+    private bool HasAliveRStarRainBlades()
+    {
+        for (int i = 0; i < activeRStarRainBlades.Count; i++)
+        {
+            RStarRainBladeData data = activeRStarRainBlades[i];
+            if (data != null && data.sword != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void SpawnRStarRainWave(Vector3 center)
+    {
+        int waveCount = Mathf.Max(1, rStarRainBladesPerWave);
+        float rainSpawnHeight = Mathf.Max(0f, rStarRainSpawnHeight);
+        float rainRadius = Mathf.Max(0f, rStarRainRadius);
+        float rainRandomDelay = Mathf.Max(0f, rStarRainRandomDelay);
+        float rainFallSpeed = Mathf.Max(0.1f, rStarRainFallSpeed);
+
+        for (int i = 0; i < waveCount; i++)
+        {
+            Vector2 randomOffset2D = Random.insideUnitCircle * rainRadius;
+            Vector3 target = center + new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
+            Vector3 spawn = target + Vector3.up * rainSpawnHeight;
+
+            GameObject sword = CreateSkillEffectVisual(
+                $"R_StarRain_{activeRStarRainBlades.Count}",
+                rSkillEffectPrefab,
+                spawn,
+                Vector3.down,
+                false,
+                false,
+                0f,
+                0f,
+                0f,
+                0f,
+                ResolveVisualScale(rEffectScale, rEffectPlaneScale));
+
+            if (sword == null)
+            {
+                continue;
+            }
+
+            if (rUsePlayerLayerForR)
+            {
+                SetLayerRecursively(sword, gameObject.layer);
+            }
+
+            if (rForceDoubleSided)
+            {
+                TrySetDoubleSidedIfSupported(sword);
+            }
+
+            EnsureEffectVisible(sword);
+            SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
+            Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : FindEffectVisualTransform(sword);
+
+            RStarRainBladeData data = new RStarRainBladeData
+            {
+                sword = sword,
+                runtime = runtime,
+                visualTransform = visualTransform,
+                baseVisibleLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity,
+                spawnPosition = spawn,
+                targetPosition = target,
+                delay = Random.Range(0f, rainRandomDelay),
+                fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / rainFallSpeed),
+                elapsed = 0f,
+                impactApplied = false
+            };
+
+            activeRStarRainBlades.Add(data);
+            ApplyRStarRainVisualRotation(data);
+        }
+    }
+
+    private void UpdateRStarRainBlades(float deltaTime)
+    {
+        for (int i = activeRStarRainBlades.Count - 1; i >= 0; i--)
+        {
+            RStarRainBladeData data = activeRStarRainBlades[i];
+            if (data == null || data.sword == null)
+            {
+                activeRStarRainBlades.RemoveAt(i);
+                continue;
+            }
+
+            data.elapsed += deltaTime;
+            if (data.elapsed < data.delay)
+            {
+                data.sword.transform.position = data.spawnPosition;
+                continue;
+            }
+
+            float fallT = Mathf.Clamp01((data.elapsed - data.delay) / Mathf.Max(0.05f, data.fallDuration));
+            float smoothFallT = Mathf.SmoothStep(0f, 1f, fallT);
+            data.sword.transform.position = Vector3.Lerp(data.spawnPosition, data.targetPosition, smoothFallT);
+            ApplyRStarRainVisualRotation(data);
+
+            if (fallT >= 1f && !data.impactApplied)
+            {
+                data.impactApplied = true;
+                ApplyRSwarmImpactDamage(data.targetPosition);
+                Destroy(data.sword);
+                activeRStarRainBlades.RemoveAt(i);
+            }
+        }
+    }
+
     private void CleanupRSwarmVisuals()
     {
         for (int i = 0; i < activeRSwarmSwords.Count; i++)
@@ -821,6 +1102,16 @@ public class Player2PrototypeController : MonoBehaviour
         }
         activeRSwarmSwords.Clear();
 
+        for (int i = 0; i < activeRStarRainBlades.Count; i++)
+        {
+            RStarRainBladeData data = activeRStarRainBlades[i];
+            if (data != null && data.sword != null)
+            {
+                Destroy(data.sword);
+            }
+        }
+        activeRStarRainBlades.Clear();
+
         if (activeRSwarmRoot != null)
         {
             Destroy(activeRSwarmRoot);
@@ -828,14 +1119,70 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
+    private void CleanupRSwarmOrbitVisuals()
+    {
+        GameObject orbitRoot = activeRSwarmRoot;
+        for (int i = 0; i < activeRSwarmSwords.Count; i++)
+        {
+            RSwarmSwordData data = activeRSwarmSwords[i];
+            if (data != null && data.sword != null)
+            {
+                if (rOrbitFadeOutDuration > 0f)
+                {
+                    StartCoroutine(FadeAndDestroy(data.sword, rOrbitFadeOutDuration));
+                }
+                else
+                {
+                    Destroy(data.sword);
+                }
+            }
+        }
+
+        activeRSwarmSwords.Clear();
+
+        activeRSwarmRoot = null;
+
+        if (orbitRoot != null)
+        {
+            if (rOrbitFadeOutDuration > 0f)
+            {
+                StartCoroutine(DestroyAfterDelay(orbitRoot, rOrbitFadeOutDuration));
+            }
+            else
+            {
+                Destroy(orbitRoot);
+            }
+        }
+    }
+
+    private IEnumerator DestroyAfterDelay(GameObject target, float delay)
+    {
+        if (target == null) yield break;
+        yield return new WaitForSeconds(Mathf.Max(0f, delay));
+        if (target != null)
+        {
+            Destroy(target);
+        }
+    }
+
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
-        if (rSwarmDamagePerTick <= 0f || rSwarmDamageRadius <= 0f)
+        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, rSwarmDamagePerTick);
+    }
+
+    private void ApplyRSwarmImpactDamage(Vector3 center)
+    {
+        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), rSwarmDamagePerTick * Mathf.Max(0f, rStarRainDamageMultiplier));
+    }
+
+    private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageAmount)
+    {
+        if (damageAmount <= 0f || radius <= 0f)
         {
             return;
         }
 
-        Collider[] hits = Physics.OverlapSphere(center, rSwarmDamageRadius, rSwarmEnemyLayer);
+        Collider[] hits = Physics.OverlapSphere(center, radius, rSwarmEnemyLayer);
         HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
         for (int i = 0; i < hits.Length; i++)
         {
@@ -854,14 +1201,14 @@ public class Player2PrototypeController : MonoBehaviour
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && combatHealth.gameObject != gameObject)
             {
-                combatHealth.TakeDamage(new BattleDamage(rSwarmDamagePerTick, BattleDamageType.Physical, gameObject));
+                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Physical, gameObject));
                 continue;
             }
 
             EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
             if (enemyHealth != null && enemyHealth.gameObject != gameObject)
             {
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(rSwarmDamagePerTick));
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
                 enemyHealth.TakeDamage(damageInt, gameObject);
             }
         }
@@ -955,29 +1302,15 @@ public class Player2PrototypeController : MonoBehaviour
             float p = Mathf.Clamp01(t / dashDuration);
             transform.position = Vector3.Lerp(start, end, p);
 
-            if (Random.value < 0.45f)
-            {
-                Vector3 trailPos = transform.position + Vector3.up * 0.5f + eEffectOffset;
-                GameObject trail = CreateSkillEffectVisual(
-                    "E_Rail",
-                    eSkillEffectPrefab,
-                    trailPos,
-                    dir,
-                    true,
-                    false,
-                    eEffectYawOffset,
-                    eEffectVisualPitch,
-                    eEffectVisualYaw,
-                    eEffectVisualRoll + ResolveRotation(eEffectRotationZ),
-                    ResolveVisualScale(eEffectScale, eEffectPlaneScale));
-                StartCoroutine(FadeAndDestroy(trail, eRailDuration));
-            }
-
             t += Time.deltaTime;
             yield return null;
         }
 
         transform.position = end;
+        if (eEnableStarFall)
+        {
+            StartCoroutine(EStarFallRoutine(start, end));
+        }
         isDashing = false;
     }
 
@@ -996,6 +1329,165 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         if (effectRoot != null) Destroy(effectRoot);
+    }
+
+    private bool HasAliveEStarFallBlades()
+    {
+        for (int i = 0; i < activeEStarFallBlades.Count; i++)
+        {
+            EStarFallBladeData data = activeEStarFallBlades[i];
+            if (data != null && data.sword != null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private IEnumerator EStarFallRoutine(Vector3 startPos, Vector3 endPos)
+    {
+        CleanupEStarFallBlades();
+
+        if (eStarFallBladeCount <= 0)
+        {
+            yield break;
+        }
+
+        int bladeCount = Mathf.Max(1, eStarFallBladeCount);
+        float spawnHeight = Mathf.Max(0f, eStarFallSpawnHeight);
+        float fallSpeed = Mathf.Max(0.1f, eStarFallFallSpeed);
+        float randomDelay = Mathf.Max(0f, eStarFallRandomDelay);
+        float sequentialDelay = Mathf.Max(0f, eStarFallSequentialDelay);
+
+        for (int i = 0; i < bladeCount; i++)
+        {
+            float t = bladeCount <= 1 ? 1f : i / (float)(bladeCount - 1);
+            Vector3 target = eStarFallUseDashPath
+                ? Vector3.Lerp(startPos, endPos, t)
+                : endPos;
+
+            if (eStarFallUseDashPath)
+            {
+                Vector2 jitter2D = Random.insideUnitCircle * Mathf.Max(0f, eStarFallPathJitter);
+                target += new Vector3(jitter2D.x, 0f, jitter2D.y);
+            }
+            else
+            {
+                Vector2 randomOffset2D = Random.insideUnitCircle * Mathf.Max(0f, eStarFallRadius);
+                target += new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
+            }
+
+            Vector3 spawn = target + Vector3.up * spawnHeight;
+
+            GameObject blade = CreateSkillEffectVisual(
+                $"E_StarFall_{i}",
+                eSkillEffectPrefab,
+                spawn,
+                Vector3.down,
+                false,
+                false,
+                0f,
+                0f,
+                0f,
+                0f,
+                ResolveVisualScale(eEffectScale, eEffectPlaneScale));
+
+            if (blade == null)
+            {
+                continue;
+            }
+
+            EnsureEffectVisible(blade);
+
+            SkillEffectRuntime runtime = blade.GetComponent<SkillEffectRuntime>();
+            Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : FindEffectVisualTransform(blade);
+            EStarFallBladeData data = new EStarFallBladeData
+            {
+                sword = blade,
+                runtime = runtime,
+                visualTransform = visualTransform,
+                spawnPosition = spawn,
+                targetPosition = target,
+                delay = (eStarFallUseDashPath ? i * sequentialDelay : 0f) + Random.Range(0f, randomDelay),
+                fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / fallSpeed),
+                elapsed = 0f,
+                impactApplied = false
+            };
+
+            activeEStarFallBlades.Add(data);
+            ApplyEStarFallVisualRotation(data, Vector3.down);
+        }
+
+        float maxLife = 0f;
+        for (int i = 0; i < activeEStarFallBlades.Count; i++)
+        {
+            EStarFallBladeData data = activeEStarFallBlades[i];
+            if (data != null)
+            {
+                maxLife = Mathf.Max(maxLife, data.delay + data.fallDuration);
+            }
+        }
+
+        float elapsed = 0f;
+        while (elapsed < maxLife || HasAliveEStarFallBlades())
+        {
+            for (int i = activeEStarFallBlades.Count - 1; i >= 0; i--)
+            {
+                EStarFallBladeData data = activeEStarFallBlades[i];
+                if (data == null || data.sword == null)
+                {
+                    activeEStarFallBlades.RemoveAt(i);
+                    continue;
+                }
+
+                data.elapsed += Time.deltaTime;
+                if (data.elapsed < data.delay)
+                {
+                    data.sword.transform.position = data.spawnPosition;
+                    ApplyEStarFallVisualRotation(data, Vector3.down);
+                    continue;
+                }
+
+                float fallT = Mathf.Clamp01((data.elapsed - data.delay) / Mathf.Max(0.05f, data.fallDuration));
+                float smoothFallT = Mathf.SmoothStep(0f, 1f, fallT);
+                Vector3 pos = Vector3.Lerp(data.spawnPosition, data.targetPosition, smoothFallT);
+                data.sword.transform.position = pos;
+                ApplyEStarFallVisualRotation(data, data.targetPosition - pos);
+
+                if (fallT >= 1f && !data.impactApplied)
+                {
+                    data.impactApplied = true;
+                    if (eEnableStarFallDamage)
+                    {
+                        float damage = Mathf.Max(0.01f, rSwarmDamagePerTick * Mathf.Max(0f, eStarFallDamageMultiplier));
+                        ApplyRSwarmAreaDamage(data.targetPosition, Mathf.Max(0.01f, eStarFallDamageRadius), damage);
+                    }
+
+                    Destroy(data.sword);
+                    activeEStarFallBlades.RemoveAt(i);
+                }
+            }
+
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        CleanupEStarFallBlades();
+    }
+
+    private void CleanupEStarFallBlades()
+    {
+        for (int i = 0; i < activeEStarFallBlades.Count; i++)
+        {
+            EStarFallBladeData data = activeEStarFallBlades[i];
+            if (data != null && data.sword != null)
+            {
+                Destroy(data.sword);
+            }
+        }
+
+        activeEStarFallBlades.Clear();
     }
 
     private void AddStandbySword()
@@ -1451,6 +1943,110 @@ public class Player2PrototypeController : MonoBehaviour
     private float ResolveRotation(float specificRotationZ)
     {
         return sharedEffectRotationZ + specificRotationZ;
+    }
+
+    private static Vector3 GetOrbitPositionXZ(float angleDegrees, float radius, float height)
+    {
+        float rad = angleDegrees * Mathf.Deg2Rad;
+        return new Vector3(
+            Mathf.Cos(rad) * radius,
+            height,
+            Mathf.Sin(rad) * radius);
+    }
+
+    private static float GetOrbitTangentYawXZ(float angleDegrees)
+    {
+        float rad = angleDegrees * Mathf.Deg2Rad;
+        Vector3 tangent = new Vector3(
+            -Mathf.Sin(rad),
+            0f,
+            Mathf.Cos(rad));
+        return Mathf.Atan2(tangent.x, tangent.z) * Mathf.Rad2Deg;
+    }
+
+    private static float GetYawFromDirectionXZ(Vector3 direction, float fallbackYaw)
+    {
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.0001f)
+        {
+            return fallbackYaw;
+        }
+
+        direction.Normalize();
+        return Mathf.Atan2(direction.x, direction.z) * Mathf.Rad2Deg;
+    }
+
+    private Quaternion BuildRVisibleBaseRotation()
+    {
+        return
+            Quaternion.Euler(rPlaneUprightEuler) *
+            Quaternion.Euler(rPlaneFaceCameraEuler) *
+            (rFlipPlaneFrontBack ? Quaternion.Euler(rPlaneFrontBackFlipEuler) : Quaternion.identity) *
+            Quaternion.Euler(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
+    }
+
+    private void ApplyRSwarmVisualRotation(RSwarmSwordData data, float yaw)
+    {
+        if (data == null || data.visualTransform == null)
+        {
+            return;
+        }
+
+        data.visualTransform.rotation = Quaternion.Euler(0f, yaw, 0f) * BuildRVisibleBaseRotation();
+    }
+
+    private Quaternion BuildRStarRainVisibleRotation()
+    {
+        if (rStarRainUseForcedVisualRotation)
+        {
+            return Quaternion.Euler(rStarRainForcedVisualEuler) * Quaternion.Euler(rStarRainVisualEulerOffset);
+        }
+
+        return BuildRVisibleBaseRotation() * Quaternion.Euler(rStarRainVisualEulerOffset);
+    }
+
+    private void ApplyRStarRainVisualRotation(RStarRainBladeData data)
+    {
+        if (data == null || data.visualTransform == null)
+        {
+            return;
+        }
+
+        Quaternion finalRotation = BuildRStarRainVisibleRotation();
+        data.sword.transform.rotation = finalRotation;
+        data.visualTransform.rotation = finalRotation;
+        // StarRain final visual.rotation is intentionally written here last so the fall swords stay vertical.
+    }
+
+    private Quaternion BuildEStarFallVisibleRotation(Vector3 fallDir)
+    {
+        if (eStarFallUseForcedVisualRotation)
+        {
+            return Quaternion.Euler(eStarFallForcedVisualEuler) * Quaternion.Euler(eStarFallVisualEulerOffset);
+        }
+
+        Vector3 dir = fallDir;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)
+        {
+            dir = Vector3.down;
+        }
+        dir.Normalize();
+
+        Quaternion fallRotation = Quaternion.LookRotation(dir, Vector3.up);
+        return fallRotation * Quaternion.Euler(eStarFallVisualEulerOffset);
+    }
+
+    private void ApplyEStarFallVisualRotation(EStarFallBladeData data, Vector3 fallDir)
+    {
+        if (data == null || data.visualTransform == null)
+        {
+            return;
+        }
+
+        Quaternion finalRotation = BuildEStarFallVisibleRotation(fallDir);
+        data.sword.transform.rotation = finalRotation;
+        data.visualTransform.rotation = finalRotation;
     }
 
     private static Color GetMaterialColor(Material mat)
