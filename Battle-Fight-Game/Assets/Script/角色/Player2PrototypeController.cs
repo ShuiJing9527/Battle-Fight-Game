@@ -6,24 +6,24 @@ using UnityEngine.Serialization;
 
 public class Player2PrototypeController : MonoBehaviour
 {
-    [Header("Move")]
+    [Header("移动")]
     [HideInInspector] public float moveSpeed = 5f;
     public float dashDistance = 4f;
     public float dashDuration = 0.15f;
     [SerializeField] private bool lockCharacterRotation = true;
 
-    [Header("Q - 神临光剑")]
+    [Header("Q - 神临光剑 / 基础")]
     public float qDelay = 0.35f;
     public float qSwordSpeed = 14f;
 
-    [Header("W - 圣轮偏转")]
+    [Header("W - 圣轮偏转 / 基础")]
     [InspectorName("W 持续时间")]
     public float wDuration = 1.5f;
     [InspectorName("W 基础减伤")]
     public float wDamageReduction = 0.4f;
     [HideInInspector] public int maxStandbySwords = 3;
 
-    [Header("W 防御加成")]
+    [Header("W - 圣轮偏转 / 防御加成")]
     [InspectorName("W 每把剑减伤加成")]
     public float wDamageReductionPerSword = 0.03f;
     [InspectorName("W 最大减伤")]
@@ -31,49 +31,87 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("W 反击伤害比例")]
     public float wCounterDamageRatio = 0.5f;
 
-    [Header("E - 天轨换位")]
+    [Header("E - 天轨换位 / 基础")]
     public float eRailDuration = 0.6f;
-    [InspectorName("E StarFall Enabled")]
-    public bool eEnableStarFall = true;
-    [InspectorName("E StarFall Blade Count")]
+
+    [Header("E - 天轨换位 / Shader 残影")]
+    [InspectorName("E 残影启用")]
+    public bool eEnableAfterimageShader = true;
+    [InspectorName("E 残影来源 Renderer")]
+    public Renderer eAfterimageSourceRenderer;
+    [InspectorName("E 残影材质")]
+    public Material eAfterimageMaterial;
+    [InspectorName("E 残影数量")]
+    public int eAfterimageCount = 8;
+    [InspectorName("E 残影时长")]
+    public float eAfterimageDuration = 0.35f;
+    [InspectorName("E 残影透明度")]
+    public float eAfterimageAlpha = 0.45f;
+    [InspectorName("E 残影生成间隔")]
+    public float eAfterimageSpawnInterval = 0.03f;
+    [InspectorName("E 残影缩放")]
+    public Vector3 eAfterimageScale = Vector3.one;
+    [InspectorName("E 残影染色")]
+    public Color eAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.45f);
+    [InspectorName("E 残影 SortingOrder 偏移")]
+    public int eAfterimageSortingOrderOffset = -1;
+
+    [Header("E - 天轨换位 / 残影 Legacy")]
+    [FormerlySerializedAs("eEnableAfterimage")]
+    [HideInInspector] public bool eEnableAfterimageLegacy = false;
+    [FormerlySerializedAs("eAfterimageCount")]
+    [HideInInspector] public int eAfterimageCountLegacy = 4;
+    [FormerlySerializedAs("eAfterimageDuration")]
+    [HideInInspector] public float eAfterimageDurationLegacy = 0.35f;
+    [FormerlySerializedAs("eAfterimageAlpha")]
+    [HideInInspector] public float eAfterimageAlphaLegacy = 0.45f;
+    [FormerlySerializedAs("eAfterimageScale")]
+    [HideInInspector] public Vector3 eAfterimageScaleLegacy = new Vector3(1f, 1f, 1f);
+    [FormerlySerializedAs("eAfterimageTint")]
+    [HideInInspector] public Color eAfterimageTintLegacy = new Color(0.6f, 0.9f, 1f, 0.45f);
+
+    [Header("Legacy - E 星落未使用")]
+    [InspectorName("E 星落启用")]
+    public bool eEnableStarFall = false;
+    [InspectorName("E 星落剑数量")]
     public int eStarFallBladeCount = 7;
-    [InspectorName("E StarFall Radius")]
+    [InspectorName("E 星落半径")]
     public float eStarFallRadius = 2.5f;
-    [InspectorName("E StarFall Spawn Height")]
+    [InspectorName("E 星落生成高度")]
     public float eStarFallSpawnHeight = 4f;
-    [InspectorName("E StarFall Fall Speed")]
+    [InspectorName("E 星落下落速度")]
     public float eStarFallFallSpeed = 10f;
-    [InspectorName("E StarFall Random Delay")]
+    [InspectorName("E 星落随机延迟")]
     public float eStarFallRandomDelay = 0.08f;
-    [InspectorName("E StarFall Damage Radius")]
+    [InspectorName("E 星落伤害半径")]
     public float eStarFallDamageRadius = 0.8f;
-    [InspectorName("E StarFall Damage Multiplier")]
+    [InspectorName("E 星落伤害倍率")]
     public float eStarFallDamageMultiplier = 0.5f;
-    [InspectorName("E StarFall Enable Damage")]
+    [InspectorName("E 星落启用伤害")]
     public bool eEnableStarFallDamage = false;
-    [InspectorName("E StarFall Use Forced Visual Rotation")]
+    [InspectorName("E 星落强制视觉旋转")]
     public bool eStarFallUseForcedVisualRotation = true;
-    [InspectorName("E StarFall Forced Visual Euler")]
+    [InspectorName("E 星落强制旋转角度")]
     public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
-    [InspectorName("E StarFall Visual Euler Offset")]
+    [InspectorName("E 星落视觉偏移")]
     public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
-    [InspectorName("E StarFall Use Dash Path")]
+    [InspectorName("E 星落使用位移路径")]
     public bool eStarFallUseDashPath = true;
-    [InspectorName("E StarFall Path Jitter")]
+    [InspectorName("E 星落路径扰动")]
     public float eStarFallPathJitter = 0.35f;
-    [InspectorName("E StarFall Sequential Delay")]
+    [InspectorName("E 星落顺序延迟")]
     public float eStarFallSequentialDelay = 0.06f;
 
     [Header("神印点")]
     [InspectorName("Current Divine Mark")]
     public int currentSwordEnergy = 0;
 
-    [Header("R - 神眷星雨")]
+    [Header("R - 神眷星雨 / 基础")]
     [FormerlySerializedAs("swordEnergy")]
     [InspectorName("R 初始剑数量")]
     public int rBaseSwordCount = 1;
 
-    [Header("Skill Effect Prefabs")]
+    [Header("技能特效预制体")]
     public GameObject sharedSkillEffectPrefab;
     public GameObject qSkillEffectPrefab;
     public GameObject wSkillEffectPrefab;
@@ -81,14 +119,14 @@ public class Player2PrototypeController : MonoBehaviour
     public GameObject rSkillEffectPrefab;
     public GameObject standbySkillEffectPrefab;
 
-    [Header("Skill Effect Visuals - Shared")]
+    [Header("技能特效通用设置")]
     public bool useRawPrefabRotationForSkillEffects = true;
     public Vector3 skillEffectPrefabBaseRotation = new Vector3(180.618f, 91.603f, -89.927f);
     public float skillEffectPrefabScaleMultiplier = 1f;
     public Vector3 sharedEffectScale = new Vector3(1f, 1f, 1f);
     public float sharedEffectRotationZ = 0f;
 
-    [Header("Skill Effect Visuals - Q")]
+    [Header("Q - 神临光剑 / 视觉")]
     public Vector3 qEffectScale = new Vector3(0.25f, 0.25f, 0.25f);
     public float qEffectRotationZ = -90f;
     public Vector3 qEffectOffset = Vector3.zero;
@@ -99,13 +137,14 @@ public class Player2PrototypeController : MonoBehaviour
     public float qEffectVisualRoll = 0f;
     public bool qEffectInvertForward = false;
 
-    [Header("Skill Effect Visuals - W")]
-    [HideInInspector] public Vector3 wEffectScale = new Vector3(0.4f, 0.4f, 0.4f);
+    [Header("W - 圣轮偏转 / 剑阵视觉")]
+    [InspectorName("W 尺寸")]
+    public Vector3 wEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector] public float wEffectRotationZ = 0f;
     [HideInInspector] public Vector3 wEffectOffset = Vector3.zero;
     [HideInInspector] public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
 
-    [Header("W 剑阵设置")]
+    [Header("W - 圣轮偏转 / 尺寸倍率")]
     [InspectorName("W 尺寸倍率")]
     public float wEffectScaleMultiplier = 1f;
     [HideInInspector] public bool wEffectVerticalRotation = true;
@@ -114,6 +153,8 @@ public class Player2PrototypeController : MonoBehaviour
     [HideInInspector] public float wEffectVisualYaw = 0f;
     [HideInInspector] public float wEffectVisualRoll = 0f;
     [HideInInspector] public int wSwordCount = 3;
+
+    [Header("W - 圣轮偏转 / 剑阵设置")]
     [InspectorName("W 初始剑数量")]
     public int baseWSwordCount = 3;
     [InspectorName("W 使用剑气值")]
@@ -132,7 +173,7 @@ public class Player2PrototypeController : MonoBehaviour
     [FormerlySerializedAs("wEffectSpinSpeed")]
     [HideInInspector] public float wEffectSelfSpinSpeed = 0f;
 
-    [Header("W 剑气加成")]
+    [Header("W - 圣轮偏转 / 剑气加成")]
     [InspectorName("W 每点剑气增加持续时间")]
     public float wDurationPerSwordEnergy = 0f;
     [InspectorName("W 最大持续时间加成")]
@@ -167,17 +208,17 @@ public class Player2PrototypeController : MonoBehaviour
     [HideInInspector] public float wOrbitDirectionRollOffset = 0f;
     [HideInInspector] public bool wKeepSwordVisibleToCamera = true;
 
-    [Header("Skill Effect Visuals - E")]
-    public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
-    public float eEffectRotationZ = -90f;
-    public Vector3 eEffectOffset = Vector3.zero;
-    public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
-    public float eEffectYawOffset = 0f;
-    public float eEffectVisualPitch = 0f;
-    public float eEffectVisualYaw = 0f;
-    public float eEffectVisualRoll = 0f;
+    [Header("E - 天轨换位 / Legacy 旧视觉")]
+    [HideInInspector] public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
+    [HideInInspector] public float eEffectRotationZ = -90f;
+    [HideInInspector] public Vector3 eEffectOffset = Vector3.zero;
+    [HideInInspector] public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
+    [HideInInspector] public float eEffectYawOffset = 0f;
+    [HideInInspector] public float eEffectVisualPitch = 0f;
+    [HideInInspector] public float eEffectVisualYaw = 0f;
+    [HideInInspector] public float eEffectVisualRoll = 0f;
 
-    [Header("R - 神眷星雨")]
+    [Header("R - 神眷星雨 / 视觉")]
     [InspectorName("R 尺寸")]
     public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector] public float rEffectRotationZ = -90f;
@@ -191,7 +232,7 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R 显示 Roll")]
     public float rEffectVisualRoll = 0f;
     [HideInInspector] public bool rEffectInvertForward = false;
-    [Header("R 星雨参数")]
+    [Header("R - 神眷星雨 / 万剑漩涡")]
     [InspectorName("R 持续时间")]
     public float rSwarmDuration = 2.0f;
     [InspectorName("R 最小半径")]
@@ -220,7 +261,7 @@ public class Player2PrototypeController : MonoBehaviour
     public bool rSwarmClockwise = true;
     [InspectorName("R 前方偏移")]
     public float rSwarmForwardOffset = 2.0f;
-    [Header("R 漩涡中心")]
+    [Header("R - 神眷星雨 / 漩涡中心")]
     [InspectorName("R 切线偏移角")]
     public float rSwarmYawOffset = 0f;
     [InspectorName("R 像角色一样面向镜头")]
@@ -240,13 +281,13 @@ public class Player2PrototypeController : MonoBehaviour
     public Vector3 rPlaneUprightEuler = new Vector3(90f, 0f, 0f);
     [InspectorName("R 面向相机角度")]
     public Vector3 rPlaneFaceCameraEuler = new Vector3(0f, 90f, 0f);
-    [Header("R 显示正反修正")]
+    [Header("R - 神眷星雨 / 显示正反修正")]
     [InspectorName("R 翻转正反面")]
     public bool rFlipPlaneFrontBack = true;
     [InspectorName("R 正反面翻转角度")]
     public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
     [HideInInspector] public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
-    [Header("R 调试")]
+    [Header("R - 神眷星雨 / 调试")]
     [HideInInspector] public bool rDebugSwordVelocityFacing = false;
     [HideInInspector] public float rFacingLookAheadTime = 0.05f;
     [HideInInspector] public bool rDebugFacingScreenAngle = false;
@@ -254,12 +295,12 @@ public class Player2PrototypeController : MonoBehaviour
     public bool rUsePlayerLayerForR = true;
     [InspectorName("R 双面显示")]
     public bool rForceDoubleSided = true;
-    [Header("R 自转")]
+    [Header("R - 神眷星雨 / 自转")]
     [HideInInspector] public bool rEnableSwordSelfSpin = false;
     [HideInInspector] public float rSwordSelfSpinMin = 30f;
     [HideInInspector] public float rSwordSelfSpinMax = 120f;
     [HideInInspector] public Vector3 rSwordLengthLocalAxis = Vector3.up;
-    [Header("R 星雨伤害")]
+    [Header("R - 神眷星雨 / 星雨伤害")]
     [InspectorName("R 伤害半径")]
     public float rSwarmDamageRadius = 3.0f;
     [InspectorName("R 伤害间隔")]
@@ -269,13 +310,13 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R 敌人层")]
     public LayerMask rSwarmEnemyLayer = ~0;
 
-    [Header("R 星雨阶段")]
+    [Header("R - 神眷星雨 / 星雨")]
     [InspectorName("R 上升时间")]
-    public float rRiseDuration = 0.45f;
+    [HideInInspector] public float rRiseDuration = 0.45f;
     [InspectorName("R 上升高度")]
-    public float rRiseHeight = 4f;
+    [HideInInspector] public float rRiseHeight = 4f;
     [InspectorName("R 星雨持续时间")]
-    public float rStarRainDuration = 1.2f;
+    [HideInInspector] public float rStarRainDuration = 1.2f;
     [InspectorName("R 星雨生成高度")]
     public float rStarRainSpawnHeight = 5f;
     [InspectorName("R 星雨范围半径")]
@@ -287,30 +328,32 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R 星雨伤害半径")]
     public float rStarRainDamageRadius = 1.2f;
 
-    [InspectorName("R StarRain Start Ratio")]
+    [InspectorName("R 星雨开始比例")]
     public float rStarRainStartRatio = 0.5f;
-    [InspectorName("R StarRain Interval")]
+    [InspectorName("R 星雨生成间隔")]
     public float rStarRainInterval = 0.12f;
-    [InspectorName("R StarRain Blades Per Wave")]
+    [InspectorName("R 每波星雨剑数")]
     public int rStarRainBladesPerWave = 2;
-    [InspectorName("R StarRain Visual Euler Offset")]
+    [InspectorName("R 星雨视觉偏移")]
     public Vector3 rStarRainVisualEulerOffset = new Vector3(90f, 0f, 0f);
-    [InspectorName("R StarRain Use Forced Visual Rotation")]
+    [InspectorName("R 星雨强制视觉旋转")]
     public bool rStarRainUseForcedVisualRotation = true;
-    [InspectorName("R StarRain Forced Visual Euler")]
+    [InspectorName("R 星雨强制旋转角度")]
     public Vector3 rStarRainForcedVisualEuler = new Vector3(90f, 180f, 0f);
-    [InspectorName("R StarRain Damage Multiplier")]
+    [InspectorName("R 星雨伤害倍率")]
     public float rStarRainDamageMultiplier = 0.6f;
-    [InspectorName("R StarRain Continue After Orbit")]
+    [InspectorName("R 星雨尺寸")]
+    public Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    [InspectorName("R 星雨延续到 Orbit 后")]
     public bool rStarRainContinueAfterOrbit = true;
-    [InspectorName("R StarRain Extra Duration After Orbit")]
+    [InspectorName("R Orbit 后额外星雨时间")]
     public float rStarRainExtraDurationAfterOrbit = 0.6f;
-    [InspectorName("R Orbit Clear When Orbit Ends")]
+    [InspectorName("R Orbit 结束即清理")]
     public bool rOrbitClearWhenOrbitEnds = true;
-    [InspectorName("R Orbit Fade Out Duration")]
+    [InspectorName("R Orbit 淡出时间")]
     public float rOrbitFadeOutDuration = 0.15f;
 
-    [Header("Skill Effect Visuals - Standby Sword")]
+    [Header("待机剑")]
     public Vector3 standbySwordScale = new Vector3(0.25f, 0.25f, 0.25f);
     public float standbySwordRotationZ = -90f;
     public Vector3 standbySwordPlaneScale = new Vector3(0.25f, 0.25f, 1f);
@@ -638,7 +681,7 @@ public class Player2PrototypeController : MonoBehaviour
                 rEffectVisualPitch,
                 rEffectVisualYaw,
                 rEffectVisualRoll + ResolveRotation(rEffectRotationZ),
-                ResolveVisualScale(rEffectScale, rEffectPlaneScale));
+                Vector3.one);
 
             if (sword == null)
             {
@@ -657,6 +700,7 @@ public class Player2PrototypeController : MonoBehaviour
 
             EnsureEffectVisible(sword);
             sword.transform.SetParent(swarmRoot.transform, true);
+            ApplyRootVisualScale(sword, ResolveVisualScaleWithoutShared(rEffectScale));
             SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
             Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : null;
             Quaternion baseVisualLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity;
@@ -847,7 +891,7 @@ public class Player2PrototypeController : MonoBehaviour
                 standbySwordVisualPitch,
                 standbySwordVisualYaw,
                 standbySwordVisualRoll + ResolveRotation(standbySwordRotationZ),
-                ResolveVisualScale(standbySwordScale, standbySwordPlaneScale));
+                Vector3.one);
 
             if (sword == null)
             {
@@ -867,13 +911,16 @@ public class Player2PrototypeController : MonoBehaviour
             if (runtime != null && runtime.visual != null)
             {
                 runtime.baseVisualRotation = runtime.visual.rotation;
+                if (!useRawPrefabRotationForSkillEffects)
+                {
+                    runtime.visual.localScale = Vector3.one;
+                }
             }
 
-            Vector3 baseScale = sword.transform.localScale;
             float sizeMul = Mathf.Max(0.01f, wEffectScaleMultiplier);
-            Vector3 finalScale = baseScale * sizeMul;
+            Vector3 finalScale = Vector3.Scale(wEffectScale, Vector3.one * sizeMul);
             sword.transform.localScale = finalScale;
-            Debug.Log($"[W Skill Scale] sword={sword.name}, baseScale={baseScale}, multiplier={sizeMul:F2}, finalScale={finalScale}", this);
+            Debug.Log($"[W Skill Scale] sword={sword.name}, baseScale={wEffectScale}, multiplier={sizeMul:F2}, finalScale={finalScale}", this);
 
             activeWSwords.Add(sword);
         }
@@ -1017,7 +1064,7 @@ public class Player2PrototypeController : MonoBehaviour
                 0f,
                 0f,
                 0f,
-                ResolveVisualScale(rEffectScale, rEffectPlaneScale));
+                Vector3.one);
 
             if (sword == null)
             {
@@ -1035,6 +1082,7 @@ public class Player2PrototypeController : MonoBehaviour
             }
 
             EnsureEffectVisible(sword);
+            ApplyRootVisualScale(sword, ResolveVisualScaleWithoutShared(rStarRainEffectScale));
             SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
             Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : FindEffectVisualTransform(sword);
 
@@ -1165,6 +1213,37 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
+    private IEnumerator FadeAndDestroy(GameObject target, float duration)
+    {
+        if (target == null)
+        {
+            yield break;
+        }
+
+        duration = Mathf.Max(0.01f, duration);
+        SkillEffectRuntime runtime = target.GetComponent<SkillEffectRuntime>();
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (target == null)
+            {
+                yield break;
+            }
+
+            float alpha = 1f - (elapsed / duration);
+            ApplyFadeAlpha(runtime, alpha);
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (target != null)
+        {
+            ApplyFadeAlpha(runtime, 0f);
+            Destroy(target);
+        }
+    }
+
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
         ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, rSwarmDamagePerTick);
@@ -1291,10 +1370,19 @@ public class Player2PrototypeController : MonoBehaviour
 
     private IEnumerator DashRoutine()
     {
+        CleanupEStarFallBlades();
         isDashing = true;
         Vector3 dir = ResolveFacingDirection();
         Vector3 start = transform.position;
         Vector3 end = start + dir * dashDistance;
+        int spawnedAfterimages = 0;
+        float afterimageTimer = 0f;
+        float spawnInterval = Mathf.Max(0.01f, eAfterimageSpawnInterval);
+
+        if (eEnableAfterimageShader)
+        {
+            TrySpawnEAfterimage(start, ref spawnedAfterimages);
+        }
 
         float t = 0f;
         while (t < dashDuration)
@@ -1302,33 +1390,207 @@ public class Player2PrototypeController : MonoBehaviour
             float p = Mathf.Clamp01(t / dashDuration);
             transform.position = Vector3.Lerp(start, end, p);
 
+            if (eEnableAfterimageShader && spawnedAfterimages < Mathf.Max(0, eAfterimageCount))
+            {
+                afterimageTimer += Time.deltaTime;
+                if (afterimageTimer >= spawnInterval)
+                {
+                    afterimageTimer -= spawnInterval;
+                    TrySpawnEAfterimage(transform.position, ref spawnedAfterimages);
+                }
+            }
+
             t += Time.deltaTime;
             yield return null;
         }
 
         transform.position = end;
-        if (eEnableStarFall)
+        if (eEnableAfterimageShader)
         {
-            StartCoroutine(EStarFallRoutine(start, end));
+            TrySpawnEAfterimage(end, ref spawnedAfterimages);
         }
         isDashing = false;
     }
 
-    private IEnumerator FadeAndDestroy(GameObject effectRoot, float duration)
+    private Renderer ResolveEAfterimageSourceRenderer()
     {
-        if (effectRoot == null) yield break;
-        SkillEffectRuntime runtime = effectRoot.GetComponent<SkillEffectRuntime>();
-        float t = 0f;
-        while (t < duration)
+        if (eAfterimageSourceRenderer != null)
         {
-            if (effectRoot == null) yield break;
-            float alpha = 1f - (t / duration);
-            ApplyFadeAlpha(runtime, alpha);
-            t += Time.deltaTime;
-            yield return null;
+            return eAfterimageSourceRenderer;
         }
 
-        if (effectRoot != null) Destroy(effectRoot);
+        SpriteRenderer[] spriteRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < spriteRenderers.Length; i++)
+        {
+            SpriteRenderer spriteRenderer = spriteRenderers[i];
+            if (spriteRenderer != null && spriteRenderer.enabled && spriteRenderer.sprite != null)
+            {
+                return spriteRenderer;
+            }
+        }
+
+        for (int i = 0; i < spriteRenderers.Length; i++)
+        {
+            SpriteRenderer spriteRenderer = spriteRenderers[i];
+            if (spriteRenderer != null)
+            {
+                return spriteRenderer;
+            }
+        }
+
+        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer != null)
+            {
+                return renderer;
+            }
+        }
+
+        return null;
+    }
+
+    private bool TrySpawnEAfterimage(Vector3 position, ref int spawnedCount)
+    {
+        if (!eEnableAfterimageShader)
+        {
+            return false;
+        }
+
+        int maxCount = Mathf.Max(0, eAfterimageCount);
+        if (maxCount > 0 && spawnedCount >= maxCount)
+        {
+            return false;
+        }
+
+        Renderer sourceRenderer = ResolveEAfterimageSourceRenderer();
+        if (sourceRenderer == null)
+        {
+            return false;
+        }
+
+        if (eAfterimageMaterial == null)
+        {
+            Debug.LogWarning("[E Afterimage] Missing eAfterimageMaterial. Assign a Shader Graph / Material for afterimages.", this);
+            return false;
+        }
+
+        GameObject afterimage = CreateEAfterimageObject(sourceRenderer, position);
+        if (afterimage == null)
+        {
+            return false;
+        }
+
+        spawnedCount += 1;
+        return true;
+    }
+
+    private GameObject CreateEAfterimageObject(Renderer sourceRenderer, Vector3 worldPosition)
+    {
+        if (sourceRenderer == null)
+        {
+            return null;
+        }
+
+        GameObject afterimage = new GameObject("E_Afterimage");
+        afterimage.transform.SetPositionAndRotation(worldPosition, sourceRenderer.transform.rotation);
+        afterimage.transform.localScale = Vector3.Scale(sourceRenderer.transform.lossyScale, eAfterimageScale);
+
+        Material runtimeMaterial = new Material(eAfterimageMaterial);
+        ApplyAfterimageMaterialTint(runtimeMaterial, eAfterimageTint, eAfterimageAlpha);
+
+        if (sourceRenderer is SpriteRenderer srcSprite)
+        {
+            SpriteRenderer ghostSprite = afterimage.AddComponent<SpriteRenderer>();
+            ghostSprite.sprite = srcSprite.sprite;
+            ghostSprite.flipX = srcSprite.flipX;
+            ghostSprite.flipY = srcSprite.flipY;
+            ghostSprite.drawMode = srcSprite.drawMode;
+            ghostSprite.size = srcSprite.size;
+            ghostSprite.spriteSortPoint = srcSprite.spriteSortPoint;
+            ghostSprite.maskInteraction = srcSprite.maskInteraction;
+            ghostSprite.sortingLayerID = srcSprite.sortingLayerID;
+            ghostSprite.sortingOrder = srcSprite.sortingOrder + eAfterimageSortingOrderOffset;
+            ghostSprite.material = runtimeMaterial;
+            ghostSprite.color = new Color(eAfterimageTint.r, eAfterimageTint.g, eAfterimageTint.b, Mathf.Clamp01(eAfterimageAlpha));
+        }
+        else if (sourceRenderer is SkinnedMeshRenderer skinnedSource)
+        {
+            Mesh bakedMesh = new Mesh();
+            skinnedSource.BakeMesh(bakedMesh);
+
+            MeshFilter meshFilter = afterimage.AddComponent<MeshFilter>();
+            meshFilter.sharedMesh = bakedMesh;
+
+            MeshRenderer meshRenderer = afterimage.AddComponent<MeshRenderer>();
+            meshRenderer.material = runtimeMaterial;
+            meshRenderer.sortingOrder = eAfterimageSortingOrderOffset;
+            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+        }
+        else
+        {
+            MeshFilter sourceMeshFilter = sourceRenderer.GetComponent<MeshFilter>();
+            MeshRenderer meshRenderer = afterimage.AddComponent<MeshRenderer>();
+            MeshFilter meshFilter = afterimage.AddComponent<MeshFilter>();
+            if (sourceMeshFilter != null)
+            {
+                meshFilter.sharedMesh = sourceMeshFilter.sharedMesh;
+            }
+            meshRenderer.material = runtimeMaterial;
+            meshRenderer.sortingOrder = eAfterimageSortingOrderOffset;
+            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            meshRenderer.receiveShadows = false;
+        }
+
+        TrySetDoubleSidedIfSupported(afterimage);
+        SkillEffectRuntime runtime = afterimage.AddComponent<SkillEffectRuntime>();
+        CacheFadeTargets(afterimage, runtime);
+        StartCoroutine(FadeAndDestroy(afterimage, Mathf.Max(0.05f, eAfterimageDuration)));
+        return afterimage;
+    }
+
+    private static void ApplyAfterimageMaterialTint(Material mat, Color tint, float alpha)
+    {
+        if (mat == null)
+        {
+            return;
+        }
+
+        Color finalTint = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(Mathf.Max(alpha, tint.a)));
+        SetMaterialColor(mat, finalTint);
+        TrySetAfterimageMaterialAlpha(mat, finalTint.a);
+    }
+
+    private static void TrySetAfterimageMaterialAlpha(Material mat, float alpha)
+    {
+        if (mat == null)
+        {
+            return;
+        }
+
+        if (mat.HasProperty("_Alpha"))
+        {
+            mat.SetFloat("_Alpha", alpha);
+        }
+
+        if (mat.HasProperty("_Opacity"))
+        {
+            mat.SetFloat("_Opacity", alpha);
+        }
+    }
+
+    private static void TrySetAfterimageMaterialTint(Material mat, Color tint, float alpha)
+    {
+        if (mat == null)
+        {
+            return;
+        }
+
+        Color finalTint = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(Mathf.Max(alpha, tint.a)));
+        SetMaterialColor(mat, finalTint);
+        TrySetAfterimageMaterialAlpha(mat, finalTint.a);
     }
 
     private bool HasAliveEStarFallBlades()
@@ -1940,6 +2202,22 @@ public class Player2PrototypeController : MonoBehaviour
             baseScale.z * roleScale.z * quadScale.z);
     }
 
+    private Vector3 ResolveVisualScaleWithoutShared(Vector3 specificScale)
+    {
+        Vector3 roleScale = specificScale.sqrMagnitude > 0.0001f ? specificScale : Vector3.one;
+        return ClampVisualScale(roleScale);
+    }
+
+    private static void ApplyRootVisualScale(GameObject effectRoot, Vector3 visualScale)
+    {
+        if (effectRoot == null)
+        {
+            return;
+        }
+
+        effectRoot.transform.localScale = ClampVisualScale(visualScale);
+    }
+
     private float ResolveRotation(float specificRotationZ)
     {
         return sharedEffectRotationZ + specificRotationZ;
@@ -2054,6 +2332,7 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat == null) return Color.white;
         if (mat.HasProperty("_BaseColor")) return mat.GetColor("_BaseColor");
         if (mat.HasProperty("_Color")) return mat.GetColor("_Color");
+        if (mat.HasProperty("_TintColor")) return mat.GetColor("_TintColor");
         return Color.white;
     }
 
@@ -2062,6 +2341,7 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat == null) return;
         if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
+        if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", color);
     }
 }
 
