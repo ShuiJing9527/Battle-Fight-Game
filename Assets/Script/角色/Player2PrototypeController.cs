@@ -6,364 +6,438 @@ using UnityEngine.Serialization;
 
 public class Player2PrototypeController : MonoBehaviour
 {
-    [Header("移动")]
+    [Header("Skill Slots")]
+    [SerializeField] private PlayerSkillBase qSkill;
+    [SerializeField] private PlayerSkillBase wSkill;
+    [SerializeField] private PlayerSkillBase eSkill;
+    [SerializeField] private PlayerSkillBase rSkill;
+
+    [Header("Dash Distance")]
     [HideInInspector] public float moveSpeed = 5f;
     public float dashDistance = 4f;
     public float dashDuration = 0.15f;
     [SerializeField] private bool lockCharacterRotation = true;
 
-    [Header("Q - 神临光剑 / 基础")]
+    [HideInInspector]
+    [Header("Q Delay")]
     public float qDelay = 0.35f;
+    [HideInInspector]
     public float qSwordSpeed = 14f;
 
-    [Header("W - 圣轮偏转 / 基础")]
-    [InspectorName("W 持续时间")]
+    [HideInInspector] [Header("W Duration")]
+    [InspectorName("W Duration")]
     public float wDuration = 1.5f;
-    [InspectorName("W 基础减伤")]
+    [HideInInspector] [InspectorName("W Damage Reduction")]
     public float wDamageReduction = 0.4f;
     [HideInInspector] public int maxStandbySwords = 3;
 
-    [Header("W - 圣轮偏转 / 防御加成")]
-    [InspectorName("W 每把剑减伤加成")]
+    [HideInInspector] [Header("W Damage Reduction Per Sword")]
+    [InspectorName("W Damage Reduction Per Sword")]
     public float wDamageReductionPerSword = 0.03f;
-    [InspectorName("W 最大减伤")]
+    [HideInInspector] [InspectorName("W Max Damage Reduction")]
     public float wMaxDamageReduction = 0.8f;
-    [InspectorName("W 反击伤害比例")]
+    [HideInInspector] [InspectorName("W Counter Damage Ratio")]
     public float wCounterDamageRatio = 0.5f;
 
-    [Header("E - 天轨换位 / 基础")]
+    [HideInInspector] [Header("E - Celestial Shift / Basic")]
     public float eRailDuration = 0.6f;
 
-    [Header("E - 天轨换位 / Shader 残影")]
-    [InspectorName("E 残影启用")]
+    [HideInInspector] [Header("E - Celestial Shift / Sprite Afterimage")]
+    [InspectorName("E Enable Afterimage Shader")]
     public bool eEnableAfterimageShader = true;
-    [InspectorName("E 残影来源 Renderer")]
-    public Renderer eAfterimageSourceRenderer;
-    [InspectorName("E 残影材质")]
-    public Material eAfterimageMaterial;
-    [InspectorName("E 残影数量")]
-    public int eAfterimageCount = 8;
-    [InspectorName("E 残影时长")]
-    public float eAfterimageDuration = 0.35f;
-    [InspectorName("E 残影透明度")]
-    public float eAfterimageAlpha = 0.45f;
-    [InspectorName("E 残影生成间隔")]
+    [HideInInspector] [SerializeField] private SpriteRenderer eAfterimageSourceSpriteRenderer;
+ public Renderer eAfterimageSourceRenderer;
+ public Material eAfterimageMaterial;
+ [InspectorName("E Afterimage Count")]
+    public int eAfterimageCount = 12;
+    [HideInInspector] [InspectorName("E Afterimage Duration")]
+    public float eAfterimageDuration = 0.45f;
+    [HideInInspector] [InspectorName("E Afterimage Alpha")]
+    public float eAfterimageAlpha = 0.35f;
+    [HideInInspector] [InspectorName("E Afterimage Spawn Interval")]
     public float eAfterimageSpawnInterval = 0.03f;
-    [InspectorName("E 残影缩放")]
+    [HideInInspector] [InspectorName("E Afterimage Scale")]
     public Vector3 eAfterimageScale = Vector3.one;
-    [InspectorName("E 残影染色")]
+    [HideInInspector] [InspectorName("E Afterimage Tint")]
     public Color eAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.45f);
-    [InspectorName("E 残影 SortingOrder 偏移")]
-    public int eAfterimageSortingOrderOffset = -1;
+    [HideInInspector] [InspectorName("E Afterimage Sorting Order Offset")]
+    public int eAfterimageSortingOrderOffset = 5;
+    [HideInInspector] [InspectorName("E Afterimage Debug Log")]
+    public bool eAfterimageDebugLog = false;
+    [HideInInspector] [InspectorName("E Afterimage Use Rainbow")]
+    [SerializeField] public bool eAfterimageUseRainbow = true;
+ [InspectorName("E Afterimage Invert Color Order")]
+    [SerializeField] public bool eAfterimageInvertColorOrder = true;
+ [InspectorName("E Afterimage Fade By Age Index")]
+    [SerializeField] public bool eAfterimageFadeByAgeIndex = true;
+ [InspectorName("E Afterimage Oldest Alpha Multiplier")]
+    [SerializeField] public float eAfterimageOldestAlphaMultiplier = 0.25f;
+ [InspectorName("E Afterimage Fade By Distance To End")]
+    [SerializeField] public bool eAfterimageFadeByDistanceToEnd = true;
+ [InspectorName("E Afterimage Far Alpha Multiplier")]
+    [SerializeField] public float eAfterimageFarAlphaMultiplier = 0.12f;
+ [InspectorName("E Afterimage Rainbow Hue Speed")]
+    [SerializeField] public float eAfterimageRainbowHueSpeed = 0.04f;
+ [InspectorName("E Afterimage Rainbow Saturation")]
+    [SerializeField] public float eAfterimageRainbowSaturation = 0.45f;
+ [InspectorName("E Afterimage Rainbow Value")]
+    [SerializeField] public float eAfterimageRainbowValue = 1f;
+ [InspectorName("E Afterimage Use Distance Sampling")]
+    [SerializeField] private bool eAfterimageUseDistanceSampling = true;
+ [InspectorName("E Afterimage Use Actual Move Direction")]
+    [SerializeField] private bool eAfterimageUseActualMoveDirection = true;
+ [InspectorName("E Afterimage Invert Move Direction")]
+    [SerializeField] private bool eAfterimageInvertMoveDirection = false;
+ [InspectorName("E Afterimage Spacing")]
+    [SerializeField] private float eAfterimageSpacing = 0.06f;
+ [InspectorName("E Afterimage Max Per Dash")]
+    [SerializeField] private int eAfterimageMaxPerDash = 24;
+ [SerializeField] private bool eAfterimageUseManualTrailLayout = false;
+ [SerializeField] private bool eAfterimageInvertTrailDirection = false;
+ [SerializeField] private float eAfterimageNearCharacterOffset = 0.03f;
+ [SerializeField] private float eAfterimageTrailLength = 2.2f;
+ [SerializeField] private float eAfterimageTrailSideOffset = 0f;
+ [SerializeField] private bool eAfterimageUsePathSamples = false;
+ [SerializeField] private float eAfterimagePathSpawnDelay = 0f;
+ [SerializeField] private float eAfterimagePathForwardBias = 0f;
+ [SerializeField] private bool eAfterimageSpawnDuringDash = false;
+ [SerializeField] private bool eEnableStarTrail = false;
+ [SerializeField] private Material eStarTrailMaterial;
+ [SerializeField] private Gradient eStarTrailGradient = CreateDefaultStarTrailGradient();
+ [SerializeField] private bool eStarTrailReverseGradient = false;
+ [SerializeField] private float eStarTrailTime = 0.6f;
+ [SerializeField] private float eStarTrailStartWidth = 0.45f;
+ [SerializeField] private float eStarTrailEndWidth = 0.02f;
+ [SerializeField] private float eStarTrailMinVertexDistance = 0.01f;
+ [SerializeField] private Vector3 eStarTrailLocalOffset = new Vector3(0f, 0.35f, 0f);
+ [SerializeField] private bool eEnableDashCoreGlow = false;
+ [SerializeField] private GameObject eDashCoreGlowPrefab;
+ [SerializeField] private Material eDashCoreGlowMaterial;
+ [SerializeField] private Color eDashCoreGlowColor = new Color(0.7f, 0.9f, 1f, 0.8f);
+ [SerializeField] private float eDashCoreGlowScale = 0.8f;
+ [SerializeField] private float eDashCoreGlowDuration = 0.35f;
+ [SerializeField] private Vector3 eDashCoreGlowOffset = new Vector3(0f, 0.5f, 0f);
+ [SerializeField] private bool eEnableStarTrailParticles = false;
+ [SerializeField] private ParticleSystem eStarTrailParticlePrefab;
+ private bool eEnableTrailRenderer = false;
+ private Material eTrailMaterial;
+ private float eTrailTime = 0.35f;
+ private float eTrailStartWidth = 0.45f;
+ private float eTrailEndWidth = 0f;
+ private float eTrailMinVertexDistance = 0.02f;
+ private Color eTrailStartColor = new Color(0.6f, 0.85f, 1f, 0.7f);
+ private Color eTrailEndColor = new Color(0.6f, 0.85f, 1f, 0f);
+ private int eTrailSortingOrderOffset = 5;
 
-    [Header("E - 天轨换位 / 残影 Legacy")]
     [FormerlySerializedAs("eEnableAfterimage")]
     [HideInInspector] public bool eEnableAfterimageLegacy = false;
     [FormerlySerializedAs("eAfterimageCount")]
-    [HideInInspector] public int eAfterimageCountLegacy = 4;
+ public int eAfterimageCountLegacy = 4;
     [FormerlySerializedAs("eAfterimageDuration")]
-    [HideInInspector] public float eAfterimageDurationLegacy = 0.35f;
+ public float eAfterimageDurationLegacy = 0.35f;
     [FormerlySerializedAs("eAfterimageAlpha")]
-    [HideInInspector] public float eAfterimageAlphaLegacy = 0.45f;
+ public float eAfterimageAlphaLegacy = 0.45f;
     [FormerlySerializedAs("eAfterimageScale")]
-    [HideInInspector] public Vector3 eAfterimageScaleLegacy = new Vector3(1f, 1f, 1f);
+ public Vector3 eAfterimageScaleLegacy = new Vector3(1f, 1f, 1f);
     [FormerlySerializedAs("eAfterimageTint")]
-    [HideInInspector] public Color eAfterimageTintLegacy = new Color(0.6f, 0.9f, 1f, 0.45f);
+ public Color eAfterimageTintLegacy = new Color(0.6f, 0.9f, 1f, 0.45f);
+ private TrailRenderer eDashTrailRenderer;
+ private GameObject eDashTrailHost;
+ private GameObject eDashCoreGlowInstance;
+ private Renderer eDashCoreGlowRenderer;
+ private ParticleSystem eDashStarTrailParticlesInstance;
+ private Material eRuntimeStarTrailMaterial;
+ private Material eRuntimeDashCoreGlowMaterial;
 
-    [Header("Legacy - E 星落未使用")]
-    [InspectorName("E 星落启用")]
-    public bool eEnableStarFall = false;
-    [InspectorName("E 星落剑数量")]
-    public int eStarFallBladeCount = 7;
-    [InspectorName("E 星落半径")]
-    public float eStarFallRadius = 2.5f;
-    [InspectorName("E 星落生成高度")]
-    public float eStarFallSpawnHeight = 4f;
-    [InspectorName("E 星落下落速度")]
-    public float eStarFallFallSpeed = 10f;
-    [InspectorName("E 星落随机延迟")]
-    public float eStarFallRandomDelay = 0.08f;
-    [InspectorName("E 星落伤害半径")]
-    public float eStarFallDamageRadius = 0.8f;
-    [InspectorName("E 星落伤害倍率")]
-    public float eStarFallDamageMultiplier = 0.5f;
-    [InspectorName("E 星落启用伤害")]
-    public bool eEnableStarFallDamage = false;
-    [InspectorName("E 星落强制视觉旋转")]
-    public bool eStarFallUseForcedVisualRotation = true;
-    [InspectorName("E 星落强制旋转角度")]
-    public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
-    [InspectorName("E 星落视觉偏移")]
-    public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
-    [InspectorName("E 星落使用位移路径")]
-    public bool eStarFallUseDashPath = true;
-    [InspectorName("E 星落路径扰动")]
-    public float eStarFallPathJitter = 0.35f;
-    [InspectorName("E 星落顺序延迟")]
-    public float eStarFallSequentialDelay = 0.06f;
+    [HideInInspector] public bool eEnableStarFall = false;
+ public int eStarFallBladeCount = 7;
+ public float eStarFallRadius = 2.5f;
+ public float eStarFallSpawnHeight = 4f;
+ public float eStarFallFallSpeed = 10f;
+ public float eStarFallRandomDelay = 0.08f;
+ public float eStarFallDamageRadius = 0.8f;
+ public float eStarFallDamageMultiplier = 0.5f;
+ public bool eEnableStarFallDamage = false;
+ public bool eStarFallUseForcedVisualRotation = true;
+ public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
+ public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
+ public bool eStarFallUseDashPath = true;
+ public float eStarFallPathJitter = 0.35f;
+ public float eStarFallSequentialDelay = 0.06f;
 
-    [Header("神印点")]
-    [InspectorName("Current Divine Mark")]
+    [Header("Current Sword Energy")]
+    [InspectorName("Current Sword Energy")]
     public int currentSwordEnergy = 0;
 
-    [Header("R - 神眷星雨 / 基础")]
+    [HideInInspector] [Header("R Base Sword Count")]
     [FormerlySerializedAs("swordEnergy")]
-    [InspectorName("R 初始剑数量")]
-    public int rBaseSwordCount = 1;
+    [InspectorName("R Base Sword Count")]
+ public int rBaseSwordCount = 1;
 
-    [Header("技能特效预制体")]
+    [Header("Shared Skill Effect Prefab")]
     public GameObject sharedSkillEffectPrefab;
+    [HideInInspector]
     public GameObject qSkillEffectPrefab;
+    [HideInInspector]
     public GameObject wSkillEffectPrefab;
     public GameObject eSkillEffectPrefab;
-    public GameObject rSkillEffectPrefab;
+    [HideInInspector] public GameObject rSkillEffectPrefab;
     public GameObject standbySkillEffectPrefab;
 
-    [Header("技能特效通用设置")]
+    [Header("Use Raw Prefab Rotation For Skill Effects")]
     public bool useRawPrefabRotationForSkillEffects = true;
-    public Vector3 skillEffectPrefabBaseRotation = new Vector3(180.618f, 91.603f, -89.927f);
+    public Vector3 skillEffectPrefabBaseRotation = Vector3.zero;
     public float skillEffectPrefabScaleMultiplier = 1f;
     public Vector3 sharedEffectScale = new Vector3(1f, 1f, 1f);
     public float sharedEffectRotationZ = 0f;
 
-    [Header("Q - 神临光剑 / 视觉")]
+    [HideInInspector]
+    [Header("Q Effect Scale")]
     public Vector3 qEffectScale = new Vector3(0.25f, 0.25f, 0.25f);
-    public float qEffectRotationZ = -90f;
+    [HideInInspector]
+    public float qEffectRotationZ = 0f;
+    [HideInInspector]
     public Vector3 qEffectOffset = Vector3.zero;
+    [HideInInspector]
     public Vector3 qEffectPlaneScale = new Vector3(0.25f, 0.25f, 1f);
+    [HideInInspector]
     public float qEffectYawOffset = 0f;
+    [HideInInspector]
     public float qEffectVisualPitch = 0f;
+    [HideInInspector]
     public float qEffectVisualYaw = 0f;
+    [HideInInspector]
     public float qEffectVisualRoll = 0f;
+    [HideInInspector]
     public bool qEffectInvertForward = false;
 
-    [Header("W - 圣轮偏转 / 剑阵视觉")]
-    [InspectorName("W 尺寸")]
+    [HideInInspector] [Header("W Effect Scale")]
+    [InspectorName("W Effect Scale")]
     public Vector3 wEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector] public float wEffectRotationZ = 0f;
-    [HideInInspector] public Vector3 wEffectOffset = Vector3.zero;
-    [HideInInspector] public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
+ public Vector3 wEffectOffset = Vector3.zero;
+ public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
 
-    [Header("W - 圣轮偏转 / 尺寸倍率")]
-    [InspectorName("W 尺寸倍率")]
+    [HideInInspector] [Header("W Effect Scale Multiplier")]
+    [InspectorName("W Effect Scale Multiplier")]
     public float wEffectScaleMultiplier = 1f;
     [HideInInspector] public bool wEffectVerticalRotation = true;
-    [HideInInspector] public Vector3 wEffectSpinAxis = Vector3.up;
-    [HideInInspector] public float wEffectVisualPitch = 0f;
-    [HideInInspector] public float wEffectVisualYaw = 0f;
-    [HideInInspector] public float wEffectVisualRoll = 0f;
-    [HideInInspector] public int wSwordCount = 3;
+ public Vector3 wEffectSpinAxis = Vector3.up;
+ public float wEffectVisualPitch = 0f;
+ public float wEffectVisualYaw = 0f;
+ public float wEffectVisualRoll = 0f;
+ public int wSwordCount = 3;
 
-    [Header("W - 圣轮偏转 / 剑阵设置")]
-    [InspectorName("W 初始剑数量")]
+    [HideInInspector] [Header("Base W Sword Count")]
+    [InspectorName("Base W Sword Count")]
     public int baseWSwordCount = 3;
-    [InspectorName("W 使用剑气值")]
+    [HideInInspector] [InspectorName("Use Sword Energy For W")]
     public bool useSwordEnergyForW = true;
-    [InspectorName("W 最大剑数量")]
+    [HideInInspector] [InspectorName("Max W Sword Count")]
     public int maxWSwordCount = 15;
-    [InspectorName("W 环绕半径")]
+    [HideInInspector] [InspectorName("W Effect Orbit Radius")]
     public float wEffectOrbitRadius = 1.2f;
-    [InspectorName("W 高度")]
+    [HideInInspector] [InspectorName("W Effect Height")]
     public float wEffectHeight = 1.1f;
-    [InspectorName("W 环绕速度")]
+    [HideInInspector] [InspectorName("W Effect Orbit Speed")]
     public float wEffectOrbitSpeed = 80f;
-    [InspectorName("W 切线偏移角")]
+    [HideInInspector] [InspectorName("W Sword Orbit Yaw Offset")]
     public float wSwordOrbitYawOffset = 90f;
     [HideInInspector] public bool wEffectFaceCamera = true;
     [FormerlySerializedAs("wEffectSpinSpeed")]
-    [HideInInspector] public float wEffectSelfSpinSpeed = 0f;
+ public float wEffectSelfSpinSpeed = 0f;
 
-    [Header("W - 圣轮偏转 / 剑气加成")]
-    [InspectorName("W 每点剑气增加持续时间")]
+    [HideInInspector] [Header("W Duration Per Sword Energy")]
+    [InspectorName("W Duration Per Sword Energy")]
     public float wDurationPerSwordEnergy = 0f;
-    [InspectorName("W 最大持续时间加成")]
+    [HideInInspector] [InspectorName("W Max Duration Bonus")]
     public float wMaxDurationBonus = 0f;
-    [InspectorName("W 每点剑气增加环绕速度")]
+    [HideInInspector] [InspectorName("W Orbit Speed Per Sword Energy")]
     public float wOrbitSpeedPerSwordEnergy = 0f;
-    [InspectorName("W 最大环绕速度加成")]
+    [HideInInspector] [InspectorName("W Max Orbit Speed Bonus")]
     public float wMaxOrbitSpeedBonus = 0f;
-    [InspectorName("W 每点剑气增加半径")]
+    [HideInInspector] [InspectorName("W Radius Per Sword Energy")]
     public float wRadiusPerSwordEnergy = 0f;
-    [InspectorName("W 最大半径加成")]
+    [HideInInspector] [InspectorName("W Max Radius Bonus")]
     public float wMaxRadiusBonus = 0f;
 
     [HideInInspector] public float wOrbitRadiusMin = 0.9f;
-    [HideInInspector] public float wOrbitRadiusMax = 1.8f;
-    [HideInInspector] public float wHeightMin = 0.2f;
-    [HideInInspector] public float wHeightMax = 1.2f;
-    [HideInInspector] public float wOrbitSpeedMin = 60f;
-    [HideInInspector] public float wOrbitSpeedMax = 120f;
-    [HideInInspector] public float wBobAmplitudeMin = 0.05f;
-    [HideInInspector] public float wBobAmplitudeMax = 0.25f;
-    [HideInInspector] public float wBobFrequencyMin = 0.8f;
-    [HideInInspector] public float wBobFrequencyMax = 2.0f;
-    [HideInInspector] public float wSwingAngleMin = 3f;
-    [HideInInspector] public float wSwingAngleMax = 12f;
-    [HideInInspector] public float wRadiusJitter = 0.12f;
-    [HideInInspector] public float wAngularJitter = 10f;
-    [HideInInspector] public bool wClockwise = true;
-    [HideInInspector] public bool wFaceOrbitDirection = true;
-    [HideInInspector] public float wOrbitDirectionYawOffset = 0f;
-    [HideInInspector] public float wOrbitDirectionPitchOffset = 0f;
-    [HideInInspector] public float wOrbitDirectionRollOffset = 0f;
-    [HideInInspector] public bool wKeepSwordVisibleToCamera = true;
+ public float wOrbitRadiusMax = 1.8f;
+ public float wHeightMin = 0.2f;
+ public float wHeightMax = 1.2f;
+ public float wOrbitSpeedMin = 60f;
+ public float wOrbitSpeedMax = 120f;
+ public float wBobAmplitudeMin = 0.05f;
+ public float wBobAmplitudeMax = 0.25f;
+ public float wBobFrequencyMin = 0.8f;
+ public float wBobFrequencyMax = 2.0f;
+ public float wSwingAngleMin = 3f;
+ public float wSwingAngleMax = 12f;
+ public float wRadiusJitter = 0.12f;
+ public float wAngularJitter = 10f;
+ public bool wClockwise = true;
+ public bool wFaceOrbitDirection = true;
+ public float wOrbitDirectionYawOffset = 0f;
+ public float wOrbitDirectionPitchOffset = 0f;
+ public float wOrbitDirectionRollOffset = 0f;
+ public bool wKeepSwordVisibleToCamera = true;
 
-    [Header("E - 天轨换位 / Legacy 旧视觉")]
+    [Header("R Effect Scale")]
     [HideInInspector] public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
-    [HideInInspector] public float eEffectRotationZ = -90f;
-    [HideInInspector] public Vector3 eEffectOffset = Vector3.zero;
-    [HideInInspector] public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
-    [HideInInspector] public float eEffectYawOffset = 0f;
-    [HideInInspector] public float eEffectVisualPitch = 0f;
-    [HideInInspector] public float eEffectVisualYaw = 0f;
-    [HideInInspector] public float eEffectVisualRoll = 0f;
+ public float eEffectRotationZ = -90f;
+ public Vector3 eEffectOffset = Vector3.zero;
+ public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
+ public float eEffectYawOffset = 0f;
+ public float eEffectVisualPitch = 0f;
+ public float eEffectVisualYaw = 0f;
+ public float eEffectVisualRoll = 0f;
 
-    [Header("R - 神眷星雨 / 视觉")]
-    [InspectorName("R 尺寸")]
-    public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-    [HideInInspector] public float rEffectRotationZ = -90f;
-    [HideInInspector] public Vector3 rEffectOffset = Vector3.zero;
-    [HideInInspector] public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
-    [HideInInspector] public float rEffectYawOffset = 0f;
-    [InspectorName("R 显示 Pitch")]
-    public float rEffectVisualPitch = 90f;
-    [InspectorName("R 显示 Yaw")]
-    public float rEffectVisualYaw = 0f;
-    [InspectorName("R 显示 Roll")]
-    public float rEffectVisualRoll = 0f;
-    [HideInInspector] public bool rEffectInvertForward = false;
-    [Header("R - 神眷星雨 / 万剑漩涡")]
-    [InspectorName("R 持续时间")]
-    public float rSwarmDuration = 2.0f;
-    [InspectorName("R 最小半径")]
-    public float rSwarmRadiusMin = 0.8f;
-    [InspectorName("R 最大半径")]
-    public float rSwarmRadiusMax = 3.2f;
-    [InspectorName("R 最低高度")]
-    public float rSwarmHeightMin = 0.4f;
-    [InspectorName("R 最高高度")]
-    public float rSwarmHeightMax = 3.0f;
-    [InspectorName("R 最小旋转速度")]
-    public float rSwarmSpeedMin = 120f;
-    [InspectorName("R 最大旋转速度")]
-    public float rSwarmSpeedMax = 300f;
-    [InspectorName("R 最小起伏幅度")]
-    public float rSwarmBobAmplitudeMin = 0.05f;
-    [InspectorName("R 最大起伏幅度")]
-    public float rSwarmBobAmplitudeMax = 0.35f;
-    [InspectorName("R 最小起伏频率")]
-    public float rSwarmBobFrequencyMin = 0.8f;
-    [InspectorName("R 最大起伏频率")]
-    public float rSwarmBobFrequencyMax = 2.5f;
-    [InspectorName("R 半径扰动")]
-    public float rSwarmRadiusJitter = 0.25f;
-    [InspectorName("R 顺时针")]
-    public bool rSwarmClockwise = true;
-    [InspectorName("R 前方偏移")]
-    public float rSwarmForwardOffset = 2.0f;
-    [Header("R - 神眷星雨 / 漩涡中心")]
-    [InspectorName("R 切线偏移角")]
-    public float rSwarmYawOffset = 0f;
-    [InspectorName("R 像角色一样面向镜头")]
-    public bool rBillboardLikePlayer = true;
-    [InspectorName("R 渲染相机")]
-    public Camera rRenderCamera;
-    [InspectorName("R 自动查找相机")]
-    public bool rAutoResolveRenderCamera = true;
-    [InspectorName("R 使用相机前方")]
-    public bool rSwarmUseCameraForward = true;
-    [InspectorName("R 围绕角色中心")]
-    public bool rSwarmCenterOnPlayer = false;
-    [InspectorName("R 应用特效偏移到中心")]
-    public bool rApplyEffectOffsetToSwarmCenter = false;
-    [HideInInspector] public bool rUseTangentFacing = true;
-    [InspectorName("R 平面竖直角度")]
-    public Vector3 rPlaneUprightEuler = new Vector3(90f, 0f, 0f);
-    [InspectorName("R 面向相机角度")]
-    public Vector3 rPlaneFaceCameraEuler = new Vector3(0f, 90f, 0f);
-    [Header("R - 神眷星雨 / 显示正反修正")]
-    [InspectorName("R 翻转正反面")]
-    public bool rFlipPlaneFrontBack = true;
-    [InspectorName("R 正反面翻转角度")]
-    public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
-    [HideInInspector] public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
-    [Header("R - 神眷星雨 / 调试")]
-    [HideInInspector] public bool rDebugSwordVelocityFacing = false;
-    [HideInInspector] public float rFacingLookAheadTime = 0.05f;
-    [HideInInspector] public bool rDebugFacingScreenAngle = false;
-    [InspectorName("R 使用玩家图层")]
-    public bool rUsePlayerLayerForR = true;
-    [InspectorName("R 双面显示")]
-    public bool rForceDoubleSided = true;
-    [Header("R - 神眷星雨 / 自转")]
-    [HideInInspector] public bool rEnableSwordSelfSpin = false;
-    [HideInInspector] public float rSwordSelfSpinMin = 30f;
-    [HideInInspector] public float rSwordSelfSpinMax = 120f;
-    [HideInInspector] public Vector3 rSwordLengthLocalAxis = Vector3.up;
-    [Header("R - 神眷星雨 / 星雨伤害")]
-    [InspectorName("R 伤害半径")]
-    public float rSwarmDamageRadius = 3.0f;
-    [InspectorName("R 伤害间隔")]
-    public float rSwarmDamageInterval = 0.25f;
-    [InspectorName("R 每次伤害")]
+    [HideInInspector] [Header("R Effect Scale")]
+    [InspectorName("R Effect Scale")]
+ public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+ public float rEffectRotationZ = 0f;
+ public Vector3 rEffectOffset = Vector3.zero;
+ public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
+ public float rEffectYawOffset = 0f;
+ [InspectorName("R Effect Visual Pitch")]
+ public float rEffectVisualPitch = 0f;
+ [InspectorName("R Effect Visual Yaw")]
+ public float rEffectVisualYaw = 0f;
+ [InspectorName("R Effect Visual Roll")]
+ public float rEffectVisualRoll = 0f;
+ public bool rEffectInvertForward = false;
+ [Header("R Swarm Duration")]
+ [InspectorName("R Swarm Duration")]
+ public float rSwarmDuration = 2.0f;
+ [InspectorName("R Swarm Radius Min")]
+ public float rSwarmRadiusMin = 0.8f;
+ [InspectorName("R Swarm Radius Max")]
+ public float rSwarmRadiusMax = 3.2f;
+ [InspectorName("R Swarm Height Min")]
+ public float rSwarmHeightMin = 0.4f;
+ [InspectorName("R Swarm Height Max")]
+ public float rSwarmHeightMax = 3.0f;
+ [InspectorName("R Swarm Speed Min")]
+ public float rSwarmSpeedMin = 120f;
+ [InspectorName("R Swarm Speed Max")]
+ public float rSwarmSpeedMax = 300f;
+ [InspectorName("R Swarm Bob Amplitude Min")]
+ public float rSwarmBobAmplitudeMin = 0.05f;
+ [InspectorName("R Swarm Bob Amplitude Max")]
+ public float rSwarmBobAmplitudeMax = 0.35f;
+ [InspectorName("R Swarm Bob Frequency Min")]
+ public float rSwarmBobFrequencyMin = 0.8f;
+ [InspectorName("R Swarm Bob Frequency Max")]
+ public float rSwarmBobFrequencyMax = 2.5f;
+ [InspectorName("R Swarm Radius Jitter")]
+ public float rSwarmRadiusJitter = 0.25f;
+ [InspectorName("R Swarm Clockwise")]
+ public bool rSwarmClockwise = true;
+ [InspectorName("R Swarm Forward Offset")]
+ public float rSwarmForwardOffset = 2.0f;
+ [Header("R Swarm Yaw Offset")]
+ [InspectorName("R Swarm Yaw Offset")]
+ public float rSwarmYawOffset = 0f;
+ [InspectorName("R Billboard Like Player")]
+ public bool rBillboardLikePlayer = true;
+ [InspectorName("R Render Camera")]
+ public Camera rRenderCamera;
+ [InspectorName("R Auto Resolve Render Camera")]
+ public bool rAutoResolveRenderCamera = true;
+ [InspectorName("R Swarm Use Camera Forward")]
+ public bool rSwarmUseCameraForward = true;
+ [InspectorName("R Swarm Center On Player")]
+ public bool rSwarmCenterOnPlayer = false;
+ [InspectorName("R Apply Effect Offset To Swarm Center")]
+ public bool rApplyEffectOffsetToSwarmCenter = false;
+ public bool rUseTangentFacing = true;
+ [InspectorName("R Plane Upright Euler")]
+ public Vector3 rPlaneUprightEuler = Vector3.zero;
+ [InspectorName("R Plane Face Camera Euler")]
+ public Vector3 rPlaneFaceCameraEuler = Vector3.zero;
+ [Header("R Flip Plane Front Back")]
+ [InspectorName("R Flip Plane Front Back")]
+ public bool rFlipPlaneFrontBack = true;
+ [InspectorName("R Plane Front Back Flip Euler")]
+ public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
+ public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
+ [Header("R Use Player Layer For R")]
+ public bool rDebugSwordVelocityFacing = false;
+ public float rFacingLookAheadTime = 0.05f;
+ public bool rDebugFacingScreenAngle = false;
+ [InspectorName("R Use Player Layer For R")]
+ public bool rUsePlayerLayerForR = true;
+ [InspectorName("R Force Double Sided")]
+ public bool rForceDoubleSided = true;
+ [Header("R Swarm Damage Radius")]
+ public bool rEnableSwordSelfSpin = false;
+ public float rSwordSelfSpinMin = 30f;
+ public float rSwordSelfSpinMax = 120f;
+ public Vector3 rSwordLengthLocalAxis = Vector3.up;
+ [Header("R Swarm Damage Radius")]
+ [InspectorName("R Swarm Damage Radius")]
+ public float rSwarmDamageRadius = 3.0f;
+ [InspectorName("R Swarm Damage Interval")]
+ public float rSwarmDamageInterval = 0.25f;
+ [InspectorName("R Swarm Damage Per Tick")]
     public float rSwarmDamagePerTick = 2.0f;
-    [InspectorName("R 敌人层")]
+    [HideInInspector] [InspectorName("R Swarm Enemy Layer")]
     public LayerMask rSwarmEnemyLayer = ~0;
 
-    [Header("R - 神眷星雨 / 星雨")]
-    [InspectorName("R 上升时间")]
-    [HideInInspector] public float rRiseDuration = 0.45f;
-    [InspectorName("R 上升高度")]
-    [HideInInspector] public float rRiseHeight = 4f;
-    [InspectorName("R 星雨持续时间")]
-    [HideInInspector] public float rStarRainDuration = 1.2f;
-    [InspectorName("R 星雨生成高度")]
+    [HideInInspector] [Header("R Star Rain Spawn Height")]
+ [InspectorName("R Star Rain Spawn Height")]
+    public float rRiseDuration = 0.45f;
+    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
+    public float rRiseHeight = 4f;
+    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
+    public float rStarRainDuration = 1.2f;
+    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
     public float rStarRainSpawnHeight = 5f;
-    [InspectorName("R 星雨范围半径")]
+    [HideInInspector] [InspectorName("R Star Rain Radius")]
     public float rStarRainRadius = 5f;
-    [InspectorName("R 星雨落下速度")]
+    [HideInInspector] [InspectorName("R Star Rain Fall Speed")]
     public float rStarRainFallSpeed = 10f;
-    [InspectorName("R 星雨随机延迟")]
+    [HideInInspector] [InspectorName("R Star Rain Random Delay")]
     public float rStarRainRandomDelay = 0.15f;
-    [InspectorName("R 星雨伤害半径")]
+    [HideInInspector] [InspectorName("R Star Rain Damage Radius")]
     public float rStarRainDamageRadius = 1.2f;
 
-    [InspectorName("R 星雨开始比例")]
+    [HideInInspector] [InspectorName("R Star Rain Start Ratio")]
     public float rStarRainStartRatio = 0.5f;
-    [InspectorName("R 星雨生成间隔")]
+    [HideInInspector] [InspectorName("R Star Rain Interval")]
     public float rStarRainInterval = 0.12f;
-    [InspectorName("R 每波星雨剑数")]
+    [HideInInspector] [InspectorName("R Star Rain Blades Per Wave")]
     public int rStarRainBladesPerWave = 2;
-    [InspectorName("R 星雨视觉偏移")]
-    public Vector3 rStarRainVisualEulerOffset = new Vector3(90f, 0f, 0f);
-    [InspectorName("R 星雨强制视觉旋转")]
+    [HideInInspector] [InspectorName("R Star Rain Visual Euler Offset")]
+    public Vector3 rStarRainVisualEulerOffset = Vector3.zero;
+    [HideInInspector] [InspectorName("R Star Rain Use Forced Visual Rotation")]
     public bool rStarRainUseForcedVisualRotation = true;
-    [InspectorName("R 星雨强制旋转角度")]
-    public Vector3 rStarRainForcedVisualEuler = new Vector3(90f, 180f, 0f);
-    [InspectorName("R 星雨伤害倍率")]
+    [HideInInspector] [InspectorName("R Star Rain Forced Visual Euler")]
+    public Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
+    [HideInInspector] [InspectorName("R Star Rain Damage Multiplier")]
     public float rStarRainDamageMultiplier = 0.6f;
-    [InspectorName("R 星雨尺寸")]
+    [HideInInspector] [InspectorName("R Star Rain Effect Scale")]
     public Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-    [InspectorName("R 星雨延续到 Orbit 后")]
+    [HideInInspector] [InspectorName("R Star Rain Continue After Orbit")]
     public bool rStarRainContinueAfterOrbit = true;
-    [InspectorName("R Orbit 后额外星雨时间")]
+    [HideInInspector] [InspectorName("R Star Rain Extra Duration After Orbit")]
     public float rStarRainExtraDurationAfterOrbit = 0.6f;
-    [InspectorName("R Orbit 结束即清理")]
+    [HideInInspector] [InspectorName("R Orbit Clear When Orbit Ends")]
     public bool rOrbitClearWhenOrbitEnds = true;
-    [InspectorName("R Orbit 淡出时间")]
+    [HideInInspector] [InspectorName("R Orbit Fade Out Duration")]
     public float rOrbitFadeOutDuration = 0.15f;
 
-    [Header("待机剑")]
+    [Header("Standby Sword Scale")]
     public Vector3 standbySwordScale = new Vector3(0.25f, 0.25f, 0.25f);
-    public float standbySwordRotationZ = -90f;
+    public float standbySwordRotationZ = 0f;
     public Vector3 standbySwordPlaneScale = new Vector3(0.25f, 0.25f, 1f);
     public Vector3 standbySwordOffset = Vector3.zero;
-    public float standbySwordVisualPitch = 90f;
+    public float standbySwordVisualPitch = 0f;
     public float standbySwordVisualYaw = 0f;
     public float standbySwordVisualRoll = 0f;
     public float standbySwordSpinSpeed = 120f;
 
-    [Header("Refs")]
+    [Header("Rb")]
     public Rigidbody rb;
     private sealed class SkillEffectRuntime : MonoBehaviour
     {
@@ -477,11 +551,6 @@ public class Player2PrototypeController : MonoBehaviour
                 return true;
             }
 
-            if (HasAliveEStarFallBlades())
-            {
-                return true;
-            }
-
             for (int i = 0; i < activeRSwarmSwords.Count; i++)
             {
                 RSwarmSwordData data = activeRSwarmSwords[i];
@@ -507,6 +576,8 @@ public class Player2PrototypeController : MonoBehaviour
     private void Awake()
     {
         initialRotation = transform.rotation;
+        InitializeSkillSlots();
+        InitializeEStarTrailDefaults();
 
         if (rb == null)
         {
@@ -524,8 +595,18 @@ public class Player2PrototypeController : MonoBehaviour
         ResolveRRenderCamera();
     }
 
+    private void Start()
+    {
+        InitializeSkillSlots();
+    }
+
     public void ClearRuntimeSkillVisualsForSwitch()
     {
+        qSkill?.Cleanup();
+        wSkill?.Cleanup();
+        eSkill?.Cleanup();
+        rSkill?.Cleanup();
+
         if (wSkillRoutine != null)
         {
             StopCoroutine(wSkillRoutine);
@@ -541,6 +622,7 @@ public class Player2PrototypeController : MonoBehaviour
         StopAllCoroutines();
         CleanupWVisuals();
         CleanupRSwarmVisuals();
+        CleanupEStarTrailVisuals();
 
         for (int i = 0; i < standbySwordVisuals.Count; i++)
         {
@@ -570,6 +652,15 @@ public class Player2PrototypeController : MonoBehaviour
         currentWFinalDamageReduction = 0f;
     }
 
+    private void OnDestroy()
+    {
+        qSkill?.Cleanup();
+        wSkill?.Cleanup();
+        eSkill?.Cleanup();
+        rSkill?.Cleanup();
+        CleanupEStarTrailVisuals();
+    }
+
     private void LateUpdate()
     {
         if (lockCharacterRotation)
@@ -585,13 +676,73 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        if (Keyboard.current.qKey.wasPressedThisFrame) CastQ();
-        if (Keyboard.current.wKey.wasPressedThisFrame) CastW();
-        if (Keyboard.current.eKey.wasPressedThisFrame) CastE();
-        if (Keyboard.current.rKey.wasPressedThisFrame) CastR();
+        if (Keyboard.current.qKey.wasPressedThisFrame)
+        {
+            if (qSkill != null) qSkill.Cast();
+            else CastQ();
+        }
+
+        if (Keyboard.current.wKey.wasPressedThisFrame)
+        {
+            if (wSkill != null) wSkill.Cast();
+            else CastW();
+        }
+
+        if (Keyboard.current.eKey.wasPressedThisFrame)
+        {
+            if (eSkill != null) eSkill.Cast();
+            else CastE();
+        }
+
+        if (Keyboard.current.rKey.wasPressedThisFrame)
+        {
+            if (rSkill != null) rSkill.Cast();
+            else CastR();
+        }
     }
 
-    private void CastQ()
+    private void InitializeSkillSlots()
+    {
+        if (qSkill == null) qSkill = GetComponent<Player2Skill_Q_DivineLightSword>();
+        if (wSkill == null) wSkill = GetComponent<Player2Skill_W_HolyWheelDeflection>();
+        if (eSkill == null) eSkill = GetComponent<Player2Skill_E_CelestialShift>();
+        if (rSkill == null) rSkill = GetComponent<Player2Skill_R_DivineStarRain>();
+
+        qSkill?.Initialize(this);
+        wSkill?.Initialize(this);
+        eSkill?.Initialize(this);
+        rSkill?.Initialize(this);
+    }
+
+    public Rigidbody Body => rb;
+
+    public Vector3 FacingDirection => ResolveFacingDirection();
+    public Vector3 GetFacingDirection() => FacingDirection;
+    public int CurrentDivineMark => currentSwordEnergy;
+    public Camera GetRenderCamera() => ResolveRRenderCamera();
+    public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
+
+    public float LegacyERailDuration => eRailDuration;
+    public bool LegacyEEnableAfterimageShader => eEnableAfterimageShader;
+    public SpriteRenderer LegacyEAfterimageSourceSpriteRenderer => eAfterimageSourceSpriteRenderer;
+    public bool LegacyEAfterimageUseDistanceSampling => eAfterimageUseDistanceSampling;
+    public bool LegacyEAfterimageUseActualMoveDirection => eAfterimageUseActualMoveDirection;
+    public bool LegacyEAfterimageInvertMoveDirection => eAfterimageInvertMoveDirection;
+    public float LegacyEAfterimageSpacing => eAfterimageSpacing;
+    public int LegacyEAfterimageMaxPerDash => eAfterimageMaxPerDash;
+
+    public void CastQ()
+    {
+        if (qSkill != null)
+        {
+            qSkill.Cast();
+            return;
+        }
+
+        CastQLegacy();
+    }
+
+    private void CastQLegacy()
     {
         Vector3 dir = ResolveFacingDirection();
         Vector3 spawnPos = transform.position + Vector3.up * 1.2f + transform.right * 0.8f + qEffectOffset;
@@ -611,8 +762,14 @@ public class Player2PrototypeController : MonoBehaviour
         currentSwordEnergy += 1;
     }
 
-    private void CastW()
+    public void CastW()
     {
+        if (wSkill != null)
+        {
+            wSkill.Cast();
+            return;
+        }
+
         if (wSkillRoutine != null)
         {
             StopCoroutine(wSkillRoutine);
@@ -623,13 +780,25 @@ public class Player2PrototypeController : MonoBehaviour
         wSkillRoutine = StartCoroutine(ShieldRoutine());
     }
 
-    private void CastE()
+    public void CastE()
     {
+        if (eSkill != null)
+        {
+            eSkill.Cast();
+            return;
+        }
+
         if (!isDashing) StartCoroutine(DashRoutine());
     }
 
-    private void CastR()
+    public void CastR()
     {
+        if (rSkill != null)
+        {
+            rSkill.Cast();
+            return;
+        }
+
         if (rSwarmRoutine != null)
         {
             StopCoroutine(rSwarmRoutine);
@@ -660,7 +829,12 @@ public class Player2PrototypeController : MonoBehaviour
         for (int i = 0; i < swordCount; i++)
         {
             float baseAngle = i * (360f / Mathf.Max(1, swordCount)) + Random.Range(-30f, 30f);
-            float radius = Random.Range(Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax), Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax));
+            float radiusMin = Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax);
+            float radiusMax = Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax);
+            float radiusT = swordCount <= 1 ? 0.5f : i / (float)(swordCount - 1);
+            float radius = Mathf.Lerp(radiusMin, radiusMax, radiusT);
+            radius += Random.Range(-rSwarmRadiusJitter, rSwarmRadiusJitter);
+            radius = Mathf.Max(0.01f, radius);
             float height = Random.Range(Mathf.Min(rSwarmHeightMin, rSwarmHeightMax), Mathf.Max(rSwarmHeightMin, rSwarmHeightMax));
             float orbitSpeed = Random.Range(Mathf.Min(rSwarmSpeedMin, rSwarmSpeedMax), Mathf.Max(rSwarmSpeedMin, rSwarmSpeedMax));
             float bobAmplitude = Random.Range(Mathf.Min(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax), Mathf.Max(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax));
@@ -723,6 +897,19 @@ public class Player2PrototypeController : MonoBehaviour
                 previousPosition = spawnPosition,
                 hasPreviousPosition = true
             });
+        }
+
+        if (eAfterimageDebugLog)
+        {
+            Debug.Log($"R Swarm radius range: min={rSwarmRadiusMin}, max={rSwarmRadiusMax}, actualRadiusCount={activeRSwarmSwords.Count}", this);
+            for (int i = 0; i < activeRSwarmSwords.Count; i++)
+            {
+                RSwarmSwordData data = activeRSwarmSwords[i];
+                if (data != null)
+                {
+                    Debug.Log($"R Swarm sword[{i}] radius={data.radius}", this);
+                }
+            }
         }
 
         float orbitElapsed = 0f;
@@ -1244,6 +1431,40 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
+    private IEnumerator FadeAndDestroySpriteGhost(GameObject ghost, SpriteRenderer sr, float duration)
+    {
+        if (ghost == null || sr == null)
+        {
+            yield break;
+        }
+
+        duration = Mathf.Max(0.05f, duration);
+        Color startColor = sr.color;
+        float elapsed = 0f;
+
+        while (elapsed < duration)
+        {
+            if (ghost == null || sr == null)
+            {
+                yield break;
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+
+            Color c = startColor;
+            c.a = Mathf.Lerp(startColor.a, 0f, t);
+            sr.color = c;
+
+            yield return null;
+        }
+
+        if (ghost != null)
+        {
+            Destroy(ghost);
+        }
+    }
+
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
         ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, rSwarmDamagePerTick);
@@ -1316,6 +1537,11 @@ public class Player2PrototypeController : MonoBehaviour
 
     public float ProcessIncomingDamageWithWGuard(float rawDamage, BattleDamage incomingDamage)
     {
+        if (wSkill != null)
+        {
+            return wSkill.ProcessIncomingDamageWithWGuard(rawDamage, incomingDamage);
+        }
+
         float clampedRaw = Mathf.Max(0f, rawDamage);
         if (!isWGuardActive)
         {
@@ -1370,88 +1596,600 @@ public class Player2PrototypeController : MonoBehaviour
 
     private IEnumerator DashRoutine()
     {
-        CleanupEStarFallBlades();
         isDashing = true;
         Vector3 dir = ResolveFacingDirection();
-        Vector3 start = transform.position;
-        Vector3 end = start + dir * dashDistance;
-        int spawnedAfterimages = 0;
-        float afterimageTimer = 0f;
-        float spawnInterval = Mathf.Max(0.01f, eAfterimageSpawnInterval);
+        Vector3 dashStartPos = transform.position;
+        Vector3 dashEndPos = dashStartPos + dir * dashDistance;
 
         if (eEnableAfterimageShader)
         {
-            TrySpawnEAfterimage(start, ref spawnedAfterimages);
-        }
+            int spawnedAfterimages = 0;
+            Vector3 lastAfterimagePos = dashStartPos;
+            float afterimageDistanceAccumulator = 0f;
+            float nextAfterimageTime = 0f;
+            float spawnInterval = Mathf.Max(0.005f, eAfterimageSpawnInterval);
+            float elapsed = 0f;
 
-        float t = 0f;
-        while (t < dashDuration)
-        {
-            float p = Mathf.Clamp01(t / dashDuration);
-            transform.position = Vector3.Lerp(start, end, p);
-
-            if (eEnableAfterimageShader && spawnedAfterimages < Mathf.Max(0, eAfterimageCount))
+            while (elapsed < dashDuration)
             {
-                afterimageTimer += Time.deltaTime;
-                if (afterimageTimer >= spawnInterval)
+                float p = Mathf.Clamp01(elapsed / dashDuration);
+                transform.position = Vector3.Lerp(dashStartPos, dashEndPos, p);
+
+                if (!eAfterimageUseManualTrailLayout && eAfterimageUseDistanceSampling)
                 {
-                    afterimageTimer -= spawnInterval;
-                    TrySpawnEAfterimage(transform.position, ref spawnedAfterimages);
+                    Vector3 currentPos = transform.position;
+                    Vector3 moveDelta = currentPos - lastAfterimagePos;
+                    Vector3 actualMoveDir = moveDelta.sqrMagnitude > 0.0001f ? moveDelta.normalized : Vector3.zero;
+                    if (eAfterimageUseActualMoveDirection && actualMoveDir.sqrMagnitude > 0.0001f)
+                    {
+                        lastMoveDir = actualMoveDir;
+                    }
+
+                    float moved = Vector3.Distance(lastAfterimagePos, currentPos);
+                    afterimageDistanceAccumulator += moved;
+
+                    int maxPerDash = Mathf.Max(0, eAfterimageMaxPerDash);
+                    float spacing = Mathf.Max(0.001f, eAfterimageSpacing);
+                    Vector3 from = lastAfterimagePos;
+                    Vector3 to = currentPos;
+                    if (eAfterimageInvertMoveDirection)
+                    {
+                        from = currentPos;
+                        to = lastAfterimagePos;
+                    }
+
+                    while (spawnedAfterimages < maxPerDash && afterimageDistanceAccumulator >= spacing)
+                    {
+                        float over = afterimageDistanceAccumulator - spacing;
+                        float spawnDistanceFromStart = moved - over;
+                        float t = moved > 0.0001f ? Mathf.Clamp01(spawnDistanceFromStart / moved) : 1f;
+                        Vector3 spawnPos = Vector3.Lerp(from, to, t);
+                        if (eAfterimageDebugLog)
+                        {
+                            Debug.Log($"E Afterimage index={spawnedAfterimages}, invert={eAfterimageInvertMoveDirection}, from={from}, to={to}, pos={spawnPos}", this);
+                        }
+                        TrySpawnEAfterimage(spawnPos, dashStartPos, dashEndPos, ref spawnedAfterimages);
+                        afterimageDistanceAccumulator -= spacing;
+                    }
+
+                    lastAfterimagePos = currentPos;
                 }
+                else if (!eAfterimageUseManualTrailLayout && eAfterimageSpawnDuringDash)
+                {
+                    while (spawnedAfterimages < Mathf.Max(0, eAfterimageCount) && elapsed >= nextAfterimageTime)
+                    {
+                        TrySpawnEAfterimage(transform.position, dashStartPos, dashEndPos, ref spawnedAfterimages);
+                        nextAfterimageTime += spawnInterval;
+                    }
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
             }
 
-            t += Time.deltaTime;
-            yield return null;
+            transform.position = dashEndPos;
+            if (eAfterimageUseManualTrailLayout)
+            {
+                StartCoroutine(SpawnEAfterimagesManualTrail(dashStartPos, dashEndPos));
+            }
+            else if (eAfterimageUseDistanceSampling)
+            {
+                // Distance sampling already handled during the dash.
+            }
+            else if (eAfterimageSpawnDuringDash)
+            {
+                // Do not spawn a second path-sampled set when real-time dash spawning is enabled.
+            }
+            else if (eAfterimageUsePathSamples)
+            {
+                StartCoroutine(SpawnEAfterimagesAlongPath(dashStartPos, dashEndPos));
+            }
+
+            isDashing = false;
+            yield break;
         }
 
-        transform.position = end;
-        if (eEnableAfterimageShader)
-        {
-            TrySpawnEAfterimage(end, ref spawnedAfterimages);
-        }
         isDashing = false;
     }
 
-    private Renderer ResolveEAfterimageSourceRenderer()
+    private TrailRenderer BeginETrailRenderer()
     {
-        if (eAfterimageSourceRenderer != null)
-        {
-            return eAfterimageSourceRenderer;
-        }
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        GameObject trailHost = sourceSprite != null ? sourceSprite.gameObject : gameObject;
 
-        SpriteRenderer[] spriteRenderers = GetComponentsInChildren<SpriteRenderer>(true);
-        for (int i = 0; i < spriteRenderers.Length; i++)
+        if (eDashTrailRenderer == null || eDashTrailRenderer.gameObject != trailHost)
         {
-            SpriteRenderer spriteRenderer = spriteRenderers[i];
-            if (spriteRenderer != null && spriteRenderer.enabled && spriteRenderer.sprite != null)
+            eDashTrailRenderer = trailHost.GetComponent<TrailRenderer>();
+            if (eDashTrailRenderer == null)
             {
-                return spriteRenderer;
+                eDashTrailRenderer = trailHost.AddComponent<TrailRenderer>();
             }
         }
 
-        for (int i = 0; i < spriteRenderers.Length; i++)
+        eDashTrailRenderer.Clear();
+        eDashTrailRenderer.emitting = true;
+        eDashTrailRenderer.time = Mathf.Max(0.05f, eTrailTime);
+        eDashTrailRenderer.startWidth = eTrailStartWidth;
+        eDashTrailRenderer.endWidth = eTrailEndWidth;
+        eDashTrailRenderer.minVertexDistance = Mathf.Max(0.001f, eTrailMinVertexDistance);
+        eDashTrailRenderer.startColor = eTrailStartColor;
+        eDashTrailRenderer.endColor = eTrailEndColor;
+        eDashTrailRenderer.alignment = LineAlignment.View;
+        eDashTrailRenderer.textureMode = LineTextureMode.Stretch;
+        eDashTrailRenderer.generateLightingData = false;
+        eDashTrailRenderer.autodestruct = false;
+        eDashTrailRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        eDashTrailRenderer.receiveShadows = false;
+        eDashTrailRenderer.sortingLayerID = sourceSprite != null ? sourceSprite.sortingLayerID : 0;
+        eDashTrailRenderer.sortingOrder = (sourceSprite != null ? sourceSprite.sortingOrder : 0) + eTrailSortingOrderOffset;
+
+        if (eTrailMaterial != null)
         {
-            SpriteRenderer spriteRenderer = spriteRenderers[i];
-            if (spriteRenderer != null)
+            eDashTrailRenderer.material = eTrailMaterial;
+        }
+        else if (sourceSprite != null && sourceSprite.sharedMaterial != null)
+        {
+            eDashTrailRenderer.material = sourceSprite.sharedMaterial;
+        }
+        else if (eDashTrailRenderer.material == null)
+        {
+            Shader fallbackShader = Shader.Find("Sprites/Default");
+            if (fallbackShader != null)
             {
-                return spriteRenderer;
+                eDashTrailRenderer.material = new Material(fallbackShader);
             }
         }
 
-        Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
-        for (int i = 0; i < renderers.Length; i++)
+        return eDashTrailRenderer;
+    }
+
+    private void EndETrailRenderer(TrailRenderer trail)
+    {
+        if (trail == null)
         {
-            Renderer renderer = renderers[i];
-            if (renderer != null)
+            return;
+        }
+
+        trail.emitting = false;
+    }
+
+    private TrailRenderer BeginEStarTrail()
+    {
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        CleanupEStarTrailVisuals();
+        InitializeEStarTrailDefaults();
+
+        GameObject trailHost = new GameObject("E_StarTrail");
+        trailHost.transform.SetParent(transform, false);
+        trailHost.transform.localPosition = eStarTrailLocalOffset;
+        trailHost.transform.localRotation = Quaternion.identity;
+        trailHost.transform.localScale = Vector3.one;
+        eDashTrailHost = trailHost;
+
+        TrailRenderer trail = trailHost.AddComponent<TrailRenderer>();
+        eDashTrailRenderer = trail;
+        trail.Clear();
+        trail.emitting = true;
+        trail.time = Mathf.Max(0.05f, eStarTrailTime);
+        trail.startWidth = eStarTrailStartWidth;
+        trail.endWidth = eStarTrailEndWidth;
+        trail.minVertexDistance = Mathf.Max(0.001f, eStarTrailMinVertexDistance);
+        trail.colorGradient = GetResolvedStarTrailGradient();
+        trail.numCornerVertices = 6;
+        trail.numCapVertices = 8;
+        trail.alignment = LineAlignment.View;
+        trail.textureMode = LineTextureMode.Stretch;
+        trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        trail.receiveShadows = false;
+        trail.generateLightingData = false;
+        trail.autodestruct = false;
+        trail.sortingLayerID = sourceSprite != null ? sourceSprite.sortingLayerID : 0;
+        trail.sortingOrder = (sourceSprite != null ? sourceSprite.sortingOrder : 0) + eTrailSortingOrderOffset;
+        trail.material = GetOrCreateStarTrailMaterial();
+        return trail;
+    }
+
+    private void EndEStarTrail(TrailRenderer trail)
+    {
+        if (trail == null)
+        {
+            return;
+        }
+
+        trail.emitting = false;
+        StartCoroutine(DestroyAfterSeconds(trail.gameObject, Mathf.Max(0.05f, eStarTrailTime)));
+    }
+
+    private GameObject BeginEDashCoreGlow()
+    {
+        if (!eEnableDashCoreGlow)
+        {
+            return null;
+        }
+
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        CleanupEDashCoreGlow();
+
+        GameObject glowObject;
+        if (eDashCoreGlowPrefab != null)
+        {
+            glowObject = Instantiate(eDashCoreGlowPrefab, transform);
+        }
+        else
+        {
+            glowObject = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            glowObject.name = "E_DashCoreGlow";
+            glowObject.transform.SetParent(transform, false);
+            Collider collider = glowObject.GetComponent<Collider>();
+            if (collider != null)
             {
-                return renderer;
+                Destroy(collider);
             }
+        }
+
+        glowObject.transform.localPosition = eDashCoreGlowOffset;
+        glowObject.transform.localRotation = Quaternion.identity;
+        glowObject.transform.localScale = Vector3.one * Mathf.Max(0.01f, eDashCoreGlowScale);
+        eDashCoreGlowInstance = glowObject;
+
+        Renderer renderer = glowObject.GetComponentInChildren<Renderer>(true);
+        if (renderer != null)
+        {
+            eDashCoreGlowRenderer = renderer;
+            renderer.material = GetOrCreateDashCoreGlowMaterial();
+            ApplyRendererColor(renderer, eDashCoreGlowColor, 1f);
+            renderer.sortingLayerID = sourceSprite != null ? sourceSprite.sortingLayerID : 0;
+            renderer.sortingOrder = (sourceSprite != null ? sourceSprite.sortingOrder : 0) + eTrailSortingOrderOffset;
+        }
+        else if (eAfterimageDebugLog)
+        {
+            Debug.LogWarning("[E DashCoreGlow] Prefab has no Renderer.", this);
+        }
+
+        return glowObject;
+    }
+
+    private void FadeAndDestroyEDashCoreGlow(GameObject glowObject, float duration)
+    {
+        if (glowObject == null)
+        {
+            return;
+        }
+
+        Renderer renderer = glowObject.GetComponentInChildren<Renderer>(true);
+        if (renderer == null)
+        {
+            Destroy(glowObject);
+            return;
+        }
+
+        StartCoroutine(FadeAndDestroyRendererRoutine(glowObject, renderer, duration));
+    }
+
+    private ParticleSystem BeginEStarTrailParticles()
+    {
+        if (!eEnableStarTrailParticles || eStarTrailParticlePrefab == null)
+        {
+            return null;
+        }
+
+        CleanupEStarTrailParticles();
+        ParticleSystem instance = Instantiate(eStarTrailParticlePrefab, transform);
+        instance.transform.localPosition = eStarTrailLocalOffset;
+        instance.transform.localRotation = Quaternion.identity;
+        instance.gameObject.name = "E_StarTrailParticles";
+        var main = instance.main;
+        main.simulationSpace = ParticleSystemSimulationSpace.World;
+        main.playOnAwake = false;
+        instance.Play(true);
+        eDashStarTrailParticlesInstance = instance;
+        return instance;
+    }
+
+    private void EndEStarTrailParticles(ParticleSystem particleSystem)
+    {
+        if (particleSystem == null)
+        {
+            return;
+        }
+
+        particleSystem.Stop(true, ParticleSystemStopBehavior.StopEmitting);
+        StartCoroutine(DestroyParticleSystemWhenDead(particleSystem));
+    }
+
+    private void CleanupEStarTrailVisuals()
+    {
+        CleanupEStarTrailParticles();
+        CleanupEDashCoreGlow();
+
+        if (eDashTrailHost != null)
+        {
+            Destroy(eDashTrailHost);
+            eDashTrailHost = null;
+            eDashTrailRenderer = null;
+        }
+
+        if (eRuntimeStarTrailMaterial != null)
+        {
+            Destroy(eRuntimeStarTrailMaterial);
+            eRuntimeStarTrailMaterial = null;
+        }
+
+        if (eRuntimeDashCoreGlowMaterial != null)
+        {
+            Destroy(eRuntimeDashCoreGlowMaterial);
+            eRuntimeDashCoreGlowMaterial = null;
+        }
+    }
+
+    private void CleanupEDashCoreGlow()
+    {
+        if (eDashCoreGlowInstance != null)
+        {
+            Destroy(eDashCoreGlowInstance);
+            eDashCoreGlowInstance = null;
+            eDashCoreGlowRenderer = null;
+        }
+    }
+
+    private void CleanupEStarTrailParticles()
+    {
+        if (eDashStarTrailParticlesInstance != null)
+        {
+            Destroy(eDashStarTrailParticlesInstance.gameObject);
+            eDashStarTrailParticlesInstance = null;
+        }
+    }
+
+    private IEnumerator DestroyAfterSeconds(GameObject target, float seconds)
+    {
+        if (target == null)
+        {
+            yield break;
+        }
+
+        yield return new WaitForSeconds(Mathf.Max(0.05f, seconds));
+        if (target != null)
+        {
+            Destroy(target);
+        }
+    }
+
+    private IEnumerator DestroyParticleSystemWhenDead(ParticleSystem particleSystem)
+    {
+        if (particleSystem == null)
+        {
+            yield break;
+        }
+
+        while (particleSystem != null && particleSystem.IsAlive(true))
+        {
+            yield return null;
+        }
+
+        if (particleSystem != null)
+        {
+            Destroy(particleSystem.gameObject);
+        }
+    }
+
+    private IEnumerator FadeAndDestroyRendererRoutine(GameObject target, Renderer renderer, float duration)
+    {
+        if (target == null || renderer == null)
+        {
+            yield break;
+        }
+
+        float total = Mathf.Max(0.05f, duration);
+        float elapsed = 0f;
+        Color baseColor = eDashCoreGlowColor;
+
+        while (elapsed < total && target != null && renderer != null)
+        {
+            float t = 1f - Mathf.Clamp01(elapsed / total);
+            Color faded = baseColor;
+            faded.a *= t;
+            ApplyRendererColor(renderer, faded, Mathf.Lerp(1f, 0.2f, 1f - t));
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
+
+        if (target != null)
+        {
+            Destroy(target);
+        }
+    }
+
+    private Material GetOrCreateStarTrailMaterial()
+    {
+        if (eStarTrailMaterial != null)
+        {
+            return eStarTrailMaterial;
+        }
+
+        if (eRuntimeStarTrailMaterial == null)
+        {
+            Shader shader = Shader.Find("AHD2TODSystem/S_E_StarTrail_Additive");
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            if (shader == null)
+            {
+                return null;
+            }
+
+            eRuntimeStarTrailMaterial = new Material(shader);
+            if (eRuntimeStarTrailMaterial.HasProperty("_MainTex"))
+            {
+                eRuntimeStarTrailMaterial.mainTexture = Texture2D.whiteTexture;
+            }
+
+            if (eRuntimeStarTrailMaterial.HasProperty("_Color"))
+            {
+                eRuntimeStarTrailMaterial.SetColor("_Color", Color.white);
+            }
+
+            if (eRuntimeStarTrailMaterial.HasProperty("_Intensity"))
+            {
+                eRuntimeStarTrailMaterial.SetFloat("_Intensity", 1.25f);
+            }
+        }
+
+        return eRuntimeStarTrailMaterial;
+    }
+
+    private Material GetOrCreateDashCoreGlowMaterial()
+    {
+        if (eDashCoreGlowMaterial != null)
+        {
+            return eDashCoreGlowMaterial;
+        }
+
+        if (eRuntimeDashCoreGlowMaterial == null)
+        {
+            Shader shader = Shader.Find("AHD2TODSystem/S_E_StarTrail_Additive");
+            if (shader == null)
+            {
+                shader = Shader.Find("Sprites/Default");
+            }
+
+            if (shader == null)
+            {
+                return null;
+            }
+
+            eRuntimeDashCoreGlowMaterial = new Material(shader);
+            if (eRuntimeDashCoreGlowMaterial.HasProperty("_MainTex"))
+            {
+                eRuntimeDashCoreGlowMaterial.mainTexture = Texture2D.whiteTexture;
+            }
+
+            if (eRuntimeDashCoreGlowMaterial.HasProperty("_Intensity"))
+            {
+                eRuntimeDashCoreGlowMaterial.SetFloat("_Intensity", 2.2f);
+            }
+        }
+
+        return eRuntimeDashCoreGlowMaterial;
+    }
+
+    private void ApplyRendererColor(Renderer renderer, Color color, float intensity)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        MaterialPropertyBlock block = new MaterialPropertyBlock();
+        renderer.GetPropertyBlock(block);
+        block.SetColor("_Color", color);
+        block.SetColor("_BaseColor", color);
+        if (renderer.sharedMaterial != null && renderer.sharedMaterial.HasProperty("_Intensity"))
+        {
+            block.SetFloat("_Intensity", intensity);
+        }
+        renderer.SetPropertyBlock(block);
+    }
+
+    private Gradient GetResolvedStarTrailGradient()
+    {
+        Gradient gradient = eStarTrailGradient != null ? eStarTrailGradient : CreateDefaultStarTrailGradient();
+        if (!eStarTrailReverseGradient)
+        {
+            return gradient;
+        }
+
+        return ReverseGradient(gradient);
+    }
+
+    private static Gradient ReverseGradient(Gradient source)
+    {
+        if (source == null)
+        {
+            return CreateDefaultStarTrailGradient();
+        }
+
+        Gradient reversed = new Gradient();
+        GradientColorKey[] sourceColorKeys = source.colorKeys;
+        GradientAlphaKey[] sourceAlphaKeys = source.alphaKeys;
+        GradientColorKey[] reversedColorKeys = new GradientColorKey[sourceColorKeys.Length];
+        GradientAlphaKey[] reversedAlphaKeys = new GradientAlphaKey[sourceAlphaKeys.Length];
+
+        for (int i = 0; i < sourceColorKeys.Length; i++)
+        {
+            GradientColorKey key = sourceColorKeys[i];
+            reversedColorKeys[i] = new GradientColorKey(key.color, 1f - key.time);
+        }
+
+        for (int i = 0; i < sourceAlphaKeys.Length; i++)
+        {
+            GradientAlphaKey key = sourceAlphaKeys[i];
+            reversedAlphaKeys[i] = new GradientAlphaKey(key.alpha, 1f - key.time);
+        }
+
+        reversed.SetKeys(reversedColorKeys, reversedAlphaKeys);
+        return reversed;
+    }
+
+    private void InitializeEStarTrailDefaults()
+    {
+        if (eStarTrailGradient == null)
+        {
+            eStarTrailGradient = CreateDefaultStarTrailGradient();
+        }
+    }
+
+    private static Gradient CreateDefaultStarTrailGradient()
+    {
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(new Color(1f, 1f, 1f), 0f),
+                new GradientColorKey(new Color(0.55f, 0.85f, 1f), 0.25f),
+                new GradientColorKey(new Color(0.42f, 0.55f, 1f), 0.65f),
+                new GradientColorKey(new Color(0.25f, 0.15f, 0.55f), 1f),
+            },
+            new[]
+            {
+                new GradientAlphaKey(0.95f, 0f),
+                new GradientAlphaKey(0.85f, 0.18f),
+                new GradientAlphaKey(0.4f, 0.7f),
+                new GradientAlphaKey(0f, 1f),
+            });
+        return gradient;
+    }
+
+    private SpriteRenderer ResolveEAfterimageSourceSpriteRenderer()
+    {
+        if (eAfterimageSourceSpriteRenderer != null && eAfterimageSourceSpriteRenderer.sprite != null)
+        {
+            return eAfterimageSourceSpriteRenderer;
+        }
+
+        if (eAfterimageSourceRenderer is SpriteRenderer legacySprite && legacySprite.sprite != null)
+        {
+            return legacySprite;
+        }
+
+        SpriteRenderer spriteRenderer = GetComponent<SpriteRenderer>();
+        if (spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            return spriteRenderer;
+        }
+
+        spriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        if (spriteRenderer != null && spriteRenderer.sprite != null)
+        {
+            return spriteRenderer;
         }
 
         return null;
     }
 
-    private bool TrySpawnEAfterimage(Vector3 position, ref int spawnedCount)
+    private bool TrySpawnEAfterimage(Vector3 position, Vector3 dashStartPos, Vector3 dashEndPos, ref int spawnedCount)
     {
         if (!eEnableAfterimageShader)
         {
@@ -1464,19 +2202,17 @@ public class Player2PrototypeController : MonoBehaviour
             return false;
         }
 
-        Renderer sourceRenderer = ResolveEAfterimageSourceRenderer();
-        if (sourceRenderer == null)
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        if (sourceSprite == null || sourceSprite.sprite == null)
         {
+            if (eAfterimageDebugLog)
+            {
+                Debug.LogWarning("[E Afterimage] source SpriteRenderer is null or has no sprite.", this);
+            }
             return false;
         }
 
-        if (eAfterimageMaterial == null)
-        {
-            Debug.LogWarning("[E Afterimage] Missing eAfterimageMaterial. Assign a Shader Graph / Material for afterimages.", this);
-            return false;
-        }
-
-        GameObject afterimage = CreateEAfterimageObject(sourceRenderer, position);
+        GameObject afterimage = SpawnEAfterimageGhost(sourceSprite, position, dashStartPos, dashEndPos, spawnedCount);
         if (afterimage == null)
         {
             return false;
@@ -1486,111 +2222,188 @@ public class Player2PrototypeController : MonoBehaviour
         return true;
     }
 
-    private GameObject CreateEAfterimageObject(Renderer sourceRenderer, Vector3 worldPosition)
+    private IEnumerator SpawnEAfterimagesAlongPath(Vector3 startPos, Vector3 endPos)
     {
-        if (sourceRenderer == null)
+        if (!eEnableAfterimageShader)
+        {
+            yield break;
+        }
+
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        if (sourceSprite == null || sourceSprite.sprite == null)
+        {
+            if (eAfterimageDebugLog)
+            {
+                Debug.LogWarning("[E Afterimage] source SpriteRenderer is null or has no sprite.", this);
+            }
+            yield break;
+        }
+
+        Vector3 visualOffset = sourceSprite.transform.position - transform.position;
+        if (eAfterimageDebugLog)
+        {
+            Debug.Log($"E Afterimage Path start={startPos}, end={endPos}, distance={Vector3.Distance(startPos, endPos)}", this);
+        }
+
+        int count = Mathf.Max(1, eAfterimageCount);
+        bool sampleForward = eAfterimageUseActualMoveDirection;
+        if (eAfterimageInvertMoveDirection)
+        {
+            sampleForward = !sampleForward;
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            float rawT = count <= 1 ? 1f : i / (float)(count - 1);
+            float biasedT = Mathf.Clamp01(rawT + eAfterimagePathForwardBias);
+            Vector3 pos = Vector3.Lerp(sampleForward ? startPos : endPos, sampleForward ? endPos : startPos, biasedT) + visualOffset;
+            SpawnEAfterimageGhost(sourceSprite, pos, startPos, endPos, i);
+
+            if (eAfterimagePathSpawnDelay > 0f)
+            {
+                yield return new WaitForSeconds(eAfterimagePathSpawnDelay);
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+    }
+
+    private IEnumerator SpawnEAfterimagesManualTrail(Vector3 dashStartPos, Vector3 dashEndPos)
+    {
+        if (!eEnableAfterimageShader)
+        {
+            yield break;
+        }
+
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        if (sourceSprite == null || sourceSprite.sprite == null)
+        {
+            if (eAfterimageDebugLog)
+            {
+                Debug.LogWarning("[E Afterimage] source SpriteRenderer is null or has no sprite.", this);
+            }
+            yield break;
+        }
+
+        Vector3 dashDir = dashEndPos - dashStartPos;
+        float totalDistance = dashDir.magnitude;
+        if (totalDistance < 0.0001f)
+        {
+            dashDir = transform.forward;
+            totalDistance = 0f;
+        }
+
+        if (dashDir.sqrMagnitude < 0.0001f)
+        {
+            yield break;
+        }
+
+        dashDir.Normalize();
+        Vector3 trailDir = eAfterimageInvertTrailDirection ? -dashDir : dashDir;
+        Vector3 side = Vector3.Cross(Vector3.up, trailDir);
+        if (side.sqrMagnitude > 0.0001f)
+        {
+            side.Normalize();
+        }
+
+        int count = Mathf.Max(1, eAfterimageCount);
+        for (int i = 0; i < count; i++)
+        {
+            float t = count <= 1 ? 0f : i / (float)(count - 1);
+            float distance = Mathf.Min(totalDistance, Mathf.Max(0f, eAfterimageNearCharacterOffset) + t * Mathf.Max(0f, eAfterimageTrailLength));
+            float distanceFromStart = eAfterimageInvertTrailDirection ? distance : Mathf.Max(0f, totalDistance - distance);
+            float sampleT = totalDistance > 0.0001f ? Mathf.Clamp01(distanceFromStart / totalDistance) : 0f;
+            Vector3 pos = Vector3.Lerp(dashStartPos, dashEndPos, sampleT);
+            if (Mathf.Abs(eAfterimageTrailSideOffset) > 0.0001f)
+            {
+                pos += side * eAfterimageTrailSideOffset;
+            }
+            SpawnEAfterimageGhost(sourceSprite, pos, dashStartPos, dashEndPos, i);
+
+            if (eAfterimagePathSpawnDelay > 0f)
+            {
+                yield return new WaitForSeconds(eAfterimagePathSpawnDelay);
+            }
+            else
+            {
+                yield return null;
+            }
+        }
+    }
+
+    private GameObject SpawnEAfterimageGhost(SpriteRenderer sourceSprite, Vector3 worldPosition, Vector3 dashStartPos, Vector3 dashEndPos, int spawnedIndex)
+    {
+        if (sourceSprite == null || sourceSprite.sprite == null)
         {
             return null;
         }
 
-        GameObject afterimage = new GameObject("E_Afterimage");
-        afterimage.transform.SetPositionAndRotation(worldPosition, sourceRenderer.transform.rotation);
-        afterimage.transform.localScale = Vector3.Scale(sourceRenderer.transform.lossyScale, eAfterimageScale);
+        GameObject ghost = new GameObject("E_Afterimage_Ghost");
+        SpriteRenderer ghostSprite = ghost.AddComponent<SpriteRenderer>();
+        ghostSprite.sprite = sourceSprite.sprite;
+        ghostSprite.flipX = sourceSprite.flipX;
+        ghostSprite.flipY = sourceSprite.flipY;
+        ghostSprite.drawMode = sourceSprite.drawMode;
+        ghostSprite.size = sourceSprite.size;
+        ghostSprite.spriteSortPoint = sourceSprite.spriteSortPoint;
+        ghostSprite.maskInteraction = sourceSprite.maskInteraction;
+        ghostSprite.sortingLayerID = sourceSprite.sortingLayerID;
+        ghostSprite.sortingOrder = sourceSprite.sortingOrder + eAfterimageSortingOrderOffset;
 
-        Material runtimeMaterial = new Material(eAfterimageMaterial);
-        ApplyAfterimageMaterialTint(runtimeMaterial, eAfterimageTint, eAfterimageAlpha);
-
-        if (sourceRenderer is SpriteRenderer srcSprite)
+        Color c;
+        if (eAfterimageUseRainbow)
         {
-            SpriteRenderer ghostSprite = afterimage.AddComponent<SpriteRenderer>();
-            ghostSprite.sprite = srcSprite.sprite;
-            ghostSprite.flipX = srcSprite.flipX;
-            ghostSprite.flipY = srcSprite.flipY;
-            ghostSprite.drawMode = srcSprite.drawMode;
-            ghostSprite.size = srcSprite.size;
-            ghostSprite.spriteSortPoint = srcSprite.spriteSortPoint;
-            ghostSprite.maskInteraction = srcSprite.maskInteraction;
-            ghostSprite.sortingLayerID = srcSprite.sortingLayerID;
-            ghostSprite.sortingOrder = srcSprite.sortingOrder + eAfterimageSortingOrderOffset;
-            ghostSprite.material = runtimeMaterial;
-            ghostSprite.color = new Color(eAfterimageTint.r, eAfterimageTint.g, eAfterimageTint.b, Mathf.Clamp01(eAfterimageAlpha));
-        }
-        else if (sourceRenderer is SkinnedMeshRenderer skinnedSource)
-        {
-            Mesh bakedMesh = new Mesh();
-            skinnedSource.BakeMesh(bakedMesh);
+            int colorIndex = spawnedIndex;
+            if (eAfterimageInvertColorOrder)
+            {
+                int count = Mathf.Max(1, eAfterimageCount);
+                colorIndex = count - 1 - spawnedIndex;
+            }
 
-            MeshFilter meshFilter = afterimage.AddComponent<MeshFilter>();
-            meshFilter.sharedMesh = bakedMesh;
-
-            MeshRenderer meshRenderer = afterimage.AddComponent<MeshRenderer>();
-            meshRenderer.material = runtimeMaterial;
-            meshRenderer.sortingOrder = eAfterimageSortingOrderOffset;
-            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            meshRenderer.receiveShadows = false;
+            float hue = Mathf.Repeat(colorIndex * eAfterimageRainbowHueSpeed, 1f);
+            c = Color.HSVToRGB(hue, eAfterimageRainbowSaturation, eAfterimageRainbowValue);
         }
         else
         {
-            MeshFilter sourceMeshFilter = sourceRenderer.GetComponent<MeshFilter>();
-            MeshRenderer meshRenderer = afterimage.AddComponent<MeshRenderer>();
-            MeshFilter meshFilter = afterimage.AddComponent<MeshFilter>();
-            if (sourceMeshFilter != null)
-            {
-                meshFilter.sharedMesh = sourceMeshFilter.sharedMesh;
-            }
-            meshRenderer.material = runtimeMaterial;
-            meshRenderer.sortingOrder = eAfterimageSortingOrderOffset;
-            meshRenderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            meshRenderer.receiveShadows = false;
+            c = eAfterimageTint;
         }
-
-        TrySetDoubleSidedIfSupported(afterimage);
-        SkillEffectRuntime runtime = afterimage.AddComponent<SkillEffectRuntime>();
-        CacheFadeTargets(afterimage, runtime);
-        StartCoroutine(FadeAndDestroy(afterimage, Mathf.Max(0.05f, eAfterimageDuration)));
-        return afterimage;
-    }
-
-    private static void ApplyAfterimageMaterialTint(Material mat, Color tint, float alpha)
-    {
-        if (mat == null)
+        if (eAfterimageFadeByDistanceToEnd)
         {
-            return;
+            float totalDistance = Vector3.Distance(dashStartPos, dashEndPos);
+            float distanceToEnd = Vector3.Distance(worldPosition, dashEndPos);
+            float endT = totalDistance <= 0.0001f
+                ? 1f
+                : 1f - Mathf.Clamp01(distanceToEnd / totalDistance);
+            float alphaScale = Mathf.Lerp(Mathf.Clamp01(eAfterimageFarAlphaMultiplier), 1f, endT);
+            c.a = Mathf.Max(0.01f, eAfterimageAlpha * alphaScale);
         }
-
-        Color finalTint = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(Mathf.Max(alpha, tint.a)));
-        SetMaterialColor(mat, finalTint);
-        TrySetAfterimageMaterialAlpha(mat, finalTint.a);
-    }
-
-    private static void TrySetAfterimageMaterialAlpha(Material mat, float alpha)
-    {
-        if (mat == null)
+        else if (eAfterimageFadeByAgeIndex)
         {
-            return;
+            int visibleCount = Mathf.Max(1, Mathf.Min(eAfterimageMaxPerDash, Mathf.Max(1, eAfterimageCount)));
+            int denominator = Mathf.Max(1, visibleCount - 1);
+            float ageT = Mathf.Clamp01(spawnedIndex / (float)denominator);
+            float alphaScale = Mathf.Lerp(Mathf.Clamp01(eAfterimageOldestAlphaMultiplier), 1f, ageT);
+            c.a = Mathf.Max(0.01f, eAfterimageAlpha * alphaScale);
         }
-
-        if (mat.HasProperty("_Alpha"))
+        else
         {
-            mat.SetFloat("_Alpha", alpha);
+            c.a = Mathf.Max(0.2f, eAfterimageAlpha);
         }
+        ghostSprite.color = c;
 
-        if (mat.HasProperty("_Opacity"))
+        ghost.transform.position = worldPosition;
+        ghost.transform.rotation = sourceSprite.transform.rotation;
+        ghost.transform.localScale = Vector3.Scale(sourceSprite.transform.lossyScale, eAfterimageScale);
+
+        if (eAfterimageDebugLog)
         {
-            mat.SetFloat("_Opacity", alpha);
-        }
-    }
-
-    private static void TrySetAfterimageMaterialTint(Material mat, Color tint, float alpha)
-    {
-        if (mat == null)
-        {
-            return;
+            Debug.Log($"Afterimage pos={worldPosition}, end={dashEndPos}, distanceToEnd={Vector3.Distance(worldPosition, dashEndPos)}, alpha={c.a}", this);
         }
 
-        Color finalTint = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(Mathf.Max(alpha, tint.a)));
-        SetMaterialColor(mat, finalTint);
-        TrySetAfterimageMaterialAlpha(mat, finalTint.a);
+        StartCoroutine(FadeAndDestroySpriteGhost(ghost, ghostSprite, eAfterimageDuration));
+        return ghost;
     }
 
     private bool HasAliveEStarFallBlades()
@@ -1963,14 +2776,7 @@ public class Player2PrototypeController : MonoBehaviour
     {
         GameObject root = new GameObject(name);
         root.transform.position = worldPosition;
-        if (useRawPrefabRotationForSkillEffects)
-        {
-            root.transform.rotation = Quaternion.Euler(skillEffectPrefabBaseRotation);
-        }
-        else
-        {
-            ApplyRootDirection(root.transform, direction, alignToDirection, invertForward, yawOffset);
-        }
+        ApplyRootDirection(root.transform, direction, alignToDirection, invertForward, yawOffset);
 
         GameObject effectVisual = CreateEffectInstance(name, specificPrefab, root.transform.position, root.transform.rotation, useRawPrefabRotationForSkillEffects);
         if (effectVisual == null)
@@ -1985,13 +2791,13 @@ public class Player2PrototypeController : MonoBehaviour
         Transform visualTarget = FindEffectVisualTransform(effectVisual);
         if (useRawPrefabRotationForSkillEffects)
         {
-            effectVisual.transform.rotation = Quaternion.Euler(skillEffectPrefabBaseRotation);
+            effectVisual.transform.rotation = root.transform.rotation;
             float rawScaleMultiplier = Mathf.Max(0.01f, skillEffectPrefabScaleMultiplier);
             effectVisual.transform.localScale = effectVisual.transform.localScale * rawScaleMultiplier;
         }
         else
         {
-            visualTarget.localRotation = Quaternion.Euler(visualPitch, visualYaw, visualRoll);
+            visualTarget.localRotation = BuildQuadOffsetRotation(visualPitch, visualYaw, visualRoll);
             visualTarget.localScale = Vector3.Scale(visualTarget.localScale, ClampVisualScale(visualScale));
         }
         EnsureEffectVisible(effectVisual);
@@ -2175,6 +2981,43 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
+    private static Quaternion BuildQuadOffsetRotation(float pitch, float yaw, float roll)
+    {
+        return Quaternion.Euler(NormalizeQuadLegacyPitch(pitch), yaw, roll);
+    }
+
+    private static float NormalizeQuadLegacyPitch(float pitch)
+    {
+        float absPitch = Mathf.Abs(pitch);
+        if (absPitch < 0.0001f)
+        {
+            return 0f;
+        }
+
+        if (Mathf.Abs(absPitch - 90f) <= 0.01f || Mathf.Abs(absPitch - 180f) <= 0.01f)
+        {
+            return 0f;
+        }
+
+        return pitch;
+    }
+
+    private static float NormalizeQuadLegacyRoll(float roll)
+    {
+        float absRoll = Mathf.Abs(roll);
+        if (absRoll < 0.0001f)
+        {
+            return 0f;
+        }
+
+        if (Mathf.Abs(absRoll - 90f) <= 0.01f)
+        {
+            return 0f;
+        }
+
+        return roll;
+    }
+
     private static void ApplyRootDirection(Transform root, Vector3 direction, bool alignToDirection, bool invertForward, float yawOffset)
     {
         float yaw = 0f;
@@ -2220,7 +3063,7 @@ public class Player2PrototypeController : MonoBehaviour
 
     private float ResolveRotation(float specificRotationZ)
     {
-        return sharedEffectRotationZ + specificRotationZ;
+        return sharedEffectRotationZ + NormalizeQuadLegacyRoll(specificRotationZ);
     }
 
     private static Vector3 GetOrbitPositionXZ(float angleDegrees, float radius, float height)
@@ -2257,10 +3100,8 @@ public class Player2PrototypeController : MonoBehaviour
     private Quaternion BuildRVisibleBaseRotation()
     {
         return
-            Quaternion.Euler(rPlaneUprightEuler) *
-            Quaternion.Euler(rPlaneFaceCameraEuler) *
-            (rFlipPlaneFrontBack ? Quaternion.Euler(rPlaneFrontBackFlipEuler) : Quaternion.identity) *
-            Quaternion.Euler(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
+            (rFlipPlaneFrontBack ? Quaternion.Euler(0f, rPlaneFrontBackFlipEuler.y, 0f) : Quaternion.identity) *
+            BuildQuadOffsetRotation(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
     }
 
     private void ApplyRSwarmVisualRotation(RSwarmSwordData data, float yaw)
@@ -2277,10 +3118,11 @@ public class Player2PrototypeController : MonoBehaviour
     {
         if (rStarRainUseForcedVisualRotation)
         {
-            return Quaternion.Euler(rStarRainForcedVisualEuler) * Quaternion.Euler(rStarRainVisualEulerOffset);
+            return BuildQuadOffsetRotation(rStarRainForcedVisualEuler.x, rStarRainForcedVisualEuler.y, rStarRainForcedVisualEuler.z) *
+                   BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
         }
 
-        return BuildRVisibleBaseRotation() * Quaternion.Euler(rStarRainVisualEulerOffset);
+        return BuildRVisibleBaseRotation() * BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
     }
 
     private void ApplyRStarRainVisualRotation(RStarRainBladeData data)
@@ -2300,7 +3142,8 @@ public class Player2PrototypeController : MonoBehaviour
     {
         if (eStarFallUseForcedVisualRotation)
         {
-            return Quaternion.Euler(eStarFallForcedVisualEuler) * Quaternion.Euler(eStarFallVisualEulerOffset);
+            return BuildQuadOffsetRotation(eStarFallForcedVisualEuler.x, eStarFallForcedVisualEuler.y, eStarFallForcedVisualEuler.z) *
+                   BuildQuadOffsetRotation(eStarFallVisualEulerOffset.x, eStarFallVisualEulerOffset.y, eStarFallVisualEulerOffset.z);
         }
 
         Vector3 dir = fallDir;
@@ -2312,7 +3155,7 @@ public class Player2PrototypeController : MonoBehaviour
         dir.Normalize();
 
         Quaternion fallRotation = Quaternion.LookRotation(dir, Vector3.up);
-        return fallRotation * Quaternion.Euler(eStarFallVisualEulerOffset);
+        return fallRotation * BuildQuadOffsetRotation(eStarFallVisualEulerOffset.x, eStarFallVisualEulerOffset.y, eStarFallVisualEulerOffset.z);
     }
 
     private void ApplyEStarFallVisualRotation(EStarFallBladeData data, Vector3 fallDir)
@@ -2344,5 +3187,9 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", color);
     }
 }
+
+
+
+
 
 
