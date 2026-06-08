@@ -197,6 +197,7 @@ Shader "UnderTheStars/Enemies/SlimeJelly_URP"
                 float spatialAlpha = lerp(_EdgeAlphaStrength, coreAlpha, coreMask);
                 spatialAlpha = lerp(spatialAlpha, spatialAlpha * (0.92 + 0.08 * centerMask), 0.5);
                 half alpha = saturate(spriteColor.a * _TintColor.a * _Transparency * _AlphaStrength * spatialAlpha);
+                alpha = max(alpha, spriteColor.a * 0.88);
                 return half4(finalColor, alpha);
             }
             ENDHLSL
@@ -286,3 +287,4 @@ Shader "UnderTheStars/Enemies/SlimeJelly_URP"
         }
     }
 }
+

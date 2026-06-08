@@ -145,7 +145,7 @@ MonoBehaviour:
   moveWobbleSpeed: 9
   moveSquashAmount: 0.12
   moveStretchAmount: 0.15
-  moveTiltAmount: 10
+  moveTiltAmount: 0
   moveBobAmount: 0.03
   moveSpeedForMaxWobble: 4
   attackChargeTime: 0.18
@@ -177,6 +177,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8b11d3eff6ff540ac864010dfc3ba890, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
+  playerTarget: {fileID: 0}
+  playerTag: Player
+  moveSpeed: 2.5
+  stopDistance: 0.8
+  faceMoveDirection: 0
+  keepFlatRotation: 1
+  attackRange: 1.35
+  attackHitRange: 1.6
+  attackCooldown: 1.1
+  attackDamage: 3
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -246,3 +256,5 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
+
+

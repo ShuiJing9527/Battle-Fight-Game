@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class Player2Bootstrap : MonoBehaviour
@@ -16,6 +16,10 @@ public class Player2Bootstrap : MonoBehaviour
     [Header("UI")]
     [SerializeField] private bool showSwitchHint = true;
     [SerializeField] private bool disablePlayer2AnimatorIfSharedController = true;
+    [SerializeField] private bool showHealthBar = true;
+
+    [Header("Player Health")]
+    [SerializeField] private float playerStartHealth = 100f;
 
     public GameObject CurrentPlayer { get; private set; }
     public Transform CurrentPlayerTransform => CurrentPlayer != null ? CurrentPlayer.transform : null;
@@ -25,6 +29,11 @@ public class Player2Bootstrap : MonoBehaviour
     private Animator player1Animator;
     private Animator player2Animator;
     private bool initialized;
+
+    private Texture2D healthBarBackgroundTexture;
+    private Texture2D healthBarFillTexture;
+    private GUIStyle switchHintStyle;
+    private GUIStyle healthBarLabelStyle;
 
     private void Start()
     {
@@ -41,21 +50,20 @@ public class Player2Bootstrap : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showSwitchHint)
+        EnsureGuiResources();
+
+        if (showSwitchHint)
         {
-            return;
+            const int width = 220;
+            const int height = 30;
+            Rect rect = new Rect(20f, 20f, width, height);
+            GUI.Label(rect, "T: Switch Player", switchHintStyle);
         }
 
-        const int width = 220;
-        const int height = 30;
-        Rect rect = new Rect(20f, 20f, width, height);
-
-        GUIStyle style = new GUIStyle(GUI.skin.label);
-        style.fontSize = 14;
-        style.alignment = TextAnchor.UpperLeft;
-        style.normal.textColor = new Color(1f, 1f, 1f, 0.75f);
-
-        GUI.Label(rect, "T: Switch Player", style);
+        if (showHealthBar)
+        {
+            DrawHealthBar();
+        }
     }
 
     private void ResolvePlayers()
@@ -170,6 +178,8 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         ResolvePlayers();
+        ApplyInitialHealth(player01);
+        ApplyInitialHealth(player02);
         cameraRig = FindObjectOfType<PlayerCameraRig>();
 
         if (partyLeader == null && !string.IsNullOrEmpty(partyLeaderName))
@@ -201,6 +211,156 @@ public class Player2Bootstrap : MonoBehaviour
         Debug.Log($"[PARTY] Current Player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
 
         initialized = true;
+    }
+
+    private void EnsureGuiResources()
+    {
+        if (healthBarBackgroundTexture == null)
+        {
+            healthBarBackgroundTexture = CreateColorTexture(new Color(0f, 0f, 0f, 0.75f));
+        }
+
+        if (healthBarFillTexture == null)
+        {
+            healthBarFillTexture = CreateColorTexture(new Color(0.85f, 0.15f, 0.15f, 1f));
+        }
+
+        if (switchHintStyle == null)
+        {
+            switchHintStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 14,
+                alignment = TextAnchor.UpperLeft
+            };
+            switchHintStyle.normal.textColor = new Color(1f, 1f, 1f, 0.75f);
+        }
+
+        if (healthBarLabelStyle == null)
+        {
+            healthBarLabelStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 13,
+                alignment = TextAnchor.MiddleCenter,
+                fontStyle = FontStyle.Bold
+            };
+            healthBarLabelStyle.normal.textColor = Color.white;
+        }
+    }
+
+    private void DrawHealthBar()
+    {
+        if (CurrentPlayer == null)
+        {
+            return;
+        }
+
+        float maxHealth = ResolveMaxHealth(CurrentPlayer);
+        if (maxHealth <= 0f)
+        {
+            return;
+        }
+
+        float currentHealth = Mathf.Clamp(ResolveCurrentHealth(CurrentPlayer), 0f, maxHealth);
+        const float x = 20f;
+        const float y = 60f;
+        const float width = 240f;
+        const float height = 24f;
+        const float border = 2f;
+
+        GUI.DrawTexture(new Rect(x, y, width, height), healthBarBackgroundTexture);
+
+        float fillWidth = (width - border * 2f) * (currentHealth / maxHealth);
+        if (fillWidth > 0f)
+        {
+            GUI.DrawTexture(new Rect(x + border, y + border, fillWidth, height - border * 2f), healthBarFillTexture);
+        }
+
+        GUI.Label(new Rect(x, y, width, height), $"PLAYER HP  {Mathf.CeilToInt(currentHealth)}/{Mathf.CeilToInt(maxHealth)}", healthBarLabelStyle);
+    }
+
+    private void ApplyInitialHealth(GameObject player)
+    {
+        if (player == null)
+        {
+            return;
+        }
+
+        CombatStats stats = player.GetComponent<CombatStats>();
+        if (stats != null)
+        {
+            stats.maxHealth = playerStartHealth;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = playerStartHealth;
+            resourceBank.currentHealth = playerStartHealth;
+        }
+
+        CombatHealth combatHealth = player.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            combatHealth.currentHealth = playerStartHealth;
+        }
+    }
+
+    private float ResolveCurrentHealth(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.currentHealth;
+        }
+
+        CombatHealth combatHealth = player.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return combatHealth.currentHealth;
+        }
+
+        return 0f;
+    }
+
+    private float ResolveMaxHealth(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.maxHealth;
+        }
+
+        CombatStats stats = player.GetComponent<CombatStats>();
+        if (stats != null)
+        {
+            return stats.maxHealth;
+        }
+
+        CombatHealth combatHealth = player.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return Mathf.Max(combatHealth.currentHealth, playerStartHealth);
+        }
+
+        return playerStartHealth;
+    }
+
+    private static Texture2D CreateColorTexture(Color color)
+    {
+        Texture2D texture = new Texture2D(1, 1);
+        texture.SetPixel(0, 0, color);
+        texture.Apply();
+        return texture;
     }
 
     private void DisablePlayer2AnimatorIfUsingPlayer01Controller()

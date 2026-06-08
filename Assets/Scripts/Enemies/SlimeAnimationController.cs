@@ -31,6 +31,9 @@ public class SlimeAnimationController : MonoBehaviour
     [SerializeField] private float attackStretchAmount = 0.22f;
     [SerializeField] private float attackStopDistance = 0.7f;
 
+    [Header("Visibility")]
+    [SerializeField] private float minimumVisibleAlpha = 0.92f;
+
     [Header("Death - Slime Death Dissolve")]
     [SerializeField] private float deathDuration = 0.65f;
     [SerializeField] private float deathFadeTime = 0.45f;
@@ -267,33 +270,16 @@ public class SlimeAnimationController : MonoBehaviour
             attackRoutine = null;
         }
 
-        float totalDuration = Mathf.Max(0.05f, deathDuration);
-        float fadeTime = Mathf.Clamp(deathFadeTime, 0.05f, totalDuration);
-        float prePulseTime = Mathf.Max(0.08f, totalDuration - fadeTime);
+        float totalDuration = Mathf.Max(0.08f, deathDuration);
 
-        for (float t = 0f; t < prePulseTime; t += Time.deltaTime)
+        for (float t = 0f; t < totalDuration; t += Time.deltaTime)
         {
-            float p = Mathf.Clamp01(t / prePulseTime);
-            float pulse = Mathf.Sin(p * Mathf.PI);
-            float xScale = 1f + pulse * 0.18f;
-            float yScale = 1f + pulse * 0.12f;
-            ApplyVisualScaleAndGrounding(xScale, yScale, 1f);
-            visualRoot.localRotation = Quaternion.Euler(
-                baseVisualLocalRotation.eulerAngles.x,
-                baseVisualLocalRotation.eulerAngles.y,
-                baseVisualLocalRotation.eulerAngles.z + Mathf.Sin(Time.time * 60f) * 1.2f);
-            yield return null;
-        }
-
-        EmitDeathParticles();
-
-        for (float t = 0f; t < fadeTime; t += Time.deltaTime)
-        {
-            float p = Mathf.Clamp01(t / fadeTime);
-            float xScale = Mathf.Lerp(1.08f, 0.9f, p);
-            float yScale = Mathf.Lerp(1.04f, 0.84f, p);
-            ApplyVisualScaleAndGrounding(xScale, yScale, 1f);
-            visualRoot.localRotation = Quaternion.Slerp(visualRoot.localRotation, baseVisualLocalRotation, Time.deltaTime * 15f);
+            float p = Mathf.Clamp01(t / totalDuration);
+            float xScale = Mathf.Lerp(1f, 1.28f, p);
+            float yScale = Mathf.Lerp(1f, 0.14f, p);
+            float zScale = Mathf.Lerp(1f, 1.08f, p);
+            ApplyVisualScaleAndGrounding(xScale, yScale, zScale);
+            visualRoot.localRotation = Quaternion.Slerp(visualRoot.localRotation, baseVisualLocalRotation, Time.deltaTime * 18f);
             SetVisualAlpha(Mathf.Lerp(baseVisualColor.a, 0f, p));
             yield return null;
         }
@@ -509,7 +495,13 @@ public class SlimeAnimationController : MonoBehaviour
         }
 
         Color color = visualSpriteRenderer.color;
-        color.a = Mathf.Clamp01(alpha);
+        float clampedAlpha = Mathf.Clamp01(alpha);
+        if (!isDying)
+        {
+            clampedAlpha = Mathf.Max(clampedAlpha, Mathf.Clamp01(baseVisualColor.a * minimumVisibleAlpha));
+        }
+
+        color.a = clampedAlpha;
         visualSpriteRenderer.color = color;
     }
 
@@ -595,3 +587,5 @@ public class SlimeAnimationController : MonoBehaviour
         return 1f - inv * inv * inv;
     }
 }
+
+

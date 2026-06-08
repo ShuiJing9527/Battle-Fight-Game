@@ -33,7 +33,7 @@ Material:
     - _AlphaStrength: 1
     - _AmbientStrength: 0.35
     - _BaseColorStrength: 1
-    - _EdgeAlphaStrength: 0.35
+    - _EdgeAlphaStrength: 0.9
     - _HighlightPower: 24
     - _HighlightStrength: 0.5
     - _InnerAlphaStrength: 1
@@ -47,7 +47,7 @@ Material:
     - _ShadowAlphaCutoff: 0.25
     - _ShadowStrength: 0.45
     - _Smoothness: 0.6
-    - _Transparency: 0.8
+    - _Transparency: 1
     m_Colors:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _HighlightColor: {r: 0.93, g: 1, b: 0.99, a: 1}
@@ -57,3 +57,4 @@ Material:
     - _TintColor: {r: 0.8, g: 0.98, b: 0.94, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
+

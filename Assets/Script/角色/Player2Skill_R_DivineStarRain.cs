@@ -76,6 +76,15 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
     [SerializeField] private Vector3 rStarRainVisualEulerOffset = Vector3.zero;
 
+    [Header("R Star Rain Motion")]
+    [SerializeField] private float rStarRainSpawnLateralMin = 1.8f;
+    [SerializeField] private float rStarRainSpawnLateralMax = 4.8f;
+    [SerializeField] private float rStarRainSpawnAngleJitter = 42f;
+    [SerializeField] private float rStarRainPitchJitter = 34f;
+    [SerializeField] private float rStarRainYawJitter = 22f;
+    [SerializeField] private float rStarRainTargetJitter = 1.35f;
+    [SerializeField] private float rStarRainFallSpeedVariance = 0.35f;
+
     [Header("R Orbit Cleanup")]
     [SerializeField] private bool rOrbitClearWhenOrbitEnds = true;
     [SerializeField] private float rOrbitFadeOutDuration = 0.15f;
@@ -130,6 +139,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         public Quaternion baseVisibleLocalRotation;
         public Vector3 spawnPosition;
         public Vector3 targetPosition;
+        public Vector3 fallDirection;
+        public Vector3 rotationEulerOffset;
         public float delay;
         public float fallDuration;
         public float elapsed;
@@ -440,7 +451,31 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         {
             Vector2 randomOffset2D = Random.insideUnitCircle * rainRadius;
             Vector3 target = center + new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
-            Vector3 spawn = target + Vector3.up * rainSpawnHeight;
+            Vector2 targetJitter2D = Random.insideUnitCircle * Mathf.Max(0f, rStarRainTargetJitter);
+            target += new Vector3(targetJitter2D.x, 0f, targetJitter2D.y);
+
+            Vector3 radialDirection = new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
+            if (radialDirection.sqrMagnitude < 0.0001f)
+            {
+                radialDirection = ResolveRSwarmForward();
+            }
+            radialDirection.y = 0f;
+            radialDirection = radialDirection.sqrMagnitude > 0.0001f ? radialDirection.normalized : Vector3.forward;
+            radialDirection = Quaternion.Euler(0f, Random.Range(-Mathf.Abs(rStarRainSpawnAngleJitter), Mathf.Abs(rStarRainSpawnAngleJitter)), 0f) * radialDirection;
+
+            float lateralMin = Mathf.Min(rStarRainSpawnLateralMin, rStarRainSpawnLateralMax);
+            float lateralMax = Mathf.Max(rStarRainSpawnLateralMin, rStarRainSpawnLateralMax);
+            float lateralDistance = Random.Range(lateralMin, lateralMax);
+            lateralDistance *= Random.Range(0.85f, 1.25f);
+            Vector3 lateralOffset = radialDirection * lateralDistance;
+            float bladeSpawnHeight = rainSpawnHeight * Random.Range(0.8f, 1.3f);
+            Vector3 spawn = target + Vector3.up * bladeSpawnHeight + lateralOffset;
+            Vector3 fallDirection = (target - spawn).sqrMagnitude > 0.0001f ? (target - spawn).normalized : Vector3.down;
+            Vector3 rotationEulerOffset = new Vector3(
+                Random.Range(-Mathf.Abs(rStarRainPitchJitter), Mathf.Abs(rStarRainPitchJitter)),
+                Random.Range(-Mathf.Abs(rStarRainYawJitter), Mathf.Abs(rStarRainYawJitter)),
+                0f);
+            float bladeFallSpeed = rainFallSpeed * Random.Range(1f - Mathf.Clamp01(rStarRainFallSpeedVariance), 1f + Mathf.Clamp01(rStarRainFallSpeedVariance));
 
             GameObject sword = CreateSkillEffectVisual(
                 $"R_StarRain_{activeRStarRainBlades.Count}",
@@ -483,8 +518,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 baseVisibleLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity,
                 spawnPosition = spawn,
                 targetPosition = target,
-                delay = Random.Range(0f, rainRandomDelay),
-                fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / rainFallSpeed),
+                fallDirection = fallDirection,
+                rotationEulerOffset = rotationEulerOffset,
+                delay = Random.Range(0f, rainRandomDelay) + Random.Range(0f, rainRandomDelay * 0.6f),
+                fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / Mathf.Max(0.1f, bladeFallSpeed)),
                 elapsed = 0f,
                 impactApplied = false
             };
@@ -1162,27 +1199,37 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         return frontBackFlip * BuildQuadOffsetRotation(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
     }
 
-    private Quaternion BuildRStarRainVisibleRotation()
+    private Quaternion BuildRStarRainVisibleRotation(Vector3 fallDir, Vector3 randomEulerOffset)
     {
-        if (rStarRainUseForcedVisualRotation)
-        {
-            return BuildQuadOffsetRotation(rStarRainForcedVisualEuler.x, rStarRainForcedVisualEuler.y, rStarRainForcedVisualEuler.z) *
-                   BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
-        }
+        Quaternion baseRotation = rStarRainUseForcedVisualRotation
+            ? BuildQuadOffsetRotation(rStarRainForcedVisualEuler.x, rStarRainForcedVisualEuler.y, rStarRainForcedVisualEuler.z) *
+              BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z)
+            : BuildRStarRainDirectionRotation(fallDir) * BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
 
-        return BuildRVisibleBaseRotation() * BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
+        return baseRotation * Quaternion.Euler(randomEulerOffset);
     }
 
     private void ApplyRStarRainVisualRotation(RStarRainBladeData data)
     {
-        if (data == null || data.visualTransform == null)
+        if (data == null || data.visualTransform == null || data.sword == null)
         {
             return;
         }
 
-        Quaternion finalRotation = BuildRStarRainVisibleRotation();
+        Vector3 liveFallDirection = data.targetPosition - data.sword.transform.position;
+        Vector3 fallDir = liveFallDirection.sqrMagnitude > 0.0001f ? liveFallDirection : data.fallDirection;
+        Quaternion finalRotation = BuildRStarRainVisibleRotation(fallDir, data.rotationEulerOffset);
         data.sword.transform.rotation = finalRotation;
         data.visualTransform.rotation = finalRotation;
+    }
+
+    private static Quaternion BuildRStarRainDirectionRotation(Vector3 fallDir)
+    {
+        Vector3 dir = fallDir.sqrMagnitude > 0.0001f ? fallDir.normalized : Vector3.down;
+        Vector3 flat = new Vector3(dir.x, 0f, dir.z);
+        float yaw = flat.sqrMagnitude > 0.0001f ? Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg : 0f;
+        float pitch = flat.sqrMagnitude > 0.0001f ? Mathf.Atan2(-dir.y, flat.magnitude) * Mathf.Rad2Deg : 90f;
+        return Quaternion.Euler(pitch, yaw, 0f);
     }
 
     private void SyncLegacyOwnerValuesIfNeeded()
