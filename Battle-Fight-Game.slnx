@@ -1,0 +1,13 @@
+﻿<Solution>
+  <Project Path="UniTask.csproj" />
+  <Project Path="UniTask.Linq.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="UniTask.Addressables.csproj" />
+  <Project Path="UniTask.Tests.csproj" />
+  <Project Path="UniTask.TextMeshPro.csproj" />
+  <Project Path="Assembly-CSharp-Editor.csproj" />
+  <Project Path="TempAsm.csproj" />
+  <Project Path="UniTask.Tests.Editor.csproj" />
+  <Project Path="UniTask.Editor.csproj" />
+  <Project Path="UniTask.DOTween.csproj" />
+</Solution>

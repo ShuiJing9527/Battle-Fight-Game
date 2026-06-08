@@ -1,0 +1,11 @@
+{
+  "name": "com.ahd2.tod-system",
+  "version": "1.0.0",
+  "displayName": "AHD2-TODSystem",
+  "description": "TOD系统。",
+  "unity": "2022.3",
+  "author": {
+    "name": "ahd2"
+  },
+  "_fingerprint": "262369a63cc352f6a77673e6e5e987994fabe00b"
+}
