@@ -13166,7 +13166,7 @@ MonoBehaviour:
   todGlobalParameters: {fileID: 11400000, guid: f89b655674b082a49b64f11701b1b082, type: 2}
   MainLight: {fileID: 1373474695}
   LensFlare: {fileID: 0}
-  isTimeFlow: 1
+  isTimeFlow: 0
 --- !u!4 &1119862290
 Transform:
   m_ObjectHideFlags: 0
@@ -13381,7 +13381,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1667661989}
+  m_CustomBakedTexture: {fileID: 2031818033}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -14785,8 +14785,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.9876591, g: 0.7308768, b: 0.33350942, a: 1}
-  m_Intensity: 8
+  m_Color: {r: 0.08199832, g: 0.10084592, b: 0.3018868, a: 0}
+  m_Intensity: 0
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -14848,7 +14848,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.5488015, y: 0.14705092, z: 0.21298672, w: 0.7948772}
+  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -15829,43 +15829,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistancePostion
   footTransform: {fileID: 1665794655}
---- !u!84 &1667661989
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1809271588
 GameObject:
   m_ObjectHideFlags: 0
@@ -17076,10 +17039,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 1a6fbdf73200154419fda3fe836e8df8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2PrototypeController
-  qSkill: {fileID: 0}
-  wSkill: {fileID: 0}
-  eSkill: {fileID: 0}
-  rSkill: {fileID: 0}
+  qSkill: {fileID: 1990323145}
+  wSkill: {fileID: 1990323144}
+  eSkill: {fileID: 1990323143}
+  rSkill: {fileID: 1990323142}
   moveSpeed: 5
   dashDistance: 4
   dashDuration: 0.15
@@ -17364,6 +17327,85 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba8d3ad4f1f7b34a8895b3745d62755, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_R_DivineStarRain
+  rBaseSwordCount: 1
+  rEffectScale: {x: 0.3, y: 0.3, z: 0.3}
+  rEffectRotationZ: 0
+  rEffectOffset: {x: 0, y: 0, z: 0}
+  rEffectPlaneScale: {x: 0.3, y: 0.3, z: 1}
+  rEffectYawOffset: 0
+  rEffectVisualPitch: 0
+  rEffectVisualYaw: 0
+  rEffectVisualRoll: 0
+  rSwarmDuration: 2
+  rSwarmRadiusMin: 0.8
+  rSwarmRadiusMax: 3.2
+  rSwarmHeightMin: 0.4
+  rSwarmHeightMax: 3
+  rSwarmSpeedMin: 120
+  rSwarmSpeedMax: 300
+  rSwarmBobAmplitudeMin: 0.05
+  rSwarmBobAmplitudeMax: 0.35
+  rSwarmBobFrequencyMin: 0.8
+  rSwarmBobFrequencyMax: 2.5
+  rSwarmRadiusJitter: 0.25
+  rSwarmClockwise: 1
+  rSwarmForwardOffset: 2
+  rSwarmYawOffset: 0
+  rRenderCamera: {fileID: 0}
+  rAutoResolveRenderCamera: 1
+  rSwarmUseCameraForward: 1
+  rSwarmCenterOnPlayer: 0
+  rApplyEffectOffsetToSwarmCenter: 0
+  rUseTangentFacing: 1
+  rPlaneUprightEuler: {x: 0, y: 0, z: 0}
+  rPlaneFaceCameraEuler: {x: 0, y: 0, z: 0}
+  rFlipPlaneFrontBack: 1
+  rPlaneFrontBackFlipEuler: {x: 0, y: 180, z: 0}
+  rUsePlayerLayerForR: 1
+  rForceDoubleSided: 1
+  rDebugSwordVelocityFacing: 0
+  rFacingLookAheadTime: 0.05
+  rDebugFacingScreenAngle: 0
+  rEnableSwordSelfSpin: 0
+  rSwordSelfSpinMin: 30
+  rSwordSelfSpinMax: 120
+  rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
+  rSwarmDamageRadius: 3
+  rSwarmDamageInterval: 0.25
+  rSwarmDamagePerTick: 2
+  rSwarmEnemyLayer:
+    serializedVersion: 2
+    m_Bits: 4294967295
+  rStarRainStartRatio: 0.5
+  rStarRainInterval: 0.12
+  rStarRainBladesPerWave: 2
+  rStarRainSpawnHeight: 5
+  rStarRainRadius: 5
+  rStarRainFallSpeed: 10
+  rStarRainRandomDelay: 0.15
+  rStarRainDamageRadius: 1.2
+  rStarRainDamageMultiplier: 0.6
+  rStarRainContinueAfterOrbit: 1
+  rStarRainExtraDurationAfterOrbit: 0.6
+  rStarRainAngleMin: 10
+  rStarRainAngleMax: 35
+  rStarRainRandomHorizontalDirection: 1
+  rStarRainFaceFallDirection: 0
+  rStarRainEffectScale: {x: 0.3, y: 0.3, z: 0.3}
+  rStarRainUseForcedVisualRotation: 1
+  rStarRainForcedVisualEuler: {x: 0, y: 180, z: 0}
+  rStarRainVisualEulerOffset: {x: 0, y: 0, z: 0}
+  rOrbitTrailEffectPrefab: {fileID: 7384281875577149491, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+  rOrbitEnableTrailEffect: 1
+  rOrbitTrailFollowWorldPosition: 1
+  rOrbitTrailClearOnSpawn: 1
+  rOrbitTrailLocalOffset: {x: 0, y: 0, z: 0}
+  rOrbitTrailLocalEuler: {x: 0, y: 0, z: 0}
+  rOrbitTrailLocalScale: {x: 1, y: 1, z: 1}
+  rOrbitClearWhenOrbitEnds: 1
+  rOrbitFadeOutDuration: 0.15
+  sharedSkillEffectPrefab: {fileID: 0}
+  rSkillEffectPrefab: {fileID: 0}
 --- !u!114 &1990323143
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17376,6 +17418,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45276561a2769df41a45b9e9df485010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
+  eRailDuration: 0.6
+  eEnableAfterimageShader: 1
+  eAfterimageSourceSpriteRenderer: {fileID: 0}
+  eAfterimageCount: 12
+  eAfterimageDuration: 0.45
+  eAfterimageAlpha: 0.35
+  eAfterimageSpawnInterval: 0.03
+  eAfterimageScale: {x: 1, y: 1, z: 1}
+  eAfterimageTint: {r: 0.6, g: 0.85, b: 1, a: 0.45}
+  eAfterimageSortingOrderOffset: 5
+  eAfterimageDebugLog: 0
+  eAfterimageUseRainbow: 1
+  eAfterimageInvertColorOrder: 1
+  eAfterimageFadeByAgeIndex: 1
+  eAfterimageOldestAlphaMultiplier: 0.25
+  eAfterimageFadeByDistanceToEnd: 1
+  eAfterimageFarAlphaMultiplier: 0.12
+  eAfterimageRainbowHueSpeed: 0.04
+  eAfterimageRainbowSaturation: 0.45
+  eAfterimageRainbowValue: 1
+  eAfterimageUseDistanceSampling: 1
+  eAfterimageUseActualMoveDirection: 1
+  eAfterimageInvertMoveDirection: 0
+  eAfterimageSpacing: 0.06
+  eAfterimageMaxPerDash: 24
 --- !u!114 &1990323144
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17388,6 +17455,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a1994dff4cc9c84cbcf8969b78086bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
+  wDuration: 1.5
+  wDamageReduction: 0.4
+  wDamageReductionPerSword: 0.03
+  wMaxDamageReduction: 0.8
+  wCounterDamageRatio: 0.5
+  wEffectScale: {x: 0.3, y: 0.3, z: 0.3}
+  wEffectScaleMultiplier: 1
+  baseWSwordCount: 3
+  useSwordEnergyForW: 1
+  maxWSwordCount: 15
+  wEffectOrbitRadius: 1.2
+  wEffectHeight: 1.1
+  wEffectOrbitSpeed: 80
+  wSwordOrbitYawOffset: 90
+  wDurationPerSwordEnergy: 0
+  wMaxDurationBonus: 0
+  wOrbitSpeedPerSwordEnergy: 0
+  wMaxOrbitSpeedBonus: 0
+  wRadiusPerSwordEnergy: 0
+  wMaxRadiusBonus: 0
+  sharedSkillEffectPrefab: {fileID: 0}
+  wSkillEffectPrefab: {fileID: 0}
+  standbySkillEffectPrefab: {fileID: 0}
 --- !u!114 &1990323145
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -17400,11 +17490,60 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4173609bc00f48b4886a7c6914064982, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_Q_DivineLightSword
+  qDelay: 0.35
+  qSwordSpeed: 14
+  qSkillEffectPrefab: {fileID: 0}
+  qEffectScale: {x: 0.25, y: 0.25, z: 0.25}
+  qEffectRotationZ: 0
+  qEffectOffset: {x: 0, y: 0, z: 0}
+  qEffectPlaneScale: {x: 0.25, y: 0.25, z: 1}
+  qEffectYawOffset: 0
+  qEffectVisualPitch: 0
+  qEffectVisualYaw: 0
+  qEffectVisualRoll: 0
+  qEffectInvertForward: 0
 --- !u!4 &2005910328 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 2962422539587455864, guid: 906495144c6b37241ade607617c4e318, type: 3}
   m_PrefabInstance: {fileID: 3069856048353722971}
   m_PrefabAsset: {fileID: 0}
+--- !u!84 &2031818033
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &2090811301
 GameObject:
   m_ObjectHideFlags: 0
@@ -17977,6 +18116,75 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
+--- !u!1001 &2435046854028520316
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2476393925861195488, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_Time
+      value: 0.28
+      objectReference: {fileID: 0}
+    - target: {fileID: 7384281875577149491, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_Name
+      value: Trail
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 8800830645082707556, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 9197073399934713408, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_Time
+      value: 0.22
+      objectReference: {fileID: 0}
+    - target: {fileID: 9197073399934713408, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
+      propertyPath: m_Parameters.widthMultiplier
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
 --- !u!1001 &2534235755152282373
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -19681,3 +19889,4 @@ SceneRoots:
   - {fileID: 176109629}
   - {fileID: 1809271592}
   - {fileID: 2282606889254906443}
+  - {fileID: 2435046854028520316}
