@@ -99,7 +99,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6587736263089903195}
-  - component: {fileID: 2725362885038075655}
   - component: {fileID: 6249757166945711620}
   - component: {fileID: 7990415199108324068}
   - component: {fileID: 6107465575505587999}
@@ -127,6 +126,7 @@ Transform:
   - {fileID: 1458015244971175668}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+<<<<<<< HEAD
 --- !u!114 &2725362885038075655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -165,6 +165,8 @@ MonoBehaviour:
   onAttackHit:
     m_PersistentCalls:
       m_Calls: []
+=======
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
 --- !u!114 &6249757166945711620
 MonoBehaviour:
   m_ObjectHideFlags: 0

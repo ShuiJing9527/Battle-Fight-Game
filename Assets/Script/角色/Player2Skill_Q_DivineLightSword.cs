@@ -4,20 +4,32 @@ using UnityEngine;
 
 public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 {
-    [Header("Q Delay")]
+    [Header("Q - 神临光剑 / 基础")]
+    [InspectorName("Q 蓄力时间")]
     [SerializeField] private float qDelay = 0.35f;
+    [InspectorName("Q 光剑速度")]
     [SerializeField] private float qSwordSpeed = 14f;
 
-    [Header("Q Effect")]
+    [Header("Q - 神临光剑 / 视觉")]
+    [InspectorName("Q 技能特效预制体")]
     [SerializeField] private GameObject qSkillEffectPrefab;
+    [InspectorName("Q 特效尺寸")]
     [SerializeField] private Vector3 qEffectScale = new Vector3(0.25f, 0.25f, 0.25f);
+    [InspectorName("Q 特效旋转 Z")]
     [SerializeField] private float qEffectRotationZ = 0f;
+    [InspectorName("Q 特效偏移")]
     [SerializeField] private Vector3 qEffectOffset = Vector3.zero;
+    [InspectorName("Q 平面尺寸")]
     [SerializeField] private Vector3 qEffectPlaneScale = new Vector3(0.25f, 0.25f, 1f);
+    [InspectorName("Q Yaw 偏移")]
     [SerializeField] private float qEffectYawOffset = 0f;
+    [InspectorName("Q 显示 Pitch")]
     [SerializeField] private float qEffectVisualPitch = 0f;
+    [InspectorName("Q 显示 Yaw")]
     [SerializeField] private float qEffectVisualYaw = 0f;
+    [InspectorName("Q 显示 Roll")]
     [SerializeField] private float qEffectVisualRoll = 0f;
+    [InspectorName("Q 反向")]
     [SerializeField] private bool qEffectInvertForward = false;
 
     [Header("Q Motion")]

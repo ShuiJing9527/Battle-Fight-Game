@@ -4,78 +4,149 @@ using UnityEngine;
 
 public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 {
-    [Header("R Base Sword Count")]
+    [Header("R - 神眷星雨 / 基础")]
+    [InspectorName("R 初始剑数量")]
     [SerializeField] private int rBaseSwordCount = 1;
 
-    [Header("R Effect Scale")]
+    [Header("R - 神眷星雨 / 视觉")]
+    [InspectorName("R 特效尺寸")]
     [SerializeField] private Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    [InspectorName("R 特效旋转 Z")]
     [SerializeField] private float rEffectRotationZ = 0f;
+    [InspectorName("R 特效偏移")]
     [SerializeField] private Vector3 rEffectOffset = Vector3.zero;
+    [InspectorName("R 平面尺寸")]
     [SerializeField] private Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
+    [InspectorName("R Yaw 偏移")]
     [SerializeField] private float rEffectYawOffset = 0f;
+    [InspectorName("R 显示 Pitch")]
     [SerializeField] private float rEffectVisualPitch = 0f;
+    [InspectorName("R 显示 Yaw")]
     [SerializeField] private float rEffectVisualYaw = 0f;
+    [InspectorName("R 显示 Roll")]
     [SerializeField] private float rEffectVisualRoll = 0f;
 
-    [Header("R Swarm")]
+    [Header("R - 神眷星雨 / 万剑漩涡")]
+    [InspectorName("R 漩涡持续时间")]
     [SerializeField] private float rSwarmDuration = 2.0f;
+    [InspectorName("R 漩涡最小半径")]
     [SerializeField] private float rSwarmRadiusMin = 0.8f;
+    [InspectorName("R 漩涡最大半径")]
     [SerializeField] private float rSwarmRadiusMax = 3.2f;
+    [InspectorName("R 漩涡最低高度")]
     [SerializeField] private float rSwarmHeightMin = 0.4f;
+    [InspectorName("R 漩涡最高高度")]
     [SerializeField] private float rSwarmHeightMax = 3.0f;
+    [InspectorName("R 漩涡最小速度")]
     [SerializeField] private float rSwarmSpeedMin = 120f;
+    [InspectorName("R 漩涡最大速度")]
     [SerializeField] private float rSwarmSpeedMax = 300f;
+    [InspectorName("R 漩涡最小起伏幅度")]
     [SerializeField] private float rSwarmBobAmplitudeMin = 0.05f;
+    [InspectorName("R 漩涡最大起伏幅度")]
     [SerializeField] private float rSwarmBobAmplitudeMax = 0.35f;
+    [InspectorName("R 漩涡最小起伏频率")]
     [SerializeField] private float rSwarmBobFrequencyMin = 0.8f;
+    [InspectorName("R 漩涡最大起伏频率")]
     [SerializeField] private float rSwarmBobFrequencyMax = 2.5f;
+    [InspectorName("R 漩涡半径扰动")]
     [SerializeField] private float rSwarmRadiusJitter = 0.25f;
+    [InspectorName("R 顺时针")]
     [SerializeField] private bool rSwarmClockwise = true;
+    [InspectorName("R 前方偏移")]
     [SerializeField] private float rSwarmForwardOffset = 2.0f;
+    [InspectorName("R 切线 Yaw 偏移")]
     [SerializeField] private float rSwarmYawOffset = 0f;
+    [InspectorName("R 渲染相机")]
     [SerializeField] private Camera rRenderCamera;
+    [InspectorName("R 自动查找渲染相机")]
     [SerializeField] private bool rAutoResolveRenderCamera = true;
+    [InspectorName("R 使用相机前方")]
     [SerializeField] private bool rSwarmUseCameraForward = true;
+    [InspectorName("R 围绕角色中心")]
     [SerializeField] private bool rSwarmCenterOnPlayer = false;
+    [InspectorName("R 将特效偏移应用到中心")]
     [SerializeField] private bool rApplyEffectOffsetToSwarmCenter = false;
+    [InspectorName("R 使用切线朝向")]
     [SerializeField] private bool rUseTangentFacing = true;
+    [InspectorName("R 平面竖直角度")]
     [SerializeField] private Vector3 rPlaneUprightEuler = Vector3.zero;
+    [InspectorName("R 面向相机角度")]
     [SerializeField] private Vector3 rPlaneFaceCameraEuler = Vector3.zero;
+    [InspectorName("R 翻转正反面")]
     [SerializeField] private bool rFlipPlaneFrontBack = true;
+    [InspectorName("R 正反面翻转角度")]
     [SerializeField] private Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
+    [InspectorName("R 使用玩家图层")]
     [SerializeField] private bool rUsePlayerLayerForR = true;
+    [InspectorName("R 双面显示")]
     [SerializeField] private bool rForceDoubleSided = true;
+    [InspectorName("R 调试剑速度朝向")]
     [SerializeField] private bool rDebugSwordVelocityFacing = false;
+    [InspectorName("R 预测朝向时间")]
     [SerializeField] private float rFacingLookAheadTime = 0.05f;
+    [InspectorName("R 调试屏幕角度")]
     [SerializeField] private bool rDebugFacingScreenAngle = false;
+    [InspectorName("R 启用自转")]
     [SerializeField] private bool rEnableSwordSelfSpin = false;
+    [InspectorName("R 自转最小速度")]
     [SerializeField] private float rSwordSelfSpinMin = 30f;
+    [InspectorName("R 自转最大速度")]
     [SerializeField] private float rSwordSelfSpinMax = 120f;
+    [InspectorName("R 自转本地轴")]
     [SerializeField] private Vector3 rSwordLengthLocalAxis = Vector3.up;
 
-    [Header("R Swarm Damage")]
+    [Header("R - 神眷星雨 / 漩涡伤害")]
+    [InspectorName("R 漩涡伤害半径")]
     [SerializeField] private float rSwarmDamageRadius = 3.0f;
+    [InspectorName("R 漩涡伤害间隔")]
     [SerializeField] private float rSwarmDamageInterval = 0.25f;
+    [InspectorName("R 漩涡每次伤害")]
     [SerializeField] private float rSwarmDamagePerTick = 2.0f;
+    [InspectorName("R 敌人层")]
     [SerializeField] private LayerMask rSwarmEnemyLayer = ~0;
 
-    [Header("R Star Rain")]
+    [Header("R - 神眷星雨 / 星雨")]
+    [InspectorName("R 星雨开始比例")]
     [SerializeField] private float rStarRainStartRatio = 0.5f;
+    [InspectorName("R 星雨生成间隔")]
     [SerializeField] private float rStarRainInterval = 0.12f;
+    [InspectorName("R 每波星雨剑数")]
     [SerializeField] private int rStarRainBladesPerWave = 2;
+    [InspectorName("R 星雨生成高度")]
     [SerializeField] private float rStarRainSpawnHeight = 5f;
+    [InspectorName("R 星雨范围半径")]
     [SerializeField] private float rStarRainRadius = 5f;
+    [InspectorName("R 星雨下落速度")]
     [SerializeField] private float rStarRainFallSpeed = 10f;
+    [InspectorName("R 星雨随机延迟")]
     [SerializeField] private float rStarRainRandomDelay = 0.15f;
+    [InspectorName("R 星雨伤害半径")]
     [SerializeField] private float rStarRainDamageRadius = 1.2f;
+    [InspectorName("R 星雨伤害倍率")]
     [SerializeField] private float rStarRainDamageMultiplier = 0.6f;
+    [InspectorName("R 星雨延续到 Orbit 后")]
     [SerializeField] private bool rStarRainContinueAfterOrbit = true;
+    [InspectorName("R Orbit 后额外星雨时间")]
     [SerializeField] private float rStarRainExtraDurationAfterOrbit = 0.6f;
+    [InspectorName("星雨随机倾斜角度最小值")]
+    [SerializeField] private float rStarRainAngleMin = 10f;
+    [InspectorName("星雨随机倾斜角度最大值")]
+    [SerializeField] private float rStarRainAngleMax = 35f;
+    [InspectorName("星雨横向射入方向随机")]
+    [SerializeField] private bool rStarRainRandomHorizontalDirection = true;
+    [InspectorName("星雨是否朝向飞行方向")]
+    [SerializeField] private bool rStarRainFaceFallDirection = true;
+    [InspectorName("R 星雨尺寸")]
     [SerializeField] private Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    [InspectorName("R 星雨强制视觉旋转")]
     [SerializeField] private bool rStarRainUseForcedVisualRotation = true;
+    [InspectorName("R 星雨强制旋转角度")]
     [SerializeField] private Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
+    [InspectorName("R 星雨视觉偏移")]
     [SerializeField] private Vector3 rStarRainVisualEulerOffset = Vector3.zero;
 
+<<<<<<< HEAD
     [Header("R Star Rain Motion")]
     [SerializeField] private float rStarRainSpawnLateralMin = 1.8f;
     [SerializeField] private float rStarRainSpawnLateralMax = 4.8f;
@@ -86,11 +157,34 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float rStarRainFallSpeedVariance = 0.35f;
 
     [Header("R Orbit Cleanup")]
+=======
+    [Header("R - 神眷星雨 / 漩涡拖尾")]
+    [InspectorName("R 漩涡拖尾特效预制体")]
+    [SerializeField] private GameObject rOrbitTrailEffectPrefab;
+    [InspectorName("R 漩涡启用拖尾")]
+    [SerializeField] private bool rOrbitEnableTrailEffect = true;
+    [InspectorName("R 漩涡拖尾跟随世界位置")]
+    [SerializeField] private bool rOrbitTrailFollowWorldPosition = true;
+    [InspectorName("R 漩涡拖尾清除初始轨迹")]
+    [SerializeField] private bool rOrbitTrailClearOnSpawn = true;
+    [InspectorName("R 漩涡拖尾本地偏移")]
+    [SerializeField] private Vector3 rOrbitTrailLocalOffset = Vector3.zero;
+    [InspectorName("R 漩涡拖尾本地旋转")]
+    [SerializeField] private Vector3 rOrbitTrailLocalEuler = Vector3.zero;
+    [InspectorName("R 漩涡拖尾本地尺寸")]
+    [SerializeField] private Vector3 rOrbitTrailLocalScale = Vector3.one;
+
+    [Header("R - 神眷星雨 / 回收")]
+    [InspectorName("R Orbit 结束即清理")]
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
     [SerializeField] private bool rOrbitClearWhenOrbitEnds = true;
+    [InspectorName("R Orbit 淡出时间")]
     [SerializeField] private float rOrbitFadeOutDuration = 0.15f;
 
-    [Header("R Effect Prefabs")]
+    [Header("R - 神眷星雨 / 预制体")]
+    [InspectorName("R 通用特效预制体")]
     [SerializeField] private GameObject sharedSkillEffectPrefab;
+    [InspectorName("R 技能特效预制体")]
     [SerializeField] private GameObject rSkillEffectPrefab;
 
     private sealed class SkillEffectRuntime : MonoBehaviour
@@ -117,6 +211,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         public float layerOffset;
         public SkillEffectRuntime runtime;
         public Transform visualTransform;
+        public GameObject trailEffect;
+        public TrailRenderer trailRenderer;
         public Quaternion baseVisibleLocalRotation;
         public float selfSpinSpeed;
         public float selfSpinAngle;
@@ -140,7 +236,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         public Vector3 spawnPosition;
         public Vector3 targetPosition;
         public Vector3 fallDirection;
+<<<<<<< HEAD
         public Vector3 rotationEulerOffset;
+=======
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
         public float delay;
         public float fallDuration;
         public float elapsed;
@@ -286,6 +385,37 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
             Transform visualTransform = runtime != null && runtime.visual != null ? runtime.visual : null;
             Quaternion baseVisualLocalRotation = visualTransform != null ? visualTransform.localRotation : Quaternion.identity;
+            GameObject trailEffect = null;
+            TrailRenderer trailRenderer = null;
+
+            if (rOrbitEnableTrailEffect && rOrbitTrailEffectPrefab != null)
+            {
+                if (rOrbitTrailFollowWorldPosition)
+                {
+                    trailEffect = Instantiate(rOrbitTrailEffectPrefab);
+                    trailEffect.transform.position = sword.transform.TransformPoint(rOrbitTrailLocalOffset);
+                    trailEffect.transform.rotation = Quaternion.Euler(rOrbitTrailLocalEuler);
+                    trailEffect.transform.localScale = rOrbitTrailLocalScale;
+                }
+                else
+                {
+                    trailEffect = Instantiate(rOrbitTrailEffectPrefab, sword.transform);
+                    trailEffect.transform.localPosition = rOrbitTrailLocalOffset;
+                    trailEffect.transform.localRotation = Quaternion.Euler(rOrbitTrailLocalEuler);
+                    trailEffect.transform.localScale = rOrbitTrailLocalScale;
+                }
+
+                trailRenderer = trailEffect.GetComponentInChildren<TrailRenderer>(true);
+                if (trailRenderer != null)
+                {
+                    if (rOrbitTrailClearOnSpawn)
+                    {
+                        trailRenderer.Clear();
+                    }
+
+                    trailRenderer.emitting = true;
+                }
+            }
 
             activeRSwarmSwords.Add(new RSwarmSwordData
             {
@@ -300,6 +430,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 layerOffset = Random.Range(-0.25f, 0.25f),
                 runtime = runtime,
                 visualTransform = visualTransform,
+                trailEffect = trailEffect,
+                trailRenderer = trailRenderer,
                 baseVisibleLocalRotation = baseVisualLocalRotation,
                 selfSpinSpeed = 0f,
                 selfSpinAngle = 0f,
@@ -367,6 +499,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                     Vector3 currentPosition = center + offset;
                     data.sword.transform.position = currentPosition;
                     data.orbitEndPosition = currentPosition;
+                    if (data.trailEffect != null && rOrbitTrailFollowWorldPosition)
+                    {
+                        data.trailEffect.transform.position = data.sword.transform.TransformPoint(rOrbitTrailLocalOffset);
+                    }
 
                     Vector3 tangent = new Vector3(-Mathf.Sin(rad), 0f, Mathf.Cos(rad));
                     if (rSwarmClockwise)
@@ -451,6 +587,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         {
             Vector2 randomOffset2D = Random.insideUnitCircle * rainRadius;
             Vector3 target = center + new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
+<<<<<<< HEAD
             Vector2 targetJitter2D = Random.insideUnitCircle * Mathf.Max(0f, rStarRainTargetJitter);
             target += new Vector3(targetJitter2D.x, 0f, targetJitter2D.y);
 
@@ -476,6 +613,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 Random.Range(-Mathf.Abs(rStarRainYawJitter), Mathf.Abs(rStarRainYawJitter)),
                 0f);
             float bladeFallSpeed = rainFallSpeed * Random.Range(1f - Mathf.Clamp01(rStarRainFallSpeedVariance), 1f + Mathf.Clamp01(rStarRainFallSpeedVariance));
+=======
+            Vector3 fallDirection = ResolveRStarRainFallDirection(center, target);
+            Vector3 spawn = target - fallDirection * rainSpawnHeight;
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
 
             GameObject sword = CreateSkillEffectVisual(
                 $"R_StarRain_{activeRStarRainBlades.Count}",
@@ -519,9 +660,14 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 spawnPosition = spawn,
                 targetPosition = target,
                 fallDirection = fallDirection,
+<<<<<<< HEAD
                 rotationEulerOffset = rotationEulerOffset,
                 delay = Random.Range(0f, rainRandomDelay) + Random.Range(0f, rainRandomDelay * 0.6f),
                 fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / Mathf.Max(0.1f, bladeFallSpeed)),
+=======
+                delay = Random.Range(0f, rainRandomDelay),
+                fallDuration = Mathf.Max(0.05f, Vector3.Distance(spawn, target) / rainFallSpeed),
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
                 elapsed = 0f,
                 impactApplied = false
             };
@@ -571,6 +717,16 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             RSwarmSwordData data = activeRSwarmSwords[i];
             if (data != null && data.sword != null)
             {
+                if (data.trailEffect != null)
+                {
+                    if (data.trailRenderer != null)
+                    {
+                        data.trailRenderer.emitting = false;
+                    }
+                    Destroy(data.trailEffect);
+                    data.trailEffect = null;
+                    data.trailRenderer = null;
+                }
                 Destroy(data.sword);
             }
         }
@@ -591,6 +747,16 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             RSwarmSwordData data = activeRSwarmSwords[i];
             if (data != null && data.sword != null)
             {
+                if (data.trailEffect != null)
+                {
+                    if (data.trailRenderer != null)
+                    {
+                        data.trailRenderer.emitting = false;
+                    }
+                    Destroy(data.trailEffect);
+                    data.trailEffect = null;
+                    data.trailRenderer = null;
+                }
                 if (rOrbitFadeOutDuration > 0f)
                 {
                     StartCoroutine(FadeAndDestroy(data.sword, rOrbitFadeOutDuration));
@@ -1199,6 +1365,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         return frontBackFlip * BuildQuadOffsetRotation(rEffectVisualPitch, rEffectVisualYaw, rEffectVisualRoll);
     }
 
+<<<<<<< HEAD
     private Quaternion BuildRStarRainVisibleRotation(Vector3 fallDir, Vector3 randomEulerOffset)
     {
         Quaternion baseRotation = rStarRainUseForcedVisualRotation
@@ -1207,6 +1374,32 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             : BuildRStarRainDirectionRotation(fallDir) * BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
 
         return baseRotation * Quaternion.Euler(randomEulerOffset);
+=======
+    private Quaternion BuildRStarRainVisibleRotation(Vector3 fallDirection)
+    {
+        Quaternion fallFacingRotation = Quaternion.identity;
+        if (rStarRainFaceFallDirection)
+        {
+            Vector3 dir = fallDirection;
+            if (dir.sqrMagnitude < 0.0001f)
+            {
+                dir = Vector3.down;
+            }
+
+            fallFacingRotation = Quaternion.LookRotation(dir.normalized, Vector3.up);
+        }
+
+        if (rStarRainUseForcedVisualRotation)
+        {
+            return fallFacingRotation *
+                   BuildQuadOffsetRotation(rStarRainForcedVisualEuler.x, rStarRainForcedVisualEuler.y, rStarRainForcedVisualEuler.z) *
+                   BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
+        }
+
+        return fallFacingRotation *
+               BuildRVisibleBaseRotation() *
+               BuildQuadOffsetRotation(rStarRainVisualEulerOffset.x, rStarRainVisualEulerOffset.y, rStarRainVisualEulerOffset.z);
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
     }
 
     private void ApplyRStarRainVisualRotation(RStarRainBladeData data)
@@ -1216,13 +1409,18 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             return;
         }
 
+<<<<<<< HEAD
         Vector3 liveFallDirection = data.targetPosition - data.sword.transform.position;
         Vector3 fallDir = liveFallDirection.sqrMagnitude > 0.0001f ? liveFallDirection : data.fallDirection;
         Quaternion finalRotation = BuildRStarRainVisibleRotation(fallDir, data.rotationEulerOffset);
+=======
+        Quaternion finalRotation = BuildRStarRainVisibleRotation(data.fallDirection);
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
         data.sword.transform.rotation = finalRotation;
         data.visualTransform.rotation = finalRotation;
     }
 
+<<<<<<< HEAD
     private static Quaternion BuildRStarRainDirectionRotation(Vector3 fallDir)
     {
         Vector3 dir = fallDir.sqrMagnitude > 0.0001f ? fallDir.normalized : Vector3.down;
@@ -1230,6 +1428,49 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float yaw = flat.sqrMagnitude > 0.0001f ? Mathf.Atan2(flat.x, flat.z) * Mathf.Rad2Deg : 0f;
         float pitch = flat.sqrMagnitude > 0.0001f ? Mathf.Atan2(-dir.y, flat.magnitude) * Mathf.Rad2Deg : 90f;
         return Quaternion.Euler(pitch, yaw, 0f);
+=======
+    private Vector3 ResolveRStarRainFallDirection(Vector3 center, Vector3 target)
+    {
+        float angle = Random.Range(Mathf.Min(rStarRainAngleMin, rStarRainAngleMax), Mathf.Max(rStarRainAngleMin, rStarRainAngleMax));
+        float rad = angle * Mathf.Deg2Rad;
+
+        Vector3 horizontalDir;
+        if (rStarRainRandomHorizontalDirection)
+        {
+            Vector2 randomCircle = Random.insideUnitCircle;
+            if (randomCircle.sqrMagnitude < 0.0001f)
+            {
+                randomCircle = Vector2.right;
+            }
+
+            randomCircle.Normalize();
+            horizontalDir = new Vector3(randomCircle.x, 0f, randomCircle.y);
+        }
+        else
+        {
+            horizontalDir = target - center;
+            horizontalDir.y = 0f;
+            if (horizontalDir.sqrMagnitude < 0.0001f)
+            {
+                horizontalDir = Vector3.forward;
+            }
+
+            horizontalDir.Normalize();
+        }
+
+        if (Random.value < 0.5f)
+        {
+            horizontalDir = -horizontalDir;
+        }
+
+        Vector3 fallDirection = (Vector3.down * Mathf.Cos(rad) + horizontalDir * Mathf.Sin(rad)).normalized;
+        if (fallDirection.sqrMagnitude < 0.0001f)
+        {
+            fallDirection = Vector3.down;
+        }
+
+        return fallDirection;
+>>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
     }
 
     private void SyncLegacyOwnerValuesIfNeeded()

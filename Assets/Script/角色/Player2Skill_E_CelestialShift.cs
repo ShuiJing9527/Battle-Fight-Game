@@ -4,56 +4,57 @@ using UnityEngine;
 
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
-    [Header("E - Celestial Shift / Basic")]
+    [Header("E - 天轨换位 / 基础")]
     [SerializeField] private float eRailDuration = 0.6f;
 
-    [Header("E - Celestial Shift / Sprite Afterimage")]
-    [InspectorName("E Enable Afterimage Shader")]
+    [Header("E - 天轨换位 / 残影")]
+    [InspectorName("E 启用残影")]
     [SerializeField] private bool eEnableAfterimageShader = true;
+    [InspectorName("E 残影来源 SpriteRenderer")]
     [SerializeField] private SpriteRenderer eAfterimageSourceSpriteRenderer;
-    [InspectorName("E Afterimage Count")]
+    [InspectorName("E 残影数量")]
     [SerializeField] private int eAfterimageCount = 12;
-    [InspectorName("E Afterimage Duration")]
+    [InspectorName("E 残影持续时间")]
     [SerializeField] private float eAfterimageDuration = 0.45f;
-    [InspectorName("E Afterimage Alpha")]
+    [InspectorName("E 残影透明度")]
     [SerializeField] private float eAfterimageAlpha = 0.35f;
-    [InspectorName("E Afterimage Spawn Interval")]
+    [InspectorName("E 残影生成间隔")]
     [SerializeField] private float eAfterimageSpawnInterval = 0.03f;
-    [InspectorName("E Afterimage Scale")]
+    [InspectorName("E 残影缩放")]
     [SerializeField] private Vector3 eAfterimageScale = Vector3.one;
-    [InspectorName("E Afterimage Tint")]
+    [InspectorName("E 残影染色")]
     [SerializeField] private Color eAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.45f);
-    [InspectorName("E Afterimage Sorting Order Offset")]
+    [InspectorName("E 残影 SortingOrder 偏移")]
     [SerializeField] private int eAfterimageSortingOrderOffset = 5;
-    [InspectorName("E Afterimage Debug Log")]
+    [InspectorName("E 残影调试日志")]
     [SerializeField] private bool eAfterimageDebugLog = false;
-    [InspectorName("E Afterimage Use Rainbow")]
+    [InspectorName("E 残影使用彩虹")]
     [SerializeField] private bool eAfterimageUseRainbow = true;
-    [InspectorName("E Afterimage Invert Color Order")]
+    [InspectorName("E 残影反转颜色顺序")]
     [SerializeField] private bool eAfterimageInvertColorOrder = true;
-    [InspectorName("E Afterimage Fade By Age Index")]
+    [InspectorName("E 残影按序号淡化")]
     [SerializeField] private bool eAfterimageFadeByAgeIndex = true;
-    [InspectorName("E Afterimage Oldest Alpha Multiplier")]
+    [InspectorName("E 最旧残影透明度倍率")]
     [SerializeField] private float eAfterimageOldestAlphaMultiplier = 0.25f;
-    [InspectorName("E Afterimage Fade By Distance To End")]
+    [InspectorName("E 残影按终点距离淡化")]
     [SerializeField] private bool eAfterimageFadeByDistanceToEnd = true;
-    [InspectorName("E Afterimage Far Alpha Multiplier")]
+    [InspectorName("E 远处残影透明度倍率")]
     [SerializeField] private float eAfterimageFarAlphaMultiplier = 0.12f;
-    [InspectorName("E Afterimage Rainbow Hue Speed")]
+    [InspectorName("E 彩虹色相速度")]
     [SerializeField] private float eAfterimageRainbowHueSpeed = 0.04f;
-    [InspectorName("E Afterimage Rainbow Saturation")]
+    [InspectorName("E 彩虹饱和度")]
     [SerializeField] private float eAfterimageRainbowSaturation = 0.45f;
-    [InspectorName("E Afterimage Rainbow Value")]
+    [InspectorName("E 彩虹亮度")]
     [SerializeField] private float eAfterimageRainbowValue = 1f;
-    [InspectorName("E Afterimage Use Distance Sampling")]
+    [InspectorName("E 残影使用距离采样")]
     [SerializeField] private bool eAfterimageUseDistanceSampling = true;
-    [InspectorName("E Afterimage Use Actual Move Direction")]
+    [InspectorName("E 残影使用真实移动方向")]
     [SerializeField] private bool eAfterimageUseActualMoveDirection = true;
-    [InspectorName("E Afterimage Invert Move Direction")]
+    [InspectorName("E 残影反转移动方向")]
     [SerializeField] private bool eAfterimageInvertMoveDirection = false;
-    [InspectorName("E Afterimage Spacing")]
+    [InspectorName("E 残影间距")]
     [SerializeField] private float eAfterimageSpacing = 0.06f;
-    [InspectorName("E Afterimage Max Per Dash")]
+    [InspectorName("E 每次位移最大残影数")]
     [SerializeField] private int eAfterimageMaxPerDash = 24;
 
     private bool isDashing;

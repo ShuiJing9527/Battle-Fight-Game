@@ -4,41 +4,63 @@ using UnityEngine;
 
 public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 {
-    [Header("W Duration")]
+    [Header("W - 圣轮偏转 / 基础")]
+    [InspectorName("W 持续时间")]
     [SerializeField] private float wDuration = 1.5f;
+    [InspectorName("W 基础减伤")]
     [SerializeField] private float wDamageReduction = 0.4f;
 
-    [Header("W Damage Reduction Per Sword")]
+    [Header("W - 圣轮偏转 / 防御加成")]
+    [InspectorName("W 每把剑减伤加成")]
     [SerializeField] private float wDamageReductionPerSword = 0.03f;
+    [InspectorName("W 最大减伤")]
     [SerializeField] private float wMaxDamageReduction = 0.8f;
+    [InspectorName("W 反击伤害比例")]
     [SerializeField] private float wCounterDamageRatio = 0.5f;
 
-    [Header("W Effect Scale")]
+    [Header("W - 圣轮偏转 / 视觉")]
+    [InspectorName("W 特效尺寸")]
     [SerializeField] private Vector3 wEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
 
-    [Header("W Effect Scale Multiplier")]
+    [InspectorName("W 尺寸倍率")]
     [SerializeField] private float wEffectScaleMultiplier = 1f;
 
-    [Header("Base W Sword Count")]
+    [Header("W - 圣轮偏转 / 剑阵")]
+    [InspectorName("W 初始剑数量")]
     [SerializeField] private int baseWSwordCount = 3;
+    [InspectorName("W 使用剑气值")]
     [SerializeField] private bool useSwordEnergyForW = true;
+    [InspectorName("W 最大剑数量")]
     [SerializeField] private int maxWSwordCount = 15;
+    [InspectorName("W 环绕半径")]
     [SerializeField] private float wEffectOrbitRadius = 1.2f;
+    [InspectorName("W 高度")]
     [SerializeField] private float wEffectHeight = 1.1f;
+    [InspectorName("W 环绕速度")]
     [SerializeField] private float wEffectOrbitSpeed = 80f;
+    [InspectorName("W 圆周切线 Yaw 偏移")]
     [SerializeField] private float wSwordOrbitYawOffset = 90f;
 
-    [Header("W Duration Per Sword Energy")]
+    [Header("W - 圣轮偏转 / 剑气加成")]
+    [InspectorName("W 每点剑气增加持续时间")]
     [SerializeField] private float wDurationPerSwordEnergy = 0f;
+    [InspectorName("W 最大持续时间加成")]
     [SerializeField] private float wMaxDurationBonus = 0f;
+    [InspectorName("W 每点剑气增加环绕速度")]
     [SerializeField] private float wOrbitSpeedPerSwordEnergy = 0f;
+    [InspectorName("W 最大环绕速度加成")]
     [SerializeField] private float wMaxOrbitSpeedBonus = 0f;
+    [InspectorName("W 每点剑气增加半径")]
     [SerializeField] private float wRadiusPerSwordEnergy = 0f;
+    [InspectorName("W 最大半径加成")]
     [SerializeField] private float wMaxRadiusBonus = 0f;
 
-    [Header("W Effect Prefabs")]
+    [Header("W - 圣轮偏转 / 预制体")]
+    [InspectorName("W 通用特效预制体")]
     [SerializeField] private GameObject sharedSkillEffectPrefab;
+    [InspectorName("W 专属特效预制体")]
     [SerializeField] private GameObject wSkillEffectPrefab;
+    [InspectorName("W 待机特效预制体")]
     [SerializeField] private GameObject standbySkillEffectPrefab;
 
     private bool isShielding;
