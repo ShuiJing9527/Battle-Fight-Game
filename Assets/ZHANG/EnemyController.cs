@@ -19,7 +19,6 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float attackDamage = 3f;
 
     private Rigidbody rb;
-<<<<<<< HEAD
     private Player2Bootstrap playerBootstrap;
     private SlimeAnimationController slimeAnimation;
     private Quaternion initialRotation;
@@ -28,19 +27,6 @@ public class EnemyController : MonoBehaviour
     private bool attackInProgress;
 
     private void Start()
-=======
-    private Transform Player;
-    private bool isChasing;
-    private CombatHealth playerHealth;
-
-    private float moveSpeed = 1f;
-
-    private float attackRange = 1f;
-    private float attackCooldown = 1f;
-    private float nextAttackTime = 0f;
-
-    void Start()
->>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
     {
         rb = GetComponent<Rigidbody>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
@@ -49,7 +35,6 @@ public class EnemyController : MonoBehaviour
 
         if (slimeAnimation != null)
         {
-<<<<<<< HEAD
             slimeAnimation.OnAttackHit += HandleAttackHit;
         }
     }
@@ -133,10 +118,6 @@ public class EnemyController : MonoBehaviour
             slimeAnimation.PlayAttack(pendingAttackTarget);
             CancelInvoke(nameof(FinishAttackRecovery));
             Invoke(nameof(FinishAttackRecovery), 0.7f);
-=======
-            Player = playerObject.transform;
-            playerHealth = playerObject.GetComponent<CombatHealth>();
->>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
         }
         else
         {
@@ -147,7 +128,6 @@ public class EnemyController : MonoBehaviour
 
     private void FinishAttackRecovery()
     {
-<<<<<<< HEAD
         attackInProgress = false;
         pendingAttackTarget = null;
     }
@@ -226,45 +206,3 @@ public class EnemyController : MonoBehaviour
         }
     }
 }
-=======
-        if (isChasing && Player != null)
-        {
-            Vector3 direction = (Player.position - transform.position).normalized;
-            rb.linearVelocity = direction * moveSpeed;
-
-            float distanceToPlayer = Vector3.Distance(transform.position, Player.position);
-            if (distanceToPlayer <= attackRange && Time.time >= nextAttackTime)
-            {
-                enemyAttack();
-                nextAttackTime = Time.time + attackCooldown;
-            }
-        }
-        else
-        {
-            isChasing = false;
-            rb.linearVelocity = Vector3.zero;
-        }
-    }
-    void enemyAttack()
-    {
-        playerHealth.TakeDamage(1);
-    }
-
-    //chase range
-    private void OnTriggerEnter(Collider collision)
-    {
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            isChasing = true;   
-        }
-    }
-    private void OnTriggerExit(Collider collision)
-    {
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            isChasing = false;   
-            rb.linearVelocity = Vector3.zero;
-        }
-    }
-}
->>>>>>> 5e39f29b2b0f9d828bf63fb9bb31e264d53dd8d6
