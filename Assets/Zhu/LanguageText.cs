@@ -3,7 +3,13 @@ using TMPro;
 
 public class LanguageText : MonoBehaviour
 {
+    [Tooltip("对应GameManager里AddText的标识")]
     public string key;
+    [Tooltip("手动拖入这个文字专用的TMP字体asset")]
+    public TMP_FontAsset customFontCN;
+    public TMP_FontAsset customFontEN;
+    public TMP_FontAsset customFontJP;
+
     private TextMeshProUGUI tmp;
 
     void Awake()
@@ -13,15 +19,40 @@ public class LanguageText : MonoBehaviour
 
     void OnEnable()
     {
-        TryRefresh();
+        RefreshContentAndFont();
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnLanguageChanged += RefreshContentAndFont;
+        }
     }
 
-    void TryRefresh()
+    void OnDisable()
     {
-        // 👇 超强防御：key为空 直接跳过，绝不报错！
-        if (GameManager.Instance == null || tmp == null || string.IsNullOrEmpty(key))
-            return;
+        if (GameManager.Instance != null)
+        {
+            GameManager.Instance.OnLanguageChanged -= RefreshContentAndFont;
+        }
+    }
 
+    void RefreshContentAndFont()
+    {
+        if (tmp == null || GameManager.Instance == null || string.IsNullOrEmpty(key)) return;
+
+        string nowLang = GameManager.Instance.settings.language;
+        // 切换对应语种字体
+        switch (nowLang)
+        {
+            case "zh":
+                if (customFontCN != null) tmp.font = customFontCN;
+                break;
+            case "en":
+                if (customFontEN != null) tmp.font = customFontEN;
+                break;
+            case "ja":
+                if (customFontJP != null) tmp.font = customFontJP;
+                break;
+        }
+        // 切换文字内容
         tmp.text = GameManager.Instance.GetText(key);
     }
 }
