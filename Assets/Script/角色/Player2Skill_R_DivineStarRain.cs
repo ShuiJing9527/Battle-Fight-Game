@@ -107,42 +107,61 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private LayerMask rSwarmEnemyLayer = ~0;
 
     [Header("R - 神眷星雨 / 星雨")]
+    [HideInInspector]
     [InspectorName("R 星雨开始比例")]
     [SerializeField] private float rStarRainStartRatio = 0.5f;
+    [HideInInspector]
     [InspectorName("R 星雨生成间隔")]
     [SerializeField] private float rStarRainInterval = 0.12f;
+    [HideInInspector]
     [InspectorName("R 每波星雨剑数")]
     [SerializeField] private int rStarRainBladesPerWave = 2;
+    [HideInInspector]
     [InspectorName("R 星雨生成高度")]
     [SerializeField] private float rStarRainSpawnHeight = 5f;
+    [HideInInspector]
     [InspectorName("R 星雨范围半径")]
     [SerializeField] private float rStarRainRadius = 5f;
+    [HideInInspector]
     [InspectorName("R 星雨下落速度")]
     [SerializeField] private float rStarRainFallSpeed = 10f;
+    [HideInInspector]
     [InspectorName("R 星雨随机延迟")]
     [SerializeField] private float rStarRainRandomDelay = 0.15f;
+    [HideInInspector]
     [InspectorName("R 星雨伤害半径")]
     [SerializeField] private float rStarRainDamageRadius = 1.2f;
+    [HideInInspector]
     [InspectorName("R 星雨伤害倍率")]
     [SerializeField] private float rStarRainDamageMultiplier = 0.6f;
+    [HideInInspector]
     [InspectorName("R 星雨延续到 Orbit 后")]
     [SerializeField] private bool rStarRainContinueAfterOrbit = true;
+    [HideInInspector]
     [InspectorName("R Orbit 后额外星雨时间")]
     [SerializeField] private float rStarRainExtraDurationAfterOrbit = 0.6f;
+    [HideInInspector]
     [InspectorName("星雨随机倾斜角度最小值")]
     [SerializeField] private float rStarRainAngleMin = 10f;
+    [HideInInspector]
     [InspectorName("星雨随机倾斜角度最大值")]
     [SerializeField] private float rStarRainAngleMax = 35f;
+    [HideInInspector]
     [InspectorName("星雨横向射入方向随机")]
     [SerializeField] private bool rStarRainRandomHorizontalDirection = true;
+    [HideInInspector]
     [InspectorName("星雨是否朝向飞行方向")]
     [SerializeField] private bool rStarRainFaceFallDirection = true;
+    [HideInInspector]
     [InspectorName("R 星雨尺寸")]
     [SerializeField] private Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    [HideInInspector]
     [InspectorName("R 星雨强制视觉旋转")]
     [SerializeField] private bool rStarRainUseForcedVisualRotation = true;
+    [HideInInspector]
     [InspectorName("R 星雨强制旋转角度")]
     [SerializeField] private Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
+    [HideInInspector]
     [InspectorName("R 星雨视觉偏移")]
     [SerializeField] private Vector3 rStarRainVisualEulerOffset = Vector3.zero;
 
@@ -440,18 +459,9 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float damageTickTimer = 0f;
         float orbitDuration = Mathf.Max(0.05f, rSwarmDuration);
         float safeDamageInterval = Mathf.Max(0.05f, rSwarmDamageInterval);
-        float rainStartTime = Mathf.Clamp01(rStarRainStartRatio) * orbitDuration;
-        float rainSpawnEndTime = orbitDuration;
-        if (rStarRainContinueAfterOrbit)
-        {
-            rainSpawnEndTime += Mathf.Max(0f, rStarRainExtraDurationAfterOrbit);
-        }
-        float rainSpawnInterval = Mathf.Max(0.01f, rStarRainInterval);
-        float rainSpawnAccumulator = 0f;
-        float totalElapsed = 0f;
         bool orbitCleared = false;
 
-        while (totalElapsed < rainSpawnEndTime || HasAliveRStarRainBlades())
+        while (orbitElapsed < orbitDuration)
         {
             center = ResolveRSwarmCenter();
             if (!orbitCleared && swarmRoot != null)
@@ -516,25 +526,6 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 {
                     CleanupRSwarmOrbitVisuals();
                 }
-            }
-
-            if (totalElapsed >= rainStartTime && totalElapsed <= rainSpawnEndTime)
-            {
-                rainSpawnAccumulator += Time.deltaTime;
-                while (rainSpawnAccumulator >= rainSpawnInterval)
-                {
-                    SpawnRStarRainWave(center);
-                    rainSpawnAccumulator -= rainSpawnInterval;
-                }
-            }
-
-            UpdateRStarRainBlades(Time.deltaTime);
-
-            totalElapsed += Time.deltaTime;
-
-            if (totalElapsed >= rainSpawnEndTime && !HasAliveRStarRainBlades())
-            {
-                break;
             }
 
             yield return null;

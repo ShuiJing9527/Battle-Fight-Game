@@ -19,6 +19,28 @@ public class Player2PrototypeController : MonoBehaviour
     [SerializeField] private bool lockCharacterRotation = true;
 
     [HideInInspector]
+    [SerializeField] private Transform visualRoot;
+    [HideInInspector]
+    [SerializeField] private float visualFloatHeight = 0.6f;
+    [HideInInspector]
+    [SerializeField] private bool keepColliderOnGround = true;
+    [HideInInspector]
+    [SerializeField] private Transform groundAnchor;
+    [HideInInspector]
+    [SerializeField] private Transform footAnchor;
+
+    [HideInInspector]
+    [SerializeField] private bool enableSpawnUnstuck = false;
+    [HideInInspector]
+    [SerializeField] private float spawnUnstuckDelay = 0.1f;
+    [HideInInspector]
+    [SerializeField] private float spawnUnstuckSearchStep = 0.5f;
+    [HideInInspector]
+    [SerializeField] private int spawnUnstuckSearchRings = 5;
+    [HideInInspector]
+    [SerializeField] private LayerMask spawnBlockerLayers = ~0;
+
+    [HideInInspector]
     [Header("Q Delay")]
     public float qDelay = 0.35f;
     [HideInInspector]
@@ -526,6 +548,10 @@ public class Player2PrototypeController : MonoBehaviour
     private readonly List<EStarFallBladeData> activeEStarFallBlades = new List<EStarFallBladeData>();
 
     private Quaternion initialRotation;
+    private Transform cachedVisualRoot;
+    private Vector3 cachedVisualRootBaseLocalPosition;
+    private bool cachedVisualRootBaseLocalPositionReady;
+    private Coroutine spawnUnstuckRoutine;
 
     public bool HasActiveRuntimeSkill
     {
@@ -578,7 +604,6 @@ public class Player2PrototypeController : MonoBehaviour
         initialRotation = transform.rotation;
         InitializeSkillSlots();
         InitializeEStarTrailDefaults();
-
         if (rb == null)
         {
             rb = GetComponent<Rigidbody>();
@@ -714,6 +739,248 @@ public class Player2PrototypeController : MonoBehaviour
         rSkill?.Initialize(this);
     }
 
+    private void ResolveVisualFloatTargets()
+    {
+        if (visualRoot == null)
+        {
+            SpriteRenderer spriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
+            if (spriteRenderer != null)
+            {
+                visualRoot = spriteRenderer.transform;
+            }
+            else
+            {
+                Renderer renderer = GetComponentInChildren<Renderer>(true);
+                if (renderer != null)
+                {
+                    visualRoot = renderer.transform;
+                }
+            }
+        }
+
+        if (groundAnchor == null)
+        {
+            groundAnchor = transform;
+        }
+
+        if (footAnchor == null)
+        {
+            footAnchor = visualRoot != null ? visualRoot : transform;
+        }
+
+        if (visualRoot != null && (!cachedVisualRootBaseLocalPositionReady || cachedVisualRoot != visualRoot))
+        {
+            cachedVisualRoot = visualRoot;
+            cachedVisualRootBaseLocalPosition = visualRoot.localPosition;
+            cachedVisualRootBaseLocalPositionReady = true;
+        }
+    }
+
+    private void ApplyVisualFloatOffset()
+    {
+        ResolveVisualFloatTargets();
+
+        if (visualRoot == null || !cachedVisualRootBaseLocalPositionReady)
+        {
+            return;
+        }
+
+        if (cachedVisualRoot != visualRoot)
+        {
+            cachedVisualRoot = visualRoot;
+            cachedVisualRootBaseLocalPosition = visualRoot.localPosition;
+            cachedVisualRootBaseLocalPositionReady = true;
+        }
+
+        Vector3 floatOffset = Vector3.up * Mathf.Max(0f, visualFloatHeight);
+        visualRoot.localPosition = cachedVisualRootBaseLocalPosition + floatOffset;
+    }
+
+    private IEnumerator SpawnUnstuckRoutine()
+    {
+        float delay = Mathf.Max(0f, spawnUnstuckDelay);
+        if (delay > 0f)
+        {
+            yield return new WaitForSeconds(delay);
+        }
+        else
+        {
+            yield return null;
+        }
+
+        spawnUnstuckRoutine = null;
+
+        if (!enableSpawnUnstuck || !keepColliderOnGround)
+        {
+            yield break;
+        }
+
+        Vector3 originalPosition = transform.position;
+        Vector3 safePosition = ResolveSafeGroundPosition(originalPosition);
+        if ((safePosition - originalPosition).sqrMagnitude > 0.0001f)
+        {
+            MoveRootToGroundPosition(safePosition);
+            Debug.Log($"Player spawn unstuck: moved from {originalPosition} to {safePosition}", this);
+        }
+    }
+
+    public Vector3 ResolveSafeGroundPosition(Vector3 desiredPosition)
+    {
+        if (!enableSpawnUnstuck || !keepColliderOnGround)
+        {
+            return desiredPosition;
+        }
+
+        if (!IsSpawnPositionBlocked(desiredPosition))
+        {
+            return desiredPosition;
+        }
+
+        float step = Mathf.Max(0.05f, spawnUnstuckSearchStep);
+        int rings = Mathf.Max(1, spawnUnstuckSearchRings);
+
+        Vector3 forward = ResolveFacingDirection();
+        forward.y = 0f;
+        if (forward.sqrMagnitude < 0.0001f)
+        {
+            forward = Vector3.forward;
+        }
+        forward.Normalize();
+
+        Vector3 right = Vector3.Cross(Vector3.up, forward);
+        right.y = 0f;
+        if (right.sqrMagnitude < 0.0001f)
+        {
+            right = Vector3.right;
+        }
+        right.Normalize();
+
+        Vector3[] directions = new Vector3[]
+        {
+            forward,
+            -forward,
+            right,
+            -right,
+            (forward + right).normalized,
+            (forward - right).normalized,
+            (-forward + right).normalized,
+            (-forward - right).normalized
+        };
+
+        for (int ring = 1; ring <= rings; ring++)
+        {
+            float radius = step * ring;
+            for (int i = 0; i < directions.Length; i++)
+            {
+                Vector3 candidate = desiredPosition + directions[i] * radius;
+                candidate.y = desiredPosition.y;
+                if (!IsSpawnPositionBlocked(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        return desiredPosition;
+    }
+
+    private bool IsSpawnPositionBlocked(Vector3 candidatePosition)
+    {
+        if (!TryGetOwnColliderBounds(candidatePosition, out Bounds combinedBounds))
+        {
+            return false;
+        }
+
+        Vector3 halfExtents = combinedBounds.extents;
+        halfExtents.x = Mathf.Max(0.05f, halfExtents.x * 0.95f);
+        halfExtents.y = Mathf.Max(0.05f, halfExtents.y * 0.95f);
+        halfExtents.z = Mathf.Max(0.05f, halfExtents.z * 0.95f);
+
+        Collider[] hits = Physics.OverlapBox(
+            combinedBounds.center,
+            halfExtents,
+            transform.rotation,
+            spawnBlockerLayers,
+            QueryTriggerInteraction.Ignore);
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+            if (hit == null || IsOwnCollider(hit))
+            {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private bool TryGetOwnColliderBounds(Vector3 candidatePosition, out Bounds bounds)
+    {
+        Collider[] colliders = GetComponentsInChildren<Collider>(true);
+        bool found = false;
+        Vector3 delta = candidatePosition - transform.position;
+        Bounds combined = new Bounds();
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null || !collider.enabled || collider.isTrigger || !IsOwnCollider(collider))
+            {
+                continue;
+            }
+
+            Bounds colliderBounds = collider.bounds;
+            colliderBounds.center += delta;
+
+            if (!found)
+            {
+                combined = colliderBounds;
+                found = true;
+            }
+            else
+            {
+                combined.Encapsulate(colliderBounds);
+            }
+        }
+
+        if (!found)
+        {
+            bounds = new Bounds(candidatePosition, new Vector3(0.5f, 1f, 0.5f));
+            return false;
+        }
+
+        bounds = combined;
+        return true;
+    }
+
+    private bool IsOwnCollider(Collider collider)
+    {
+        if (collider == null)
+        {
+            return false;
+        }
+
+        Transform current = collider.transform;
+        return current == transform || current.IsChildOf(transform);
+    }
+
+    private void MoveRootToGroundPosition(Vector3 worldPosition)
+    {
+        if (rb != null)
+        {
+            rb.position = worldPosition;
+            rb.linearVelocity = Vector3.zero;
+            rb.angularVelocity = Vector3.zero;
+            rb.WakeUp();
+        }
+
+        transform.position = worldPosition;
+        Physics.SyncTransforms();
+    }
+
     public Rigidbody Body => rb;
 
     public Vector3 FacingDirection => ResolveFacingDirection();
@@ -721,6 +988,8 @@ public class Player2PrototypeController : MonoBehaviour
     public int CurrentDivineMark => currentSwordEnergy;
     public Camera GetRenderCamera() => ResolveRRenderCamera();
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
+    public Transform GroundAnchor => groundAnchor != null ? groundAnchor : transform;
+    public Transform FootAnchor => footAnchor != null ? footAnchor : (visualRoot != null ? visualRoot : transform);
 
     public float LegacyERailDuration => eRailDuration;
     public bool LegacyEEnableAfterimageShader => eEnableAfterimageShader;

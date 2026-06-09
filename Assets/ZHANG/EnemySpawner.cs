@@ -58,9 +58,9 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        Vector3 spawnPosition = ResolveSpawnPosition();
         int randomIndex = Random.Range(0, enemyPrefabs.Length);
         GameObject selectedEnemy = enemyPrefabs[randomIndex];
+        Vector3 spawnPosition = ResolveSpawnPosition(selectedEnemy);
         GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
 
         currentEnemyCount++;
@@ -79,7 +79,7 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private Vector3 ResolveSpawnPosition()
+    private Vector3 ResolveSpawnPosition(GameObject selectedEnemyPrefab)
     {
         Transform activePlayer = ResolveActivePlayerTarget();
         if (spawnAroundPlayer && activePlayer != null)
@@ -93,7 +93,10 @@ public class EnemySpawner : MonoBehaviour
             }
 
             Vector3 spawnPosition = activePlayer.position + new Vector3(offset2D.x, 0f, offset2D.y);
-            spawnPosition.y = transform.position.y;
+            if (selectedEnemyPrefab != null)
+            {
+                spawnPosition.y = selectedEnemyPrefab.transform.position.y;
+            }
             return spawnPosition;
         }
 
