@@ -276,6 +276,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         Cleanup();
         CastInternal();
+        Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
     }
 
     public override void Cleanup()
@@ -305,13 +306,13 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         Cleanup();
     }
 
-    private void CastInternal()
+    private bool CastInternal()
     {
         int energyForR = Mathf.Max(0, Owner != null ? Owner.currentSwordEnergy : 0);
         int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
         if (count <= 0)
         {
-            return;
+            return false;
         }
 
         Camera renderCamera = ResolveRRenderCamera();
@@ -323,6 +324,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+        return true;
     }
 
     private IEnumerator RSwarmRoutine(int count)

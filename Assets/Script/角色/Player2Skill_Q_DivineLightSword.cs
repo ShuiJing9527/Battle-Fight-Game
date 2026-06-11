@@ -150,6 +150,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
         Owner.currentSwordEnergy += 1;
         qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab));
+        Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
     }
 
     public override void Cleanup()

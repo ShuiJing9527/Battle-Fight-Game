@@ -99,6 +99,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         Cleanup();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
+        Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
     }
 
     public override void Cleanup()

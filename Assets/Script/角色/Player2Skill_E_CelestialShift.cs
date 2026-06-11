@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-
+using Spine.Unity;
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
     [Header("E - 天轨换位 / 基础")]
@@ -11,7 +11,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [InspectorName("E 启用残影")]
     [SerializeField] private bool eEnableAfterimageShader = true;
     [InspectorName("E 残影来源 SpriteRenderer")]
-    [SerializeField] private SpriteRenderer eAfterimageSourceSpriteRenderer;
+    [SerializeField] private SpriteRenderer eAfterimageSourceRenderer;
+    [InspectorName("E 残影材质")]
+    [SerializeField] private Material eAfterimageMaterial;
     [InspectorName("E 残影数量")]
     [SerializeField] private int eAfterimageCount = 12;
     [InspectorName("E 残影持续时间")]
@@ -52,6 +54,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [SerializeField] private bool eAfterimageUseActualMoveDirection = true;
     [InspectorName("E 残影反转移动方向")]
     [SerializeField] private bool eAfterimageInvertMoveDirection = false;
+    [InspectorName("E 残影反转翻转")]
+    [SerializeField] private bool eAfterimageInvertFlip = false;
     [InspectorName("E 残影间距")]
     [SerializeField] private float eAfterimageSpacing = 0.06f;
     [InspectorName("E 每次位移最大残影数")]
@@ -74,6 +78,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         StartCoroutine(DashRoutine());
+        Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
     }
 
     public override void Cleanup()
@@ -116,6 +121,11 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
         Vector3 dashStartPos = Owner != null ? Owner.transform.position : transform.position;
         Vector3 dashEndPos = dashStartPos + dir * dashDistance;
+        bool afterimageFlipX = GetCurrentSpineFacingFlipX();
+        if (eAfterimageInvertFlip)
+        {
+            afterimageFlipX = !afterimageFlipX;
+        }
 
         int spawnedAfterimages = 0;
         Vector3 lastAfterimagePos = dashStartPos;
@@ -168,7 +178,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
                         Debug.Log($"E Afterimage index={spawnedAfterimages}, invert={eAfterimageInvertMoveDirection}, from={from}, to={to}, pos={spawnPos}", this);
                     }
 
-                    TrySpawnEAfterimage(spawnPos, dashStartPos, dashEndPos, ref spawnedAfterimages);
+                    TrySpawnEAfterimage(spawnPos, dashStartPos, dashEndPos, afterimageFlipX, ref spawnedAfterimages);
                     afterimageDistanceAccumulator -= spacing;
                 }
 
@@ -191,7 +201,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         isDashing = false;
     }
 
-    private bool TrySpawnEAfterimage(Vector3 position, Vector3 dashStartPos, Vector3 dashEndPos, ref int spawnedCount)
+    private bool TrySpawnEAfterimage(Vector3 position, Vector3 dashStartPos, Vector3 dashEndPos, bool afterimageFlipX, ref int spawnedCount)
     {
         if (!eEnableAfterimageShader)
         {
@@ -204,7 +214,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             return false;
         }
 
-        SpriteRenderer sourceSprite = ResolveEAfterimageSourceSpriteRenderer();
+        SpriteRenderer sourceSprite = ResolveEAfterimageSourceRenderer();
         if (sourceSprite == null || sourceSprite.sprite == null)
         {
             if (eAfterimageDebugLog)
@@ -215,7 +225,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             return false;
         }
 
-        GameObject afterimage = SpawnEAfterimageGhost(sourceSprite, position, dashStartPos, dashEndPos, spawnedCount);
+        GameObject afterimage = SpawnEAfterimageGhost(sourceSprite, position, dashStartPos, dashEndPos, afterimageFlipX, spawnedCount);
         if (afterimage == null)
         {
             return false;
@@ -225,11 +235,11 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         return true;
     }
 
-    private SpriteRenderer ResolveEAfterimageSourceSpriteRenderer()
+    private SpriteRenderer ResolveEAfterimageSourceRenderer()
     {
-        if (eAfterimageSourceSpriteRenderer != null && eAfterimageSourceSpriteRenderer.sprite != null)
+        if (eAfterimageSourceRenderer != null && eAfterimageSourceRenderer.sprite != null)
         {
-            return eAfterimageSourceSpriteRenderer;
+            return eAfterimageSourceRenderer;
         }
 
         if (Owner != null)
@@ -262,7 +272,23 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         return null;
     }
 
-    private GameObject SpawnEAfterimageGhost(SpriteRenderer sourceSprite, Vector3 worldPosition, Vector3 dashStartPos, Vector3 dashEndPos, int spawnedIndex)
+    private bool GetCurrentSpineFacingFlipX()
+    {
+        SkeletonAnimation spineAnimation = Owner != null ? Owner.GetSpineAnimation() : null;
+        if (spineAnimation == null)
+        {
+            spineAnimation = GetComponentInChildren<SkeletonAnimation>(true);
+        }
+
+        if (spineAnimation != null && spineAnimation.Skeleton != null)
+        {
+            return spineAnimation.Skeleton.ScaleX < 0f;
+        }
+
+        return false;
+    }
+
+    private GameObject SpawnEAfterimageGhost(SpriteRenderer sourceSprite, Vector3 worldPosition, Vector3 dashStartPos, Vector3 dashEndPos, bool afterimageFlipX, int spawnedIndex)
     {
         if (sourceSprite == null || sourceSprite.sprite == null)
         {
@@ -272,7 +298,11 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         GameObject ghost = new GameObject("E_Afterimage_Ghost");
         SpriteRenderer ghostSprite = ghost.AddComponent<SpriteRenderer>();
         ghostSprite.sprite = sourceSprite.sprite;
-        ghostSprite.flipX = sourceSprite.flipX;
+        if (eAfterimageMaterial != null)
+        {
+            ghostSprite.material = new Material(eAfterimageMaterial);
+        }
+        ghostSprite.flipX = afterimageFlipX;
         ghostSprite.flipY = sourceSprite.flipY;
         ghostSprite.drawMode = sourceSprite.drawMode;
         ghostSprite.size = sourceSprite.size;
@@ -299,6 +329,14 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             c = eAfterimageTint;
         }
 
+        c *= sourceSprite.color;
+
+        int visibleCount = Mathf.Max(1, Mathf.Min(eAfterimageMaxPerDash, Mathf.Max(1, eAfterimageCount)));
+        int denominator = Mathf.Max(1, visibleCount - 1);
+        float ageT = Mathf.Clamp01(spawnedIndex / (float)denominator);
+        float rampMaxAlpha = Mathf.Clamp01(eAfterimageAlpha);
+        float rampAlpha = Mathf.Lerp(0.08f, rampMaxAlpha, ageT);
+
         if (eAfterimageFadeByDistanceToEnd)
         {
             float totalDistance = Vector3.Distance(dashStartPos, dashEndPos);
@@ -306,26 +344,24 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             float endT = totalDistance <= 0.0001f
                 ? 1f
                 : 1f - Mathf.Clamp01(distanceToEnd / totalDistance);
-            float alphaScale = Mathf.Lerp(Mathf.Clamp01(eAfterimageFarAlphaMultiplier), 1f, endT);
-            c.a = Mathf.Max(0.01f, eAfterimageAlpha * alphaScale);
+            float distanceAlpha = Mathf.Lerp(0.08f, rampMaxAlpha, endT);
+            c.a = Mathf.Min(rampMaxAlpha, Mathf.Max(rampAlpha, distanceAlpha));
         }
         else if (eAfterimageFadeByAgeIndex)
         {
-            int visibleCount = Mathf.Max(1, Mathf.Min(eAfterimageMaxPerDash, Mathf.Max(1, eAfterimageCount)));
-            int denominator = Mathf.Max(1, visibleCount - 1);
-            float ageT = Mathf.Clamp01(spawnedIndex / (float)denominator);
-            float alphaScale = Mathf.Lerp(Mathf.Clamp01(eAfterimageOldestAlphaMultiplier), 1f, ageT);
-            c.a = Mathf.Max(0.01f, eAfterimageAlpha * alphaScale);
+            c.a = Mathf.Min(rampMaxAlpha, rampAlpha);
         }
         else
         {
-            c.a = Mathf.Max(0.2f, eAfterimageAlpha);
+            c.a = rampMaxAlpha;
         }
 
-        ghostSprite.color = c;
+        ApplySpriteRendererColor(ghostSprite, c, eAfterimageMaterial != null);
         ghost.transform.position = worldPosition;
         ghost.transform.rotation = sourceSprite.transform.rotation;
-        ghost.transform.localScale = Vector3.Scale(sourceSprite.transform.lossyScale, eAfterimageScale);
+        Vector3 sourceScale = sourceSprite.transform.lossyScale;
+        sourceScale = new Vector3(Mathf.Abs(sourceScale.x), Mathf.Abs(sourceScale.y), Mathf.Abs(sourceScale.z));
+        ghost.transform.localScale = Vector3.Scale(sourceScale, eAfterimageScale);
 
         if (eAfterimageDebugLog)
         {
@@ -335,6 +371,37 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         activeAfterimageGhosts.Add(ghost);
         StartCoroutine(FadeAndDestroySpriteGhost(ghost, ghostSprite, eAfterimageDuration));
         return ghost;
+    }
+
+    private static void ApplySpriteRendererColor(SpriteRenderer spriteRenderer, Color color, bool syncMaterial)
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        spriteRenderer.color = color;
+
+        if (!syncMaterial)
+        {
+            return;
+        }
+
+        Material material = spriteRenderer.material;
+        if (material == null)
+        {
+            return;
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", color);
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
     }
 
     private IEnumerator FadeAndDestroySpriteGhost(GameObject ghost, SpriteRenderer sr, float duration)
@@ -352,7 +419,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             float t = 1f - Mathf.Clamp01(elapsed / total);
             Color c = baseColor;
             c.a *= t;
-            sr.color = c;
+            ApplySpriteRendererColor(sr, c, eAfterimageMaterial != null);
             elapsed += Time.deltaTime;
             yield return null;
         }

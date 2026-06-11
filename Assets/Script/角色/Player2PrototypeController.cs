@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.Serialization;
+using Spine.Unity;
 
 public class Player2PrototypeController : MonoBehaviour
 {
@@ -527,6 +528,10 @@ public class Player2PrototypeController : MonoBehaviour
     }
 
     private Vector3 lastMoveDir = Vector3.forward;
+    private SkeletonAnimation cachedSpineAnimation;
+    private int cachedSpineFacingScaleX = 1;
+    private Vector3 cachedSpineMirrorLastPosition;
+    private bool cachedSpineMirrorLastPositionInitialized;
     private int standbySwords;
     private bool isDashing;
     private bool isShielding;
@@ -602,6 +607,8 @@ public class Player2PrototypeController : MonoBehaviour
     private void Awake()
     {
         initialRotation = transform.rotation;
+        cachedSpineMirrorLastPosition = transform.position;
+        cachedSpineMirrorLastPositionInitialized = true;
         InitializeSkillSlots();
         InitializeEStarTrailDefaults();
         if (rb == null)
@@ -692,6 +699,8 @@ public class Player2PrototypeController : MonoBehaviour
         {
             transform.rotation = initialRotation;
         }
+
+        UpdateSpineFacingMirror();
     }
 
     private void Update()
@@ -743,6 +752,15 @@ public class Player2PrototypeController : MonoBehaviour
     {
         if (visualRoot == null)
         {
+            SkeletonAnimation spineAnimation = ResolveSpineAnimation();
+            if (spineAnimation != null)
+            {
+                visualRoot = spineAnimation.transform;
+            }
+        }
+
+        if (visualRoot == null)
+        {
             SpriteRenderer spriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
             if (spriteRenderer != null)
             {
@@ -774,6 +792,47 @@ public class Player2PrototypeController : MonoBehaviour
             cachedVisualRootBaseLocalPosition = visualRoot.localPosition;
             cachedVisualRootBaseLocalPositionReady = true;
         }
+    }
+
+    public SkeletonAnimation GetSpineAnimation()
+    {
+        return ResolveSpineAnimation();
+    }
+
+    private SkeletonAnimation ResolveSpineAnimation()
+    {
+        if (cachedSpineAnimation != null)
+        {
+            return cachedSpineAnimation;
+        }
+
+        cachedSpineAnimation = GetComponentInChildren<SkeletonAnimation>(true);
+        return cachedSpineAnimation;
+    }
+
+    private void UpdateSpineFacingMirror()
+    {
+        SkeletonAnimation spineAnimation = ResolveSpineAnimation();
+        if (spineAnimation == null || spineAnimation.Skeleton == null)
+        {
+            return;
+        }
+
+        if (!cachedSpineMirrorLastPositionInitialized)
+        {
+            cachedSpineMirrorLastPosition = transform.position;
+            cachedSpineMirrorLastPositionInitialized = true;
+        }
+
+        Vector3 delta = transform.position - cachedSpineMirrorLastPosition;
+        if (Mathf.Abs(delta.x) > 0.0001f)
+        {
+            cachedSpineFacingScaleX = delta.x > 0f ? -1 : 1;
+        }
+
+        cachedSpineMirrorLastPosition = transform.position;
+
+        spineAnimation.Skeleton.ScaleX = cachedSpineFacingScaleX;
     }
 
     private void ApplyVisualFloatOffset()
@@ -978,6 +1037,8 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         transform.position = worldPosition;
+        cachedSpineMirrorLastPosition = worldPosition;
+        cachedSpineMirrorLastPositionInitialized = true;
         Physics.SyncTransforms();
     }
 
@@ -1057,7 +1118,10 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        if (!isDashing) StartCoroutine(DashRoutine());
+        if (!isDashing)
+        {
+            StartCoroutine(DashRoutine());
+        }
     }
 
     public void CastR()

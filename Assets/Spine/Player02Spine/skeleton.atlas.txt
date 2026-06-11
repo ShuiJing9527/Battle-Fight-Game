@@ -1,0 +1,374 @@
+
+skeleton.png
+size: 2039,1975
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+神眷之子-拆分_0000_头冠+5
+  rotate: false
+  xy: 460, 521
+  size: 442, 299
+  orig: 2249, 2249
+  offset: 834, 1557
+  index: -1
+神眷之子-拆分_0001_头冠饰品+5
+  rotate: true
+  xy: 351, 1894
+  size: 79, 119
+  orig: 2249, 2249
+  offset: 941, 1442
+  index: -1
+神眷之子-拆分_0002_右留海+3
+  rotate: true
+  xy: 1375, 1038
+  size: 267, 567
+  orig: 2249, 2249
+  offset: 1061, 1148
+  index: -1
+神眷之子-拆分_0003_耳朵+2
+  rotate: false
+  xy: 1171, 1850
+  size: 195, 123
+  orig: 2249, 2249
+  offset: 1239, 1293
+  index: -1
+神眷之子-拆分_0004_左留海+2
+  rotate: true
+  xy: 2, 1513
+  size: 233, 494
+  orig: 2249, 2249
+  offset: 717, 1180
+  index: -1
+神眷之子-拆分_0005_闭眼+1
+  rotate: false
+  xy: 2, 1926
+  size: 347, 47
+  orig: 2249, 2249
+  offset: 848, 1321
+  index: -1
+神眷之子-拆分_0006_睁眼+1
+  rotate: false
+  xy: 158, 1748
+  size: 362, 129
+  orig: 2249, 2249
+  offset: 840, 1288
+  index: -1
+神眷之子-拆分_0008_右手镯（前）+8
+  rotate: true
+  xy: 2, 1785
+  size: 139, 154
+  orig: 2249, 2249
+  offset: 1276, 850
+  index: -1
+神眷之子-拆分_0009_右手+7
+  rotate: false
+  xy: 904, 474
+  size: 408, 346
+  orig: 2249, 2249
+  offset: 1102, 826
+  index: -1
+神眷之子-拆分_0010_右手镯（后）+6
+  rotate: true
+  xy: 1368, 1850
+  size: 123, 134
+  orig: 2249, 2249
+  offset: 1291, 852
+  index: -1
+神眷之子-拆分_0011_左腰部装饰+3
+  rotate: true
+  xy: 982, 1639
+  size: 209, 212
+  orig: 2249, 2249
+  offset: 714, 761
+  index: -1
+神眷之子-拆分_0012_左侧羽摆（前）+3
+  rotate: true
+  xy: 1504, 1848
+  size: 125, 430
+  orig: 2249, 2249
+  offset: 818, 555
+  index: -1
+神眷之子-拆分_0013_左侧羽摆+2
+  rotate: true
+  xy: 1649, 1307
+  size: 290, 388
+  orig: 2249, 2249
+  offset: 618, 565
+  index: -1
+神眷之子-拆分_0014_右腰部装饰+3
+  rotate: true
+  xy: 1589, 1599
+  size: 247, 249
+  orig: 2249, 2249
+  offset: 1122, 722
+  index: -1
+神眷之子-拆分_0015_右侧羽摆（前）+3
+  rotate: true
+  xy: 522, 1708
+  size: 163, 458
+  orig: 2249, 2249
+  offset: 1030, 531
+  index: -1
+神眷之子-拆分_0016_右侧羽摆+2
+  rotate: false
+  xy: 1657, 2
+  size: 368, 438
+  orig: 2249, 2249
+  offset: 1123, 541
+  index: -1
+神眷之子-拆分_0017_腰封底+1
+  rotate: true
+  xy: 465, 829
+  size: 316, 318
+  orig: 2249, 2249
+  offset: 868, 715
+  index: -1
+神眷之子-拆分_0018_前摆0
+  rotate: true
+  xy: 1196, 1615
+  size: 231, 391
+  orig: 2249, 2249
+  offset: 870, 616
+  index: -1
+神眷之子-拆分_0019_右头发-1
+  rotate: true
+  xy: 498, 1448
+  size: 258, 424
+  orig: 2249, 2249
+  offset: 1202, 1227
+  index: -1
+神眷之子-拆分_0020_左头发-1
+  rotate: true
+  xy: 614, 1873
+  size: 100, 394
+  orig: 2249, 2249
+  offset: 822, 1137
+  index: -1
+神眷之子-拆分_0021_上半身-1
+  rotate: true
+  xy: 2, 925
+  size: 293, 461
+  orig: 2249, 2249
+  offset: 898, 799
+  index: -1
+神眷之子-拆分_0022_左手镯（前）-1
+  rotate: true
+  xy: 1010, 1862
+  size: 111, 159
+  orig: 2249, 2249
+  offset: 730, 880
+  index: -1
+神眷之子-拆分_0023_左手-2
+  rotate: false
+  xy: 2, 625
+  size: 456, 298
+  orig: 2249, 2249
+  offset: 603, 880
+  index: -1
+神眷之子-拆分_0024_左手镯（后）-3
+  rotate: true
+  xy: 472, 1879
+  size: 94, 140
+  orig: 2249, 2249
+  offset: 748, 891
+  index: -1
+神眷之子-拆分_0025_右侧雏羽-3
+  rotate: false
+  xy: 2, 1220
+  size: 468, 291
+  orig: 2249, 2249
+  offset: 1074, 748
+  index: -1
+神眷之子-拆分_0026_左侧雏羽-3
+  rotate: false
+  xy: 472, 1147
+  size: 380, 299
+  orig: 2249, 2249
+  offset: 554, 737
+  index: -1
+神眷之子-拆分_0028_左羽翼（头）-4
+  rotate: true
+  xy: 854, 1093
+  size: 265, 519
+  orig: 2249, 2249
+  offset: 619, 1543
+  index: -1
+神眷之子-拆分_0033_左裙羽翼-5
+  rotate: true
+  xy: 2, 261
+  size: 362, 386
+  orig: 2249, 2249
+  offset: 446, 807
+  index: -1
+神眷之子-拆分_0034_裙摆蕾丝（前）-6
+  rotate: false
+  xy: 1357, 744
+  size: 472, 292
+  orig: 2249, 2249
+  offset: 762, 542
+  index: -1
+神眷之子-拆分_0035_裙摆蕾丝（左侧）-7
+  rotate: true
+  xy: 785, 822
+  size: 269, 570
+  orig: 2249, 2249
+  offset: 565, 254
+  index: -1
+神眷之子-拆分_0036_裙摆蕾丝（右侧）-7
+  rotate: true
+  xy: 1067, 104
+  size: 336, 588
+  orig: 2249, 2249
+  offset: 1158, 229
+  index: -1
+神眷之子-拆分_0037_右腿-8
+  rotate: true
+  xy: 390, 165
+  size: 307, 675
+  orig: 2249, 2249
+  offset: 947, 127
+  index: -1
+神眷之子-拆分_0038_左腿-9
+  rotate: true
+  xy: 924, 1360
+  size: 237, 723
+  orig: 2249, 2249
+  offset: 854, 58
+  index: -1
+神眷之子-拆分_0045_左头发(后)-13
+  rotate: true
+  xy: 1314, 442
+  size: 300, 678
+  orig: 2249, 2249
+  offset: 709, 786
+  index: -1
+
+skeleton2.png
+size: 1890,1971
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+神眷之子-拆分_0029_右羽翼（头）-4
+  rotate: true
+  xy: 955, 913
+  size: 355, 570
+  orig: 2249, 2249
+  offset: 1260, 1525
+  index: -1
+神眷之子-拆分_0039_右羽翼（黑）-10
+  rotate: false
+  xy: 955, 1270
+  size: 933, 699
+  orig: 2249, 2249
+  offset: 1090, 362
+  index: -1
+神眷之子-拆分_0041_玄羽翼（左）-11
+  rotate: true
+  xy: 2, 87
+  size: 807, 1062
+  orig: 2249, 2249
+  offset: 40, 393
+  index: -1
+神眷之子-拆分_0042_玄羽翼（右）-11
+  rotate: false
+  xy: 2, 896
+  size: 951, 1073
+  orig: 2249, 2249
+  offset: 1238, 362
+  index: -1
+神眷之子-拆分_0048_帽子-15
+  rotate: true
+  xy: 1066, 2
+  size: 909, 786
+  orig: 2249, 2249
+  offset: 710, 1241
+  index: -1
+
+skeleton3.png
+size: 1923,1556
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+神眷之子-拆分_0007_头0
+  rotate: false
+  xy: 2, 668
+  size: 547, 502
+  orig: 2249, 2249
+  offset: 769, 1194
+  index: -1
+神眷之子-拆分_0030_右羽翼裙摆-4
+  rotate: false
+  xy: 2, 93
+  size: 737, 546
+  orig: 2249, 2249
+  offset: 1099, 396
+  index: -1
+神眷之子-拆分_0031_左羽翼裙摆-4
+  rotate: false
+  xy: 551, 641
+  size: 533, 503
+  orig: 2249, 2249
+  offset: 362, 417
+  index: -1
+神眷之子-拆分_0032_右裙羽翼-5
+  rotate: false
+  xy: 1406, 1095
+  size: 515, 459
+  orig: 2249, 2249
+  offset: 1259, 749
+  index: -1
+神眷之子-拆分_0043_左头发-12
+  rotate: true
+  xy: 2, 1172
+  size: 382, 603
+  orig: 2249, 2249
+  offset: 600, 891
+  index: -1
+神眷之子-拆分_0044_右头发-12
+  rotate: true
+  xy: 1086, 563
+  size: 530, 723
+  orig: 2249, 2249
+  offset: 1191, 895
+  index: -1
+神眷之子-拆分_0046_右头发（后）-13
+  rotate: true
+  xy: 607, 1146
+  size: 408, 797
+  orig: 2249, 2249
+  offset: 1179, 747
+  index: -1
+神眷之子-拆分_0049_后蕾丝裙摆-15
+  rotate: false
+  xy: 741, 2
+  size: 718, 559
+  orig: 2249, 2249
+  offset: 671, 272
+  index: -1
+
+skeleton4.png
+size: 1922,832
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+神眷之子-拆分_0027_头饰-3
+  rotate: false
+  xy: 1295, 206
+  size: 625, 624
+  orig: 2249, 2249
+  offset: 769, 1303
+  index: -1
+神眷之子-拆分_0040_左羽翼（黑）-10
+  rotate: true
+  xy: 620, 136
+  size: 694, 673
+  orig: 2249, 2249
+  offset: 217, 397
+  index: -1
+神眷之子-拆分_0047_头发（后）-14
+  rotate: false
+  xy: 2, 2
+  size: 616, 828
+  orig: 2249, 2249
+  offset: 819, 686
+  index: -1

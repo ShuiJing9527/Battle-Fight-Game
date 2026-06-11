@@ -44,7 +44,7 @@ Material:
     m_Floats:
     - _NoiseScaie: 500
     - _NoiseThreshold: 0.5
-    - _OutlineWidth: 0.025
+    - _OutlineWidth: 0.012
     - _QueueControl: 0
     - _QueueOffset: 0
     - _Speed: 0.3
