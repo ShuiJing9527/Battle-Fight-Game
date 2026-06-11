@@ -12,6 +12,30 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [InspectorName("Q Skill Effect Prefab")]
     [SerializeField] private GameObject qSkillEffectPrefab;
 
+    [Header("Q - Divine Light Sword / Fall Trail")]
+    [HideInInspector]
+    [InspectorName("Q Spawn Fall Trail")]
+    [SerializeField] private bool qSpawnFallTrail = false;
+    [HideInInspector]
+    [InspectorName("Q Fall Trail Prefab")]
+    [SerializeField] private GameObject qFallTrailPrefab;
+    [HideInInspector]
+    [InspectorName("Q Fall Trail Local Offset")]
+    [SerializeField] private Vector3 qFallTrailLocalOffset = Vector3.zero;
+    [HideInInspector]
+    [InspectorName("Q Fall Trail Scale")]
+    [SerializeField] private Vector3 qFallTrailScale = Vector3.one;
+
+    [Header("Q - Divine Light Sword / Impact Cone Spark")]
+    [InspectorName("Q Spawn Impact Cone Spark")]
+    [SerializeField] private bool qSpawnImpactConeSpark = true;
+    [InspectorName("Q Impact Cone Spark Prefab")]
+    [SerializeField] private GameObject qImpactConeSparkPrefab;
+    [InspectorName("Q Impact Cone Spark Lifetime")]
+    [SerializeField] private float qImpactConeSparkLifetime = 0.6f;
+    [InspectorName("Q Impact Cone Spark Scale")]
+    [SerializeField] private Vector3 qImpactConeSparkScale = Vector3.one;
+
     [Header("Q - Divine Light Sword / Star Fall")]
     [InspectorName("Q Star Fall Blade Count")]
     [SerializeField] private int qStarFallBladeCount = 7;
@@ -47,13 +71,30 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qStarFallDamageMultiplier = 1f;
 
     [Header("Q - Divine Light Sword / Impact")]
-    [InspectorName("Q Spawn Impact Particle")]
-    [SerializeField] private bool qSpawnImpactParticle = true;
-    [InspectorName("Q Impact Particle Prefab")]
+    [HideInInspector]
+    [SerializeField] private bool qSpawnImpactSeal = false;
+    [HideInInspector]
+    [SerializeField] private GameObject qImpactStarSealPrefab;
+    [HideInInspector]
+    [SerializeField] private float qImpactStarSealLifetime = 0.45f;
+    [HideInInspector]
+    [SerializeField] private Vector3 qImpactStarSealScale = Vector3.one;
+    [HideInInspector]
+    [SerializeField] private bool qSpawnVerticalFlash = false;
+    [HideInInspector]
+    [SerializeField] private GameObject qImpactVerticalFlashPrefab;
+    [HideInInspector]
+    [SerializeField] private float qImpactVerticalFlashLifetime = 0.18f;
+    [HideInInspector]
+    [SerializeField] private Vector3 qImpactVerticalFlashScale = Vector3.one;
+
+    [HideInInspector]
+    [SerializeField] private bool qSpawnImpactParticle = false;
+    [HideInInspector]
     [SerializeField] private GameObject qImpactParticlePrefab;
-    [InspectorName("Q Impact Particle Lifetime")]
+    [HideInInspector]
     [SerializeField] private float qImpactParticleLifetime = 1f;
-    [InspectorName("Q Impact Particle Scale")]
+    [HideInInspector]
     [SerializeField] private Vector3 qImpactParticleScale = Vector3.one;
 
     [Header("Q - Divine Light Sword / Visual")]
@@ -170,6 +211,16 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         activeQBlades.Clear();
     }
 
+    private void OnValidate()
+    {
+#if UNITY_EDITOR
+        if (qImpactConeSparkPrefab == null)
+        {
+            qImpactConeSparkPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/FX_Q_Impact_ConeSpark.prefab");
+        }
+#endif
+    }
+
     private IEnumerator QStarFallRoutine(GameObject sourcePrefab)
     {
         activeQWaveCount++;
@@ -268,6 +319,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         Transform visualTarget = FindEffectVisualTransform(bladeVisual);
         ApplyQStarFallVisualRotation(visualTarget, fallDirection);
         visualTarget.localScale = Vector3.Scale(visualTarget.localScale, ClampVisualScale(qStarFallEffectScale));
+
         return bladeRoot;
     }
 
@@ -285,13 +337,12 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            SpawnQImpactParticle(targetPos);
-
             if (qStarFallEnableDamage)
             {
                 ApplyQStarFallDamage(targetPos);
             }
 
+            SpawnQImpactConeSpark(targetPos);
             activeQBlades.Remove(bladeRoot);
             if (waveBlades != null)
             {
@@ -348,16 +399,16 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void SpawnQImpactParticle(Vector3 impactPosition)
+    private void SpawnQImpactConeSpark(Vector3 impactPosition)
     {
-        if (!qSpawnImpactParticle || qImpactParticlePrefab == null)
+        if (!qSpawnImpactConeSpark || qImpactConeSparkPrefab == null)
         {
             return;
         }
 
-        GameObject effect = Instantiate(qImpactParticlePrefab, impactPosition, Quaternion.identity);
-        effect.transform.localScale = Vector3.Scale(effect.transform.localScale, ClampVisualScale(qImpactParticleScale));
-        Destroy(effect, Mathf.Max(0.01f, qImpactParticleLifetime));
+        GameObject impactObject = Instantiate(qImpactConeSparkPrefab, impactPosition, Quaternion.identity);
+        impactObject.transform.localScale = ClampVisualScale(qImpactConeSparkScale);
+        Destroy(impactObject, Mathf.Max(0.05f, qImpactConeSparkLifetime));
     }
 
     private Vector3 ResolveCastDirection()
