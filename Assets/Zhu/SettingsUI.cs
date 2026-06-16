@@ -7,7 +7,6 @@ public class SettingsUI : MonoBehaviour
     public Slider musicSlider;
     public Slider sfxSlider;
     public Toggle fullscreenToggle;
-    public TMP_Dropdown languageDropdown;
 
     void OnEnable()
     {
@@ -16,48 +15,39 @@ public class SettingsUI : MonoBehaviour
 
     public void RefreshUI()
     {
+        // 第一层防护：GameManager不存在直接退出
         if (GameManager.Instance == null)
             return;
 
-        var gm = GameManager.Instance;
+        // 逐个赋值，空组件跳过不报错
+        if (musicSlider != null)
+            musicSlider.value = GameManager.Instance.settings.musicVolume;
+
+        if (sfxSlider != null)
+            sfxSlider.value = GameManager.Instance.settings.sfxVolume;
+
+        if (fullscreenToggle != null)
+            fullscreenToggle.isOn = GameManager.Instance.settings.fullscreen;
+    }
+
+    public void SaveSettings()
+    {
+        if (GameManager.Instance == null) return;
 
         if (musicSlider != null)
-            musicSlider.value = gm.settings.musicVolume;
+            GameManager.Instance.settings.musicVolume = musicSlider.value;
+
         if (sfxSlider != null)
-            sfxSlider.value = gm.settings.sfxVolume;
+            GameManager.Instance.settings.sfxVolume = sfxSlider.value;
+
         if (fullscreenToggle != null)
-            fullscreenToggle.isOn = gm.settings.fullscreen;
-
-        languageDropdown.ClearOptions();
-        languageDropdown.AddOptions(gm.GetLangNames());
-
-        int index = gm.GetLangKeys().IndexOf(gm.settings.language);
-        if (index >= 0)
-            languageDropdown.value = index;
+        {
+            GameManager.Instance.settings.fullscreen = fullscreenToggle.isOn;
+            Screen.fullScreen = GameManager.Instance.settings.fullscreen;
+        }
     }
 
-    // 👇 这个就是你要的方法！现在已经写进去了！
-    public void OnLanguageChanged(int index)
-    {
-        if (GameManager.Instance == null)
-            return;
-
-        string langKey = GameManager.Instance.GetLangKeys()[index];
-        GameManager.Instance.SwitchLanguage(langKey);
-    }
-
-    public void Save()
-    {
-        if (GameManager.Instance == null)
-            return;
-
-        var gm = GameManager.Instance;
-        gm.settings.musicVolume = musicSlider.value;
-        gm.settings.sfxVolume = sfxSlider.value;
-        gm.settings.fullscreen = fullscreenToggle.isOn;
-    }
-
-    public void Close()
+    public void ClosePanel()
     {
         gameObject.SetActive(false);
     }
