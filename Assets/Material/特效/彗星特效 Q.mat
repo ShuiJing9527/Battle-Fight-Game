@@ -20,7 +20,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: "\u5F57\u661F\u7279\u6548"
+  m_Name: "\u5F57\u661F\u7279\u6548 Q"
   m_Shader: {fileID: -6465566751694194690, guid: eee38aa0a48fe4b43a740cdceb66f809, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -60,8 +60,8 @@ Material:
     - _QueueControl: 0
     - _QueueOffset: 0
     m_Colors:
-    - _Color01: {r: 364.43573, g: 128.15323, b: 0, a: 1}
-    - _Color_02: {r: 6.0072465, g: 0.81568646, b: 11.984314, a: 1}
+    - _Color01: {r: 158.11438, g: 368.35437, b: 305.44534, a: 1}
+    - _Color_02: {r: 0.7529413, g: 4.455237, b: 11.984315, a: 1}
     - _DissolceSpeed: {r: 0.5, g: 0, b: 0, a: 0}
     - _MainTexSpeed: {r: -0.5, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []

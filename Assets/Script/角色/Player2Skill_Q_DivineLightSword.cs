@@ -26,15 +26,31 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [InspectorName("Q Fall Trail Scale")]
     [SerializeField] private Vector3 qFallTrailScale = Vector3.one;
 
-    [Header("Q - Divine Light Sword / Impact Cone Spark")]
+    [Header("Q - Divine Light Sword / Legacy Cone Spark")]
+    [HideInInspector]
     [InspectorName("Q Spawn Impact Cone Spark")]
     [SerializeField] private bool qSpawnImpactConeSpark = true;
+    [HideInInspector]
     [InspectorName("Q Impact Cone Spark Prefab")]
     [SerializeField] private GameObject qImpactConeSparkPrefab;
+    [HideInInspector]
     [InspectorName("Q Impact Cone Spark Lifetime")]
     [SerializeField] private float qImpactConeSparkLifetime = 0.6f;
+    [HideInInspector]
     [InspectorName("Q Impact Cone Spark Scale")]
     [SerializeField] private Vector3 qImpactConeSparkScale = Vector3.one;
+
+    [Header("Q - Divine Light Sword / Impact Dust")]
+    [InspectorName("Q Spawn Impact Dust")]
+    [SerializeField] private bool qSpawnImpactDust = true;
+    [InspectorName("Q Impact Dust Prefab")]
+    [SerializeField] private GameObject qImpactDustPrefab;
+    [InspectorName("Q Impact Dust Lifetime")]
+    [SerializeField] private float qImpactDustLifetime = 1f;
+    [InspectorName("Q Impact Dust Local Offset")]
+    [SerializeField] private Vector3 qImpactDustLocalOffset = new Vector3(0f, 0.02f, 0f);
+    [InspectorName("Q Impact Dust Scale")]
+    [SerializeField] private Vector3 qImpactDustScale = Vector3.one;
 
     [Header("Q - Divine Light Sword / Star Fall")]
     [InspectorName("Q Star Fall Blade Count")]
@@ -214,9 +230,9 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     private void OnValidate()
     {
 #if UNITY_EDITOR
-        if (qImpactConeSparkPrefab == null)
+        if (qImpactDustPrefab == null)
         {
-            qImpactConeSparkPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/FX_Q_Impact_ConeSpark.prefab");
+            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/烟尘.prefab");
         }
 #endif
     }
@@ -342,7 +358,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 ApplyQStarFallDamage(targetPos);
             }
 
-            SpawnQImpactConeSpark(targetPos);
+            SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
             if (waveBlades != null)
             {
@@ -399,16 +415,23 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void SpawnQImpactConeSpark(Vector3 impactPosition)
+    private void SpawnQImpactDust(Vector3 impactPosition)
     {
-        if (!qSpawnImpactConeSpark || qImpactConeSparkPrefab == null)
+#if UNITY_EDITOR
+        if (qImpactDustPrefab == null)
+        {
+            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/烟尘.prefab");
+        }
+#endif
+        if (!qSpawnImpactDust || qImpactDustPrefab == null)
         {
             return;
         }
 
-        GameObject impactObject = Instantiate(qImpactConeSparkPrefab, impactPosition, Quaternion.identity);
-        impactObject.transform.localScale = ClampVisualScale(qImpactConeSparkScale);
-        Destroy(impactObject, Mathf.Max(0.05f, qImpactConeSparkLifetime));
+        Vector3 spawnPos = impactPosition + qImpactDustLocalOffset;
+        GameObject impactObject = Instantiate(qImpactDustPrefab, spawnPos, Quaternion.identity);
+        impactObject.transform.localScale = ClampVisualScale(qImpactDustScale);
+        Destroy(impactObject, Mathf.Max(0.05f, qImpactDustLifetime));
     }
 
     private Vector3 ResolveCastDirection()

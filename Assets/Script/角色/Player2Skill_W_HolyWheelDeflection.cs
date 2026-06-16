@@ -63,11 +63,34 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 待机特效预制体")]
     [SerializeField] private GameObject standbySkillEffectPrefab;
 
+    [Header("W - Holy Wheel / Shield Bubble")]
+    [InspectorName("W Spawn Shield Bubble")]
+    [SerializeField] private bool wSpawnShieldBubble = true;
+    [InspectorName("W Shield Bubble Prefab")]
+    [SerializeField] private GameObject wShieldBubblePrefab;
+    [InspectorName("W Shield Bubble Local Offset")]
+    [SerializeField] private Vector3 wShieldBubbleLocalOffset = new Vector3(0f, 0.2f, 0f);
+    [InspectorName("W Shield Bubble Scale")]
+    [SerializeField] private Vector3 wShieldBubbleScale = new Vector3(1.2f, 1.5f, 1f);
+    [InspectorName("W Shield Bubble Fade In Duration")]
+    [SerializeField] private float wShieldBubbleFadeInDuration = 0.15f;
+    [InspectorName("W Shield Bubble Fade Out Duration")]
+    [SerializeField] private float wShieldBubbleFadeOutDuration = 0.15f;
+    [InspectorName("W Shield Bubble Pulse Amount")]
+    [SerializeField] private float wShieldBubblePulseAmount = 0.03f;
+    [InspectorName("W Shield Bubble Pulse Speed")]
+    [SerializeField] private float wShieldBubblePulseSpeed = 2f;
+
     private bool isShielding;
     private bool isWGuardActive;
     private float wOrbitAngle;
     private Coroutine wSkillRoutine;
     private GameObject activeWOrbitVisualRoot;
+    private GameObject activeWShieldBubble;
+    private readonly List<SpriteRenderer> activeWShieldBubbleSpriteRenderers = new List<SpriteRenderer>();
+    private readonly List<Color> activeWShieldBubbleSpriteBaseColors = new List<Color>();
+    private readonly List<Renderer> activeWShieldBubbleMeshRenderers = new List<Renderer>();
+    private readonly List<Color> activeWShieldBubbleMeshBaseColors = new List<Color>();
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
@@ -125,6 +148,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             Destroy(activeWOrbitVisualRoot);
             activeWOrbitVisualRoot = null;
         }
+
+        DestroyWShieldBubbleImmediate();
 
         Transform[] allTransforms = FindObjectsOfType<Transform>(true);
         for (int i = 0; i < allTransforms.Length; i++)
@@ -187,6 +212,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         orbitRoot.transform.position = Owner != null ? Owner.transform.position : transform.position;
         orbitRoot.transform.rotation = Quaternion.identity;
         activeWOrbitVisualRoot = orbitRoot;
+        GameObject shieldBubble = SpawnWShieldBubble(orbitRoot.transform);
 
         int energyForW = useSwordEnergyForW ? Mathf.Max(0, Owner != null ? Owner.currentSwordEnergy : 0) : 0;
         int swordCount = baseWSwordCount;
@@ -304,13 +330,386 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
                 }
             }
 
+            if (shieldBubble != null)
+            {
+                UpdateWShieldBubble(shieldBubble.transform, t);
+            }
+
             t += Time.deltaTime;
             yield return null;
+        }
+
+        if (shieldBubble != null)
+        {
+            yield return FadeOutWShieldBubble(shieldBubble, orbitRoot != null ? orbitRoot.transform : null, wShieldBubbleFadeOutDuration);
         }
 
         Cleanup();
         isShielding = false;
         wSkillRoutine = null;
+    }
+
+    private GameObject SpawnWShieldBubble(Transform parent)
+    {
+        if (!wSpawnShieldBubble || wShieldBubblePrefab == null || parent == null)
+        {
+            activeWShieldBubble = null;
+            activeWShieldBubbleSpriteRenderers.Clear();
+            activeWShieldBubbleSpriteBaseColors.Clear();
+            activeWShieldBubbleMeshRenderers.Clear();
+            activeWShieldBubbleMeshBaseColors.Clear();
+            return null;
+        }
+
+        GameObject bubble = Instantiate(wShieldBubblePrefab, parent);
+        bubble.name = "W_ShieldBubble";
+        bubble.transform.localPosition = wShieldBubbleLocalOffset;
+        bubble.transform.localRotation = Quaternion.identity;
+        bubble.transform.localScale = ClampVisualScale(wShieldBubbleScale);
+
+        Collider[] colliders = bubble.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            if (colliders[i] != null)
+            {
+                colliders[i].enabled = false;
+            }
+        }
+
+        activeWShieldBubbleSpriteRenderers.Clear();
+        activeWShieldBubbleSpriteBaseColors.Clear();
+        activeWShieldBubbleMeshRenderers.Clear();
+        activeWShieldBubbleMeshBaseColors.Clear();
+
+        SpriteRenderer[] spriteRenderers = bubble.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < spriteRenderers.Length; i++)
+        {
+            SpriteRenderer spriteRenderer = spriteRenderers[i];
+            if (spriteRenderer == null)
+            {
+                continue;
+            }
+
+            activeWShieldBubbleSpriteRenderers.Add(spriteRenderer);
+            activeWShieldBubbleSpriteBaseColors.Add(spriteRenderer.color);
+            SetSpriteRendererAlpha(spriteRenderer, 0f);
+        }
+
+        Renderer[] renderers = bubble.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || renderer is SpriteRenderer)
+            {
+                continue;
+            }
+
+            activeWShieldBubbleMeshRenderers.Add(renderer);
+            activeWShieldBubbleMeshBaseColors.Add(ResolveRendererBaseColor(renderer));
+            SetRendererAlpha(renderer, 0f);
+        }
+
+        if (activeWShieldBubbleSpriteRenderers.Count == 0 && activeWShieldBubbleMeshRenderers.Count == 0)
+        {
+            Destroy(bubble);
+            activeWShieldBubble = null;
+            return null;
+        }
+
+        activeWShieldBubble = bubble;
+        return bubble;
+    }
+
+    private void UpdateWShieldBubble(Transform bubbleTransform, float elapsed)
+    {
+        if (bubbleTransform == null || activeWShieldBubble == null)
+        {
+            return;
+        }
+
+        bubbleTransform.localPosition = wShieldBubbleLocalOffset;
+
+        float pulse = 1f;
+        if (wShieldBubblePulseAmount > 0f)
+        {
+            pulse = 1f + Mathf.Sin(elapsed * wShieldBubblePulseSpeed) * wShieldBubblePulseAmount;
+        }
+
+        bubbleTransform.localScale = Vector3.Scale(ClampVisualScale(wShieldBubbleScale), Vector3.one * pulse);
+
+        if (activeWShieldBubbleSpriteRenderers.Count > 0 || activeWShieldBubbleMeshRenderers.Count > 0)
+        {
+            float fadeIn = wShieldBubbleFadeInDuration <= 0f ? 1f : Mathf.Clamp01(elapsed / wShieldBubbleFadeInDuration);
+            float alphaPulse = 1f;
+            if (wShieldBubblePulseAmount > 0f)
+            {
+                alphaPulse = 1f + Mathf.Sin(elapsed * wShieldBubblePulseSpeed) * (wShieldBubblePulseAmount * 0.5f);
+            }
+
+            for (int i = 0; i < activeWShieldBubbleSpriteRenderers.Count; i++)
+            {
+                SpriteRenderer spriteRenderer = activeWShieldBubbleSpriteRenderers[i];
+                if (spriteRenderer == null)
+                {
+                    continue;
+                }
+
+                Color baseColor = i < activeWShieldBubbleSpriteBaseColors.Count ? activeWShieldBubbleSpriteBaseColors[i] : spriteRenderer.color;
+                float alpha = Mathf.Clamp01(baseColor.a * fadeIn * alphaPulse);
+                SetSpriteRendererColor(spriteRenderer, baseColor, alpha);
+            }
+
+            for (int i = 0; i < activeWShieldBubbleMeshRenderers.Count; i++)
+            {
+                Renderer renderer = activeWShieldBubbleMeshRenderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Color baseColor = i < activeWShieldBubbleMeshBaseColors.Count ? activeWShieldBubbleMeshBaseColors[i] : ResolveRendererBaseColor(renderer);
+                float alpha = Mathf.Clamp01(baseColor.a * fadeIn * alphaPulse);
+                SetRendererColor(renderer, baseColor, alpha);
+            }
+        }
+    }
+
+    private IEnumerator FadeOutWShieldBubble(GameObject bubble, Transform followRoot, float duration)
+    {
+        if (bubble == null)
+        {
+            yield break;
+        }
+
+        if ((activeWShieldBubbleSpriteRenderers.Count == 0 && activeWShieldBubbleMeshRenderers.Count == 0) || duration <= 0f)
+        {
+            DestroyWShieldBubbleImmediate();
+            yield break;
+        }
+
+        float startAlpha = 0f;
+        for (int i = 0; i < activeWShieldBubbleSpriteRenderers.Count; i++)
+        {
+            SpriteRenderer spriteRenderer = activeWShieldBubbleSpriteRenderers[i];
+            if (spriteRenderer != null)
+            {
+                startAlpha = Mathf.Max(startAlpha, spriteRenderer.color.a);
+            }
+        }
+        for (int i = 0; i < activeWShieldBubbleMeshRenderers.Count; i++)
+        {
+            Renderer renderer = activeWShieldBubbleMeshRenderers[i];
+            if (renderer != null)
+            {
+                startAlpha = Mathf.Max(startAlpha, ResolveRendererAlpha(renderer));
+            }
+        }
+        float elapsed = 0f;
+        duration = Mathf.Max(0.01f, duration);
+
+        while (elapsed < duration)
+        {
+            if (bubble == null)
+            {
+                yield break;
+            }
+
+            if (followRoot != null)
+            {
+                Vector3 orbitBase = Owner != null ? Owner.transform.position : transform.position;
+                followRoot.position = orbitBase;
+                followRoot.rotation = Quaternion.identity;
+            }
+
+            if (bubble.transform != null)
+            {
+                bubble.transform.localPosition = wShieldBubbleLocalOffset;
+                float pulse = 1f;
+                if (wShieldBubblePulseAmount > 0f)
+                {
+                    pulse = 1f + Mathf.Sin(elapsed * wShieldBubblePulseSpeed) * wShieldBubblePulseAmount;
+                }
+
+                bubble.transform.localScale = Vector3.Scale(ClampVisualScale(wShieldBubbleScale), Vector3.one * pulse);
+            }
+
+            elapsed += Time.deltaTime;
+            float t = Mathf.Clamp01(elapsed / duration);
+            float alpha = Mathf.Lerp(startAlpha, 0f, t);
+            for (int i = 0; i < activeWShieldBubbleSpriteRenderers.Count; i++)
+            {
+                SpriteRenderer spriteRenderer = activeWShieldBubbleSpriteRenderers[i];
+                if (spriteRenderer == null)
+                {
+                    continue;
+                }
+
+                Color baseColor = i < activeWShieldBubbleSpriteBaseColors.Count ? activeWShieldBubbleSpriteBaseColors[i] : spriteRenderer.color;
+                SetSpriteRendererColor(spriteRenderer, baseColor, alpha);
+            }
+            for (int i = 0; i < activeWShieldBubbleMeshRenderers.Count; i++)
+            {
+                Renderer renderer = activeWShieldBubbleMeshRenderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Color baseColor = i < activeWShieldBubbleMeshBaseColors.Count ? activeWShieldBubbleMeshBaseColors[i] : ResolveRendererBaseColor(renderer);
+                SetRendererColor(renderer, baseColor, alpha);
+            }
+            yield return null;
+        }
+
+        DestroyWShieldBubbleImmediate();
+    }
+
+    private void DestroyWShieldBubbleImmediate()
+    {
+        if (activeWShieldBubble != null)
+        {
+            Destroy(activeWShieldBubble);
+        }
+
+        activeWShieldBubble = null;
+        activeWShieldBubbleSpriteRenderers.Clear();
+        activeWShieldBubbleSpriteBaseColors.Clear();
+        activeWShieldBubbleMeshRenderers.Clear();
+        activeWShieldBubbleMeshBaseColors.Clear();
+    }
+
+    private static void SetSpriteRendererColor(SpriteRenderer spriteRenderer, Color baseColor, float alpha)
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        Color color = baseColor;
+        color.a = Mathf.Clamp01(alpha);
+        spriteRenderer.color = color;
+    }
+
+    private static void SetSpriteRendererAlpha(SpriteRenderer spriteRenderer, float alpha)
+    {
+        if (spriteRenderer == null)
+        {
+            return;
+        }
+
+        Color color = spriteRenderer.color;
+        color.a = Mathf.Clamp01(alpha);
+        spriteRenderer.color = color;
+    }
+
+    private static void SetRendererAlpha(Renderer renderer, float alpha)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        SetRendererColor(renderer, ResolveRendererBaseColor(renderer), alpha);
+    }
+
+    private static Color ResolveRendererBaseColor(Renderer renderer)
+    {
+        if (renderer == null)
+        {
+            return Color.white;
+        }
+
+        Material[] materials = renderer.materials;
+        for (int i = 0; i < materials.Length; i++)
+        {
+            Material material = materials[i];
+            if (TryGetMaterialColor(material, out Color color))
+            {
+                return color;
+            }
+        }
+
+        return Color.white;
+    }
+
+    private static float ResolveRendererAlpha(Renderer renderer)
+    {
+        return ResolveRendererBaseColor(renderer).a;
+    }
+
+    private static void SetRendererColor(Renderer renderer, Color baseColor, float alpha)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        Material[] materials = renderer.materials;
+        for (int i = 0; i < materials.Length; i++)
+        {
+            SetMaterialColor(materials[i], baseColor, alpha);
+        }
+    }
+
+    private static bool TryGetMaterialColor(Material material, out Color color)
+    {
+        if (material == null)
+        {
+            color = Color.white;
+            return false;
+        }
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            color = material.GetColor("_BaseColor");
+            return true;
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            color = material.GetColor("_Color");
+            return true;
+        }
+
+        if (material.HasProperty("_TintColor"))
+        {
+            color = material.GetColor("_TintColor");
+            return true;
+        }
+
+        color = Color.white;
+        return false;
+    }
+
+    private static void SetMaterialColor(Material material, Color baseColor, float alpha)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        Color color = baseColor;
+        color.a = Mathf.Clamp01(alpha);
+
+        if (material.HasProperty("_BaseColor"))
+        {
+            material.SetColor("_BaseColor", color);
+        }
+
+        if (material.HasProperty("_Color"))
+        {
+            material.SetColor("_Color", color);
+        }
+
+        if (material.HasProperty("_TintColor"))
+        {
+            material.SetColor("_TintColor", color);
+        }
+
+        if (material.HasProperty("_Alpha"))
+        {
+            material.SetFloat("_Alpha", color.a);
+        }
     }
 
     private GameObject CreateSkillEffectVisual(
