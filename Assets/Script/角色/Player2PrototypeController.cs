@@ -13,6 +13,11 @@ public class Player2PrototypeController : MonoBehaviour
     [SerializeField] private PlayerSkillBase eSkill;
     [SerializeField] private PlayerSkillBase rSkill;
 
+    [Header("冷却&蓝量管理器")]
+    public PlayerSkillCooldownManager cooldownManager;
+
+
+
     [Header("Dash Distance")]
     [HideInInspector] public float moveSpeed = 5f;
     public float dashDistance = 4f;
@@ -47,155 +52,171 @@ public class Player2PrototypeController : MonoBehaviour
     [HideInInspector]
     public float qSwordSpeed = 14f;
 
-    [HideInInspector] [Header("W Duration")]
+    [HideInInspector]
+    [Header("W Duration")]
     [InspectorName("W Duration")]
     public float wDuration = 1.5f;
-    [HideInInspector] [InspectorName("W Damage Reduction")]
+    [HideInInspector]
+    [InspectorName("W Damage Reduction")]
     public float wDamageReduction = 0.4f;
     [HideInInspector] public int maxStandbySwords = 3;
 
-    [HideInInspector] [Header("W Damage Reduction Per Sword")]
+    [HideInInspector]
+    [Header("W Damage Reduction Per Sword")]
     [InspectorName("W Damage Reduction Per Sword")]
     public float wDamageReductionPerSword = 0.03f;
-    [HideInInspector] [InspectorName("W Max Damage Reduction")]
+    [HideInInspector]
+    [InspectorName("W Max Damage Reduction")]
     public float wMaxDamageReduction = 0.8f;
-    [HideInInspector] [InspectorName("W Counter Damage Ratio")]
+    [HideInInspector]
+    [InspectorName("W Counter Damage Ratio")]
     public float wCounterDamageRatio = 0.5f;
 
-    [HideInInspector] [Header("E - Celestial Shift / Basic")]
+    [HideInInspector]
+    [Header("E - Celestial Shift / Basic")]
     public float eRailDuration = 0.6f;
 
-    [HideInInspector] [Header("E - Celestial Shift / Sprite Afterimage")]
+    [HideInInspector]
+    [Header("E - Celestial Shift / Sprite Afterimage")]
     [InspectorName("E Enable Afterimage Shader")]
     public bool eEnableAfterimageShader = true;
     [HideInInspector] [SerializeField] private SpriteRenderer eAfterimageSourceSpriteRenderer;
- public Renderer eAfterimageSourceRenderer;
- public Material eAfterimageMaterial;
- [InspectorName("E Afterimage Count")]
+    public Renderer eAfterimageSourceRenderer;
+    public Material eAfterimageMaterial;
+    [InspectorName("E Afterimage Count")]
     public int eAfterimageCount = 12;
-    [HideInInspector] [InspectorName("E Afterimage Duration")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Duration")]
     public float eAfterimageDuration = 0.45f;
-    [HideInInspector] [InspectorName("E Afterimage Alpha")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Alpha")]
     public float eAfterimageAlpha = 0.35f;
-    [HideInInspector] [InspectorName("E Afterimage Spawn Interval")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Spawn Interval")]
     public float eAfterimageSpawnInterval = 0.03f;
-    [HideInInspector] [InspectorName("E Afterimage Scale")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Scale")]
     public Vector3 eAfterimageScale = Vector3.one;
-    [HideInInspector] [InspectorName("E Afterimage Tint")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Tint")]
     public Color eAfterimageTint = new Color(0.6f, 0.85f, 1f, 0.45f);
-    [HideInInspector] [InspectorName("E Afterimage Sorting Order Offset")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Sorting Order Offset")]
     public int eAfterimageSortingOrderOffset = 5;
-    [HideInInspector] [InspectorName("E Afterimage Debug Log")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Debug Log")]
     public bool eAfterimageDebugLog = false;
-    [HideInInspector] [InspectorName("E Afterimage Use Rainbow")]
+    [HideInInspector]
+    [InspectorName("E Afterimage Use Rainbow")]
     [SerializeField] public bool eAfterimageUseRainbow = true;
- [InspectorName("E Afterimage Invert Color Order")]
+    [InspectorName("E Afterimage Invert Color Order")]
     [SerializeField] public bool eAfterimageInvertColorOrder = true;
- [InspectorName("E Afterimage Fade By Age Index")]
+    [InspectorName("E Afterimage Fade By Age Index")]
     [SerializeField] public bool eAfterimageFadeByAgeIndex = true;
- [InspectorName("E Afterimage Oldest Alpha Multiplier")]
+    [InspectorName("E Afterimage Oldest Alpha Multiplier")]
     [SerializeField] public float eAfterimageOldestAlphaMultiplier = 0.25f;
- [InspectorName("E Afterimage Fade By Distance To End")]
+    [InspectorName("E Afterimage Fade By Distance To End")]
     [SerializeField] public bool eAfterimageFadeByDistanceToEnd = true;
- [InspectorName("E Afterimage Far Alpha Multiplier")]
+    [InspectorName("E Afterimage Far Alpha Multiplier")]
     [SerializeField] public float eAfterimageFarAlphaMultiplier = 0.12f;
- [InspectorName("E Afterimage Rainbow Hue Speed")]
+    [InspectorName("E Afterimage Rainbow Hue Speed")]
     [SerializeField] public float eAfterimageRainbowHueSpeed = 0.04f;
- [InspectorName("E Afterimage Rainbow Saturation")]
+    [InspectorName("E Afterimage Rainbow Saturation")]
     [SerializeField] public float eAfterimageRainbowSaturation = 0.45f;
- [InspectorName("E Afterimage Rainbow Value")]
+    [InspectorName("E Afterimage Rainbow Value")]
     [SerializeField] public float eAfterimageRainbowValue = 1f;
- [InspectorName("E Afterimage Use Distance Sampling")]
+    [InspectorName("E Afterimage Use Distance Sampling")]
     [SerializeField] private bool eAfterimageUseDistanceSampling = true;
- [InspectorName("E Afterimage Use Actual Move Direction")]
+    [InspectorName("E Afterimage Use Actual Move Direction")]
     [SerializeField] private bool eAfterimageUseActualMoveDirection = true;
- [InspectorName("E Afterimage Invert Move Direction")]
+    [InspectorName("E Afterimage Invert Move Direction")]
     [SerializeField] private bool eAfterimageInvertMoveDirection = false;
- [InspectorName("E Afterimage Spacing")]
+    [InspectorName("E Afterimage Spacing")]
     [SerializeField] private float eAfterimageSpacing = 0.06f;
- [InspectorName("E Afterimage Max Per Dash")]
+    [InspectorName("E Afterimage Max Per Dash")]
     [SerializeField] private int eAfterimageMaxPerDash = 24;
- [SerializeField] private bool eAfterimageUseManualTrailLayout = false;
- [SerializeField] private bool eAfterimageInvertTrailDirection = false;
- [SerializeField] private float eAfterimageNearCharacterOffset = 0.03f;
- [SerializeField] private float eAfterimageTrailLength = 2.2f;
- [SerializeField] private float eAfterimageTrailSideOffset = 0f;
- [SerializeField] private bool eAfterimageUsePathSamples = false;
- [SerializeField] private float eAfterimagePathSpawnDelay = 0f;
- [SerializeField] private float eAfterimagePathForwardBias = 0f;
- [SerializeField] private bool eAfterimageSpawnDuringDash = false;
- [SerializeField] private bool eEnableStarTrail = false;
- [SerializeField] private Material eStarTrailMaterial;
- [SerializeField] private Gradient eStarTrailGradient = CreateDefaultStarTrailGradient();
- [SerializeField] private bool eStarTrailReverseGradient = false;
- [SerializeField] private float eStarTrailTime = 0.6f;
- [SerializeField] private float eStarTrailStartWidth = 0.45f;
- [SerializeField] private float eStarTrailEndWidth = 0.02f;
- [SerializeField] private float eStarTrailMinVertexDistance = 0.01f;
- [SerializeField] private Vector3 eStarTrailLocalOffset = new Vector3(0f, 0.35f, 0f);
- [SerializeField] private bool eEnableDashCoreGlow = false;
- [SerializeField] private GameObject eDashCoreGlowPrefab;
- [SerializeField] private Material eDashCoreGlowMaterial;
- [SerializeField] private Color eDashCoreGlowColor = new Color(0.7f, 0.9f, 1f, 0.8f);
- [SerializeField] private float eDashCoreGlowScale = 0.8f;
- [SerializeField] private float eDashCoreGlowDuration = 0.35f;
- [SerializeField] private Vector3 eDashCoreGlowOffset = new Vector3(0f, 0.5f, 0f);
- [SerializeField] private bool eEnableStarTrailParticles = false;
- [SerializeField] private ParticleSystem eStarTrailParticlePrefab;
- private bool eEnableTrailRenderer = false;
- private Material eTrailMaterial;
- private float eTrailTime = 0.35f;
- private float eTrailStartWidth = 0.45f;
- private float eTrailEndWidth = 0f;
- private float eTrailMinVertexDistance = 0.02f;
- private Color eTrailStartColor = new Color(0.6f, 0.85f, 1f, 0.7f);
- private Color eTrailEndColor = new Color(0.6f, 0.85f, 1f, 0f);
- private int eTrailSortingOrderOffset = 5;
+    [SerializeField] private bool eAfterimageUseManualTrailLayout = false;
+    [SerializeField] private bool eAfterimageInvertTrailDirection = false;
+    [SerializeField] private float eAfterimageNearCharacterOffset = 0.03f;
+    [SerializeField] private float eAfterimageTrailLength = 2.2f;
+    [SerializeField] private float eAfterimageTrailSideOffset = 0f;
+    [SerializeField] private bool eAfterimageUsePathSamples = false;
+    [SerializeField] private float eAfterimagePathSpawnDelay = 0f;
+    [SerializeField] private float eAfterimagePathForwardBias = 0f;
+    [SerializeField] private bool eAfterimageSpawnDuringDash = false;
+    [SerializeField] private bool eEnableStarTrail = false;
+    [SerializeField] private Material eStarTrailMaterial;
+    [SerializeField] private Gradient eStarTrailGradient = CreateDefaultStarTrailGradient();
+    [SerializeField] private bool eStarTrailReverseGradient = false;
+    [SerializeField] private float eStarTrailTime = 0.6f;
+    [SerializeField] private float eStarTrailStartWidth = 0.45f;
+    [SerializeField] private float eStarTrailEndWidth = 0.02f;
+    [SerializeField] private float eStarTrailMinVertexDistance = 0.01f;
+    [SerializeField] private Vector3 eStarTrailLocalOffset = new Vector3(0f, 0.35f, 0f);
+    [SerializeField] private bool eEnableDashCoreGlow = false;
+    [SerializeField] private GameObject eDashCoreGlowPrefab;
+    [SerializeField] private Material eDashCoreGlowMaterial;
+    [SerializeField] private Color eDashCoreGlowColor = new Color(0.7f, 0.9f, 1f, 0.8f);
+    [SerializeField] private float eDashCoreGlowScale = 0.8f;
+    [SerializeField] private float eDashCoreGlowDuration = 0.35f;
+    [SerializeField] private Vector3 eDashCoreGlowOffset = new Vector3(0f, 0.5f, 0f);
+    [SerializeField] private bool eEnableStarTrailParticles = false;
+    [SerializeField] private ParticleSystem eStarTrailParticlePrefab;
+    private bool eEnableTrailRenderer = false;
+    private Material eTrailMaterial;
+    private float eTrailTime = 0.35f;
+    private float eTrailStartWidth = 0.45f;
+    private float eTrailEndWidth = 0f;
+    private float eTrailMinVertexDistance = 0.02f;
+    private Color eTrailStartColor = new Color(0.6f, 0.85f, 1f, 0.7f);
+    private Color eTrailEndColor = new Color(0.6f, 0.85f, 1f, 0f);
+    private int eTrailSortingOrderOffset = 5;
 
     [FormerlySerializedAs("eEnableAfterimage")]
     [HideInInspector] public bool eEnableAfterimageLegacy = false;
     [FormerlySerializedAs("eAfterimageCount")]
- public int eAfterimageCountLegacy = 4;
+    public int eAfterimageCountLegacy = 4;
     [FormerlySerializedAs("eAfterimageDuration")]
- public float eAfterimageDurationLegacy = 0.35f;
+    public float eAfterimageDurationLegacy = 0.35f;
     [FormerlySerializedAs("eAfterimageAlpha")]
- public float eAfterimageAlphaLegacy = 0.45f;
+    public float eAfterimageAlphaLegacy = 0.45f;
     [FormerlySerializedAs("eAfterimageScale")]
- public Vector3 eAfterimageScaleLegacy = new Vector3(1f, 1f, 1f);
+    public Vector3 eAfterimageScaleLegacy = new Vector3(1f, 1f, 1f);
     [FormerlySerializedAs("eAfterimageTint")]
- public Color eAfterimageTintLegacy = new Color(0.6f, 0.9f, 1f, 0.45f);
- private TrailRenderer eDashTrailRenderer;
- private GameObject eDashTrailHost;
- private GameObject eDashCoreGlowInstance;
- private Renderer eDashCoreGlowRenderer;
- private ParticleSystem eDashStarTrailParticlesInstance;
- private Material eRuntimeStarTrailMaterial;
- private Material eRuntimeDashCoreGlowMaterial;
+    public Color eAfterimageTintLegacy = new Color(0.6f, 0.9f, 1f, 0.45f);
+    private TrailRenderer eDashTrailRenderer;
+    private GameObject eDashTrailHost;
+    private GameObject eDashCoreGlowInstance;
+    private Renderer eDashCoreGlowRenderer;
+    private ParticleSystem eDashStarTrailParticlesInstance;
+    private Material eRuntimeStarTrailMaterial;
+    private Material eRuntimeDashCoreGlowMaterial;
 
     [HideInInspector] public bool eEnableStarFall = false;
- public int eStarFallBladeCount = 7;
- public float eStarFallRadius = 2.5f;
- public float eStarFallSpawnHeight = 4f;
- public float eStarFallFallSpeed = 10f;
- public float eStarFallRandomDelay = 0.08f;
- public float eStarFallDamageRadius = 0.8f;
- public float eStarFallDamageMultiplier = 0.5f;
- public bool eEnableStarFallDamage = false;
- public bool eStarFallUseForcedVisualRotation = true;
- public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
- public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
- public bool eStarFallUseDashPath = true;
- public float eStarFallPathJitter = 0.35f;
- public float eStarFallSequentialDelay = 0.06f;
+    public int eStarFallBladeCount = 7;
+    public float eStarFallRadius = 2.5f;
+    public float eStarFallSpawnHeight = 4f;
+    public float eStarFallFallSpeed = 10f;
+    public float eStarFallRandomDelay = 0.08f;
+    public float eStarFallDamageRadius = 0.8f;
+    public float eStarFallDamageMultiplier = 0.5f;
+    public bool eEnableStarFallDamage = false;
+    public bool eStarFallUseForcedVisualRotation = true;
+    public Vector3 eStarFallForcedVisualEuler = new Vector3(0f, 0f, 90f);
+    public Vector3 eStarFallVisualEulerOffset = Vector3.zero;
+    public bool eStarFallUseDashPath = true;
+    public float eStarFallPathJitter = 0.35f;
+    public float eStarFallSequentialDelay = 0.06f;
 
     [Header("Current Sword Energy")]
     [InspectorName("Current Sword Energy")]
     public int currentSwordEnergy = 0;
 
-    [HideInInspector] [Header("R Base Sword Count")]
+    [HideInInspector]
+    [Header("R Base Sword Count")]
     [FormerlySerializedAs("swordEnergy")]
     [InspectorName("R Base Sword Count")]
- public int rBaseSwordCount = 1;
+    public int rBaseSwordCount = 1;
 
     [Header("Shared Skill Effect Prefab")]
     public GameObject sharedSkillEffectPrefab;
@@ -234,220 +255,257 @@ public class Player2PrototypeController : MonoBehaviour
     [HideInInspector]
     public bool qEffectInvertForward = false;
 
-    [HideInInspector] [Header("W Effect Scale")]
+    [HideInInspector]
+    [Header("W Effect Scale")]
     [InspectorName("W Effect Scale")]
     public Vector3 wEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector] public float wEffectRotationZ = 0f;
- public Vector3 wEffectOffset = Vector3.zero;
- public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
+    public Vector3 wEffectOffset = Vector3.zero;
+    public Vector3 wEffectPlaneScale = new Vector3(0.25f, 0.25f, 0.25f);
 
-    [HideInInspector] [Header("W Effect Scale Multiplier")]
+    [HideInInspector]
+    [Header("W Effect Scale Multiplier")]
     [InspectorName("W Effect Scale Multiplier")]
     public float wEffectScaleMultiplier = 1f;
     [HideInInspector] public bool wEffectVerticalRotation = true;
- public Vector3 wEffectSpinAxis = Vector3.up;
- public float wEffectVisualPitch = 0f;
- public float wEffectVisualYaw = 0f;
- public float wEffectVisualRoll = 0f;
- public int wSwordCount = 3;
+    public Vector3 wEffectSpinAxis = Vector3.up;
+    public float wEffectVisualPitch = 0f;
+    public float wEffectVisualYaw = 0f;
+    public float wEffectVisualRoll = 0f;
+    public int wSwordCount = 3;
 
-    [HideInInspector] [Header("Base W Sword Count")]
+    [HideInInspector]
+    [Header("Base W Sword Count")]
     [InspectorName("Base W Sword Count")]
     public int baseWSwordCount = 3;
-    [HideInInspector] [InspectorName("Use Sword Energy For W")]
+    [HideInInspector]
+    [InspectorName("Use Sword Energy For W")]
     public bool useSwordEnergyForW = true;
-    [HideInInspector] [InspectorName("Max W Sword Count")]
+    [HideInInspector]
+    [InspectorName("Max W Sword Count")]
     public int maxWSwordCount = 15;
-    [HideInInspector] [InspectorName("W Effect Orbit Radius")]
+    [HideInInspector]
+    [InspectorName("W Effect Orbit Radius")]
     public float wEffectOrbitRadius = 1.2f;
-    [HideInInspector] [InspectorName("W Effect Height")]
+    [HideInInspector]
+    [InspectorName("W Effect Height")]
     public float wEffectHeight = 1.1f;
-    [HideInInspector] [InspectorName("W Effect Orbit Speed")]
+    [HideInInspector]
+    [InspectorName("W Effect Orbit Speed")]
     public float wEffectOrbitSpeed = 80f;
-    [HideInInspector] [InspectorName("W Sword Orbit Yaw Offset")]
+    [HideInInspector]
+    [InspectorName("W Sword Orbit Yaw Offset")]
     public float wSwordOrbitYawOffset = 90f;
     [HideInInspector] public bool wEffectFaceCamera = true;
     [FormerlySerializedAs("wEffectSpinSpeed")]
- public float wEffectSelfSpinSpeed = 0f;
+    public float wEffectSelfSpinSpeed = 0f;
 
-    [HideInInspector] [Header("W Duration Per Sword Energy")]
+    [HideInInspector]
+    [Header("W Duration Per Sword Energy")]
     [InspectorName("W Duration Per Sword Energy")]
     public float wDurationPerSwordEnergy = 0f;
-    [HideInInspector] [InspectorName("W Max Duration Bonus")]
+    [HideInInspector]
+    [InspectorName("W Max Duration Bonus")]
     public float wMaxDurationBonus = 0f;
-    [HideInInspector] [InspectorName("W Orbit Speed Per Sword Energy")]
+    [HideInInspector]
+    [InspectorName("W Orbit Speed Per Sword Energy")]
     public float wOrbitSpeedPerSwordEnergy = 0f;
-    [HideInInspector] [InspectorName("W Max Orbit Speed Bonus")]
+    [HideInInspector]
+    [InspectorName("W Max Orbit Speed Bonus")]
     public float wMaxOrbitSpeedBonus = 0f;
-    [HideInInspector] [InspectorName("W Radius Per Sword Energy")]
+    [HideInInspector]
+    [InspectorName("W Radius Per Sword Energy")]
     public float wRadiusPerSwordEnergy = 0f;
-    [HideInInspector] [InspectorName("W Max Radius Bonus")]
+    [HideInInspector]
+    [InspectorName("W Max Radius Bonus")]
     public float wMaxRadiusBonus = 0f;
 
     [HideInInspector] public float wOrbitRadiusMin = 0.9f;
- public float wOrbitRadiusMax = 1.8f;
- public float wHeightMin = 0.2f;
- public float wHeightMax = 1.2f;
- public float wOrbitSpeedMin = 60f;
- public float wOrbitSpeedMax = 120f;
- public float wBobAmplitudeMin = 0.05f;
- public float wBobAmplitudeMax = 0.25f;
- public float wBobFrequencyMin = 0.8f;
- public float wBobFrequencyMax = 2.0f;
- public float wSwingAngleMin = 3f;
- public float wSwingAngleMax = 12f;
- public float wRadiusJitter = 0.12f;
- public float wAngularJitter = 10f;
- public bool wClockwise = true;
- public bool wFaceOrbitDirection = true;
- public float wOrbitDirectionYawOffset = 0f;
- public float wOrbitDirectionPitchOffset = 0f;
- public float wOrbitDirectionRollOffset = 0f;
- public bool wKeepSwordVisibleToCamera = true;
+    public float wOrbitRadiusMax = 1.8f;
+    public float wHeightMin = 0.2f;
+    public float wHeightMax = 1.2f;
+    public float wOrbitSpeedMin = 60f;
+    public float wOrbitSpeedMax = 120f;
+    public float wBobAmplitudeMin = 0.05f;
+    public float wBobAmplitudeMax = 0.25f;
+    public float wBobFrequencyMin = 0.8f;
+    public float wBobFrequencyMax = 2.0f;
+    public float wSwingAngleMin = 3f;
+    public float wSwingAngleMax = 12f;
+    public float wRadiusJitter = 0.12f;
+    public float wAngularJitter = 10f;
+    public bool wClockwise = true;
+    public bool wFaceOrbitDirection = true;
+    public float wOrbitDirectionYawOffset = 0f;
+    public float wOrbitDirectionPitchOffset = 0f;
+    public float wOrbitDirectionRollOffset = 0f;
+    public bool wKeepSwordVisibleToCamera = true;
 
     [Header("R Effect Scale")]
     [HideInInspector] public Vector3 eEffectScale = new Vector3(0.35f, 0.35f, 0.35f);
- public float eEffectRotationZ = -90f;
- public Vector3 eEffectOffset = Vector3.zero;
- public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
- public float eEffectYawOffset = 0f;
- public float eEffectVisualPitch = 0f;
- public float eEffectVisualYaw = 0f;
- public float eEffectVisualRoll = 0f;
+    public float eEffectRotationZ = -90f;
+    public Vector3 eEffectOffset = Vector3.zero;
+    public Vector3 eEffectPlaneScale = new Vector3(0.35f, 0.35f, 1f);
+    public float eEffectYawOffset = 0f;
+    public float eEffectVisualPitch = 0f;
+    public float eEffectVisualYaw = 0f;
+    public float eEffectVisualRoll = 0f;
 
-    [HideInInspector] [Header("R Effect Scale")]
+    [HideInInspector]
+    [Header("R Effect Scale")]
     [InspectorName("R Effect Scale")]
- public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
- public float rEffectRotationZ = 0f;
- public Vector3 rEffectOffset = Vector3.zero;
- public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
- public float rEffectYawOffset = 0f;
- [InspectorName("R Effect Visual Pitch")]
- public float rEffectVisualPitch = 0f;
- [InspectorName("R Effect Visual Yaw")]
- public float rEffectVisualYaw = 0f;
- [InspectorName("R Effect Visual Roll")]
- public float rEffectVisualRoll = 0f;
- public bool rEffectInvertForward = false;
- [Header("R Swarm Duration")]
- [InspectorName("R Swarm Duration")]
- public float rSwarmDuration = 2.0f;
- [InspectorName("R Swarm Radius Min")]
- public float rSwarmRadiusMin = 0.8f;
- [InspectorName("R Swarm Radius Max")]
- public float rSwarmRadiusMax = 3.2f;
- [InspectorName("R Swarm Height Min")]
- public float rSwarmHeightMin = 0.4f;
- [InspectorName("R Swarm Height Max")]
- public float rSwarmHeightMax = 3.0f;
- [InspectorName("R Swarm Speed Min")]
- public float rSwarmSpeedMin = 120f;
- [InspectorName("R Swarm Speed Max")]
- public float rSwarmSpeedMax = 300f;
- [InspectorName("R Swarm Bob Amplitude Min")]
- public float rSwarmBobAmplitudeMin = 0.05f;
- [InspectorName("R Swarm Bob Amplitude Max")]
- public float rSwarmBobAmplitudeMax = 0.35f;
- [InspectorName("R Swarm Bob Frequency Min")]
- public float rSwarmBobFrequencyMin = 0.8f;
- [InspectorName("R Swarm Bob Frequency Max")]
- public float rSwarmBobFrequencyMax = 2.5f;
- [InspectorName("R Swarm Radius Jitter")]
- public float rSwarmRadiusJitter = 0.25f;
- [InspectorName("R Swarm Clockwise")]
- public bool rSwarmClockwise = true;
- [InspectorName("R Swarm Forward Offset")]
- public float rSwarmForwardOffset = 2.0f;
- [Header("R Swarm Yaw Offset")]
- [InspectorName("R Swarm Yaw Offset")]
- public float rSwarmYawOffset = 0f;
- [InspectorName("R Billboard Like Player")]
- public bool rBillboardLikePlayer = true;
- [InspectorName("R Render Camera")]
- public Camera rRenderCamera;
- [InspectorName("R Auto Resolve Render Camera")]
- public bool rAutoResolveRenderCamera = true;
- [InspectorName("R Swarm Use Camera Forward")]
- public bool rSwarmUseCameraForward = true;
- [InspectorName("R Swarm Center On Player")]
- public bool rSwarmCenterOnPlayer = false;
- [InspectorName("R Apply Effect Offset To Swarm Center")]
- public bool rApplyEffectOffsetToSwarmCenter = false;
- public bool rUseTangentFacing = true;
- [InspectorName("R Plane Upright Euler")]
- public Vector3 rPlaneUprightEuler = Vector3.zero;
- [InspectorName("R Plane Face Camera Euler")]
- public Vector3 rPlaneFaceCameraEuler = Vector3.zero;
- [Header("R Flip Plane Front Back")]
- [InspectorName("R Flip Plane Front Back")]
- public bool rFlipPlaneFrontBack = true;
- [InspectorName("R Plane Front Back Flip Euler")]
- public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
- public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
- [Header("R Use Player Layer For R")]
- public bool rDebugSwordVelocityFacing = false;
- public float rFacingLookAheadTime = 0.05f;
- public bool rDebugFacingScreenAngle = false;
- [InspectorName("R Use Player Layer For R")]
- public bool rUsePlayerLayerForR = true;
- [InspectorName("R Force Double Sided")]
- public bool rForceDoubleSided = true;
- [Header("R Swarm Damage Radius")]
- public bool rEnableSwordSelfSpin = false;
- public float rSwordSelfSpinMin = 30f;
- public float rSwordSelfSpinMax = 120f;
- public Vector3 rSwordLengthLocalAxis = Vector3.up;
- [Header("R Swarm Damage Radius")]
- [InspectorName("R Swarm Damage Radius")]
- public float rSwarmDamageRadius = 3.0f;
- [InspectorName("R Swarm Damage Interval")]
- public float rSwarmDamageInterval = 0.25f;
- [InspectorName("R Swarm Damage Per Tick")]
+    public Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
+    public float rEffectRotationZ = 0f;
+    public Vector3 rEffectOffset = Vector3.zero;
+    public Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
+    public float rEffectYawOffset = 0f;
+    [InspectorName("R Effect Visual Pitch")]
+    public float rEffectVisualPitch = 0f;
+    [InspectorName("R Effect Visual Yaw")]
+    public float rEffectVisualYaw = 0f;
+    [InspectorName("R Effect Visual Roll")]
+    public float rEffectVisualRoll = 0f;
+    public bool rEffectInvertForward = false;
+    [Header("R Swarm Duration")]
+    [InspectorName("R Swarm Duration")]
+    public float rSwarmDuration = 2.0f;
+    [InspectorName("R Swarm Radius Min")]
+    public float rSwarmRadiusMin = 0.8f;
+    [InspectorName("R Swarm Radius Max")]
+    public float rSwarmRadiusMax = 3.2f;
+    [InspectorName("R Swarm Height Min")]
+    public float rSwarmHeightMin = 0.4f;
+    [InspectorName("R Swarm Height Max")]
+    public float rSwarmHeightMax = 3.0f;
+    [InspectorName("R Swarm Speed Min")]
+    public float rSwarmSpeedMin = 120f;
+    [InspectorName("R Swarm Speed Max")]
+    public float rSwarmSpeedMax = 300f;
+    [InspectorName("R Swarm Bob Amplitude Min")]
+    public float rSwarmBobAmplitudeMin = 0.05f;
+    [InspectorName("R Swarm Bob Amplitude Max")]
+    public float rSwarmBobAmplitudeMax = 0.35f;
+    [InspectorName("R Swarm Bob Frequency Min")]
+    public float rSwarmBobFrequencyMin = 0.8f;
+    [InspectorName("R Swarm Bob Frequency Max")]
+    public float rSwarmBobFrequencyMax = 2.5f;
+    [InspectorName("R Swarm Radius Jitter")]
+    public float rSwarmRadiusJitter = 0.25f;
+    [InspectorName("R Swarm Clockwise")]
+    public bool rSwarmClockwise = true;
+    [InspectorName("R Swarm Forward Offset")]
+    public float rSwarmForwardOffset = 2.0f;
+    [Header("R Swarm Yaw Offset")]
+    [InspectorName("R Swarm Yaw Offset")]
+    public float rSwarmYawOffset = 0f;
+    [InspectorName("R Billboard Like Player")]
+    public bool rBillboardLikePlayer = true;
+    [InspectorName("R Render Camera")]
+    public Camera rRenderCamera;
+    [InspectorName("R Auto Resolve Render Camera")]
+    public bool rAutoResolveRenderCamera = true;
+    [InspectorName("R Swarm Use Camera Forward")]
+    public bool rSwarmUseCameraForward = true;
+    [InspectorName("R Swarm Center On Player")]
+    public bool rSwarmCenterOnPlayer = false;
+    [InspectorName("R Apply Effect Offset To Swarm Center")]
+    public bool rApplyEffectOffsetToSwarmCenter = false;
+    public bool rUseTangentFacing = true;
+    [InspectorName("R Plane Upright Euler")]
+    public Vector3 rPlaneUprightEuler = Vector3.zero;
+    [InspectorName("R Plane Face Camera Euler")]
+    public Vector3 rPlaneFaceCameraEuler = Vector3.zero;
+    [Header("R Flip Plane Front Back")]
+    [InspectorName("R Flip Plane Front Back")]
+    public bool rFlipPlaneFrontBack = true;
+    [InspectorName("R Plane Front Back Flip Euler")]
+    public Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
+    public Vector3 rInPlaneRotationAxis = new Vector3(0f, 0f, 1f);
+    [Header("R Use Player Layer For R")]
+    public bool rDebugSwordVelocityFacing = false;
+    public float rFacingLookAheadTime = 0.05f;
+    public bool rDebugFacingScreenAngle = false;
+    [InspectorName("R Use Player Layer For R")]
+    public bool rUsePlayerLayerForR = true;
+    [InspectorName("R Force Double Sided")]
+    public bool rForceDoubleSided = true;
+    [Header("R Swarm Damage Radius")]
+    public bool rEnableSwordSelfSpin = false;
+    public float rSwordSelfSpinMin = 30f;
+    public float rSwordSelfSpinMax = 120f;
+    public Vector3 rSwordLengthLocalAxis = Vector3.up;
+    [Header("R Swarm Damage Radius")]
+    [InspectorName("R Swarm Damage Radius")]
+    public float rSwarmDamageRadius = 3.0f;
+    [InspectorName("R Swarm Damage Interval")]
+    public float rSwarmDamageInterval = 0.25f;
+    [InspectorName("R Swarm Damage Per Tick")]
     public float rSwarmDamagePerTick = 2.0f;
-    [HideInInspector] [InspectorName("R Swarm Enemy Layer")]
+    [HideInInspector]
+    [InspectorName("R Swarm Enemy Layer")]
     public LayerMask rSwarmEnemyLayer = ~0;
 
-    [HideInInspector] [Header("R Star Rain Spawn Height")]
- [InspectorName("R Star Rain Spawn Height")]
+    [HideInInspector]
+    [Header("R Star Rain Spawn Height")]
+    [InspectorName("R Star Rain Spawn Height")]
     public float rRiseDuration = 0.45f;
-    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Spawn Height")]
     public float rRiseHeight = 4f;
-    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Spawn Height")]
     public float rStarRainDuration = 1.2f;
-    [HideInInspector] [InspectorName("R Star Rain Spawn Height")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Spawn Height")]
     public float rStarRainSpawnHeight = 5f;
-    [HideInInspector] [InspectorName("R Star Rain Radius")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Radius")]
     public float rStarRainRadius = 5f;
-    [HideInInspector] [InspectorName("R Star Rain Fall Speed")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Fall Speed")]
     public float rStarRainFallSpeed = 10f;
-    [HideInInspector] [InspectorName("R Star Rain Random Delay")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Random Delay")]
     public float rStarRainRandomDelay = 0.15f;
-    [HideInInspector] [InspectorName("R Star Rain Damage Radius")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Damage Radius")]
     public float rStarRainDamageRadius = 1.2f;
 
-    [HideInInspector] [InspectorName("R Star Rain Start Ratio")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Start Ratio")]
     public float rStarRainStartRatio = 0.5f;
-    [HideInInspector] [InspectorName("R Star Rain Interval")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Interval")]
     public float rStarRainInterval = 0.12f;
-    [HideInInspector] [InspectorName("R Star Rain Blades Per Wave")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Blades Per Wave")]
     public int rStarRainBladesPerWave = 2;
-    [HideInInspector] [InspectorName("R Star Rain Visual Euler Offset")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Visual Euler Offset")]
     public Vector3 rStarRainVisualEulerOffset = Vector3.zero;
-    [HideInInspector] [InspectorName("R Star Rain Use Forced Visual Rotation")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Use Forced Visual Rotation")]
     public bool rStarRainUseForcedVisualRotation = true;
-    [HideInInspector] [InspectorName("R Star Rain Forced Visual Euler")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Forced Visual Euler")]
     public Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
-    [HideInInspector] [InspectorName("R Star Rain Damage Multiplier")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Damage Multiplier")]
     public float rStarRainDamageMultiplier = 0.6f;
-    [HideInInspector] [InspectorName("R Star Rain Effect Scale")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Effect Scale")]
     public Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-    [HideInInspector] [InspectorName("R Star Rain Continue After Orbit")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Continue After Orbit")]
     public bool rStarRainContinueAfterOrbit = true;
-    [HideInInspector] [InspectorName("R Star Rain Extra Duration After Orbit")]
+    [HideInInspector]
+    [InspectorName("R Star Rain Extra Duration After Orbit")]
     public float rStarRainExtraDurationAfterOrbit = 0.6f;
-    [HideInInspector] [InspectorName("R Orbit Clear When Orbit Ends")]
+    [HideInInspector]
+    [InspectorName("R Orbit Clear When Orbit Ends")]
     public bool rOrbitClearWhenOrbitEnds = true;
-    [HideInInspector] [InspectorName("R Orbit Fade Out Duration")]
+    [HideInInspector]
+    [InspectorName("R Orbit Fade Out Duration")]
     public float rOrbitFadeOutDuration = 0.15f;
 
     [Header("Standby Sword Scale")]
@@ -625,6 +683,10 @@ public class Player2PrototypeController : MonoBehaviour
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
 
         ResolveRRenderCamera();
+
+        // 初始化冷却与蓝量系统
+        // 全局冷却倒计时 + 自动回蓝
+        cooldownManager?.TickCooldownAndMana(Time.deltaTime);
     }
 
     private void Start()
@@ -710,31 +772,53 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
+        // 全局冷却倒计时 + 自动回蓝
+        cooldownManager?.TickCooldownAndMana(Time.deltaTime);
+
+        // Q 技能
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
-            if (qSkill != null) qSkill.Cast();
-            else CastQ();
+            if (CanCastSkill(0))
+            {
+                ConsumeSkill(0);
+                if (qSkill != null) qSkill.Cast();
+                else CastQ();
+            }
         }
 
+        // W 技能
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
-            if (wSkill != null) wSkill.Cast();
-            else CastW();
+            if (CanCastSkill(1))
+            {
+                ConsumeSkill(1);
+                if (wSkill != null) wSkill.Cast();
+                else CastW();
+            }
         }
 
+        // E 技能
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
-            if (eSkill != null) eSkill.Cast();
-            else CastE();
+            if (CanCastSkill(2))
+            {
+                ConsumeSkill(2);
+                if (eSkill != null) eSkill.Cast();
+                else CastE();
+            }
         }
 
+        // R 技能
         if (Keyboard.current.rKey.wasPressedThisFrame)
         {
-            if (rSkill != null) rSkill.Cast();
-            else CastR();
+            if (CanCastSkill(3))
+            {
+                ConsumeSkill(3);
+                if (rSkill != null) rSkill.Cast();
+                else CastR();
+            }
         }
     }
-
     private void InitializeSkillSlots()
     {
         if (qSkill == null) qSkill = GetComponent<Player2Skill_Q_DivineLightSword>();
@@ -1426,7 +1510,6 @@ public class Player2PrototypeController : MonoBehaviour
 
             sword.transform.SetParent(orbitRoot.transform, true);
 
-            // W size control: only use W Effect Scale Multiplier on top of the correctly displayed base scale.
             SkillEffectRuntime runtime = sword.GetComponent<SkillEffectRuntime>();
             if (runtime != null && runtime.visual != null)
             {
@@ -1517,7 +1600,6 @@ public class Player2PrototypeController : MonoBehaviour
             activeWOrbitVisualRoot = null;
         }
 
-        // Clean legacy/temporary W visuals that may have been spawned by older logic.
         Transform[] allTransforms = FindObjectsOfType<Transform>(true);
         for (int i = 0; i < allTransforms.Length; i++)
         {
@@ -3118,7 +3200,6 @@ public class Player2PrototypeController : MonoBehaviour
             return null;
         }
 
-        // Keep world transform when parenting so instantiated prefab stays at the root skill position.
         effectVisual.transform.SetParent(root.transform, true);
 
         Transform visualTarget = FindEffectVisualTransform(effectVisual);
@@ -3468,7 +3549,6 @@ public class Player2PrototypeController : MonoBehaviour
         Quaternion finalRotation = BuildRStarRainVisibleRotation();
         data.sword.transform.rotation = finalRotation;
         data.visualTransform.rotation = finalRotation;
-        // StarRain final visual.rotation is intentionally written here last so the fall swords stay vertical.
     }
 
     private Quaternion BuildEStarFallVisibleRotation(Vector3 fallDir)
@@ -3519,10 +3599,50 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat.HasProperty("_Color")) mat.SetColor("_Color", color);
         if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", color);
     }
+
+    // 内部判断：技能是否满足释放条件
+    // 内部判断：技能是否满足释放条件
+    private bool CanCastSkill(int index)
+    {
+        if (cooldownManager == null) return true;
+        return cooldownManager.IsSkillCastable(index);
+    }
+
+    // 内部消耗：扣蓝 + 进入冷却
+    private void ConsumeSkill(int index)
+    {
+        if (cooldownManager == null) return;
+        cooldownManager.ConsumeSkillResource(index);
+    }
+
+    // ========== UI 只读接口，给技能栏UI调用 ==========
+    public float GetSkillCurrentCD(int index)
+    {
+        if (cooldownManager == null) return 0f;
+        return cooldownManager.GetCurrentSkillCD(index);
+    }
+
+    public float GetSkillMaxCD(int index)
+    {
+        if (cooldownManager == null) return 0f;
+        return cooldownManager.GetSkillMaxCD(index);
+    }
+
+    public float GetSkillManaCost(int index)
+    {
+        if (cooldownManager == null) return 0f;
+        return cooldownManager.GetSkillManaCost(index);
+    }
+
+    public float GetCurrentMana()
+    {
+        if (cooldownManager == null) return 0f;
+        return cooldownManager.GetCurrentMana();
+    }
+
+    public bool IsSkillReady(int index)
+    {
+        if (cooldownManager == null) return true;
+        return cooldownManager.IsSkillReady(index);
+    }
 }
-
-
-
-
-
-
