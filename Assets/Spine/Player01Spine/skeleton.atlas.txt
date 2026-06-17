@@ -1,0 +1,174 @@
+
+skeleton.png
+size: 4025,2034
+format: RGBA8888
+filter: Linear,Linear
+repeat: none
+神眷之子-拆分_0000_剪刀装饰
+  rotate: true
+  xy: 1898, 1150
+  size: 245, 213
+  orig: 2249, 2249
+  offset: 424, 1143
+  index: -1
+神眷之子-拆分_0001_左剪刀0
+  rotate: true
+  xy: 2, 1397
+  size: 635, 2117
+  orig: 2249, 2249
+  offset: 62, 65
+  index: -1
+神眷之子-拆分_0002_右剪刀-1
+  rotate: true
+  xy: 2, 840
+  size: 555, 1894
+  orig: 2249, 2249
+  offset: 398, 65
+  index: -1
+神眷之子-拆分_0003_呆毛+7
+  rotate: true
+  xy: 1628, 41
+  size: 153, 173
+  orig: 2249, 2249
+  offset: 897, 1889
+  index: -1
+神眷之子-拆分_0004_左视角留海+6
+  rotate: false
+  xy: 3529, 939
+  size: 471, 432
+  orig: 2249, 2249
+  offset: 805, 1448
+  index: -1
+神眷之子-拆分_0005_左视角留海（左）+5
+  rotate: true
+  xy: 2373, 350
+  size: 392, 602
+  orig: 2249, 2249
+  offset: 593, 1304
+  index: -1
+神眷之子-拆分_0006_左视角留海（右）+4
+  rotate: false
+  xy: 3072, 1374
+  size: 456, 658
+  orig: 2249, 2249
+  offset: 960, 1280
+  index: -1
+神眷之子-拆分_0007_右蝴蝶结+3
+  rotate: true
+  xy: 3490, 583
+  size: 354, 533
+  orig: 2249, 2249
+  offset: 1301, 1095
+  index: -1
+神眷之子-拆分_0008_右马尾+2
+  rotate: true
+  xy: 2482, 744
+  size: 383, 580
+  orig: 2249, 2249
+  offset: 1039, 848
+  index: -1
+神眷之子-拆分_0009_左视角头+1
+  rotate: false
+  xy: 817, 75
+  size: 809, 763
+  orig: 2249, 2249
+  offset: 741, 1205
+  index: -1
+神眷之子-拆分_0010_右手+1
+  rotate: true
+  xy: 1952, 2
+  size: 233, 366
+  orig: 2249, 2249
+  offset: 1143, 751
+  index: -1
+神眷之子-拆分_0011_蝴蝶结（胸前）0
+  rotate: true
+  xy: 3072, 1015
+  size: 357, 455
+  orig: 2249, 2249
+  offset: 766, 720
+  index: -1
+神眷之子-拆分_0012_左马尾-1
+  rotate: false
+  xy: 1628, 196
+  size: 322, 642
+  orig: 2249, 2249
+  offset: 654, 895
+  index: -1
+神眷之子-拆分_0013_左蝴蝶结-2
+  rotate: true
+  xy: 2977, 340
+  size: 257, 367
+  orig: 2249, 2249
+  offset: 639, 1111
+  index: -1
+神眷之子-拆分_0014_身体（裙摆）-3
+  rotate: false
+  xy: 2121, 1129
+  size: 949, 903
+  orig: 2249, 2249
+  offset: 617, 518
+  index: -1
+神眷之子-拆分_0015_左手-4
+  rotate: true
+  xy: 2958, 54
+  size: 284, 338
+  orig: 2249, 2249
+  offset: 709, 779
+  index: -1
+神眷之子-拆分_0016_左视角右腿-5
+  rotate: true
+  xy: 2373, 72
+  size: 276, 583
+  orig: 2249, 2249
+  offset: 1058, 183
+  index: -1
+神眷之子-拆分_0017_左视角左腿-6
+  rotate: true
+  xy: 3346, 320
+  size: 261, 566
+  orig: 2249, 2249
+  offset: 839, 205
+  index: -1
+神眷之子-拆分_0018_右视角留海+6
+  rotate: false
+  xy: 3064, 599
+  size: 424, 414
+  orig: 2249, 2249
+  offset: 667, 1462
+  index: -1
+神眷之子-拆分_0019_右视角留海（左）+5
+  rotate: false
+  xy: 3530, 1373
+  size: 428, 659
+  orig: 2249, 2249
+  offset: 975, 1272
+  index: -1
+神眷之子-拆分_0020_右视角留海（右）+4
+  rotate: false
+  xy: 1952, 237
+  size: 419, 605
+  orig: 2249, 2249
+  offset: 586, 1304
+  index: -1
+神眷之子-拆分_0021_右视角头0
+  rotate: false
+  xy: 2, 60
+  size: 813, 778
+  orig: 2249, 2249
+  offset: 741, 1190
+  index: -1
+神眷之子-拆分_0022_右视角右腿-5
+  rotate: true
+  xy: 1898, 844
+  size: 283, 582
+  orig: 2249, 2249
+  offset: 1056, 184
+  index: -1
+神眷之子-拆分_0023_右视角左腿-6
+  rotate: true
+  xy: 3298, 49
+  size: 269, 566
+  orig: 2249, 2249
+  offset: 833, 205
+  index: -1
