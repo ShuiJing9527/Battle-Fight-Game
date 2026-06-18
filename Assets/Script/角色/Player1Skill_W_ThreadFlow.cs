@@ -2,25 +2,52 @@ using UnityEngine;
 
 public class Player1Skill_W_ThreadFlow : Player01SkillBase
 {
+    [Header("W")]
+    [SerializeField, Min(0f)] private float damageReduction = 0.4f;
+    [SerializeField] private GameObject shieldPrefab;
+
+    public bool IsDefending { get; private set; }
+
+    private GameObject activeShieldInstance;
+
     private void Reset()
     {
         cooldown = 4.5f;
         duration = 0.75f;
         effectPower = 0.8f;
-        animationName = "Idle";
+        animationName = "";
         debugLog = true;
+        damageReduction = 0.4f;
     }
 
-    protected override bool ShouldLoopAnimation()
+    public override bool LocksLocomotionAnimation()
     {
-        return true;
+        return false;
     }
 
     protected override void OnCastStarted()
     {
+        IsDefending = true;
+
+        if (shieldPrefab != null)
+        {
+            activeShieldInstance = Instantiate(shieldPrefab, transform.position, transform.rotation, transform);
+        }
+
         if (debugLog)
         {
-            Debug.Log($"[W - 丝缕缠流] Placeholder flow active. effectPower={effectPower:F2}", this);
+            Debug.Log($"[W - 丝缕缠流] Defense state entered. damageReduction={damageReduction:F2}", this);
+        }
+    }
+
+    protected override void OnCastFinished()
+    {
+        IsDefending = false;
+
+        if (activeShieldInstance != null)
+        {
+            Destroy(activeShieldInstance);
+            activeShieldInstance = null;
         }
     }
 

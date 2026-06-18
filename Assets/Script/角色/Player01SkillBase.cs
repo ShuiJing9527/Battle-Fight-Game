@@ -17,8 +17,9 @@ public abstract class Player01SkillBase : MonoBehaviour
 
     protected Player01SkillController Controller { get; private set; }
 
-    private float nextCastTime;
-    private Coroutine castRoutine;
+    protected float nextCastTime;
+    protected Coroutine castRoutine;
+    protected bool castFinished;
 
     public virtual void Initialize(Player01SkillController controller)
     {
@@ -32,27 +33,10 @@ public abstract class Player01SkillBase : MonoBehaviour
 
     public virtual void Cast()
     {
-        if (!CanCastNow())
+        if (!TryReserveCast())
         {
-            if (debugLog)
-            {
-                Debug.Log($"[{GetSkillLabel()}] Skill is on cooldown.", this);
-            }
-
             return;
         }
-
-        if (Controller != null && !Controller.TryBeginSkill(this))
-        {
-            if (debugLog)
-            {
-                Debug.Log($"[{GetSkillLabel()}] Controller is busy, cast ignored.", this);
-            }
-
-            return;
-        }
-
-        nextCastTime = Time.time + Mathf.Max(0f, cooldown);
 
         if (debugLog)
         {
@@ -61,12 +45,7 @@ public abstract class Player01SkillBase : MonoBehaviour
 
         OnCastStarted();
 
-        if (castRoutine != null)
-        {
-            StopCoroutine(castRoutine);
-        }
-
-        castRoutine = StartCoroutine(CastRoutine());
+        StartManagedCast(CastRoutine());
     }
 
     protected virtual void OnCastStarted()
@@ -82,6 +61,11 @@ public abstract class Player01SkillBase : MonoBehaviour
         return false;
     }
 
+    public virtual bool LocksLocomotionAnimation()
+    {
+        return true;
+    }
+
     protected virtual string ResolveAnimationName()
     {
         return animationName;
@@ -92,7 +76,7 @@ public abstract class Player01SkillBase : MonoBehaviour
         return GetType().Name;
     }
 
-    private IEnumerator CastRoutine()
+    protected virtual IEnumerator CastRoutine()
     {
         string resolvedAnimation = ResolveAnimationName();
         if (Controller != null)
@@ -110,12 +94,7 @@ public abstract class Player01SkillBase : MonoBehaviour
             yield return null;
         }
 
-        OnCastFinished();
-
-        if (Controller != null)
-        {
-            Controller.FinishSkill(this);
-        }
+        CompleteCast();
 
         if (debugLog)
         {
@@ -135,17 +114,68 @@ public abstract class Player01SkillBase : MonoBehaviour
         AbortCast();
     }
 
-    private void AbortCast()
+    protected bool TryReserveCast()
+    {
+        if (!CanCastNow())
+        {
+            if (debugLog)
+            {
+                Debug.Log($"[{GetSkillLabel()}] Skill is on cooldown.", this);
+            }
+
+            return false;
+        }
+
+        if (Controller != null && !Controller.TryBeginSkill(this))
+        {
+            if (debugLog)
+            {
+                Debug.Log($"[{GetSkillLabel()}] Controller is busy, cast ignored.", this);
+            }
+
+            return false;
+        }
+
+        nextCastTime = Time.time + Mathf.Max(0f, cooldown);
+        castFinished = false;
+        return true;
+    }
+
+    protected void StartManagedCast(IEnumerator routine)
     {
         if (castRoutine != null)
         {
             StopCoroutine(castRoutine);
-            castRoutine = null;
         }
+
+        castRoutine = routine != null ? StartCoroutine(routine) : null;
+    }
+
+    protected void CompleteCast()
+    {
+        if (castFinished)
+        {
+            return;
+        }
+
+        castFinished = true;
+        castRoutine = null;
+
+        OnCastFinished();
 
         if (Controller != null)
         {
             Controller.FinishSkill(this);
         }
+    }
+
+    private void AbortCast()
+    {
+        if (castRoutine != null)
+        {
+            StopCoroutine(castRoutine);
+    }
+
+        CompleteCast();
     }
 }

@@ -13611,7 +13611,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 2086290263}
+  m_CustomBakedTexture: {fileID: 1754209746}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -15158,8 +15158,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.09305849, g: 0.1115995, b: 0.30937007, a: 0}
-  m_Intensity: 0
+  m_Color: {r: 0.99352294, g: 0.7574182, b: 0.35392275, a: 1}
+  m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -15221,7 +15221,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
+  m_LocalRotation: {x: 0.41277313, y: 0.11060224, z: 0.23399667, w: 0.8732875}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -16057,7 +16057,7 @@ MonoBehaviour:
   walkAnimationName: Walk
   runAnimationName: Run
   walkSpeedThreshold: 0.15
-  runSpeedThreshold: 2.5
+  runSpeedThreshold: 6
   spineSortingOrder: 20
   debugLog: 0
 --- !u!114 &1414717694
@@ -16072,11 +16072,15 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_Q_QuickShear
-  cooldown: 0.7
+  cooldown: 1
   duration: 0.42
   effectPower: 1.2
   animationName: ATK2
   debugLog: 1
+  slashCount: 3
+  slashInterval: 0.15
+  qDamage: 1.2
+  qRange: 1.5
 --- !u!114 &1414717695
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16092,8 +16096,10 @@ MonoBehaviour:
   cooldown: 4.5
   duration: 0.75
   effectPower: 0.8
-  animationName: Idle
+  animationName: 
   debugLog: 1
+  damageReduction: 0.4
+  shieldPrefab: {fileID: 0}
 --- !u!114 &1414717696
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16111,6 +16117,11 @@ MonoBehaviour:
   effectPower: 4
   animationName: Run
   debugLog: 1
+  speedMultiplier: 1.75
+  ignoreObstacleCollision: 1
+  obstacleLayers:
+    serializedVersion: 2
+    m_Bits: 8
 --- !u!114 &1414717697
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16128,6 +16139,12 @@ MonoBehaviour:
   effectPower: 1.35
   animationName: ATK1
   debugLog: 1
+  needlePrefab: {fileID: 0}
+  needleCount: 3
+  needleSpreadAngle: 10
+  needleSpeed: 14
+  needleDamage: 1.35
+  spawnOffset: {x: 0.85, y: 0.15, z: 0}
 --- !u!1 &1662612881
 GameObject:
   m_ObjectHideFlags: 0
@@ -16254,6 +16271,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &1754209746
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1809271588
 GameObject:
   m_ObjectHideFlags: 0
@@ -16788,7 +16842,7 @@ MonoBehaviour:
     materialsInsideMask: []
     materialsOutsideMask: []
   disableRenderingOnOverride: 1
-  _animationName: 
+  _animationName: Idle
   loop: 1
   timeScale: 1
 --- !u!23 &1994693531
@@ -16852,43 +16906,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 2962422539587455864, guid: 906495144c6b37241ade607617c4e318, type: 3}
   m_PrefabInstance: {fileID: 3069856048353722971}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &2086290263
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &2090811301
 GameObject:
   m_ObjectHideFlags: 0
