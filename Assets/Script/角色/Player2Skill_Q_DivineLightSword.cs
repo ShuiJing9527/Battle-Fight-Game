@@ -51,6 +51,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private Vector3 qImpactDustLocalOffset = new Vector3(0f, 0.2f, 0f);
     [InspectorName("Q Impact Dust Scale")]
     [SerializeField] private Vector3 qImpactDustScale = Vector3.one;
+    [InspectorName("Q Show Dust Debug Marker")]
+    [SerializeField] private bool qShowDustDebugMarker = false;
 
     [Header("Q - Divine Light Sword / Star Fall")]
     [InspectorName("Q Star Fall Blade Count")]
@@ -232,7 +234,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #if UNITY_EDITOR
         if (qImpactDustPrefab == null)
         {
-            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/烟尘.prefab");
+            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/QImpactDust_Visible.prefab");
         }
 #endif
     }
@@ -420,7 +422,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #if UNITY_EDITOR
         if (qImpactDustPrefab == null)
         {
-            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/烟尘.prefab");
+            qImpactDustPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Player/QImpactDust_Visible.prefab");
         }
 #endif
         if (!qSpawnImpactDust || qImpactDustPrefab == null)
@@ -428,13 +430,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             return;
         }
 
-        Vector3 spawnPos = impactPosition + Vector3.up * 0.5f + qImpactDustLocalOffset;
+        Vector3 spawnPos = impactPosition + qImpactDustLocalOffset;
         Debug.Log($"[Q Dust] spawn requested, prefab={qImpactDustPrefab.name}, qSpawnImpactDust={qSpawnImpactDust}", this);
         Debug.Log($"[Q Dust] impactPosition={impactPosition}, localOffset={qImpactDustLocalOffset}, finalPosition={spawnPos}", this);
 
         GameObject impactObject = Instantiate(qImpactDustPrefab, spawnPos, Quaternion.identity);
         impactObject.SetActive(true);
-        impactObject.transform.localScale = ClampVisualScale(qImpactDustScale * 3f);
+        impactObject.transform.localScale = ClampVisualScale(qImpactDustScale);
         Debug.Log($"[Q Dust] instantiated name={impactObject.name}, activeSelf={impactObject.activeSelf}, activeInHierarchy={impactObject.activeInHierarchy}", this);
 
         ParticleSystem[] particleSystems = impactObject.GetComponentsInChildren<ParticleSystem>(true);
@@ -455,11 +457,55 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 }
 
                 ParticleSystem.MainModule main = particleSystem.main;
-                Color startColor = main.startColor.color;
-                if (startColor.a < 0.25f)
+                ParticleSystem.MinMaxGradient startColor = main.startColor;
+                ParticleSystem.MinMaxCurve startSize = main.startSize;
+                ParticleSystem.MinMaxCurve startLifetime = main.startLifetime;
+                ParticleSystem.EmissionModule emission = particleSystem.emission;
+                int burstCount = 0;
+                try
                 {
-                    Debug.LogWarning($"[Q Dust] particle start alpha is low: {particleSystem.name}, alpha={startColor.a}", this);
+                    ParticleSystem.Burst[] bursts = new ParticleSystem.Burst[32];
+                    burstCount = emission.GetBursts(bursts);
                 }
+                catch (System.Exception)
+                {
+                    burstCount = -1;
+                }
+
+                if (startColor.mode == ParticleSystemGradientMode.Color && startColor.color.a < 0.25f)
+                {
+                    Debug.LogWarning($"[Q Dust] particle start alpha is low: {particleSystem.name}, alpha={startColor.color.a}", this);
+                }
+
+                ParticleSystemRenderer particleRenderer = particleSystem.GetComponent<ParticleSystemRenderer>();
+                string psName = particleSystem.name;
+                string startColorText = startColor.mode == ParticleSystemGradientMode.Color ? startColor.color.ToString() : startColor.mode.ToString();
+                string startSizeText = startSize.mode.ToString();
+                string startLifetimeText = startLifetime.mode.ToString();
+                string rendererName = particleRenderer != null ? particleRenderer.name : "null";
+                string sharedMaterialName = particleRenderer != null && particleRenderer.sharedMaterial != null ? particleRenderer.sharedMaterial.name : "null";
+                string renderModeText = particleRenderer != null ? particleRenderer.renderMode.ToString() : "null";
+                int sortingOrder = particleRenderer != null ? particleRenderer.sortingOrder : -1;
+                int renderQueue = particleRenderer != null && particleRenderer.sharedMaterial != null ? particleRenderer.sharedMaterial.renderQueue : -1;
+
+                Debug.Log(
+                    "[Q Dust] ps name=" + psName
+                    + ", startColor=" + startColorText
+                    + ", startSize=" + startSizeText
+                    + ", startLifetime=" + startLifetimeText
+                    + ", emission.enabled=" + emission.enabled
+                    + ", burst count=" + burstCount
+                    + ", isPlaying=" + particleSystem.isPlaying,
+                    this);
+
+                Debug.Log(
+                    "[Q Dust] psRenderer name=" + rendererName
+                    + ", enabled=" + (particleRenderer != null && particleRenderer.enabled)
+                    + ", sharedMaterial=" + sharedMaterialName
+                    + ", renderMode=" + renderModeText
+                    + ", sortingOrder=" + sortingOrder
+                    + ", renderQueue=" + renderQueue,
+                    this);
 
                 particleSystem.Clear(true);
                 particleSystem.Play(true);
@@ -502,22 +548,25 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
         Debug.Log($"[Q Dust] spawned at {spawnPos}", this);
 
-        GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        debugSphere.name = "Q_Dust_DebugSphere";
-        debugSphere.transform.position = spawnPos;
-        debugSphere.transform.localScale = Vector3.one * 0.12f;
-        Renderer debugSphereRenderer = debugSphere.GetComponent<Renderer>();
-        if (debugSphereRenderer != null)
+        if (qShowDustDebugMarker)
         {
-            debugSphereRenderer.material.color = new Color(1f, 1f, 0f, 1f);
-            debugSphereRenderer.sortingOrder = 200;
+            GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            debugSphere.name = "Q_Dust_DebugMarker";
+            debugSphere.transform.position = spawnPos;
+            debugSphere.transform.localScale = Vector3.one * 0.12f;
+            Renderer debugSphereRenderer = debugSphere.GetComponent<Renderer>();
+            if (debugSphereRenderer != null)
+            {
+                debugSphereRenderer.material.color = new Color(1f, 1f, 0f, 1f);
+                debugSphereRenderer.sortingOrder = 200;
+            }
+            Collider debugSphereCollider = debugSphere.GetComponent<Collider>();
+            if (debugSphereCollider != null)
+            {
+                Destroy(debugSphereCollider);
+            }
+            Destroy(debugSphere, 1f);
         }
-        Collider debugSphereCollider = debugSphere.GetComponent<Collider>();
-        if (debugSphereCollider != null)
-        {
-            Destroy(debugSphereCollider);
-        }
-        Destroy(debugSphere, 1f);
 
         Destroy(impactObject, Mathf.Max(0.05f, qImpactDustLifetime));
     }
