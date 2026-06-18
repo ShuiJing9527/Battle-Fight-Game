@@ -48,7 +48,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [InspectorName("Q Impact Dust Lifetime")]
     [SerializeField] private float qImpactDustLifetime = 1f;
     [InspectorName("Q Impact Dust Local Offset")]
-    [SerializeField] private Vector3 qImpactDustLocalOffset = new Vector3(0f, 0.02f, 0f);
+    [SerializeField] private Vector3 qImpactDustLocalOffset = new Vector3(0f, 0.2f, 0f);
     [InspectorName("Q Impact Dust Scale")]
     [SerializeField] private Vector3 qImpactDustScale = Vector3.one;
 
@@ -428,9 +428,97 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             return;
         }
 
-        Vector3 spawnPos = impactPosition + qImpactDustLocalOffset;
+        Vector3 spawnPos = impactPosition + Vector3.up * 0.5f + qImpactDustLocalOffset;
+        Debug.Log($"[Q Dust] spawn requested, prefab={qImpactDustPrefab.name}, qSpawnImpactDust={qSpawnImpactDust}", this);
+        Debug.Log($"[Q Dust] impactPosition={impactPosition}, localOffset={qImpactDustLocalOffset}, finalPosition={spawnPos}", this);
+
         GameObject impactObject = Instantiate(qImpactDustPrefab, spawnPos, Quaternion.identity);
-        impactObject.transform.localScale = ClampVisualScale(qImpactDustScale);
+        impactObject.SetActive(true);
+        impactObject.transform.localScale = ClampVisualScale(qImpactDustScale * 3f);
+        Debug.Log($"[Q Dust] instantiated name={impactObject.name}, activeSelf={impactObject.activeSelf}, activeInHierarchy={impactObject.activeInHierarchy}", this);
+
+        ParticleSystem[] particleSystems = impactObject.GetComponentsInChildren<ParticleSystem>(true);
+        int particleSystemCount = particleSystems != null ? particleSystems.Length : 0;
+        Debug.Log($"[Q Dust] particleSystems count={particleSystemCount}", this);
+        if (particleSystems == null || particleSystems.Length == 0)
+        {
+            Debug.LogWarning($"[Q Dust] spawned prefab without ParticleSystem: {qImpactDustPrefab.name}", this);
+        }
+        else
+        {
+            for (int i = 0; i < particleSystems.Length; i++)
+            {
+                ParticleSystem particleSystem = particleSystems[i];
+                if (particleSystem == null)
+                {
+                    continue;
+                }
+
+                ParticleSystem.MainModule main = particleSystem.main;
+                Color startColor = main.startColor.color;
+                if (startColor.a < 0.25f)
+                {
+                    Debug.LogWarning($"[Q Dust] particle start alpha is low: {particleSystem.name}, alpha={startColor.a}", this);
+                }
+
+                particleSystem.Clear(true);
+                particleSystem.Play(true);
+                Debug.Log($"[Q Dust] Play called on {particleSystem.name}", this);
+            }
+        }
+
+        Renderer[] renderers = impactObject.GetComponentsInChildren<Renderer>(true);
+        int rendererCount = renderers != null ? renderers.Length : 0;
+        Debug.Log($"[Q Dust] renderers count={rendererCount}", this);
+        if (renderers == null || renderers.Length == 0)
+        {
+            Debug.LogWarning($"[Q Dust] spawned prefab without Renderer: {qImpactDustPrefab.name}", this);
+        }
+        else
+        {
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                Material rendererMaterial = renderer.sharedMaterial != null ? renderer.sharedMaterial : renderer.material;
+                string rendererMaterialName = rendererMaterial != null ? rendererMaterial.name : "null";
+                int rendererRenderQueue = rendererMaterial != null ? rendererMaterial.renderQueue : -1;
+                Debug.Log(
+                    "[Q Dust] renderer enabled=" + renderer.enabled
+                    + ", material=" + rendererMaterialName
+                    + ", sortingOrder=" + renderer.sortingOrder
+                    + ", renderQueue=" + rendererRenderQueue,
+                    this);
+                if (rendererMaterial == null)
+                {
+                    Debug.LogWarning($"[Q Dust] renderer missing material: {renderer.name}", this);
+                }
+            }
+        }
+
+        Debug.Log($"[Q Dust] spawned at {spawnPos}", this);
+
+        GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        debugSphere.name = "Q_Dust_DebugSphere";
+        debugSphere.transform.position = spawnPos;
+        debugSphere.transform.localScale = Vector3.one * 0.12f;
+        Renderer debugSphereRenderer = debugSphere.GetComponent<Renderer>();
+        if (debugSphereRenderer != null)
+        {
+            debugSphereRenderer.material.color = new Color(1f, 1f, 0f, 1f);
+            debugSphereRenderer.sortingOrder = 200;
+        }
+        Collider debugSphereCollider = debugSphere.GetComponent<Collider>();
+        if (debugSphereCollider != null)
+        {
+            Destroy(debugSphereCollider);
+        }
+        Destroy(debugSphere, 1f);
+
         Destroy(impactObject, Mathf.Max(0.05f, qImpactDustLifetime));
     }
 

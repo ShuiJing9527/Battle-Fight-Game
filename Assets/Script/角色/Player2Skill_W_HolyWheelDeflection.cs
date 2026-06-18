@@ -390,6 +390,12 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
                 continue;
             }
 
+            spriteRenderer.sortingOrder = 10;
+            Material spriteMaterial = spriteRenderer.material;
+            if (spriteMaterial != null)
+            {
+                ConfigureWShieldBubbleMaterial(spriteMaterial);
+            }
             activeWShieldBubbleSpriteRenderers.Add(spriteRenderer);
             activeWShieldBubbleSpriteBaseColors.Add(spriteRenderer.color);
             SetSpriteRendererAlpha(spriteRenderer, 0f);
@@ -404,6 +410,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
                 continue;
             }
 
+            renderer.sortingOrder = 10;
+            ConfigureWShieldBubbleRenderer(renderer);
             activeWShieldBubbleMeshRenderers.Add(renderer);
             activeWShieldBubbleMeshBaseColors.Add(ResolveRendererBaseColor(renderer));
             SetRendererAlpha(renderer, 0f);
@@ -418,6 +426,65 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         activeWShieldBubble = bubble;
         return bubble;
+    }
+
+    private static void ConfigureWShieldBubbleRenderer(Renderer renderer)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        renderer.sortingOrder = 10;
+        renderer.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        renderer.receiveShadows = false;
+
+        Material[] materials = renderer.materials;
+        for (int i = 0; i < materials.Length; i++)
+        {
+            ConfigureWShieldBubbleMaterial(materials[i]);
+        }
+    }
+
+    private static void ConfigureWShieldBubbleMaterial(Material material)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        material.renderQueue = 3000;
+        material.SetOverrideTag("RenderType", "Transparent");
+
+        if (material.HasProperty("_Surface"))
+        {
+            material.SetFloat("_Surface", 1f);
+        }
+
+        if (material.HasProperty("_SrcBlend"))
+        {
+            material.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+        }
+
+        if (material.HasProperty("_DstBlend"))
+        {
+            material.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
+        }
+
+        if (material.HasProperty("_ZWrite"))
+        {
+            material.SetFloat("_ZWrite", 0f);
+        }
+
+        if (material.HasProperty("_Cull"))
+        {
+            material.SetFloat("_Cull", 0f);
+        }
+
+        if (material.HasProperty("_ZTest"))
+        {
+            material.SetFloat("_ZTest", (float)UnityEngine.Rendering.CompareFunction.LessEqual);
+        }
     }
 
     private void UpdateWShieldBubble(Transform bubbleTransform, float elapsed)
