@@ -180,6 +180,9 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private Vector3 rOrbitTrailLocalEuler = Vector3.zero;
     [InspectorName("R 漩涡拖尾本地尺寸")]
     [SerializeField] private Vector3 rOrbitTrailLocalScale = Vector3.one;
+    [Header("R - Center Aura")]
+    [SerializeField] private GameObject rCenterAuraPrefab;
+    [SerializeField] private Vector3 rCenterAuraLocalOffset = new Vector3(0f, 0.12f, 0f);
 
     [Header("R - 神眷星雨 / 回收")]
     [InspectorName("R Orbit 结束即清理")]
@@ -251,6 +254,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private float lastMoveDirYawFallback = 0f;
     private Coroutine rSwarmRoutine;
     private GameObject activeRSwarmRoot;
+    private GameObject activeRCenterAura;
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
     private readonly List<RStarRainBladeData> activeRStarRainBlades = new List<RStarRainBladeData>();
     private Camera resolvedRRenderCamera;
@@ -294,6 +298,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             Destroy(activeRSwarmRoot);
             activeRSwarmRoot = null;
         }
+
+        CleanupRCenterAura();
     }
 
     private void OnDisable()
@@ -335,6 +341,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         swarmRoot.transform.rotation = Quaternion.identity;
         activeRSwarmRoot = swarmRoot;
         activeRSwarmSwords.Clear();
+        SpawnRCenterAura(swarmRoot.transform);
 
         int swordCount = Mathf.Max(0, count);
         for (int i = 0; i < swordCount; i++)
@@ -712,6 +719,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         activeRSwarmSwords.Clear();
         activeRSwarmRoot = null;
+        CleanupRCenterAura();
 
         if (orbitRoot != null)
         {
@@ -737,6 +745,33 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             }
         }
         activeRStarRainBlades.Clear();
+    }
+
+    private void SpawnRCenterAura(Transform parent)
+    {
+        CleanupRCenterAura();
+
+        GameObject prefab = ResolveRCenterAuraPrefab();
+        if (prefab == null || parent == null)
+        {
+            return;
+        }
+
+        GameObject aura = Instantiate(prefab, parent);
+        aura.name = "R_CenterAura";
+        aura.transform.localPosition = rCenterAuraLocalOffset;
+        aura.transform.localRotation = Quaternion.identity;
+        aura.transform.localScale = Vector3.one;
+        activeRCenterAura = aura;
+    }
+
+    private void CleanupRCenterAura()
+    {
+        if (activeRCenterAura != null)
+        {
+            Destroy(activeRCenterAura);
+            activeRCenterAura = null;
+        }
     }
 
     private IEnumerator DestroyAfterDelay(GameObject target, float delay)
@@ -836,6 +871,23 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         return Owner != null ? Owner.sharedSkillEffectPrefab : null;
+    }
+
+    private GameObject ResolveRCenterAuraPrefab()
+    {
+        if (rCenterAuraPrefab != null)
+        {
+            return rCenterAuraPrefab;
+        }
+
+#if UNITY_EDITOR
+        rCenterAuraPrefab = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Effects/R_CenterAura.prefab");
+        if (rCenterAuraPrefab != null)
+        {
+            return rCenterAuraPrefab;
+        }
+#endif
+        return null;
     }
 
     private bool ResolveUseRawPrefabRotationForSkillEffects()

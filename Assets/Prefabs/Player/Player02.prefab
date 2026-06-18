@@ -941,6 +941,7 @@ MonoBehaviour:
   currentSwordEnergy: 1
   rBaseSwordCount: 7
   sharedSkillEffectPrefab: {fileID: 0}
+  rCenterAuraPrefab: {fileID: 1278023953841578186, guid: 45f7c565d659401987de96f17b25ad4f, type: 3}
   qSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   wSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   eSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
