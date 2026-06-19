@@ -1,16 +1,16 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 {
-    [Header("W - 圣轮偏转 / 基础")]
+    [Header("W - 星环剑轮 / 基础")]
     [InspectorName("W 持续时间")]
     [SerializeField] private float wDuration = 1.5f;
     [InspectorName("W 基础减伤")]
     [SerializeField] private float wDamageReduction = 0.4f;
 
-    [Header("W - 圣轮偏转 / 防御加成")]
+    [Header("W - 星环剑轮 / 神印加成")]
     [InspectorName("W 每把剑减伤加成")]
     [SerializeField] private float wDamageReductionPerSword = 0.03f;
     [InspectorName("W 最大减伤")]
@@ -18,14 +18,13 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 反击伤害比例")]
     [SerializeField] private float wCounterDamageRatio = 0.5f;
 
-    [Header("W - 圣轮偏转 / 视觉")]
+    [Header("W - 星环剑轮 / 视觉")]
     [InspectorName("W 特效尺寸")]
     [SerializeField] private Vector3 wEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-
     [InspectorName("W 尺寸倍率")]
     [SerializeField] private float wEffectScaleMultiplier = 1f;
 
-    [Header("W - 圣轮偏转 / 剑阵")]
+    [Header("W - 星环剑轮 / 剑轮")]
     [InspectorName("W 初始剑数量")]
     [SerializeField] private int baseWSwordCount = 3;
     [InspectorName("W 使用剑气值")]
@@ -41,7 +40,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 圆周切线 Yaw 偏移")]
     [SerializeField] private float wSwordOrbitYawOffset = 90f;
 
-    [Header("W - 圣轮偏转 / 剑气加成")]
+    [Header("W - 星环剑轮 / 神印加成")]
     [InspectorName("W 每点剑气增加持续时间")]
     [SerializeField] private float wDurationPerSwordEnergy = 0f;
     [InspectorName("W 最大持续时间加成")]
@@ -55,7 +54,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 最大半径加成")]
     [SerializeField] private float wMaxRadiusBonus = 0f;
 
-    [Header("W - 圣轮偏转 / 预制体")]
+    [Header("W - 星环剑轮 / 预制体")]
     [InspectorName("W 通用特效预制体")]
     [SerializeField] private GameObject sharedSkillEffectPrefab;
     [InspectorName("W 专属特效预制体")]
@@ -63,7 +62,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 待机特效预制体")]
     [SerializeField] private GameObject standbySkillEffectPrefab;
 
-    [Header("W - Holy Wheel / Shield Bubble")]
+    [Header("W - 星环剑轮 / 护盾球体")]
     [InspectorName("W Spawn Shield Bubble")]
     [SerializeField] private bool wSpawnShieldBubble = true;
     [InspectorName("W Shield Bubble Prefab")]

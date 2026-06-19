@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -7,18 +7,18 @@ using Spine.Unity;
 
 public class Player2PrototypeController : MonoBehaviour
 {
-    [Header("Skill Slots")]
+    [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private PlayerSkillBase qSkill;
     [SerializeField] private PlayerSkillBase wSkill;
     [SerializeField] private PlayerSkillBase eSkill;
     [SerializeField] private PlayerSkillBase rSkill;
 
-    [Header("冷却&蓝量管理器")]
+    [Header("E - 星痕瞬移 / 残影特效")]
     public PlayerSkillCooldownManager cooldownManager;
 
 
 
-    [Header("Dash Distance")]
+    [Header("R - 神眷剑涡 / 基础")]
     [HideInInspector] public float moveSpeed = 5f;
     public float dashDistance = 4f;
     public float dashDuration = 0.15f;
@@ -47,13 +47,13 @@ public class Player2PrototypeController : MonoBehaviour
     [SerializeField] private LayerMask spawnBlockerLayers = ~0;
 
     [HideInInspector]
-    [Header("Q Delay")]
+    [Header("R - 神眷剑涡 / 视觉")]
     public float qDelay = 0.35f;
     [HideInInspector]
     public float qSwordSpeed = 14f;
 
     [HideInInspector]
-    [Header("W Duration")]
+    [Header("R - 神眷剑涡 / 万剑漩涡")]
     [InspectorName("W Duration")]
     public float wDuration = 1.5f;
     [HideInInspector]
@@ -62,7 +62,7 @@ public class Player2PrototypeController : MonoBehaviour
     [HideInInspector] public int maxStandbySwords = 3;
 
     [HideInInspector]
-    [Header("W Damage Reduction Per Sword")]
+    [Header("R - 神眷剑涡 / 漩涡伤害")]
     [InspectorName("W Damage Reduction Per Sword")]
     public float wDamageReductionPerSword = 0.03f;
     [HideInInspector]
@@ -73,11 +73,11 @@ public class Player2PrototypeController : MonoBehaviour
     public float wCounterDamageRatio = 0.5f;
 
     [HideInInspector]
-    [Header("E - Celestial Shift / Basic")]
+    [Header("R - 神眷剑涡 / 备用星雨")]
     public float eRailDuration = 0.6f;
 
     [HideInInspector]
-    [Header("E - Celestial Shift / Sprite Afterimage")]
+    [Header("R - 神眷剑涡 / 漩涡拖尾")]
     [InspectorName("E Enable Afterimage Shader")]
     public bool eEnableAfterimageShader = true;
     [HideInInspector] [SerializeField] private SpriteRenderer eAfterimageSourceSpriteRenderer;
@@ -208,17 +208,17 @@ public class Player2PrototypeController : MonoBehaviour
     public float eStarFallPathJitter = 0.35f;
     public float eStarFallSequentialDelay = 0.06f;
 
-    [Header("Current Sword Energy")]
+    [Header("R - 神眷剑涡 / 中心气场")]
     [InspectorName("Current Sword Energy")]
     public int currentSwordEnergy = 0;
 
     [HideInInspector]
-    [Header("R Base Sword Count")]
+    [Header("R - 神眷剑涡 / 预制体")]
     [FormerlySerializedAs("swordEnergy")]
     [InspectorName("R Base Sword Count")]
     public int rBaseSwordCount = 1;
 
-    [Header("Shared Skill Effect Prefab")]
+    [Header("R - 神眷剑涡 / 收场")]
     public GameObject sharedSkillEffectPrefab;
     [HideInInspector]
     public GameObject qSkillEffectPrefab;
@@ -446,60 +446,60 @@ public class Player2PrototypeController : MonoBehaviour
     public LayerMask rSwarmEnemyLayer = ~0;
 
     [HideInInspector]
-    [Header("R Star Rain Spawn Height")]
-    [InspectorName("R Star Rain Spawn Height")]
+    [Header("R 附加坠落 Spawn Height")]
+    [InspectorName("R 附加坠落 Spawn Height")]
     public float rRiseDuration = 0.45f;
     [HideInInspector]
-    [InspectorName("R Star Rain Spawn Height")]
+    [InspectorName("R 附加坠落 Spawn Height")]
     public float rRiseHeight = 4f;
     [HideInInspector]
-    [InspectorName("R Star Rain Spawn Height")]
+    [InspectorName("R 附加坠落 Spawn Height")]
     public float rStarRainDuration = 1.2f;
     [HideInInspector]
-    [InspectorName("R Star Rain Spawn Height")]
+    [InspectorName("R 附加坠落 Spawn Height")]
     public float rStarRainSpawnHeight = 5f;
     [HideInInspector]
-    [InspectorName("R Star Rain Radius")]
+    [InspectorName("R 附加坠落 Radius")]
     public float rStarRainRadius = 5f;
     [HideInInspector]
-    [InspectorName("R Star Rain Fall Speed")]
+    [InspectorName("R 附加坠落 Fall Speed")]
     public float rStarRainFallSpeed = 10f;
     [HideInInspector]
-    [InspectorName("R Star Rain Random Delay")]
+    [InspectorName("R 附加坠落 Random Delay")]
     public float rStarRainRandomDelay = 0.15f;
     [HideInInspector]
-    [InspectorName("R Star Rain Damage Radius")]
+    [InspectorName("R 附加坠落 Damage Radius")]
     public float rStarRainDamageRadius = 1.2f;
 
     [HideInInspector]
-    [InspectorName("R Star Rain Start Ratio")]
+    [InspectorName("R 附加坠落 Start Ratio")]
     public float rStarRainStartRatio = 0.5f;
     [HideInInspector]
-    [InspectorName("R Star Rain Interval")]
+    [InspectorName("R 附加坠落 Interval")]
     public float rStarRainInterval = 0.12f;
     [HideInInspector]
-    [InspectorName("R Star Rain Blades Per Wave")]
+    [InspectorName("R 附加坠落 Blades Per Wave")]
     public int rStarRainBladesPerWave = 2;
     [HideInInspector]
-    [InspectorName("R Star Rain Visual Euler Offset")]
+    [InspectorName("R 附加坠落 Visual Euler Offset")]
     public Vector3 rStarRainVisualEulerOffset = Vector3.zero;
     [HideInInspector]
-    [InspectorName("R Star Rain Use Forced Visual Rotation")]
+    [InspectorName("R 附加坠落 Use Forced Visual Rotation")]
     public bool rStarRainUseForcedVisualRotation = true;
     [HideInInspector]
-    [InspectorName("R Star Rain Forced Visual Euler")]
+    [InspectorName("R 附加坠落 Forced Visual Euler")]
     public Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
     [HideInInspector]
-    [InspectorName("R Star Rain Damage Multiplier")]
+    [InspectorName("R 附加坠落 Damage Multiplier")]
     public float rStarRainDamageMultiplier = 0.6f;
     [HideInInspector]
-    [InspectorName("R Star Rain Effect Scale")]
+    [InspectorName("R 附加坠落 Effect Scale")]
     public Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector]
-    [InspectorName("R Star Rain Continue After Orbit")]
+    [InspectorName("R 附加坠落 Continue After Orbit")]
     public bool rStarRainContinueAfterOrbit = true;
     [HideInInspector]
-    [InspectorName("R Star Rain Extra Duration After Orbit")]
+    [InspectorName("R 附加坠落 Extra Duration After Orbit")]
     public float rStarRainExtraDurationAfterOrbit = 0.6f;
     [HideInInspector]
     [InspectorName("R Orbit Clear When Orbit Ends")]
@@ -684,8 +684,8 @@ public class Player2PrototypeController : MonoBehaviour
 
         ResolveRRenderCamera();
 
-        // 初始化冷却与蓝量系统
-        // 全局冷却倒计时 + 自动回蓝
+        // 鍒濆鍖栧喎鍗翠笌钃濋噺绯荤粺
+        // 鍏ㄥ眬鍐峰嵈鍊掕鏃?+ 鑷姩鍥炶摑
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
     }
 
@@ -772,10 +772,10 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        // 全局冷却倒计时 + 自动回蓝
+        // 鍏ㄥ眬鍐峰嵈鍊掕鏃?+ 鑷姩鍥炶摑
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
 
-        // Q 技能
+        // Q 鎶€鑳?
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
             if (CanCastSkill(0))
@@ -786,7 +786,7 @@ public class Player2PrototypeController : MonoBehaviour
             }
         }
 
-        // W 技能
+        // W 鎶€鑳?
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
             if (CanCastSkill(1))
@@ -797,7 +797,7 @@ public class Player2PrototypeController : MonoBehaviour
             }
         }
 
-        // E 技能
+        // E 鎶€鑳?
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
             if (CanCastSkill(2))
@@ -808,7 +808,7 @@ public class Player2PrototypeController : MonoBehaviour
             }
         }
 
-        // R 技能
+        // R 鎶€鑳?
         if (Keyboard.current.rKey.wasPressedThisFrame)
         {
             if (CanCastSkill(3))
@@ -3600,22 +3600,22 @@ public class Player2PrototypeController : MonoBehaviour
         if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", color);
     }
 
-    // 内部判断：技能是否满足释放条件
-    // 内部判断：技能是否满足释放条件
+    // 鍐呴儴鍒ゆ柇锛氭妧鑳芥槸鍚︽弧瓒抽噴鏀炬潯浠?
+    // 鍐呴儴鍒ゆ柇锛氭妧鑳芥槸鍚︽弧瓒抽噴鏀炬潯浠?
     private bool CanCastSkill(int index)
     {
         if (cooldownManager == null) return true;
         return cooldownManager.IsSkillCastable(index);
     }
 
-    // 内部消耗：扣蓝 + 进入冷却
+    // 鍐呴儴娑堣€楋細鎵ｈ摑 + 杩涘叆鍐峰嵈
     private void ConsumeSkill(int index)
     {
         if (cooldownManager == null) return;
         cooldownManager.ConsumeSkillResource(index);
     }
 
-    // ========== UI 只读接口，给技能栏UI调用 ==========
+    // ========== UI 鍙鎺ュ彛锛岀粰鎶€鑳芥爮UI璋冪敤 ==========
     public float GetSkillCurrentCD(int index)
     {
         if (cooldownManager == null) return 0f;

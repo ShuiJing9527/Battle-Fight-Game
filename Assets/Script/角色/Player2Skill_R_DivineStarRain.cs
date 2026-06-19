@@ -1,199 +1,128 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
 public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 {
-    [Header("R - 神眷星雨 / 基础")]
-    [InspectorName("R 初始剑数量")]
+    [Header("R - 神眷剑涡 / 基础")]
     [SerializeField] private int rBaseSwordCount = 1;
 
-    [Header("R - 神眷星雨 / 视觉")]
-    [InspectorName("R 特效尺寸")]
+    [Header("R - 神眷剑涡 / 视觉")]
     [SerializeField] private Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
-    [InspectorName("R 特效旋转 Z")]
     [SerializeField] private float rEffectRotationZ = 0f;
-    [InspectorName("R 特效偏移")]
     [SerializeField] private Vector3 rEffectOffset = Vector3.zero;
-    [InspectorName("R 平面尺寸")]
     [SerializeField] private Vector3 rEffectPlaneScale = new Vector3(0.3f, 0.3f, 1f);
-    [InspectorName("R Yaw 偏移")]
     [SerializeField] private float rEffectYawOffset = 0f;
-    [InspectorName("R 显示 Pitch")]
     [SerializeField] private float rEffectVisualPitch = 0f;
-    [InspectorName("R 显示 Yaw")]
     [SerializeField] private float rEffectVisualYaw = 0f;
-    [InspectorName("R 显示 Roll")]
     [SerializeField] private float rEffectVisualRoll = 0f;
 
-    [Header("R - 神眷星雨 / 万剑漩涡")]
-    [InspectorName("R 漩涡持续时间")]
+    [Header("R - 神眷剑涡 / 万剑漩涡")]
     [SerializeField] private float rSwarmDuration = 2.0f;
-    [InspectorName("R 漩涡最小半径")]
     [SerializeField] private float rSwarmRadiusMin = 0.8f;
-    [InspectorName("R 漩涡最大半径")]
     [SerializeField] private float rSwarmRadiusMax = 3.2f;
-    [InspectorName("R 漩涡最低高度")]
     [SerializeField] private float rSwarmHeightMin = 0.4f;
-    [InspectorName("R 漩涡最高高度")]
     [SerializeField] private float rSwarmHeightMax = 3.0f;
-    [InspectorName("R 漩涡最小速度")]
     [SerializeField] private float rSwarmSpeedMin = 120f;
-    [InspectorName("R 漩涡最大速度")]
     [SerializeField] private float rSwarmSpeedMax = 300f;
-    [InspectorName("R 漩涡最小起伏幅度")]
     [SerializeField] private float rSwarmBobAmplitudeMin = 0.05f;
-    [InspectorName("R 漩涡最大起伏幅度")]
     [SerializeField] private float rSwarmBobAmplitudeMax = 0.35f;
-    [InspectorName("R 漩涡最小起伏频率")]
     [SerializeField] private float rSwarmBobFrequencyMin = 0.8f;
-    [InspectorName("R 漩涡最大起伏频率")]
     [SerializeField] private float rSwarmBobFrequencyMax = 2.5f;
-    [InspectorName("R 漩涡半径扰动")]
     [SerializeField] private float rSwarmRadiusJitter = 0.25f;
-    [InspectorName("R 顺时针")]
     [SerializeField] private bool rSwarmClockwise = true;
-    [InspectorName("R 前方偏移")]
     [SerializeField] private float rSwarmForwardOffset = 2.0f;
-    [InspectorName("R 切线 Yaw 偏移")]
     [SerializeField] private float rSwarmYawOffset = 0f;
-    [InspectorName("R 渲染相机")]
     [SerializeField] private Camera rRenderCamera;
-    [InspectorName("R 自动查找渲染相机")]
     [SerializeField] private bool rAutoResolveRenderCamera = true;
-    [InspectorName("R 使用相机前方")]
     [SerializeField] private bool rSwarmUseCameraForward = true;
-    [InspectorName("R 围绕角色中心")]
     [SerializeField] private bool rSwarmCenterOnPlayer = false;
-    [InspectorName("R 将特效偏移应用到中心")]
     [SerializeField] private bool rApplyEffectOffsetToSwarmCenter = false;
-    [InspectorName("R 使用切线朝向")]
     [SerializeField] private bool rUseTangentFacing = true;
-    [InspectorName("R 平面竖直角度")]
     [SerializeField] private Vector3 rPlaneUprightEuler = Vector3.zero;
-    [InspectorName("R 面向相机角度")]
     [SerializeField] private Vector3 rPlaneFaceCameraEuler = Vector3.zero;
-    [InspectorName("R 翻转正反面")]
     [SerializeField] private bool rFlipPlaneFrontBack = true;
-    [InspectorName("R 正反面翻转角度")]
     [SerializeField] private Vector3 rPlaneFrontBackFlipEuler = new Vector3(0f, 180f, 0f);
-    [InspectorName("R 使用玩家图层")]
     [SerializeField] private bool rUsePlayerLayerForR = true;
-    [InspectorName("R 双面显示")]
     [SerializeField] private bool rForceDoubleSided = true;
-    [InspectorName("R 调试剑速度朝向")]
     [SerializeField] private bool rDebugSwordVelocityFacing = false;
-    [InspectorName("R 预测朝向时间")]
     [SerializeField] private float rFacingLookAheadTime = 0.05f;
-    [InspectorName("R 调试屏幕角度")]
     [SerializeField] private bool rDebugFacingScreenAngle = false;
-    [InspectorName("R 启用自转")]
     [SerializeField] private bool rEnableSwordSelfSpin = false;
-    [InspectorName("R 自转最小速度")]
     [SerializeField] private float rSwordSelfSpinMin = 30f;
-    [InspectorName("R 自转最大速度")]
     [SerializeField] private float rSwordSelfSpinMax = 120f;
-    [InspectorName("R 自转本地轴")]
     [SerializeField] private Vector3 rSwordLengthLocalAxis = Vector3.up;
 
-    [Header("R - 神眷星雨 / 漩涡伤害")]
-    [InspectorName("R 漩涡伤害半径")]
+    [Header("R - 神眷剑涡 / 漩涡伤害")]
     [SerializeField] private float rSwarmDamageRadius = 3.0f;
-    [InspectorName("R 漩涡伤害间隔")]
     [SerializeField] private float rSwarmDamageInterval = 0.25f;
-    [InspectorName("R 漩涡每次伤害")]
     [SerializeField] private float rSwarmDamagePerTick = 2.0f;
-    [InspectorName("R 敌人层")]
     [SerializeField] private LayerMask rSwarmEnemyLayer = ~0;
 
-    [Header("R - 神眷星雨 / 星雨")]
+    [Header("R - 神眷剑涡 / 备用星雨")]
     [HideInInspector]
-    [InspectorName("R 星雨开始比例")]
     [SerializeField] private float rStarRainStartRatio = 0.5f;
     [HideInInspector]
-    [InspectorName("R 星雨生成间隔")]
     [SerializeField] private float rStarRainInterval = 0.12f;
     [HideInInspector]
-    [InspectorName("R 每波星雨剑数")]
     [SerializeField] private int rStarRainBladesPerWave = 2;
     [HideInInspector]
-    [InspectorName("R 星雨生成高度")]
     [SerializeField] private float rStarRainSpawnHeight = 5f;
     [HideInInspector]
-    [InspectorName("R 星雨范围半径")]
     [SerializeField] private float rStarRainRadius = 5f;
     [HideInInspector]
-    [InspectorName("R 星雨下落速度")]
     [SerializeField] private float rStarRainFallSpeed = 10f;
     [HideInInspector]
-    [InspectorName("R 星雨随机延迟")]
     [SerializeField] private float rStarRainRandomDelay = 0.15f;
     [HideInInspector]
-    [InspectorName("R 星雨伤害半径")]
     [SerializeField] private float rStarRainDamageRadius = 1.2f;
     [HideInInspector]
-    [InspectorName("R 星雨伤害倍率")]
     [SerializeField] private float rStarRainDamageMultiplier = 0.6f;
     [HideInInspector]
-    [InspectorName("R 星雨延续到 Orbit 后")]
     [SerializeField] private bool rStarRainContinueAfterOrbit = true;
     [HideInInspector]
-    [InspectorName("R Orbit 后额外星雨时间")]
     [SerializeField] private float rStarRainExtraDurationAfterOrbit = 0.6f;
     [HideInInspector]
-    [InspectorName("星雨随机倾斜角度最小值")]
     [SerializeField] private float rStarRainAngleMin = 10f;
     [HideInInspector]
-    [InspectorName("星雨随机倾斜角度最大值")]
     [SerializeField] private float rStarRainAngleMax = 35f;
     [HideInInspector]
-    [InspectorName("星雨横向射入方向随机")]
     [SerializeField] private bool rStarRainRandomHorizontalDirection = true;
     [HideInInspector]
-    [InspectorName("星雨是否朝向飞行方向")]
     [SerializeField] private bool rStarRainFaceFallDirection = true;
     [HideInInspector]
-    [InspectorName("R 星雨尺寸")]
     [SerializeField] private Vector3 rStarRainEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
     [HideInInspector]
-    [InspectorName("R 星雨强制视觉旋转")]
     [SerializeField] private bool rStarRainUseForcedVisualRotation = true;
     [HideInInspector]
-    [InspectorName("R 星雨强制旋转角度")]
     [SerializeField] private Vector3 rStarRainForcedVisualEuler = new Vector3(0f, 180f, 0f);
     [HideInInspector]
-    [InspectorName("R 星雨视觉偏移")]
     [SerializeField] private Vector3 rStarRainVisualEulerOffset = Vector3.zero;
 
-    [Header("R - 神眷星雨 / 漩涡拖尾")]
-    [InspectorName("R 漩涡拖尾特效预制体")]
+    [Header("R - 神眷剑涡 / 漩涡拖尾")]
     [SerializeField] private GameObject rOrbitTrailEffectPrefab;
-    [InspectorName("R 漩涡启用拖尾")]
     [SerializeField] private bool rOrbitEnableTrailEffect = true;
-    [InspectorName("R 漩涡拖尾跟随世界位置")]
     [SerializeField] private bool rOrbitTrailFollowWorldPosition = true;
-    [InspectorName("R 漩涡拖尾清除初始轨迹")]
     [SerializeField] private bool rOrbitTrailClearOnSpawn = true;
-    [InspectorName("R 漩涡拖尾本地偏移")]
     [SerializeField] private Vector3 rOrbitTrailLocalOffset = Vector3.zero;
-    [InspectorName("R 漩涡拖尾本地旋转")]
     [SerializeField] private Vector3 rOrbitTrailLocalEuler = Vector3.zero;
-    [InspectorName("R 漩涡拖尾本地尺寸")]
     [SerializeField] private Vector3 rOrbitTrailLocalScale = Vector3.one;
-    [Header("R - Center Aura")]
+    [Header("R - 神眷剑涡 / 中心气场")]
     [SerializeField] private GameObject rCenterAuraPrefab;
     [SerializeField] private Vector3 rCenterAuraLocalOffset = new Vector3(0f, 0.12f, 0f);
 
-    [Header("R - 神眷星雨 / 回收")]
-    [InspectorName("R Orbit 结束即清理")]
+    [Header("R - 神眷剑涡 / 气场回复")]
+    [SerializeField] private bool rEnableAuraHeal = true;
+    [SerializeField] private float rAuraHealInterval = 0.1f;
+    [SerializeField] private float rAuraHealPercentOfMaxHp = 0.01f;
+    [SerializeField] private bool rAuraHealCanOverMaxHp = false;
+
+    [Header("R - 神眷剑涡 / 收场")]
     [SerializeField] private bool rOrbitClearWhenOrbitEnds = true;
-    [InspectorName("R Orbit 淡出时间")]
     [SerializeField] private float rOrbitFadeOutDuration = 0.15f;
 
-    [Header("R - 神眷星雨 / 预制体")]
-    [InspectorName("R 通用特效预制体")]
+    [Header("R - 神眷剑涡 / 预制体")]
     [SerializeField] private GameObject sharedSkillEffectPrefab;
-    [InspectorName("R 技能特效预制体")]
     [SerializeField] private GameObject rSkillEffectPrefab;
 
     private sealed class SkillEffectRuntime : MonoBehaviour
@@ -253,6 +182,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
     private float lastMoveDirYawFallback = 0f;
     private Coroutine rSwarmRoutine;
+    private Coroutine rAuraHealRoutine;
     private GameObject activeRSwarmRoot;
     private GameObject activeRCenterAura;
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
@@ -330,6 +260,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+        StartRAuraHealRoutine();
         return true;
     }
 
@@ -540,6 +471,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             yield return null;
         }
 
+        StopRAuraHealRoutine();
         CleanupRSwarmVisuals();
         rSwarmRoutine = null;
     }
@@ -772,6 +704,110 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             Destroy(activeRCenterAura);
             activeRCenterAura = null;
         }
+    }
+
+    private void StartRAuraHealRoutine()
+    {
+        if (!rEnableAuraHeal || rAuraHealRoutine != null)
+        {
+            return;
+        }
+
+        rAuraHealRoutine = StartCoroutine(RAuraHealRoutine());
+    }
+
+    private void StopRAuraHealRoutine()
+    {
+        if (rAuraHealRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(rAuraHealRoutine);
+        rAuraHealRoutine = null;
+    }
+
+    private IEnumerator RAuraHealRoutine()
+    {
+        float interval = Mathf.Max(0.01f, rAuraHealInterval);
+        while (rSwarmRoutine != null || activeRSwarmRoot != null)
+        {
+            ApplyRAuraHealOnce();
+            yield return new WaitForSeconds(interval);
+        }
+
+        rAuraHealRoutine = null;
+    }
+
+    private void ApplyRAuraHealOnce()
+    {
+        if (!rEnableAuraHeal || Owner == null)
+        {
+            return;
+        }
+
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        if (combatHealth == null)
+        {
+            return;
+        }
+
+        float maxHp = ResolveRAuraHealMaxHp(combatHealth);
+        if (maxHp <= 0f)
+        {
+            return;
+        }
+
+        float healValue = maxHp * Mathf.Max(0f, rAuraHealPercentOfMaxHp);
+        int healAmount = Mathf.Max(1, Mathf.RoundToInt(healValue));
+
+        if (rAuraHealCanOverMaxHp)
+        {
+            if (combatHealth.resourceBank != null)
+            {
+                combatHealth.resourceBank.currentHealth += healAmount;
+                combatHealth.currentHealth = combatHealth.resourceBank.currentHealth;
+            }
+            else
+            {
+                combatHealth.currentHealth += healAmount;
+            }
+        }
+        else
+        {
+            combatHealth.Heal(healAmount);
+        }
+
+        if (rDebugFacingScreenAngle)
+        {
+            float currentHp = combatHealth.resourceBank != null ? combatHealth.resourceBank.currentHealth : combatHealth.currentHealth;
+            Debug.Log($"[R Aura Heal] amount={healAmount}, currentHp={currentHp:F2}, maxHp={maxHp:F2}", this);
+        }
+    }
+
+    private float ResolveRAuraHealMaxHp(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return 0f;
+        }
+
+        if (combatHealth.resourceBank != null)
+        {
+            return Mathf.Max(0f, combatHealth.resourceBank.maxHealth);
+        }
+
+        if (combatHealth.stats != null)
+        {
+            return Mathf.Max(0f, combatHealth.stats.maxHealth);
+        }
+
+        return Mathf.Max(0f, combatHealth.currentHealth);
     }
 
     private IEnumerator DestroyAfterDelay(GameObject target, float delay)

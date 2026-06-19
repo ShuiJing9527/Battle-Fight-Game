@@ -58,7 +58,6 @@ GameObject:
   - component: {fileID: 1315556082860043331}
   - component: {fileID: 4389982266256825078}
   - component: {fileID: 3604876330921278939}
-  - component: {fileID: 3834860738741355261}
   - component: {fileID: 1546861807539437966}
   - component: {fileID: 4540091804298959558}
   - component: {fileID: 2543590936332733996}
@@ -214,28 +213,6 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 5
   rb: {fileID: 4389982266256825078}
---- !u!95 &3834860738741355261
-Animator:
-  serializedVersion: 7
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8605461027058166016}
-  m_Enabled: 0
-  m_Avatar: {fileID: 0}
-  m_Controller: {fileID: 9100000, guid: 21fa83cb20266a34495f288c1b017484, type: 2}
-  m_CullingMode: 0
-  m_UpdateMode: 0
-  m_ApplyRootMotion: 0
-  m_LinearVelocityBlending: 0
-  m_StabilizeFeet: 0
-  m_AnimatePhysics: 0
-  m_WarningMessage: 
-  m_HasTransformHierarchy: 1
-  m_AllowConstantClipSamplingOptimization: 1
-  m_KeepAnimatorStateOnDisable: 0
-  m_WriteDefaultValuesOnDisable: 0
 --- !u!114 &1546861807539437966
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -810,6 +787,7 @@ MonoBehaviour:
   wSkill: {fileID: 6660332782158251141}
   eSkill: {fileID: 5650248378318002330}
   rSkill: {fileID: 1446829692210700123}
+  cooldownManager: {fileID: 0}
   moveSpeed: 5
   dashDistance: 4
   dashDuration: 0.15
@@ -861,10 +839,6 @@ MonoBehaviour:
   eAfterimageInvertMoveDirection: 0
   eAfterimageSpacing: 0.07
   eAfterimageMaxPerDash: 24
-  eDashEffectPrefab: {fileID: 0}
-  eDashEffectLocalOffset: {x: 0, y: 0, z: 0}
-  eSpawnDashEffect: 1
-  eDashEffectLifetime: 0.7
   eAfterimageUseManualTrailLayout: 1
   eAfterimageInvertTrailDirection: 0
   eAfterimageNearCharacterOffset: 0.03
@@ -945,7 +919,6 @@ MonoBehaviour:
   currentSwordEnergy: 1
   rBaseSwordCount: 7
   sharedSkillEffectPrefab: {fileID: 0}
-  rCenterAuraPrefab: {fileID: 1278023953841578186, guid: 45f7c565d659401987de96f17b25ad4f, type: 3}
   qSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   wSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   eSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
@@ -1113,7 +1086,31 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_Q_DivineLightSword
   qDelay: 0.35
   qSkillEffectPrefab: {fileID: 0}
+  qSpawnFallTrail: 0
+  qFallTrailPrefab: {fileID: 0}
+  qFallTrailLocalOffset: {x: 0, y: 0, z: 0}
+  qFallTrailScale: {x: 1, y: 1, z: 1}
+  qSpawnImpactConeSpark: 1
+  qImpactConeSparkPrefab: {fileID: 0}
+  qImpactConeSparkLifetime: 0.6
+  qImpactConeSparkScale: {x: 1, y: 1, z: 1}
+  qSpawnImpactDust: 1
+  qImpactDustPrefab: {fileID: 0}
+  qImpactDustLifetime: 1
+  qImpactDustLocalOffset: {x: 0, y: 0.2, z: 0}
+  qImpactDustScale: {x: 1, y: 1, z: 1}
+  qShowDustDebugMarker: 0
+  qSpawnImpactLightning: 1
+  qImpactLightningPrefab: {fileID: 0}
+  qImpactLightningLifetime: 0.25
+  qImpactLightningLocalOffset: {x: 0, y: 0, z: 0}
+  qImpactLightningScale: {x: 1, y: 1, z: 1}
   qStarFallBladeCount: 5
+  qStarFallMinBladeCount: 1
+  qStarFallBaseMaxBladeCount: 3
+  qStarFallMaxBladeCountCap: 12
+  qStarFallBladeCountPerDivineMark: 1
+  qStarFallUseDivineMarkScaling: 1
   qStarFallPathLength: 4.5
   qStarFallStartOffset: 0.8
   qStarFallForwardJitter: 0.35
@@ -1125,9 +1122,26 @@ MonoBehaviour:
   qStarFallFallSpeed: 12
   qStarFallSequentialDelay: 0.06
   qStarFallPathJitter: 0.15
+  qRandomAreaForwardMin: -2
+  qRandomAreaForwardMax: 5
+  qRandomAreaSideRange: 4
+  qRandomAreaUsePlayerCenter: 1
+  qRandomAreaYOffset: 0
   qStarFallDamageRadius: 0.8
   qStarFallEnableDamage: 0
   qStarFallDamageMultiplier: 1
+  qSpawnImpactSeal: 0
+  qImpactStarSealPrefab: {fileID: 0}
+  qImpactStarSealLifetime: 0.45
+  qImpactStarSealScale: {x: 1, y: 1, z: 1}
+  qSpawnVerticalFlash: 0
+  qImpactVerticalFlashPrefab: {fileID: 0}
+  qImpactVerticalFlashLifetime: 0.18
+  qImpactVerticalFlashScale: {x: 1, y: 1, z: 1}
+  qSpawnImpactParticle: 0
+  qImpactParticlePrefab: {fileID: 0}
+  qImpactParticleLifetime: 1
+  qImpactParticleScale: {x: 1, y: 1, z: 1}
   qStarFallUseForcedVisualRotation: 0
   qStarFallForcedVisualEuler: {x: 0, y: 0, z: 0}
   qStarFallVisualEulerOffset: {x: 0, y: 0, z: 0}
@@ -1192,6 +1206,14 @@ MonoBehaviour:
   sharedSkillEffectPrefab: {fileID: 0}
   wSkillEffectPrefab: {fileID: 0}
   standbySkillEffectPrefab: {fileID: 0}
+  wSpawnShieldBubble: 1
+  wShieldBubblePrefab: {fileID: 0}
+  wShieldBubbleLocalOffset: {x: 0, y: 0.2, z: 0}
+  wShieldBubbleScale: {x: 1.2, y: 1.5, z: 1}
+  wShieldBubbleFadeInDuration: 0.15
+  wShieldBubbleFadeOutDuration: 0.15
+  wShieldBubblePulseAmount: 0.03
+  wShieldBubblePulseSpeed: 2
 --- !u!114 &5650248378318002330
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1206,7 +1228,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
   eRailDuration: 0.6
   eEnableAfterimageShader: 1
-  eAfterimageSourceSpriteRenderer: {fileID: 0}
+  eAfterimageSourceRenderer: {fileID: 0}
+  eAfterimageMaterial: {fileID: 0}
   eAfterimageCount: 12
   eAfterimageDuration: 0.45
   eAfterimageAlpha: 0.35
@@ -1227,8 +1250,14 @@ MonoBehaviour:
   eAfterimageUseDistanceSampling: 1
   eAfterimageUseActualMoveDirection: 1
   eAfterimageInvertMoveDirection: 0
+  eAfterimageInvertFlip: 0
   eAfterimageSpacing: 0.06
   eAfterimageMaxPerDash: 24
+  eDashEffectPrefab: {fileID: 0}
+  eDashEffectLocalOffset: {x: 0, y: 0, z: 0}
+  eDashEffectYawOffset: 0
+  eSpawnDashEffect: 1
+  eDashEffectLifetime: 0.7
 --- !u!114 &1446829692210700123
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1316,6 +1345,12 @@ MonoBehaviour:
   rOrbitTrailLocalOffset: {x: 0, y: 0, z: 0}
   rOrbitTrailLocalEuler: {x: 0, y: 0, z: 0}
   rOrbitTrailLocalScale: {x: 1, y: 1, z: 1}
+  rCenterAuraPrefab: {fileID: 0}
+  rCenterAuraLocalOffset: {x: 0, y: 0.12, z: 0}
+  rEnableAuraHeal: 1
+  rAuraHealInterval: 0.1
+  rAuraHealPercentOfMaxHp: 0.01
+  rAuraHealCanOverMaxHp: 0
   rOrbitClearWhenOrbitEnds: 1
   rOrbitFadeOutDuration: 0.15
   sharedSkillEffectPrefab: {fileID: 0}

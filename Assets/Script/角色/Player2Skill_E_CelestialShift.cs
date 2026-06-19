@@ -4,10 +4,10 @@ using UnityEngine;
 using Spine.Unity;
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
-    [Header("E - 天轨换位 / 基础")]
+    [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private float eRailDuration = 0.6f;
 
-    [Header("E - 天轨换位 / 残影")]
+    [Header("E - 星痕瞬移 / 残影特效")]
     [InspectorName("E 启用残影")]
     [SerializeField] private bool eEnableAfterimageShader = true;
     [InspectorName("E 残影来源 SpriteRenderer")]
@@ -63,7 +63,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
 
     private bool isDashing;
     private Vector3 lastMoveDir = Vector3.forward;
-    [Header("E - Dash Effect")]
+    [Header("E - 星痕瞬移 / 光迹特效")]
     [SerializeField] private GameObject eDashEffectPrefab;
     [SerializeField] private Vector3 eDashEffectLocalOffset = Vector3.zero;
     [SerializeField] private float eDashEffectYawOffset = 0f;
