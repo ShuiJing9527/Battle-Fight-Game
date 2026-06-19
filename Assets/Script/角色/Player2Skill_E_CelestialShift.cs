@@ -63,6 +63,13 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
 
     private bool isDashing;
     private Vector3 lastMoveDir = Vector3.forward;
+    [Header("E - Dash Effect")]
+    [SerializeField] private GameObject eDashEffectPrefab;
+    [SerializeField] private Vector3 eDashEffectLocalOffset = Vector3.zero;
+    [SerializeField] private float eDashEffectYawOffset = 0f;
+    [SerializeField] private bool eSpawnDashEffect = true;
+    [SerializeField] private float eDashEffectLifetime = 0.7f;
+
     private readonly List<GameObject> activeAfterimageGhosts = new List<GameObject>();
 
     public override void Initialize(Player2PrototypeController owner)
@@ -196,6 +203,11 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         else
         {
             transform.position = dashEndPos;
+        }
+
+        if (eSpawnDashEffect)
+        {
+            SpawnDashEffect(dashStartPos, dashEndPos);
         }
 
         isDashing = false;
@@ -429,5 +441,36 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             activeAfterimageGhosts.Remove(ghost);
             Destroy(ghost);
         }
+    }
+
+    private void SpawnDashEffect(Vector3 dashStartPos, Vector3 dashEndPos)
+    {
+        if (eDashEffectPrefab == null)
+        {
+            return;
+        }
+
+        Vector3 dashDirection = dashEndPos - dashStartPos;
+        dashDirection.y = 0f;
+        Vector3 effectDirection = dashDirection.sqrMagnitude > 0.0001f ? -dashDirection.normalized : Vector3.back;
+        Quaternion rotation = Quaternion.LookRotation(effectDirection, Vector3.up);
+        rotation *= Quaternion.Euler(0f, eDashEffectYawOffset, 0f);
+
+        Vector3 spawnPosition = dashEndPos + eDashEffectLocalOffset;
+        GameObject instance = Instantiate(eDashEffectPrefab, spawnPosition, rotation);
+        ParticleSystem[] systems = instance.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < systems.Length; i++)
+        {
+            ParticleSystem system = systems[i];
+            if (system == null)
+            {
+                continue;
+            }
+
+            system.Clear(true);
+            system.Play(true);
+        }
+
+        Destroy(instance, Mathf.Max(0.05f, eDashEffectLifetime));
     }
 }

@@ -861,6 +861,10 @@ MonoBehaviour:
   eAfterimageInvertMoveDirection: 0
   eAfterimageSpacing: 0.07
   eAfterimageMaxPerDash: 24
+  eDashEffectPrefab: {fileID: 0}
+  eDashEffectLocalOffset: {x: 0, y: 0, z: 0}
+  eSpawnDashEffect: 1
+  eDashEffectLifetime: 0.7
   eAfterimageUseManualTrailLayout: 1
   eAfterimageInvertTrailDirection: 0
   eAfterimageNearCharacterOffset: 0.03
