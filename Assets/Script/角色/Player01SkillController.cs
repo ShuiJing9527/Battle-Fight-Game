@@ -240,7 +240,10 @@ public class Player01SkillController : MonoBehaviour
 
     private void TryRestoreLocomotionAnimation(string source, bool force)
     {
-        if (currentSkill != null && !force)
+        bool allowLocomotionWhileRunningBoost =
+            currentSkill is Player1Skill_E_BrokenDash eSkill && eSkill.IsRunningBoost;
+
+        if (currentSkill != null && !force && !allowLocomotionWhileRunningBoost)
         {
             return;
         }
@@ -398,11 +401,6 @@ public class Player01SkillController : MonoBehaviour
 
     private string ResolveLocomotionAnimationName()
     {
-        if (currentSkill is Player1Skill_E_BrokenDash eSkill && eSkill.IsRunningBoost && !string.IsNullOrWhiteSpace(runAnimationName))
-        {
-            return runAnimationName;
-        }
-
         float moveMagnitude = ResolveMoveMagnitude();
         if (moveMagnitude >= runSpeedThreshold && !string.IsNullOrWhiteSpace(runAnimationName))
         {

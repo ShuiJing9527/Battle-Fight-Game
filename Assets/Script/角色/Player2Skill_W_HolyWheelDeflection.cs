@@ -10,6 +10,14 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 基础减伤")]
     [SerializeField] private float wDamageReduction = 0.4f;
 
+    [Header("W - 星环剑轮 / 护盾")]
+    [InspectorName("W 护盾倍率")]
+    [SerializeField, Min(0f)] private float wShieldMaxHpMultiplier = 2f;
+    [InspectorName("W 每个额外星刃的护盾加成")]
+    [SerializeField, Min(0f)] private float wShieldBonusPerExtraSword = 0.1f;
+    [InspectorName("W 结束时清空护盾")]
+    [SerializeField] private bool wClearShieldOnEnd = true;
+
     [Header("W - 星环剑轮 / 神印加成")]
     [InspectorName("W 每把剑减伤加成")]
     [SerializeField] private float wDamageReductionPerSword = 0.03f;
@@ -84,6 +92,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private bool isWGuardActive;
     private float wOrbitAngle;
     private Coroutine wSkillRoutine;
+    private float wAppliedShieldValue;
     private GameObject activeWOrbitVisualRoot;
     private GameObject activeWShieldBubble;
     private readonly List<SpriteRenderer> activeWShieldBubbleSpriteRenderers = new List<SpriteRenderer>();
@@ -174,6 +183,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         isWGuardActive = false;
         currentWSwordCount = 0;
         currentWFinalDamageReduction = 0f;
+        ClearWShield();
     }
 
     private void OnDisable()
@@ -280,6 +290,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         currentWSwordCount = activeWSwords.Count;
         currentWFinalDamageReduction = ComputeWFinalDamageReduction(currentWSwordCount);
         isWGuardActive = true;
+        ApplyWShield(currentWSwordCount);
 
         Debug.Log($"[W Skill] Base={baseWSwordCount}, CurrentSwordEnergy={energyForW}, Spawned={activeWSwords.Count}, Duration={finalDuration:F2}, OrbitSpeed={finalOrbitSpeed:F2}, Radius={finalRadius:F2}, DamageReduction={currentWFinalDamageReduction:F2}", this);
         if (activeWSwords.Count > swordCount)
@@ -1252,5 +1263,88 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth/EnemyHealth for counter damage.", this);
+    }
+
+    private void ApplyWShield(int currentSwordCount)
+    {
+        if (Owner == null)
+        {
+            return;
+        }
+
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        if (combatHealth == null)
+        {
+            Debug.LogWarning("[W Shield] Owner has no CombatHealth shield receiver.", this);
+            return;
+        }
+
+        float maxHp = ResolveOwnerMaxHp();
+        int extraSwordCount = Mathf.Max(0, currentSwordCount - baseWSwordCount);
+        float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier);
+        wAppliedShieldValue = Mathf.Max(0f, baseShield * (1f + extraSwordCount * wShieldBonusPerExtraSword));
+        combatHealth.SetShield(wAppliedShieldValue);
+        Debug.Log($"[W Shield] Applied shield={wAppliedShieldValue:F2}, baseShield={baseShield:F2}, maxHp={maxHp:F2}, extraSwordCount={extraSwordCount}, bonusPerSword={wShieldBonusPerExtraSword:F2}", this);
+    }
+
+    private void ClearWShield()
+    {
+        if (!wClearShieldOnEnd)
+        {
+            return;
+        }
+
+        if (Owner == null)
+        {
+            wAppliedShieldValue = 0f;
+            return;
+        }
+
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            combatHealth.ClearShield();
+            Debug.Log($"[W Shield] Cleared shield, previousApplied={wAppliedShieldValue:F2}", this);
+        }
+
+        wAppliedShieldValue = 0f;
+    }
+
+    private float ResolveOwnerMaxHp()
+    {
+        if (Owner == null)
+        {
+            return 0f;
+        }
+
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            if (combatHealth.resourceBank != null)
+            {
+                return Mathf.Max(0f, combatHealth.resourceBank.maxHealth);
+            }
+
+            if (combatHealth.stats != null)
+            {
+                return Mathf.Max(0f, combatHealth.stats.maxHealth);
+            }
+
+            return Mathf.Max(0f, combatHealth.currentHealth);
+        }
+
+        BattleResourceBank resourceBank = Owner.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return Mathf.Max(0f, resourceBank.maxHealth);
+        }
+
+        CombatStats stats = Owner.GetComponent<CombatStats>();
+        if (stats != null)
+        {
+            return Mathf.Max(0f, stats.maxHealth);
+        }
+
+        return 0f;
     }
 }

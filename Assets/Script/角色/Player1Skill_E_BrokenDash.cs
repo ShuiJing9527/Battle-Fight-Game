@@ -4,10 +4,13 @@ using UnityEngine;
 
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
-    [Header("E")]
-    [SerializeField, Min(0.1f)] private float speedMultiplier = 1.75f;
+    [Header("E - 持续奔跑")]
+    [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
     [SerializeField] private bool ignoreObstacleCollision = true;
     [SerializeField] private LayerMask obstacleLayers = 1 << 3;
+    [Header("E - 幽灵视觉")]
+    [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
+    [SerializeField] private bool eEnableGhostStateVisual = true;
 
     public bool IsRunningBoost { get; private set; }
 
@@ -18,18 +21,34 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private void Reset()
     {
         cooldown = 2.2f;
-        duration = 0.35f;
+        duration = 3f;
         effectPower = 4f;
         animationName = "Run";
         debugLog = true;
-        speedMultiplier = 1.75f;
+        speedMultiplier = 2f;
         ignoreObstacleCollision = true;
         obstacleLayers = 1 << 3;
+    }
+
+    public override void Cast()
+    {
+        if (IsRunningBoost)
+        {
+            if (debugLog)
+            {
+                Debug.Log("[Player01 E Run] already running, ignored.", this);
+            }
+
+            return;
+        }
+
+        base.Cast();
     }
 
     private void Awake()
     {
         cachedMovement = GetComponent<PlayerMovement>();
+        CacheGhostStateVisual();
     }
 
     protected override bool ShouldLoopAnimation()
@@ -42,13 +61,17 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         IsRunningBoost = true;
         ApplySpeedBoost();
         ApplyObstacleCollisionIgnore(true);
+        SetGhostStateVisible(true);
 
         if (debugLog)
         {
-            Debug.Log($"[E - BrokenDash] Start. animation={animationName}, speedMultiplier={speedMultiplier:F2}, ignoreObstacleCollision={ignoreObstacleCollision}", this);
+            Debug.Log($"[Player01 E Run] start duration={duration:F2}, animation={animationName}, speedMultiplier={speedMultiplier:F2}, ignoreObstacleCollision={ignoreObstacleCollision}", this);
         }
 
-        PlayRunAnimation();
+        if (Controller != null)
+        {
+            Controller.RestoreLocomotionAnimation(true);
+        }
     }
 
     protected override IEnumerator CastRoutine()
@@ -72,30 +95,17 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         IsRunningBoost = false;
         RestoreSpeed();
         ApplyObstacleCollisionIgnore(false);
+        SetGhostStateVisible(false);
+
+        if (debugLog)
+        {
+            Debug.Log("[Player01 E Run] end restore movement/collision", this);
+        }
     }
 
     protected override string GetSkillLabel()
     {
-        return "E - BrokenDash";
-    }
-
-    private void PlayRunAnimation()
-    {
-        if (Controller == null)
-        {
-            return;
-        }
-
-        float lockDuration = Mathf.Max(0f, duration);
-        if (debugLog)
-        {
-            Debug.Log($"[E - BrokenDash] Try play {animationName} with lock={lockDuration:F2}.", this);
-        }
-
-        if (!Controller.TryPlayLockedSkillAnimation(animationName, true, lockDuration) && debugLog)
-        {
-            Debug.LogWarning($"[E - BrokenDash] Failed to play animation '{animationName}'.", this);
-        }
+        return "E - 持续奔跑";
     }
 
     private void ApplySpeedBoost()
@@ -179,5 +189,43 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 cachedLayerCollisionStates.Remove(layer);
             }
         }
+    }
+
+    protected override void OnDisable()
+    {
+        base.OnDisable();
+        SetGhostStateVisible(false);
+    }
+
+    protected override void OnDestroy()
+    {
+        base.OnDestroy();
+        SetGhostStateVisible(false);
+    }
+
+    private void CacheGhostStateVisual()
+    {
+        if (eGhostStateVisual != null)
+        {
+            return;
+        }
+
+        eGhostStateVisual = GetComponentInChildren<Player01GhostStateVisual>(true);
+    }
+
+    private void SetGhostStateVisible(bool visible)
+    {
+        if (!eEnableGhostStateVisual)
+        {
+            visible = false;
+        }
+
+        CacheGhostStateVisual();
+        if (eGhostStateVisual == null)
+        {
+            return;
+        }
+
+        eGhostStateVisual.SetGhostActive(visible);
     }
 }

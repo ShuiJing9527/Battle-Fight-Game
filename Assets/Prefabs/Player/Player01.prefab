@@ -107,7 +107,6 @@ GameObject:
   - component: {fileID: 6725505632984679695}
   - component: {fileID: 422191370296094423}
   - component: {fileID: 1063072708171050644}
-  - component: {fileID: 4473591438675472373}
   - component: {fileID: 1505681936420621240}
   m_Layer: 0
   m_Name: "\u706B\u7130"
@@ -187,28 +186,6 @@ MeshRenderer:
   m_SortingLayer: 0
   m_SortingOrder: 50
   m_AdditionalVertexStreams: {fileID: 0}
---- !u!64 &4473591438675472373
-MeshCollider:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6284736616834087478}
-  m_Material: {fileID: 0}
-  m_IncludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_ExcludeLayers:
-    serializedVersion: 2
-    m_Bits: 0
-  m_LayerOverridePriority: 0
-  m_IsTrigger: 0
-  m_ProvidesContacts: 0
-  m_Enabled: 1
-  serializedVersion: 5
-  m_Convex: 0
-  m_CookingOptions: 30
-  m_Mesh: {fileID: 10210, guid: 0000000000000000e000000000000000, type: 0}
 --- !u!114 &1505681936420621240
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -247,6 +224,7 @@ GameObject:
   - component: {fileID: 6262736825200089138}
   - component: {fileID: 48694291259105405}
   - component: {fileID: 3948502578290390607}
+  - component: {fileID: 9002000000000000001}
   m_Layer: 0
   m_Name: Player01
   m_TagString: Player
@@ -273,6 +251,45 @@ Transform:
   - {fileID: 1877475523376043010}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &9002000000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 98d3f8d19d5044b4b7cf83c19d4fa8b1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player01GhostStateVisual
+  bodyRenderer: {fileID: 8104417566104533252}
+  bodyGhostMaterial: {fileID: 2100000, guid: 6f2a2ef91be14134aefcb2f6d8bb1c10, type: 2}
+  bodyTintColor: {r: 0.35, g: 0.85, b: 1, a: 1}
+  bodyAlpha: 0.35
+  flowColor: {r: 0.82, g: 0.97, b: 1, a: 1}
+  flowIntensity: 1.35
+  flowSpeedX: 0.35
+  flowSpeedY: 0.08
+  flowWidth: 0.22
+  scanlineIntensity: 0.08
+  scanlineDensity: 180
+  scanlineSpeed: 1.2
+  rgbSplitStrength: 0.25
+  jitterStrength: 0.15
+  jitterSpeed: 2.2
+  hideNoiseStrength: 0.05
+  hideNoiseSpeed: 0.8
+  shadowRoot: {fileID: 0}
+  shadowRenderer: {fileID: 0}
+  shadowGhostMaterial: {fileID: 2100000, guid: 8f7b54c5a9f14f88bd0dc6c4d2fb5f21, type: 2}
+  shadowOffset: {x: 0.06, y: -0.04, z: -0.01}
+  shadowAlpha: 0.18
+  shadowTintColor: {r: 0.18, g: 0.45, b: 0.82, a: 1}
+  shadowNoiseStrength: 0.08
+  shadowFlowStrength: 0.65
+  shadowRGBSplitStrength: 0.35
+  shadowJitterStrength: 0.28
 --- !u!212 &8684536898306610109
 SpriteRenderer:
   m_ObjectHideFlags: 0
@@ -1027,15 +1044,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_E_BrokenDash
   cooldown: 2.2
-  duration: 0.35
+  duration: 3
   effectPower: 4
   animationName: Run
   debugLog: 1
-  speedMultiplier: 1.75
+  speedMultiplier: 2
   ignoreObstacleCollision: 1
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 8
+  eGhostStateVisual: {fileID: 9002000000000000001}
+  eEnableGhostStateVisual: 1
 --- !u!114 &3948502578290390607
 MonoBehaviour:
   m_ObjectHideFlags: 0

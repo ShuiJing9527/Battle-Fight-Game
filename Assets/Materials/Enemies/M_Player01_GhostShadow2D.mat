@@ -1,0 +1,70 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_Player01_GhostShadow2D
+  m_Shader: {fileID: 4800000, guid: d8f1a1c6b0b54f5a9d4d2c3b1a7e8f90, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_LockedProperties:
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: ab556f86eebee454c807b1079c9ce798, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _BodyAlpha: 0.22
+    - _FlowIntensity: 0.9
+    - _FlowSpeedX: 0.22
+    - _FlowSpeedY: 0.05
+    - _FlowWidth: 0.16
+    - _HideNoiseSpeed: 0.65
+    - _HideNoiseStrength: 0.08
+    - _JitterSpeed: 1.4
+    - _JitterStrength: 0.28
+    - _RGBSplitStrength: 0.35
+    - _ScanlineDensity: 120
+    - _ScanlineIntensity: 0.05
+    - _ScanlineSpeed: 0.8
+    - _ShadowAlpha: 0.32
+    - _ShadowFlowStrength: 0.95
+    - _ShadowJitterStrength: 0.4
+    - _ShadowNoiseStrength: 0.12
+    - _ShadowOffsetX: 0.08
+    - _ShadowOffsetY: -0.06
+    - _ShadowRGBSplitStrength: 0.48
+    m_Colors:
+    - _BodyTintColor: {r: 0.18, g: 0.45, b: 0.82, a: 1}
+    - _FlowColor: {r: 0.58, g: 0.86, b: 1, a: 1}
+    - _ShadowTintColor: {r: 0.1, g: 0.3, b: 0.6, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

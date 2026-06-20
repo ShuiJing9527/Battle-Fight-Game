@@ -13,7 +13,7 @@ public class PlayerCameraRig : MonoBehaviour
     [Tooltip("Fallback tag used when no party bootstrap is found.")]
     public string fallbackPlayerTag = "Player";
     [Tooltip("Fallback scene object names checked when tag lookup fails.")]
-    public string[] fallbackPlayerNames = { "Player02", "Player01", "Player" };
+    public string[] fallbackPlayerNames = { "Player01", "Player02", "Player" };
 
     [Header("Camera Distance/Offset (Relative to Player Pivot)")]
     [Tooltip("Back distance from player pivot.")]
@@ -148,7 +148,7 @@ public class PlayerCameraRig : MonoBehaviour
         targetCenterOffset = Vector3.zero;
         autoResolvePlayerSlot = true;
         fallbackPlayerTag = "Player";
-        fallbackPlayerNames = new[] { "Player02", "Player01", "Player" };
+        fallbackPlayerNames = new[] { "Player01", "Player02", "Player" };
     }
 
     private static GameObject FindSceneObjectByNameIncludingInactive(string targetName)

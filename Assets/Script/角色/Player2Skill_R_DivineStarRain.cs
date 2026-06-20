@@ -21,6 +21,19 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float rSwarmDuration = 2.0f;
     [SerializeField] private float rSwarmRadiusMin = 0.8f;
     [SerializeField] private float rSwarmRadiusMax = 3.2f;
+    [SerializeField] private bool rUseDivineMarkRadiusScaling = true;
+    [SerializeField] private float rRadiusPerDivineMark = 0.75f;
+    [SerializeField] private float rMaxRadius = 12f;
+    [SerializeField] private bool rUseScreenWideVortexRange = true;
+    [SerializeField] private float rBaseHorizontalRange = 3.8f;
+    [SerializeField] private float rHorizontalRangePerDivineMark = 1.1f;
+    [SerializeField] private float rMaxHorizontalRange = 14.5f;
+    [SerializeField] private float rBaseVerticalRange = 1f;
+    [SerializeField] private float rVerticalRangePerDivineMark = 0.2f;
+    [SerializeField] private float rMaxVerticalRange = 3f;
+    [SerializeField] private float rBaseHeightRange = 0.8f;
+    [SerializeField] private float rHeightRangePerDivineMark = 0.25f;
+    [SerializeField] private float rMaxHeightRange = 4f;
     [SerializeField] private float rSwarmHeightMin = 0.4f;
     [SerializeField] private float rSwarmHeightMax = 3.0f;
     [SerializeField] private float rSwarmSpeedMin = 120f;
@@ -185,6 +198,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private Coroutine rAuraHealRoutine;
     private GameObject activeRSwarmRoot;
     private GameObject activeRCenterAura;
+    private int usedDivineMarkCount;
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
     private readonly List<RStarRainBladeData> activeRStarRainBlades = new List<RStarRainBladeData>();
     private Camera resolvedRRenderCamera;
@@ -221,6 +235,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             rSwarmRoutine = null;
         }
 
+        usedDivineMarkCount = 0;
         CleanupRSwarmVisuals();
         CleanupRStarRainVisuals();
         if (activeRSwarmRoot != null)
@@ -254,6 +269,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         Camera renderCamera = ResolveRRenderCamera();
         Vector3 previewCenter = ResolveRSwarmCenter();
         Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
+        usedDivineMarkCount = energyForR;
         if (Owner != null)
         {
             Owner.currentSwordEnergy = 0;
@@ -262,6 +278,83 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
         StartRAuraHealRoutine();
         return true;
+    }
+
+    private int GetDivineMarkCount()
+    {
+        return Mathf.Max(0, usedDivineMarkCount);
+    }
+
+    private float GetScaledRSwarmRadiusMin()
+    {
+        float baseRadiusMin = Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax);
+        if (!rUseDivineMarkRadiusScaling)
+        {
+            return Mathf.Max(0.01f, baseRadiusMin);
+        }
+
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rRadiusPerDivineMark) * 0.25f;
+        return Mathf.Max(0.01f, Mathf.Min(baseRadiusMin + bonus, Mathf.Max(0.01f, rMaxRadius)));
+    }
+
+    private float GetScaledRSwarmRadiusMax()
+    {
+        float baseRadiusMax = Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax);
+        if (!rUseDivineMarkRadiusScaling)
+        {
+            return Mathf.Max(0.01f, baseRadiusMax);
+        }
+
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rRadiusPerDivineMark);
+        return Mathf.Max(0.01f, Mathf.Min(baseRadiusMax + bonus, Mathf.Max(0.01f, rMaxRadius)));
+    }
+
+    private float GetScaledRSwarmHorizontalRange()
+    {
+        if (!rUseScreenWideVortexRange)
+        {
+            return GetScaledRSwarmRadiusMax();
+        }
+
+        float baseRange = Mathf.Max(0.01f, rBaseHorizontalRange);
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rHorizontalRangePerDivineMark);
+        return Mathf.Max(0.01f, Mathf.Min(baseRange + bonus, Mathf.Max(0.01f, rMaxHorizontalRange)));
+    }
+
+    private float GetScaledRSwarmVerticalRange()
+    {
+        if (!rUseScreenWideVortexRange)
+        {
+            return Mathf.Max(0.01f, Mathf.Min(rSwarmRadiusMax, rMaxRadius));
+        }
+
+        float baseRange = Mathf.Max(0.01f, rBaseVerticalRange);
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rVerticalRangePerDivineMark);
+        return Mathf.Max(0.01f, Mathf.Min(baseRange + bonus, Mathf.Max(0.01f, rMaxVerticalRange)));
+    }
+
+    private float GetScaledRSwarmHeightRange()
+    {
+        if (!rUseScreenWideVortexRange)
+        {
+            return Mathf.Max(0.01f, rBaseHeightRange);
+        }
+
+        float baseRange = Mathf.Max(0.01f, rBaseHeightRange);
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rHeightRangePerDivineMark);
+        return Mathf.Max(0.01f, Mathf.Min(baseRange + bonus, Mathf.Max(0.01f, rMaxHeightRange)));
+    }
+
+    private float GetScaledRStarRainRadius()
+    {
+        float baseRadius = Mathf.Max(0f, rStarRainRadius);
+        if (!rUseDivineMarkRadiusScaling)
+        {
+            return baseRadius;
+        }
+
+        float bonus = GetDivineMarkCount() * Mathf.Max(0f, rRadiusPerDivineMark);
+        return Mathf.Max(0f, Mathf.Min(baseRadius + bonus, Mathf.Max(0.01f, rMaxRadius)));
     }
 
     private IEnumerator RSwarmRoutine(int count)
@@ -275,22 +368,27 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         SpawnRCenterAura(swarmRoot.transform);
 
         int swordCount = Mathf.Max(0, count);
+        float finalRadiusMin = GetScaledRSwarmRadiusMin();
+        float finalRadiusMax = GetScaledRSwarmRadiusMax();
+        float finalHorizontalRange = GetScaledRSwarmHorizontalRange();
+        float finalDepthRange = GetScaledRSwarmVerticalRange();
+        float finalHeightRange = GetScaledRSwarmHeightRange();
+        Debug.Log($"[R Vortex Range] marks={GetDivineMarkCount()}, horizontal={finalHorizontalRange:F2}, height={finalHeightRange:F2}, depth={finalDepthRange:F2}, count={swordCount}", this);
         for (int i = 0; i < swordCount; i++)
         {
-            float baseAngle = i * (360f / Mathf.Max(1, swordCount)) + Random.Range(-30f, 30f);
-            float radiusMin = Mathf.Min(rSwarmRadiusMin, rSwarmRadiusMax);
-            float radiusMax = Mathf.Max(rSwarmRadiusMin, rSwarmRadiusMax);
-            float radiusT = swordCount <= 1 ? 0.5f : i / (float)(swordCount - 1);
-            float radius = Mathf.Lerp(radiusMin, radiusMax, radiusT);
-            radius += Random.Range(-rSwarmRadiusJitter, rSwarmRadiusJitter);
-            radius = Mathf.Max(0.01f, radius);
-            float height = Random.Range(Mathf.Min(rSwarmHeightMin, rSwarmHeightMax), Mathf.Max(rSwarmHeightMin, rSwarmHeightMax));
+            float spawnX = Random.Range(-finalHorizontalRange, finalHorizontalRange);
+            float spawnY = Random.Range(Mathf.Max(0.1f, finalHeightRange * 0.2f), finalHeightRange);
+            float spawnZ = Random.Range(-finalDepthRange, finalDepthRange);
+            float baseAngle = Mathf.Atan2(spawnZ, spawnX) * Mathf.Rad2Deg + Random.Range(-30f, 30f);
+            float radius = Mathf.Max(finalRadiusMin, new Vector2(spawnX, spawnZ).magnitude);
+            radius = Mathf.Min(radius, finalRadiusMax);
+            float height = spawnY;
             float orbitSpeed = Random.Range(Mathf.Min(rSwarmSpeedMin, rSwarmSpeedMax), Mathf.Max(rSwarmSpeedMin, rSwarmSpeedMax));
             float bobAmplitude = Random.Range(Mathf.Min(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax), Mathf.Max(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax));
             float bobFrequency = Random.Range(Mathf.Min(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax), Mathf.Max(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax));
             float phase = Random.Range(0f, Mathf.PI * 2f);
 
-            Vector3 spawnOffset = GetOrbitPositionXZ(baseAngle, radius, height);
+            Vector3 spawnOffset = new Vector3(spawnX, height, spawnZ);
             Vector3 spawnPosition = center + spawnOffset;
 
             GameObject sword = CreateSkillEffectVisual(
@@ -384,7 +482,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         if (rDebugFacingScreenAngle)
         {
-            Debug.Log($"R Swarm radius range: min={rSwarmRadiusMin}, max={rSwarmRadiusMax}, actualRadiusCount={activeRSwarmSwords.Count}", this);
+            Debug.Log($"R Swarm radius range: min={finalRadiusMin:F2}, max={finalRadiusMax:F2}, horizontal={finalHorizontalRange:F2}, height={finalHeightRange:F2}, depth={finalDepthRange:F2}, actualRadiusCount={activeRSwarmSwords.Count}", this);
             for (int i = 0; i < activeRSwarmSwords.Count; i++)
             {
                 RSwarmSwordData data = activeRSwarmSwords[i];
@@ -473,6 +571,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         StopRAuraHealRoutine();
         CleanupRSwarmVisuals();
+        usedDivineMarkCount = 0;
         rSwarmRoutine = null;
     }
 
@@ -494,14 +593,17 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     {
         int waveCount = Mathf.Max(1, rStarRainBladesPerWave);
         float rainSpawnHeight = Mathf.Max(0f, rStarRainSpawnHeight);
-        float rainRadius = Mathf.Max(0f, rStarRainRadius);
+        float rainRadius = Mathf.Max(0f, rUseScreenWideVortexRange
+            ? Mathf.Max(GetScaledRSwarmHorizontalRange(), GetScaledRSwarmVerticalRange())
+            : GetScaledRStarRainRadius());
         float rainRandomDelay = Mathf.Max(0f, rStarRainRandomDelay);
         float rainFallSpeed = Mathf.Max(0.1f, rStarRainFallSpeed);
 
         for (int i = 0; i < waveCount; i++)
         {
-            Vector2 randomOffset2D = Random.insideUnitCircle * rainRadius;
-            Vector3 target = center + new Vector3(randomOffset2D.x, 0f, randomOffset2D.y);
+            float targetX = Random.Range(-rainRadius, rainRadius);
+            float targetZ = Random.Range(-Mathf.Max(0.01f, rainRadius * 0.3f), Mathf.Max(0.01f, rainRadius * 0.3f));
+            Vector3 target = center + new Vector3(targetX, 0f, targetZ);
             Vector3 fallDirection = ResolveRStarRainFallDirection(center, target);
             Vector3 spawn = target - fallDirection * rainSpawnHeight;
 

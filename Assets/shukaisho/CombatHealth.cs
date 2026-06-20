@@ -10,8 +10,11 @@ public class CombatHealth : MonoBehaviour
     public bool destroyOnDeath = true;
 
     public event Action<GameObject> Died;
+    public event Action<float, float> OnShieldChanged;
 
     private bool dead;
+    private float localShield;
+    private float localMaxShield;
 
     private float MaxHealth => stats != null ? stats.maxHealth : (resourceBank != null ? resourceBank.maxHealth : currentHealth);
 
@@ -27,7 +30,22 @@ public class CombatHealth : MonoBehaviour
             resourceBank = GetComponent<BattleResourceBank>();
         }
 
+        if (resourceBank != null)
+        {
+            resourceBank.OnShieldChanged += HandleResourceBankOnShieldChanged;
+        }
+
         currentHealth = Mathf.Clamp(currentHealth, 0f, MaxHealth);
+        localShield = Mathf.Max(0f, localShield);
+        localMaxShield = Mathf.Max(0f, localMaxShield);
+    }
+
+    private void OnDestroy()
+    {
+        if (resourceBank != null)
+        {
+            resourceBank.OnShieldChanged -= HandleResourceBankOnShieldChanged;
+        }
     }
 
     public void TakeDamage(float amount)
@@ -43,24 +61,20 @@ public class CombatHealth : MonoBehaviour
         }
 
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : Mathf.Max(0f, damage.amount);
+        finalDamage = AbsorbShieldDamage(finalDamage);
+        Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
+        if (player2 != null)
+        {
+            finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
+        }
+
         if (resourceBank != null)
         {
-            finalDamage = resourceBank.AbsorbDamage(finalDamage);
-            Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
-            if (player2 != null)
-            {
-                finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
-            }
             resourceBank.currentHealth = Mathf.Max(0f, resourceBank.currentHealth - finalDamage);
             currentHealth = resourceBank.currentHealth;
         }
         else
         {
-            Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
-            if (player2 != null)
-            {
-                finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
-            }
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
         }
 
@@ -82,6 +96,92 @@ public class CombatHealth : MonoBehaviour
         {
             currentHealth = Mathf.Min(MaxHealth, currentHealth + amount);
         }
+    }
+
+    public void SetShield(float amount)
+    {
+        amount = Mathf.Max(0f, amount);
+        if (resourceBank != null)
+        {
+            resourceBank.SetShield(amount);
+            return;
+        }
+
+        localShield = amount;
+        localMaxShield = amount;
+        OnShieldChanged?.Invoke(localShield, localMaxShield);
+    }
+
+    public void ClearShield()
+    {
+        if (resourceBank != null)
+        {
+            resourceBank.ClearShield();
+            return;
+        }
+
+        localShield = 0f;
+        localMaxShield = 0f;
+        OnShieldChanged?.Invoke(localShield, localMaxShield);
+    }
+
+    public float GetShield()
+    {
+        return resourceBank != null ? resourceBank.CurrentShield : localShield;
+    }
+
+    public float GetMaxShield()
+    {
+        if (resourceBank != null)
+        {
+            return resourceBank.MaxShield;
+        }
+
+        return localMaxShield;
+    }
+
+    public bool HasActiveShield()
+    {
+        return GetShield() > 0f;
+    }
+
+    public float CurrentShield => GetShield();
+    public float MaxShield => GetMaxShield();
+    public bool HasShield => HasActiveShield();
+
+    public float GetCurrentShield()
+    {
+        return GetShield();
+    }
+
+    private float AbsorbShieldDamage(float amount)
+    {
+        amount = Mathf.Max(0f, amount);
+        float shieldUsed = Mathf.Min(GetShield(), amount);
+        if (shieldUsed <= 0f)
+        {
+            return amount;
+        }
+
+        float remainingShield = GetShield() - shieldUsed;
+        if (resourceBank != null)
+        {
+            resourceBank.SetShieldCurrent(remainingShield);
+        }
+        else
+        {
+            localShield = remainingShield;
+            localMaxShield = Mathf.Max(localMaxShield, localShield);
+            OnShieldChanged?.Invoke(localShield, localMaxShield);
+        }
+
+        Debug.Log($"[Shield] absorbed={shieldUsed:F2}, remaining={remainingShield:F2}, incoming={amount:F2}", this);
+        return amount - shieldUsed;
+    }
+
+    private void HandleResourceBankOnShieldChanged(float currentShield, float maxShield)
+    {
+        OnShieldChanged?.Invoke(currentShield, maxShield);
     }
 
     private void Die(GameObject killer)

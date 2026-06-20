@@ -1,27 +1,29 @@
-using System;
+﻿using System;
 using UnityEngine;
 
 public class BattleResourceBank : MonoBehaviour
 {
-    [Header("生命魂")]
+    [Header("Health")]
     [Min(0f)] public float maxHealth = 3f;
     [Min(0f)] public float currentHealth = 3f;
     [Min(0f)] public float shield = 0f;
+    [Min(0f)] public float maxShield = 0f;
 
-    [Header("能量魂")]
+    [Header("Energy")]
     [Min(0f)] public float maxEnergy = 100f;
     [Min(0f)] public float currentEnergy = 0f;
     [Min(0f)] public float energyOverflowDamageBonusPerPoint = 0f;
     [Min(0f)] public float energyOverflowBuffSeconds = 0f;
 
-    [Header("成长魂")]
+    [Header("Growth")]
     [Min(0)] public int growthSoul = 0;
 
-    [Header("功能魂")]
+    [Header("Function")]
     [Min(0)] public int functionSoul = 0;
 
     public event Action<SoulType, float> SoulApplied;
     public event Action FunctionSoulTriggered;
+    public event Action<float, float> OnShieldChanged;
 
     private float skillDamageMultiplier = 1f;
     private float skillDamageBuffEndTime = -1f;
@@ -99,6 +101,45 @@ public class BattleResourceBank : MonoBehaviour
         ApplyLifeSoul(amount);
     }
 
+    public void SetShield(float amount)
+    {
+        shield = Mathf.Max(0f, amount);
+        maxShield = shield;
+        OnShieldChanged?.Invoke(shield, maxShield);
+    }
+
+    public void SetShieldCurrent(float amount)
+    {
+        shield = Mathf.Max(0f, amount);
+        OnShieldChanged?.Invoke(shield, maxShield);
+    }
+
+    public void ClearShield()
+    {
+        shield = 0f;
+        maxShield = 0f;
+        OnShieldChanged?.Invoke(shield, maxShield);
+    }
+
+    public float CurrentShield => shield;
+    public float MaxShield => maxShield;
+    public bool HasShield => shield > 0f;
+
+    public float GetCurrentShield()
+    {
+        return shield;
+    }
+
+    public float GetMaxShield()
+    {
+        return maxShield;
+    }
+
+    public bool HasActiveShield()
+    {
+        return shield > 0f;
+    }
+
     private void ApplyLifeSoul(float amount)
     {
         float before = currentHealth;
@@ -109,6 +150,8 @@ public class BattleResourceBank : MonoBehaviour
         if (overflow > 0f)
         {
             shield += overflow;
+            maxShield = Mathf.Max(maxShield, shield);
+            OnShieldChanged?.Invoke(shield, maxShield);
         }
     }
 
@@ -131,6 +174,11 @@ public class BattleResourceBank : MonoBehaviour
         amount = Mathf.Max(0f, amount);
         float shieldUsed = Mathf.Min(shield, amount);
         shield -= shieldUsed;
+        if (shieldUsed > 0f)
+        {
+            Debug.Log($"[Shield] absorbed={shieldUsed:F2}, remaining={shield:F2}, incoming={amount:F2}", this);
+            OnShieldChanged?.Invoke(shield, maxShield);
+        }
         return amount - shieldUsed;
     }
 }

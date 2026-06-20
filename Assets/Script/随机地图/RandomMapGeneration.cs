@@ -156,6 +156,12 @@ namespace UnderTheStars.GenerationMap
             Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
             if (refTilemap == null) return;
 
+            Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+            if (bootstrap != null)
+            {
+                bootstrap.EnsureInitializedForSpawn();
+            }
+
             Transform spawnTarget = ResolveSpawnTargetTransform();
             if (spawnTarget == null) return;
 
@@ -194,10 +200,13 @@ namespace UnderTheStars.GenerationMap
                     targetMovement.rb.linearVelocity = Vector3.zero;
                 }
 
-                // Keep current standing height and only update X/Z to spawn cell center.
-                // This avoids "spawn high then fall" behavior.
-                Vector3 current = spawnTarget.position;
-                spawnTarget.position = new Vector3(worldSpawnPos.x, current.y, worldSpawnPos.z);
+                Vector3 spawnBasePosition = worldSpawnPos;
+                if (bootstrap != null)
+                {
+                    spawnBasePosition = bootstrap.ApplyCharacterHeightOffset(spawnTarget.gameObject, worldSpawnPos);
+                }
+
+                spawnTarget.position = spawnBasePosition;
 
                 Debug.Log($"Player placed. Cell:{cellPos} -> World:{worldSpawnPos}");
                 Debug.Log($"[SPAWN] Spawn target = {spawnTarget.name}");

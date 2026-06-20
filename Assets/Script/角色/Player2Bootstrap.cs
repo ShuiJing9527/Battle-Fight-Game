@@ -8,10 +8,14 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField] private GameObject player02;
     [SerializeField] private GameObject partyLeader;
 
+    [Header("Height Offsets")]
+    [SerializeField] private float player01YOffset = 0.75f;
+    [SerializeField] private float player02YOffset = 1.2f;
+
     [Header("Fallback Names (Optional)")]
     [SerializeField] private string player01Name = "Player01";
     [SerializeField] private string player02Name = "Player02";
-    [SerializeField] private string partyLeaderName = "Player02";
+    [SerializeField] private string partyLeaderName = "Player01";
 
     [Header("UI")]
     [SerializeField] private bool showSwitchHint = true;
@@ -32,6 +36,10 @@ public class Player2Bootstrap : MonoBehaviour
 
     private Texture2D healthBarBackgroundTexture;
     private Texture2D healthBarFillTexture;
+    private Texture2D energyBarBackgroundTexture;
+    private Texture2D energyBarFillTexture;
+    private Texture2D shieldBarBackgroundTexture;
+    private Texture2D shieldBarFillTexture;
     private GUIStyle switchHintStyle;
     private GUIStyle healthBarLabelStyle;
 
@@ -62,7 +70,8 @@ public class Player2Bootstrap : MonoBehaviour
 
         if (showHealthBar)
         {
-            DrawHealthBar();
+            DrawStatusBars();
+            DrawShieldBar();
         }
     }
 
@@ -137,10 +146,20 @@ public class Player2Bootstrap : MonoBehaviour
             return;
         }
 
+        Vector3 basePosition;
         if (CurrentPlayer != null && CurrentPlayer != nextActive)
         {
-            Vector3 pos = CurrentPlayer.transform.position;
-            nextActive.transform.position = pos;
+            basePosition = RemoveCharacterHeightOffset(CurrentPlayer, CurrentPlayer.transform.position);
+        }
+        else
+        {
+            basePosition = RemoveCharacterHeightOffset(nextActive, nextActive.transform.position);
+        }
+
+        nextActive.transform.position = ApplyCharacterHeightOffset(nextActive, basePosition);
+        if (nextInactive != null)
+        {
+            nextInactive.transform.position = ApplyCharacterHeightOffset(nextInactive, basePosition);
         }
 
         nextActive.SetActive(true);
@@ -199,7 +218,7 @@ public class Player2Bootstrap : MonoBehaviour
             partyLeader = player01;
         }
 
-        GameObject startPlayer = partyLeader == player02 ? player02 : player01;
+        GameObject startPlayer = player01 != null ? player01 : (partyLeader == player02 ? player02 : partyLeader);
         SetActivePlayer(startPlayer);
 
         if (disablePlayer2AnimatorIfSharedController)
@@ -213,6 +232,31 @@ public class Player2Bootstrap : MonoBehaviour
         initialized = true;
     }
 
+    public float GetCharacterHeightOffset(GameObject character)
+    {
+        if (character == null)
+        {
+            return 0f;
+        }
+
+        if (character == player02 || character.GetComponent<Player2PrototypeController>() != null || (!string.IsNullOrEmpty(player02Name) && character.name.Contains(player02Name)))
+        {
+            return player02YOffset;
+        }
+
+        return player01YOffset;
+    }
+
+    public Vector3 ApplyCharacterHeightOffset(GameObject character, Vector3 basePosition)
+    {
+        return basePosition + Vector3.up * GetCharacterHeightOffset(character);
+    }
+
+    public Vector3 RemoveCharacterHeightOffset(GameObject character, Vector3 worldPosition)
+    {
+        return worldPosition - Vector3.up * GetCharacterHeightOffset(character);
+    }
+
     private void EnsureGuiResources()
     {
         if (healthBarBackgroundTexture == null)
@@ -223,6 +267,26 @@ public class Player2Bootstrap : MonoBehaviour
         if (healthBarFillTexture == null)
         {
             healthBarFillTexture = CreateColorTexture(new Color(0.85f, 0.15f, 0.15f, 1f));
+        }
+
+        if (energyBarBackgroundTexture == null)
+        {
+            energyBarBackgroundTexture = CreateColorTexture(new Color(0.04f, 0.12f, 0.22f, 0.78f));
+        }
+
+        if (energyBarFillTexture == null)
+        {
+            energyBarFillTexture = CreateColorTexture(new Color(0.22f, 0.55f, 1f, 1f));
+        }
+
+        if (shieldBarBackgroundTexture == null)
+        {
+            shieldBarBackgroundTexture = CreateColorTexture(new Color(0f, 0.1f, 0.2f, 0.75f));
+        }
+
+        if (shieldBarFillTexture == null)
+        {
+            shieldBarFillTexture = CreateColorTexture(new Color(0.25f, 0.8f, 1f, 1f));
         }
 
         if (switchHintStyle == null)
@@ -247,7 +311,7 @@ public class Player2Bootstrap : MonoBehaviour
         }
     }
 
-    private void DrawHealthBar()
+    private void DrawStatusBars()
     {
         if (CurrentPlayer == null)
         {
@@ -255,27 +319,87 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         float maxHealth = ResolveMaxHealth(CurrentPlayer);
-        if (maxHealth <= 0f)
+        float currentHealth = Mathf.Clamp(ResolveCurrentHealth(CurrentPlayer), 0f, maxHealth);
+        float maxEnergy = ResolveMaxEnergy(CurrentPlayer);
+        float currentEnergy = Mathf.Clamp(ResolveCurrentEnergy(CurrentPlayer), 0f, maxEnergy);
+
+        if (maxHealth <= 0f && maxEnergy <= 0f)
         {
             return;
         }
 
-        float currentHealth = Mathf.Clamp(ResolveCurrentHealth(CurrentPlayer), 0f, maxHealth);
         const float x = 20f;
         const float y = 60f;
-        const float width = 240f;
-        const float height = 24f;
+        const float width = 220f;
+        const float height = 20f;
+        const float gap = 8f;
         const float border = 2f;
 
-        GUI.DrawTexture(new Rect(x, y, width, height), healthBarBackgroundTexture);
-
-        float fillWidth = (width - border * 2f) * (currentHealth / maxHealth);
-        if (fillWidth > 0f)
+        if (maxHealth > 0f)
         {
-            GUI.DrawTexture(new Rect(x + border, y + border, fillWidth, height - border * 2f), healthBarFillTexture);
+            DrawBar(new Rect(x, y, width, height), healthBarBackgroundTexture, healthBarFillTexture, currentHealth, maxHealth, "HP", Color.red);
         }
 
-        GUI.Label(new Rect(x, y, width, height), $"PLAYER HP  {Mathf.CeilToInt(currentHealth)}/{Mathf.CeilToInt(maxHealth)}", healthBarLabelStyle);
+        if (maxEnergy > 0f)
+        {
+            DrawBar(new Rect(x, y + height + gap, width, height), energyBarBackgroundTexture, energyBarFillTexture, currentEnergy, maxEnergy, "MP", new Color(0.25f, 0.65f, 1f, 1f));
+        }
+    }
+
+    private void DrawShieldBar()
+    {
+        if (CurrentPlayer == null)
+        {
+            return;
+        }
+
+        float currentShield = ResolveCurrentShield(CurrentPlayer);
+        float maxShield = ResolveMaxShield(CurrentPlayer);
+        if (currentShield <= 0f || maxShield <= 0f)
+        {
+            return;
+        }
+
+        const float width = 260f;
+        const float height = 22f;
+        const float border = 2f;
+        float x = Mathf.Max(20f, (Screen.width - width) * 0.5f);
+        float y = Mathf.Max(24f, Screen.height - 54f);
+
+        GUI.DrawTexture(new Rect(x, y, width, height), shieldBarBackgroundTexture);
+
+        float fillWidth = (width - border * 2f) * Mathf.Clamp01(currentShield / maxShield);
+        if (fillWidth > 0f)
+        {
+            GUI.DrawTexture(new Rect(x + border, y + border, fillWidth, height - border * 2f), shieldBarFillTexture);
+        }
+
+        Color previousColor = healthBarLabelStyle.normal.textColor;
+        healthBarLabelStyle.normal.textColor = new Color(0.5f, 0.9f, 1f, 1f);
+        GUI.Label(new Rect(x, y, width, height), $"SHIELD  {Mathf.CeilToInt(currentShield)}/{Mathf.CeilToInt(maxShield)}", healthBarLabelStyle);
+        healthBarLabelStyle.normal.textColor = previousColor;
+    }
+
+    private void DrawBar(Rect rect, Texture2D background, Texture2D fill, float currentValue, float maxValue, string label, Color labelColor)
+    {
+        if (background == null || fill == null || maxValue <= 0f)
+        {
+            return;
+        }
+
+        const float border = 2f;
+        GUI.DrawTexture(rect, background);
+
+        float fillWidth = (rect.width - border * 2f) * Mathf.Clamp01(currentValue / maxValue);
+        if (fillWidth > 0f)
+        {
+            GUI.DrawTexture(new Rect(rect.x + border, rect.y + border, fillWidth, rect.height - border * 2f), fill);
+        }
+
+        Color previousColor = healthBarLabelStyle.normal.textColor;
+        healthBarLabelStyle.normal.textColor = labelColor;
+        GUI.Label(rect, $"{label}  {Mathf.CeilToInt(currentValue)}/{Mathf.CeilToInt(maxValue)}", healthBarLabelStyle);
+        healthBarLabelStyle.normal.textColor = previousColor;
     }
 
     private void ApplyInitialHealth(GameObject player)
@@ -353,6 +477,82 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         return playerStartHealth;
+    }
+
+    private float ResolveCurrentEnergy(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.currentEnergy;
+        }
+
+        return 0f;
+    }
+
+    private float ResolveMaxEnergy(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.maxEnergy;
+        }
+
+        return 0f;
+    }
+
+    private float ResolveCurrentShield(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        CombatHealth combatHealth = player.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return combatHealth.CurrentShield;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.CurrentShield;
+        }
+
+        return 0f;
+    }
+
+    private float ResolveMaxShield(GameObject player)
+    {
+        if (player == null)
+        {
+            return 0f;
+        }
+
+        CombatHealth combatHealth = player.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return combatHealth.MaxShield;
+        }
+
+        BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return resourceBank.MaxShield;
+        }
+
+        return 0f;
     }
 
     private static Texture2D CreateColorTexture(Color color)
