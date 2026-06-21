@@ -4,18 +4,22 @@ using UnityEngine;
 
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
-    [Header("E - 閹镐胶鐢绘總鏃囩獓")]
+    [Header("E - Run Boost")]
     [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
     [SerializeField] private bool ignoreObstacleCollision = true;
     [SerializeField] private LayerMask obstacleLayers = 1 << 3;
 
-    [Header("E - 楠炵晫浼掔憴鍡氼潕")]
+    [Header("E - Ghost Visual")]
     [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
     [SerializeField] private bool eEnableGhostStateVisual = true;
 
     [Header("E - Shadow Follower")]
     [SerializeField] private Player01EGhostShadowFollower eGhostShadowFollower;
     [SerializeField] private bool eEnableGhostShadowFollower = true;
+
+    [Header("E - Ghost Particles")]
+    [SerializeField] private Player01EGhostParticleController eGhostParticleController;
+    [SerializeField] private bool eEnableGhostParticles = true;
 
     public bool IsRunningBoost { get; private set; }
 
@@ -55,12 +59,17 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         cachedMovement = GetComponent<PlayerMovement>();
         CacheGhostStateVisual();
         CacheGhostShadowFollower();
+        CacheGhostParticleController();
 
         if (debugLog)
         {
             Debug.Log(eGhostShadowFollower != null
                 ? $"[E Shadow] ghostShadowFollower found: {eGhostShadowFollower.name}"
                 : "[E Shadow] ghostShadowFollower is null", this);
+
+            Debug.Log(eGhostParticleController != null
+                ? $"[E GhostParticles] controller found: {eGhostParticleController.name}"
+                : "[E GhostParticles] controller is null", this);
         }
     }
 
@@ -76,6 +85,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         ApplyObstacleCollisionIgnore(true);
         SetGhostStateVisible(true);
         SetGhostShadowVisible(true);
+        SetGhostParticlesVisible(true);
 
         if (debugLog)
         {
@@ -111,6 +121,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         ApplyObstacleCollisionIgnore(false);
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
+        SetGhostParticlesVisible(false);
 
         if (debugLog)
         {
@@ -120,7 +131,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     protected override string GetSkillLabel()
     {
-        return "E - 閹镐胶鐢绘總鏃囩獓";
+        return "E - Run Boost";
     }
 
     private void ApplySpeedBoost()
@@ -211,6 +222,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         base.OnDisable();
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
+        SetGhostParticlesVisible(false);
     }
 
     protected override void OnDestroy()
@@ -218,6 +230,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         base.OnDestroy();
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
+        SetGhostParticlesVisible(false);
     }
 
     private void CacheGhostStateVisual()
@@ -238,6 +251,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         eGhostShadowFollower = GetComponentInChildren<Player01EGhostShadowFollower>(true);
+    }
+
+    private void CacheGhostParticleController()
+    {
+        if (eGhostParticleController != null)
+        {
+            return;
+        }
+
+        eGhostParticleController = GetComponentInChildren<Player01EGhostParticleController>(true);
     }
 
     private void SetGhostStateVisible(bool visible)
@@ -275,5 +298,26 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         eGhostShadowFollower.SetShadowActive(visible);
+    }
+
+    private void SetGhostParticlesVisible(bool visible)
+    {
+        if (!eEnableGhostParticles)
+        {
+            visible = false;
+        }
+
+        CacheGhostParticleController();
+        if (eGhostParticleController == null)
+        {
+            if (debugLog)
+            {
+                Debug.Log("[E GhostParticles] controller is null", this);
+            }
+
+            return;
+        }
+
+        eGhostParticleController.SetGhostParticlesActive(visible);
     }
 }
