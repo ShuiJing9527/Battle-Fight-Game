@@ -1,0 +1,88 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_Player01_W_VeilBarrier
+  m_Shader: {fileID: 4800000, guid: 5d4f29b3a8d84e7f8f3a8f0a2e7c1c91, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: 3100
+  stringTagMap:
+    RenderType: Transparent
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _DetailDistortionTex:
+        m_Texture: {fileID: 2800000, guid: 32031dcd918d7fb48bd5fd8b78917563, type: 3}
+        m_Scale: {x: 9, y: 9}
+        m_Offset: {x: 0, y: 0}
+    - _DissolveTex:
+        m_Texture: {fileID: 2800000, guid: f0e7998b0e5a81245a33247d29060eb9, type: 3}
+        m_Scale: {x: 0.5, y: 0.5}
+        m_Offset: {x: 0, y: 0}
+    - _DistortionTex:
+        m_Texture: {fileID: 2800000, guid: 32031dcd918d7fb48bd5fd8b78917563, type: 3}
+        m_Scale: {x: 4, y: 4}
+        m_Offset: {x: 0, y: 0}
+    - _MainTex:
+        m_Texture: {fileID: 2800000, guid: 73da8f697ce167d479a0c60a03c134ba, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ParallaxMap:
+        m_Texture: {fileID: 2800000, guid: 98aef6b9d2a665246b2aea05a9f3f1c8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _Alpha: 0.55
+    - _CenterDistortionFade: 0.5
+    - _DetailDistortionSpeedX: -0.12
+    - _DetailDistortionSpeedY: 0.1
+    - _DetailDistortionStrength: 0.08
+    - _DetailDistortionTiling: 9
+    - _DissolveAmount: 1
+    - _DissolveEdgeIntensity: 5
+    - _DissolveSoftness: 0.03
+    - _DissolveWidth: 0.12
+    - _DistortionSpeedX: 0.1
+    - _DistortionSpeedY: 0.06
+    - _DistortionStrength: 0.12
+    - _MainTexFlowStrength: 1
+    - _MainTexSpeedX: 0.012
+    - _MainTexSpeedY: 0.004
+    - _OpacityMultiplier: 1
+    - _ParallaxCenter: 0.5
+    - _ParallaxSpeedX: -0.01
+    - _ParallaxSpeedY: 0.008
+    - _ParallaxStrength: 0.12
+    - _PulseSpeed: 1.2
+    - _PulseStrength: 0.05
+    - _RefractionStrength: 0.08
+    - _RimDistortionBoost: 1.5
+    - _RimIntensity: 2.5
+    - _RimPower: 3
+    - _SceneBlend: 0.4
+    - _SurfaceDistortionSpeedX: 0.08
+    - _SurfaceDistortionSpeedY: 0.05
+    - _SurfaceDistortionStrength: 0.18
+    - _SurfaceDistortionTiling: 4
+    - _TintStrength: 0.12
+    m_Colors:
+    - _Color: {r: 1, g: 1, b: 1, a: 1}
+    - _DissolveEdgeColor: {r: 0.65, g: 0.95, b: 1, a: 1}
+    - _RefractionTint: {r: 1, g: 1, b: 1, a: 1}
+    - _RimColor: {r: 0.48, g: 0.55, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

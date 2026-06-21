@@ -1823,8 +1823,16 @@ MonoBehaviour:
   enemyAttackMultiplier: 0.5
   enemyDebuffRefreshInterval: 0.1
   veilBarrierPrefab: {fileID: 100100000, guid: 733d5c480a51c5d459210aaa211a4215, type: 3}
+  veilBarrierMaterial: {fileID: 2100000, guid: 7f9c2a18f8ac4f2fbdfc6bb40d8c1f7e, type: 2}
   veilBarrierScale: {x: 45, y: 45, z: 45}
   veilBarrierLocalOffset: {x: 0, y: 0, z: 0}
+  wDissolveInDuration: 0.4
+  wDissolveOutDuration: 0.45
+  wDissolveStartValue: 1
+  wDissolveVisibleValue: 0
+  wDissolveHiddenValue: 1
+  wEdgeIntensityNormal: 2.5
+  wEdgeIntensityBurst: 3.5
   damageReduction: 0.4
   shieldPrefab: {fileID: 0}
 --- !u!114 &48694291259105405
