@@ -64,13 +64,13 @@ Material:
     - _ScanlineDensity: 120
     - _ScanlineIntensity: 0
     - _ScanlineSpeed: 0.8
-    - _ShadowAlpha: 0.38
-    - _ShadowFlowStrength: 0.55
-    - _ShadowJitterStrength: 0.02
+    - _ShadowAlpha: 0.3
+    - _ShadowFlowStrength: 0.45
+    - _ShadowJitterStrength: 0.03
     - _ShadowNoiseStrength: 0.03
     - _ShadowOffsetX: 0.08
     - _ShadowOffsetY: -0.06
-    - _ShadowRGBSplitStrength: 0.02
+    - _ShadowRGBSplitStrength: 0.05
     m_Colors:
     - _BodyTintColor: {r: 0.28897822, g: 0.81564987, b: 0.93962264, a: 1}
     - _FlowColor: {r: 0.11258806, g: 0.31544995, b: 0.94716984, a: 1}
