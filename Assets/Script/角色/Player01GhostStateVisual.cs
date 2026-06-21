@@ -1,5 +1,5 @@
-using UnityEngine;
 using Spine.Unity;
+using UnityEngine;
 
 public class Player01GhostStateVisual : MonoBehaviour
 {
@@ -27,29 +27,8 @@ public class Player01GhostStateVisual : MonoBehaviour
     [SerializeField] private float hideNoiseStrength = 0.05f;
     [SerializeField] private float hideNoiseSpeed = 0.8f;
 
-    [Header("Ghost Shadow")]
-    [SerializeField] private Transform shadowRoot;
-    [SerializeField] private Renderer shadowRenderer;
-    [SerializeField] private Material shadowGhostMaterial;
-    [SerializeField] private Vector3 shadowOffset = new Vector3(0.06f, -0.04f, -0.01f);
-    [Range(0f, 1f)]
-    [SerializeField] private float shadowAlpha = 0.18f;
-    [SerializeField] private Color shadowTintColor = new Color(0.18f, 0.45f, 0.82f, 1f);
-    [Range(0f, 1f)]
-    [SerializeField] private float shadowNoiseStrength = 0.08f;
-    [Range(0f, 5f)]
-    [SerializeField] private float shadowFlowStrength = 0.65f;
-    [Range(0f, 2f)]
-    [SerializeField] private float shadowRGBSplitStrength = 0.35f;
-    [Range(0f, 1f)]
-    [SerializeField] private float shadowJitterStrength = 0.28f;
-
     private Material[] originalBodyMaterials;
-    private Material[] originalShadowMaterials;
     private Material[] activeBodyGhostMaterials;
-    private Material[] activeShadowGhostMaterials;
-    private Vector3 shadowBaseLocalPosition;
-    private bool shadowBaseCaptured;
     private bool ghostActive;
 
     private void Reset()
@@ -69,7 +48,7 @@ public class Player01GhostStateVisual : MonoBehaviour
         CaptureOriginalMaterials();
         if (ghostActive)
         {
-            ApplyShadowOffset();
+            ApplyGhostMaterials();
         }
     }
 
@@ -78,25 +57,15 @@ public class Player01GhostStateVisual : MonoBehaviour
         CacheReferences();
     }
 
-    private void LateUpdate()
-    {
-        if (ghostActive)
-        {
-            ApplyShadowOffset();
-        }
-    }
-
     private void OnDisable()
     {
         RestoreMaterials();
-        RestoreShadowTransform();
         DestroyActiveGhostMaterials();
     }
 
     private void OnDestroy()
     {
         RestoreMaterials();
-        RestoreShadowTransform();
         DestroyActiveGhostMaterials();
     }
 
@@ -107,11 +76,6 @@ public class Player01GhostStateVisual : MonoBehaviour
 
         if (ghostActive == active)
         {
-            if (active)
-            {
-                ApplyShadowOffset();
-            }
-
             return;
         }
 
@@ -120,21 +84,10 @@ public class Player01GhostStateVisual : MonoBehaviour
         if (active)
         {
             ApplyGhostMaterials();
-            if (shadowRoot != null)
-            {
-                shadowRoot.gameObject.SetActive(shadowRenderer != null);
-            }
-
-            ApplyShadowOffset();
         }
         else
         {
             RestoreMaterials();
-            RestoreShadowTransform();
-            if (shadowRoot != null)
-            {
-                shadowRoot.gameObject.SetActive(false);
-            }
         }
     }
 
@@ -153,26 +106,6 @@ public class Player01GhostStateVisual : MonoBehaviour
         {
             bodyRenderer = GetComponentInChildren<Renderer>(true);
         }
-
-        if (shadowRoot == null)
-        {
-            Transform candidate = transform.Find("GhostShadowLayer");
-            if (candidate != null)
-            {
-                shadowRoot = candidate;
-            }
-        }
-
-        if (shadowRenderer == null && shadowRoot != null)
-        {
-            shadowRenderer = shadowRoot.GetComponentInChildren<Renderer>(true);
-        }
-
-        if (!shadowBaseCaptured && shadowRoot != null)
-        {
-            shadowBaseLocalPosition = shadowRoot.localPosition;
-            shadowBaseCaptured = true;
-        }
     }
 
     private void CaptureOriginalMaterials()
@@ -181,31 +114,19 @@ public class Player01GhostStateVisual : MonoBehaviour
         {
             originalBodyMaterials = bodyRenderer.sharedMaterials;
         }
-
-        if (shadowRenderer != null && originalShadowMaterials == null)
-        {
-            originalShadowMaterials = shadowRenderer.sharedMaterials;
-        }
     }
 
     private void ApplyGhostMaterials()
     {
         DestroyActiveGhostMaterials();
 
-        if (bodyRenderer != null)
+        if (bodyRenderer == null || bodyGhostMaterial == null)
         {
-            if (bodyGhostMaterial != null)
-            {
-                activeBodyGhostMaterials = CreateMaterialCopies(bodyRenderer.sharedMaterials, bodyGhostMaterial, false);
-                bodyRenderer.materials = activeBodyGhostMaterials;
-            }
+            return;
         }
 
-        if (shadowRenderer != null && shadowGhostMaterial != null)
-        {
-            activeShadowGhostMaterials = CreateMaterialCopies(shadowRenderer.sharedMaterials, shadowGhostMaterial, true);
-            shadowRenderer.materials = activeShadowGhostMaterials;
-        }
+        activeBodyGhostMaterials = CreateMaterialCopies(bodyRenderer.sharedMaterials, bodyGhostMaterial);
+        bodyRenderer.materials = activeBodyGhostMaterials;
     }
 
     private void RestoreMaterials()
@@ -214,14 +135,9 @@ public class Player01GhostStateVisual : MonoBehaviour
         {
             bodyRenderer.sharedMaterials = originalBodyMaterials;
         }
-
-        if (shadowRenderer != null && originalShadowMaterials != null)
-        {
-            shadowRenderer.sharedMaterials = originalShadowMaterials;
-        }
     }
 
-    private Material[] CreateMaterialCopies(Material[] sourceMaterials, Material template, bool shadow)
+    private Material[] CreateMaterialCopies(Material[] sourceMaterials, Material template)
     {
         if (sourceMaterials == null || sourceMaterials.Length == 0 || template == null)
         {
@@ -234,113 +150,96 @@ public class Player01GhostStateVisual : MonoBehaviour
             Material baseSource = sourceMaterials[i] != null ? sourceMaterials[i] : template;
             Material copy = new Material(baseSource);
             copy.shader = template.shader;
-            ApplyGhostMaterialParameters(copy, shadow);
+            ApplyGhostMaterialParameters(copy);
+            CopyScanPatternProperties(template, copy);
             result[i] = copy;
         }
 
         return result;
     }
 
-    private void ApplyGhostMaterialParameters(Material mat, bool shadow)
+    private void CopyScanPatternProperties(Material source, Material target)
+    {
+        if (source == null || target == null)
+        {
+            return;
+        }
+
+        if (source.HasProperty("_ScanPatternTex") && target.HasProperty("_ScanPatternTex"))
+        {
+            target.SetTexture("_ScanPatternTex", source.GetTexture("_ScanPatternTex"));
+        }
+
+        if (source.HasProperty("_ScanPatternStrength") && target.HasProperty("_ScanPatternStrength"))
+        {
+            target.SetFloat("_ScanPatternStrength", source.GetFloat("_ScanPatternStrength"));
+        }
+
+        if (source.HasProperty("_ScanPatternSpeedX") && target.HasProperty("_ScanPatternSpeedX"))
+        {
+            target.SetFloat("_ScanPatternSpeedX", source.GetFloat("_ScanPatternSpeedX"));
+        }
+
+        if (source.HasProperty("_ScanPatternSpeedY") && target.HasProperty("_ScanPatternSpeedY"))
+        {
+            target.SetFloat("_ScanPatternSpeedY", source.GetFloat("_ScanPatternSpeedY"));
+        }
+
+        if (source.HasProperty("_ScanPatternTilingX") && target.HasProperty("_ScanPatternTilingX"))
+        {
+            target.SetFloat("_ScanPatternTilingX", source.GetFloat("_ScanPatternTilingX"));
+        }
+
+        if (source.HasProperty("_ScanPatternTilingY") && target.HasProperty("_ScanPatternTilingY"))
+        {
+            target.SetFloat("_ScanPatternTilingY", source.GetFloat("_ScanPatternTilingY"));
+        }
+
+        if (source.HasProperty("_ScanPatternColor") && target.HasProperty("_ScanPatternColor"))
+        {
+            target.SetColor("_ScanPatternColor", source.GetColor("_ScanPatternColor"));
+        }
+    }
+
+    private void ApplyGhostMaterialParameters(Material mat)
     {
         if (mat == null)
         {
             return;
         }
 
-        if (shadow)
-        {
-            mat.SetColor("_BodyTintColor", shadowTintColor);
-            mat.SetFloat("_BodyAlpha", shadowAlpha);
-            mat.SetColor("_FlowColor", shadowTintColor);
-            mat.SetFloat("_FlowIntensity", shadowFlowStrength);
-            mat.SetFloat("_FlowSpeedX", 0.22f);
-            mat.SetFloat("_FlowSpeedY", 0.05f);
-            mat.SetFloat("_FlowWidth", 0.16f);
-            mat.SetFloat("_ScanlineIntensity", 0.05f);
-            mat.SetFloat("_ScanlineDensity", 120f);
-            mat.SetFloat("_ScanlineSpeed", 0.8f);
-            mat.SetFloat("_RGBSplitStrength", shadowRGBSplitStrength);
-            mat.SetFloat("_JitterStrength", shadowJitterStrength);
-            mat.SetFloat("_JitterSpeed", 1.4f);
-            mat.SetFloat("_HideNoiseStrength", shadowNoiseStrength);
-            mat.SetFloat("_HideNoiseSpeed", 0.65f);
-        }
-        else
-        {
-            mat.SetColor("_BodyTintColor", bodyTintColor);
-            mat.SetFloat("_BodyAlpha", bodyAlpha);
-            mat.SetColor("_FlowColor", flowColor);
-            mat.SetFloat("_FlowIntensity", flowIntensity);
-            mat.SetFloat("_FlowSpeedX", flowSpeedX);
-            mat.SetFloat("_FlowSpeedY", flowSpeedY);
-            mat.SetFloat("_FlowWidth", flowWidth);
-            mat.SetFloat("_ScanlineIntensity", scanlineIntensity);
-            mat.SetFloat("_ScanlineDensity", scanlineDensity);
-            mat.SetFloat("_ScanlineSpeed", scanlineSpeed);
-            mat.SetFloat("_RGBSplitStrength", rgbSplitStrength);
-            mat.SetFloat("_JitterStrength", jitterStrength);
-            mat.SetFloat("_JitterSpeed", jitterSpeed);
-            mat.SetFloat("_HideNoiseStrength", hideNoiseStrength);
-            mat.SetFloat("_HideNoiseSpeed", hideNoiseSpeed);
-
-            mat.SetFloat("_ShadowAlpha", shadowAlpha);
-            mat.SetColor("_ShadowTintColor", shadowTintColor);
-            mat.SetFloat("_ShadowOffsetX", shadowOffset.x);
-            mat.SetFloat("_ShadowOffsetY", shadowOffset.y);
-            mat.SetFloat("_ShadowNoiseStrength", shadowNoiseStrength);
-            mat.SetFloat("_ShadowFlowStrength", shadowFlowStrength);
-            mat.SetFloat("_ShadowRGBSplitStrength", shadowRGBSplitStrength);
-            mat.SetFloat("_ShadowJitterStrength", shadowJitterStrength);
-        }
-    }
-
-    private void ApplyShadowOffset()
-    {
-        if (shadowRoot == null || !shadowBaseCaptured)
-        {
-            return;
-        }
-
-        shadowRoot.localPosition = shadowBaseLocalPosition + shadowOffset;
-    }
-
-    private void RestoreShadowTransform()
-    {
-        if (shadowRoot == null || !shadowBaseCaptured)
-        {
-            return;
-        }
-
-        shadowRoot.localPosition = shadowBaseLocalPosition;
+        mat.SetColor("_BodyTintColor", bodyTintColor);
+        mat.SetFloat("_BodyAlpha", bodyAlpha);
+        mat.SetColor("_FlowColor", flowColor);
+        mat.SetFloat("_FlowIntensity", flowIntensity);
+        mat.SetFloat("_FlowSpeedX", flowSpeedX);
+        mat.SetFloat("_FlowSpeedY", flowSpeedY);
+        mat.SetFloat("_FlowWidth", flowWidth);
+        mat.SetFloat("_ScanlineIntensity", scanlineIntensity);
+        mat.SetFloat("_ScanlineDensity", scanlineDensity);
+        mat.SetFloat("_ScanlineSpeed", scanlineSpeed);
+        mat.SetFloat("_RGBSplitStrength", rgbSplitStrength);
+        mat.SetFloat("_JitterStrength", jitterStrength);
+        mat.SetFloat("_JitterSpeed", jitterSpeed);
+        mat.SetFloat("_HideNoiseStrength", hideNoiseStrength);
+        mat.SetFloat("_HideNoiseSpeed", hideNoiseSpeed);
     }
 
     private void DestroyActiveGhostMaterials()
     {
-        if (activeBodyGhostMaterials != null)
+        if (activeBodyGhostMaterials == null)
         {
-            for (int i = 0; i < activeBodyGhostMaterials.Length; i++)
-            {
-                if (activeBodyGhostMaterials[i] != null)
-                {
-                    Destroy(activeBodyGhostMaterials[i]);
-                }
-            }
-
-            activeBodyGhostMaterials = null;
+            return;
         }
 
-        if (activeShadowGhostMaterials != null)
+        for (int i = 0; i < activeBodyGhostMaterials.Length; i++)
         {
-            for (int i = 0; i < activeShadowGhostMaterials.Length; i++)
+            if (activeBodyGhostMaterials[i] != null)
             {
-                if (activeShadowGhostMaterials[i] != null)
-                {
-                    Destroy(activeShadowGhostMaterials[i]);
-                }
+                Destroy(activeBodyGhostMaterials[i]);
             }
-
-            activeShadowGhostMaterials = null;
         }
+
+        activeBodyGhostMaterials = null;
     }
 }

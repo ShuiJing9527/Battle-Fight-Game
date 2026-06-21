@@ -9,17 +9,23 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
     [SerializeField] private bool returnToIdleWhenNoHorizontalInput = true;
     [SerializeField] private float rotateLerpSpeed = 20f;
 
+    private Vector3 initialLocalPosition;
+    private Quaternion initialLocalRotation;
+    private Vector3 initialLocalScale;
     private Quaternion idleRotation;
     private bool hasIdleRotation;
+    private bool hasInitialTransform;
 
     private void Awake()
     {
+        CacheInitialTransform();
+        RestoreInitialTransform();
         CacheIdleRotation();
     }
 
     private void OnEnable()
     {
-        CacheIdleRotation();
+        Reinitialize();
     }
 
     private void Update()
@@ -64,5 +70,37 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
     {
         idleRotation = transform.localRotation;
         hasIdleRotation = true;
+    }
+
+    private void CacheInitialTransform()
+    {
+        if (hasInitialTransform)
+        {
+            return;
+        }
+
+        initialLocalPosition = transform.localPosition;
+        initialLocalRotation = transform.localRotation;
+        initialLocalScale = transform.localScale;
+        hasInitialTransform = true;
+    }
+
+    private void RestoreInitialTransform()
+    {
+        if (!hasInitialTransform)
+        {
+            return;
+        }
+
+        transform.localPosition = initialLocalPosition;
+        transform.localRotation = initialLocalRotation;
+        transform.localScale = initialLocalScale;
+    }
+
+    public void Reinitialize()
+    {
+        CacheInitialTransform();
+        RestoreInitialTransform();
+        CacheIdleRotation();
     }
 }

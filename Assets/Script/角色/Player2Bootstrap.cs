@@ -166,6 +166,11 @@ public class Player2Bootstrap : MonoBehaviour
         nextInactive.SetActive(false);
         CurrentPlayer = nextActive;
 
+        if (nextActive == player01)
+        {
+            RefreshPlayer01EyeFire();
+        }
+
         Rigidbody nextRb = nextActive.GetComponent<Rigidbody>();
         if (nextRb != null)
         {
@@ -230,6 +235,23 @@ public class Player2Bootstrap : MonoBehaviour
         Debug.Log($"[PARTY] Current Player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
 
         initialized = true;
+    }
+
+    private void RefreshPlayer01EyeFire()
+    {
+        if (player01 == null)
+        {
+            return;
+        }
+
+        EyeFireHorizontalRotationController[] controllers = player01.GetComponentsInChildren<EyeFireHorizontalRotationController>(true);
+        for (int i = 0; i < controllers.Length; i++)
+        {
+            if (controllers[i] != null)
+            {
+                controllers[i].Reinitialize();
+            }
+        }
     }
 
     public float GetCharacterHeightOffset(GameObject character)

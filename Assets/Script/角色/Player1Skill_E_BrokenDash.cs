@@ -1,16 +1,21 @@
-using System.Collections.Generic;
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
-    [Header("E - 持续奔跑")]
+    [Header("E - 閹镐胶鐢绘總鏃囩獓")]
     [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
     [SerializeField] private bool ignoreObstacleCollision = true;
     [SerializeField] private LayerMask obstacleLayers = 1 << 3;
-    [Header("E - 幽灵视觉")]
+
+    [Header("E - 楠炵晫浼掔憴鍡氼潕")]
     [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
     [SerializeField] private bool eEnableGhostStateVisual = true;
+
+    [Header("E - Shadow Follower")]
+    [SerializeField] private Player01EGhostShadowFollower eGhostShadowFollower;
+    [SerializeField] private bool eEnableGhostShadowFollower = true;
 
     public bool IsRunningBoost { get; private set; }
 
@@ -49,6 +54,14 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         cachedMovement = GetComponent<PlayerMovement>();
         CacheGhostStateVisual();
+        CacheGhostShadowFollower();
+
+        if (debugLog)
+        {
+            Debug.Log(eGhostShadowFollower != null
+                ? $"[E Shadow] ghostShadowFollower found: {eGhostShadowFollower.name}"
+                : "[E Shadow] ghostShadowFollower is null", this);
+        }
     }
 
     protected override bool ShouldLoopAnimation()
@@ -62,6 +75,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         ApplySpeedBoost();
         ApplyObstacleCollisionIgnore(true);
         SetGhostStateVisible(true);
+        SetGhostShadowVisible(true);
 
         if (debugLog)
         {
@@ -96,6 +110,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         RestoreSpeed();
         ApplyObstacleCollisionIgnore(false);
         SetGhostStateVisible(false);
+        SetGhostShadowVisible(false);
 
         if (debugLog)
         {
@@ -105,7 +120,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     protected override string GetSkillLabel()
     {
-        return "E - 持续奔跑";
+        return "E - 閹镐胶鐢绘總鏃囩獓";
     }
 
     private void ApplySpeedBoost()
@@ -195,12 +210,14 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         base.OnDisable();
         SetGhostStateVisible(false);
+        SetGhostShadowVisible(false);
     }
 
     protected override void OnDestroy()
     {
         base.OnDestroy();
         SetGhostStateVisible(false);
+        SetGhostShadowVisible(false);
     }
 
     private void CacheGhostStateVisual()
@@ -211,6 +228,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         eGhostStateVisual = GetComponentInChildren<Player01GhostStateVisual>(true);
+    }
+
+    private void CacheGhostShadowFollower()
+    {
+        if (eGhostShadowFollower != null)
+        {
+            return;
+        }
+
+        eGhostShadowFollower = GetComponentInChildren<Player01EGhostShadowFollower>(true);
     }
 
     private void SetGhostStateVisible(bool visible)
@@ -227,5 +254,26 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         eGhostStateVisual.SetGhostActive(visible);
+    }
+
+    private void SetGhostShadowVisible(bool visible)
+    {
+        if (!eEnableGhostShadowFollower)
+        {
+            visible = false;
+        }
+
+        CacheGhostShadowFollower();
+        if (eGhostShadowFollower == null)
+        {
+            if (debugLog)
+            {
+                Debug.Log("[E Shadow] ghostShadowFollower is null", this);
+            }
+
+            return;
+        }
+
+        eGhostShadowFollower.SetShadowActive(visible);
     }
 }

@@ -54,7 +54,6 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 922604953166537750}
-  - component: {fileID: 546754724555932253}
   - component: {fileID: 1315556082860043331}
   - component: {fileID: 4389982266256825078}
   - component: {fileID: 3604876330921278939}
@@ -93,64 +92,6 @@ Transform:
   - {fileID: 2343996877811622976}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &546754724555932253
-SpriteRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8605461027058166016}
-  m_Enabled: 1
-  m_CastShadows: 1
-  m_ReceiveShadows: 1
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 0
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 94fb41062d04c104983d53140ae8efe2, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 0
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 5d7b86b1fab425c47b65333a29fe2f2a, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_FlipX: 0
-  m_FlipY: 0
-  m_DrawMode: 0
-  m_Size: {x: 8.126985, y: 14.5}
-  m_AdaptiveModeThreshold: 0.5
-  m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
-  m_SpriteSortPoint: 0
 --- !u!65 &1315556082860043331
 BoxCollider:
   m_ObjectHideFlags: 0
@@ -247,6 +188,7 @@ MonoBehaviour:
   maxHealth: 100
   currentHealth: 100
   shield: 0
+  maxShield: 0
   maxEnergy: 100
   currentEnergy: 100
   energyOverflowDamageBonusPerPoint: 0
@@ -814,8 +756,8 @@ MonoBehaviour:
   wCounterDamageRatio: 0.5
   eRailDuration: 0.3
   eEnableAfterimageShader: 1
-  eAfterimageSourceSpriteRenderer: {fileID: 546754724555932253}
-  eAfterimageSourceRenderer: {fileID: 546754724555932253}
+  eAfterimageSourceSpriteRenderer: {fileID: 0}
+  eAfterimageSourceRenderer: {fileID: 0}
   eAfterimageMaterial: {fileID: 0}
   eAfterimageCount: 12
   eAfterimageDuration: 0.7
@@ -1185,6 +1127,9 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
   wDuration: 2.5
   wDamageReduction: 0.4
+  wShieldMaxHpMultiplier: 2
+  wShieldBonusPerExtraSword: 0.1
+  wClearShieldOnEnd: 1
   wDamageReductionPerSword: 0.03
   wMaxDamageReduction: 0.8
   wCounterDamageRatio: 0.5
@@ -1282,6 +1227,19 @@ MonoBehaviour:
   rSwarmDuration: 5
   rSwarmRadiusMin: 0.8
   rSwarmRadiusMax: 3.2
+  rUseDivineMarkRadiusScaling: 1
+  rRadiusPerDivineMark: 0.75
+  rMaxRadius: 12
+  rUseScreenWideVortexRange: 1
+  rBaseHorizontalRange: 3.8
+  rHorizontalRangePerDivineMark: 1.1
+  rMaxHorizontalRange: 14.5
+  rBaseVerticalRange: 1
+  rVerticalRangePerDivineMark: 0.2
+  rMaxVerticalRange: 3
+  rBaseHeightRange: 0.8
+  rHeightRangePerDivineMark: 0.25
+  rMaxHeightRange: 4
   rSwarmHeightMin: 0
   rSwarmHeightMax: 1.5
   rSwarmSpeedMin: 120

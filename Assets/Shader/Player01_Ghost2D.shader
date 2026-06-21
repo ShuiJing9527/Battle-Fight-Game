@@ -10,6 +10,13 @@ Shader "Custom/Player01_Ghost2D"
         _FlowSpeedX ("Flow Speed X", Float) = 0.35
         _FlowSpeedY ("Flow Speed Y", Float) = 0.08
         _FlowWidth ("Flow Width", Range(0.01, 1)) = 0.22
+        _ScanPatternTex ("Scan / Flow Pattern Texture", 2D) = "black" {}
+        _ScanPatternStrength ("Scan Pattern Strength", Range(0, 1)) = 0.25
+        _ScanPatternSpeedX ("Scan Pattern Speed X", Float) = 0.05
+        _ScanPatternSpeedY ("Scan Pattern Speed Y", Float) = 0.15
+        _ScanPatternTilingX ("Scan Pattern Tiling X", Float) = 1
+        _ScanPatternTilingY ("Scan Pattern Tiling Y", Float) = 1
+        _ScanPatternColor ("Scan Pattern Color", Color) = (0.82, 0.97, 1, 1)
         _ScanlineIntensity ("Scanline Intensity", Range(0, 1)) = 0.08
         _ScanlineDensity ("Scanline Density", Float) = 180
         _ScanlineSpeed ("Scanline Speed", Float) = 1.2
@@ -57,6 +64,8 @@ Shader "Custom/Player01_Ghost2D"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
+            TEXTURE2D(_ScanPatternTex);
+            SAMPLER(sampler_ScanPatternTex);
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
@@ -68,6 +77,12 @@ Shader "Custom/Player01_Ghost2D"
                 float _FlowSpeedX;
                 float _FlowSpeedY;
                 float _FlowWidth;
+                float _ScanPatternStrength;
+                float _ScanPatternSpeedX;
+                float _ScanPatternSpeedY;
+                float _ScanPatternTilingX;
+                float _ScanPatternTilingY;
+                float4 _ScanPatternColor;
                 float _ScanlineIntensity;
                 float _ScanlineDensity;
                 float _ScanlineSpeed;
@@ -127,6 +142,15 @@ Shader "Custom/Player01_Ghost2D"
                 return saturate(1.0 - smoothstep(width, width + width * 0.75, abs(x)));
             }
 
+            float SampleScanPattern(float2 uv, float2 timeOffset)
+            {
+                float2 tiling = max(float2(_ScanPatternTilingX, _ScanPatternTilingY), float2(0.001, 0.001));
+                float2 patternUV = uv * tiling + timeOffset;
+                float4 patternSample = SAMPLE_TEXTURE2D(_ScanPatternTex, sampler_ScanPatternTex, patternUV);
+                float patternValue = max(patternSample.a, dot(patternSample.rgb, float3(0.3333333, 0.3333333, 0.3333333)));
+                return saturate(patternValue);
+            }
+
             half4 frag(Varyings input) : SV_Target
             {
                 UNITY_SETUP_INSTANCE_ID(input);
@@ -157,7 +181,12 @@ Shader "Custom/Player01_Ghost2D"
                 float scanPhase = uv.y * _ScanlineDensity + _Time.y * _ScanlineSpeed;
                 float scanline = (sin(scanPhase * 6.2831853) * 0.5 + 0.5);
                 scanline = smoothstep(0.45, 0.92, scanline) * _ScanlineIntensity;
-                scanline *= alphaMask;
+                scanline *= alphaMask * lerp(1.0, 0.4, saturate(_ScanPatternStrength));
+
+                float2 scanPatternOffset = _Time.y * float2(_ScanPatternSpeedX, _ScanPatternSpeedY);
+                float scanPatternValue = SampleScanPattern(uv, scanPatternOffset);
+                scanPatternValue = smoothstep(0.08, 0.9, scanPatternValue) * _ScanPatternStrength * alphaMask;
+                float3 scanPatternGlow = _ScanPatternColor.rgb * scanPatternValue;
 
                 float flowPhase = frac(uv.x * 0.85 + uv.y * 0.2 + _Time.y * (_FlowSpeedX + _FlowSpeedY * 0.5));
                 float flowBand = SmoothBand(flowPhase - 0.5, max(0.01, _FlowWidth * 0.5));
@@ -192,7 +221,12 @@ Shader "Custom/Player01_Ghost2D"
                 float shadowScanPhase = shadowUV.y * (_ScanlineDensity * 0.92) + _Time.y * (_ScanlineSpeed * 0.8);
                 float shadowScan = (sin(shadowScanPhase * 6.2831853) * 0.5 + 0.5);
                 shadowScan = smoothstep(0.45, 0.92, shadowScan) * (0.05 + _ShadowNoiseStrength * 0.15);
-                shadowScan *= shadowG.a;
+                shadowScan *= shadowG.a * lerp(1.0, 0.4, saturate(_ScanPatternStrength));
+
+                float2 shadowPatternOffset = _Time.y * float2(_ScanPatternSpeedX, _ScanPatternSpeedY) * 0.85;
+                float shadowPatternValue = SampleScanPattern(shadowUV, shadowPatternOffset);
+                shadowPatternValue = smoothstep(0.08, 0.9, shadowPatternValue) * _ScanPatternStrength * shadowG.a;
+                float3 shadowPatternGlow = _ScanPatternColor.rgb * shadowPatternValue * 0.85;
 
                 float shadowFlowPhase = frac(shadowUV.x * 0.78 + shadowUV.y * 0.18 + _Time.y * ((_FlowSpeedX + _FlowSpeedY) * 0.65));
                 float shadowFlowBand = SmoothBand(shadowFlowPhase - 0.5, max(0.01, _FlowWidth * 0.7));
@@ -205,9 +239,10 @@ Shader "Custom/Player01_Ghost2D"
                 float shadowAlpha = shadowG.a * _ShadowAlpha * shadowHideMask;
                 float3 shadowColor = shadowSample * _ShadowTintColor.rgb;
                 shadowColor += _FlowColor.rgb * (shadowFlowBand * _ShadowFlowStrength + shadowScan);
+                shadowColor += shadowPatternGlow;
                 shadowColor *= 0.75;
 
-                float3 finalColor = finalBodyColor + shadowColor * shadowAlpha;
+                float3 finalColor = finalBodyColor + scanPatternGlow + shadowColor * shadowAlpha;
 
                 finalColor *= input.color.rgb;
                 bodyAlpha = saturate(bodyAlpha * input.color.a);

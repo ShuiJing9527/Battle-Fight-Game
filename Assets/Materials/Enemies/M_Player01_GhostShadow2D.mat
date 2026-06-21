@@ -20,12 +20,16 @@ Material:
   stringTagMap:
     RenderType: Transparent
   disabledShaderPasses: []
-  m_LockedProperties:
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
         m_Texture: {fileID: 2800000, guid: ab556f86eebee454c807b1079c9ce798, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _ScanPatternTex:
+        m_Texture: {fileID: 2800000, guid: f0e7998b0e5a81245a33247d29060eb9, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - unity_Lightmaps:
@@ -42,29 +46,35 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BodyAlpha: 0.22
-    - _FlowIntensity: 0.9
-    - _FlowSpeedX: 0.22
-    - _FlowSpeedY: 0.05
-    - _FlowWidth: 0.16
+    - _BodyAlpha: 0.32
+    - _FlowIntensity: 0.55
+    - _FlowSpeedX: 0.12
+    - _FlowSpeedY: 0.03
+    - _FlowWidth: 0.2
     - _HideNoiseSpeed: 0.65
-    - _HideNoiseStrength: 0.08
+    - _HideNoiseStrength: 0.03
     - _JitterSpeed: 1.4
-    - _JitterStrength: 0.28
-    - _RGBSplitStrength: 0.35
+    - _JitterStrength: 0.02
+    - _RGBSplitStrength: 0.02
+    - _ScanPatternSpeedX: 0.05
+    - _ScanPatternSpeedY: 0.15
+    - _ScanPatternStrength: 0.18
+    - _ScanPatternTilingX: 1
+    - _ScanPatternTilingY: 1
     - _ScanlineDensity: 120
-    - _ScanlineIntensity: 0.05
+    - _ScanlineIntensity: 0
     - _ScanlineSpeed: 0.8
-    - _ShadowAlpha: 0.32
-    - _ShadowFlowStrength: 0.95
-    - _ShadowJitterStrength: 0.4
-    - _ShadowNoiseStrength: 0.12
+    - _ShadowAlpha: 0.38
+    - _ShadowFlowStrength: 0.55
+    - _ShadowJitterStrength: 0.02
+    - _ShadowNoiseStrength: 0.03
     - _ShadowOffsetX: 0.08
     - _ShadowOffsetY: -0.06
-    - _ShadowRGBSplitStrength: 0.48
+    - _ShadowRGBSplitStrength: 0.02
     m_Colors:
-    - _BodyTintColor: {r: 0.18, g: 0.45, b: 0.82, a: 1}
-    - _FlowColor: {r: 0.58, g: 0.86, b: 1, a: 1}
-    - _ShadowTintColor: {r: 0.1, g: 0.3, b: 0.6, a: 1}
+    - _BodyTintColor: {r: 0.28897822, g: 0.81564987, b: 0.93962264, a: 1}
+    - _FlowColor: {r: 0.11258806, g: 0.31544995, b: 0.94716984, a: 1}
+    - _ScanPatternColor: {r: 0.58, g: 0.86, b: 1, a: 1}
+    - _ShadowTintColor: {r: 0.14387321, g: 0.30405223, b: 0.4566037, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
