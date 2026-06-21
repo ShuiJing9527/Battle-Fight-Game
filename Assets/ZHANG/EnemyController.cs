@@ -21,10 +21,13 @@ public class EnemyController : MonoBehaviour
     private Rigidbody rb;
     private Player2Bootstrap playerBootstrap;
     private SlimeAnimationController slimeAnimation;
+    private EnemyDebuffReceiver debuffReceiver;
     private Quaternion initialRotation;
     private float nextAttackTime;
     private Transform pendingAttackTarget;
     private bool attackInProgress;
+    private float lastLoggedMoveMultiplier = -1f;
+    private float lastLoggedAttackMultiplier = -1f;
 
     private void Start()
     {
@@ -37,6 +40,8 @@ public class EnemyController : MonoBehaviour
         {
             slimeAnimation.OnAttackHit += HandleAttackHit;
         }
+
+        ResolveDebuffReceiver();
     }
 
     private void OnDestroy()
@@ -87,8 +92,16 @@ public class EnemyController : MonoBehaviour
         }
 
         Vector3 direction = toPlayer / distance;
-        rb.linearVelocity = new Vector3(direction.x * moveSpeed, rb.linearVelocity.y, direction.z * moveSpeed);
-        PlayMoveAnimation(direction);
+        float moveMultiplier = ResolveMoveSpeedMultiplier();
+        float currentMoveSpeed = moveSpeed * moveMultiplier;
+        if (Mathf.Abs(moveMultiplier - lastLoggedMoveMultiplier) > 0.001f)
+        {
+            Debug.Log($"[EnemyController] finalMoveSpeed={currentMoveSpeed:F2} multiplier={moveMultiplier:F2}", this);
+            lastLoggedMoveMultiplier = moveMultiplier;
+        }
+
+        rb.linearVelocity = new Vector3(direction.x * currentMoveSpeed, rb.linearVelocity.y, direction.z * currentMoveSpeed);
+        PlayMoveAnimation(direction, currentMoveSpeed);
 
         if (faceMoveDirection)
         {
@@ -152,20 +165,28 @@ public class EnemyController : MonoBehaviour
         CombatHealth combatHealth = hitTarget.GetComponentInParent<CombatHealth>();
         if (combatHealth != null)
         {
-            combatHealth.TakeDamage(new BattleDamage(attackDamage, BattleDamageType.Physical, gameObject));
+            float attackMultiplier = ResolveAttackMultiplier();
+            float currentAttackDamage = attackDamage * attackMultiplier;
+            if (Mathf.Abs(attackMultiplier - lastLoggedAttackMultiplier) > 0.001f)
+            {
+                Debug.Log($"[EnemyController] finalAttackDamage={currentAttackDamage:F2} multiplier={attackMultiplier:F2}", this);
+                lastLoggedAttackMultiplier = attackMultiplier;
+            }
+
+            combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, BattleDamageType.Physical, gameObject));
         }
 
         FinishAttackRecovery();
     }
 
-    private void PlayMoveAnimation(Vector3 direction)
+    private void PlayMoveAnimation(Vector3 direction, float currentMoveSpeed)
     {
         if (slimeAnimation == null)
         {
             return;
         }
 
-        slimeAnimation.PlayMoveAnimation(new Vector2(direction.x, direction.z), moveSpeed);
+        slimeAnimation.PlayMoveAnimation(new Vector2(direction.x, direction.z), currentMoveSpeed);
     }
 
     private void StopMoveAnimation()
@@ -204,5 +225,27 @@ public class EnemyController : MonoBehaviour
                 playerTarget = playerObject.transform;
             }
         }
+    }
+
+    private EnemyDebuffReceiver ResolveDebuffReceiver()
+    {
+        if (debuffReceiver == null)
+        {
+            debuffReceiver = GetComponent<EnemyDebuffReceiver>();
+        }
+
+        return debuffReceiver;
+    }
+
+    private float ResolveMoveSpeedMultiplier()
+    {
+        EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
+        return receiver != null ? receiver.GetMoveSpeedMultiplier() : 1f;
+    }
+
+    private float ResolveAttackMultiplier()
+    {
+        EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
+        return receiver != null ? receiver.GetAttackMultiplier() : 1f;
     }
 }

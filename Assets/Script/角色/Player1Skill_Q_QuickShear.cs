@@ -46,6 +46,11 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             Debug.Log($"[Q - QuickShear] Start. animation={animationName}, slashes={slashCount}, interval={slashInterval:F2}", this);
         }
+
+        if (Controller != null && Controller.IsVeilBarrierActive())
+        {
+            Debug.Log("[Player01 Q] cast while W active", this);
+        }
     }
 
     protected override IEnumerator CastRoutine()

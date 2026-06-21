@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public class CombatHealth : MonoBehaviour
@@ -15,6 +16,7 @@ public class CombatHealth : MonoBehaviour
     private bool dead;
     private float localShield;
     private float localMaxShield;
+    private readonly Dictionary<string, float> incomingDamageMultipliers = new Dictionary<string, float>();
 
     private float MaxHealth => stats != null ? stats.maxHealth : (resourceBank != null ? resourceBank.maxHealth : currentHealth);
 
@@ -61,6 +63,7 @@ public class CombatHealth : MonoBehaviour
         }
 
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : Mathf.Max(0f, damage.amount);
+        finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
         Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
         if (player2 != null)
@@ -154,6 +157,36 @@ public class CombatHealth : MonoBehaviour
         return GetShield();
     }
 
+    public void AddDamageReductionModifier(string key, float multiplier)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        incomingDamageMultipliers[key] = Mathf.Max(0f, multiplier);
+    }
+
+    public void RemoveDamageReductionModifier(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        incomingDamageMultipliers.Remove(key);
+    }
+
+    public void SetIncomingDamageMultiplier(object source, float multiplier)
+    {
+        AddDamageReductionModifier(GetModifierKey(source), multiplier);
+    }
+
+    public void RemoveIncomingDamageMultiplier(object source)
+    {
+        RemoveDamageReductionModifier(GetModifierKey(source));
+    }
+
     private float AbsorbShieldDamage(float amount)
     {
         amount = Mathf.Max(0f, amount);
@@ -177,6 +210,27 @@ public class CombatHealth : MonoBehaviour
 
         Debug.Log($"[Shield] absorbed={shieldUsed:F2}, remaining={remainingShield:F2}, incoming={amount:F2}", this);
         return amount - shieldUsed;
+    }
+
+    private float GetIncomingDamageMultiplier()
+    {
+        float multiplier = 1f;
+        foreach (float value in incomingDamageMultipliers.Values)
+        {
+            multiplier *= Mathf.Max(0f, value);
+        }
+
+        return multiplier;
+    }
+
+    private static string GetModifierKey(object source)
+    {
+        if (source == null)
+        {
+            return string.Empty;
+        }
+
+        return source is string stringKey ? stringKey : source.GetHashCode().ToString();
     }
 
     private void HandleResourceBankOnShieldChanged(float currentShield, float maxShield)

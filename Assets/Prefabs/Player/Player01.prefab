@@ -1809,11 +1809,22 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1003, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_W_ThreadFlow
-  cooldown: 4.5
-  duration: 0.75
+  cooldown: 8
+  duration: 8
   effectPower: 0.8
   animationName: 
   debugLog: 1
+  wDuration: 8
+  wCooldown: 8
+  wRadius: 4.5
+  wFollowPlayer: 1
+  playerDamageTakenMultiplier: 0.5
+  enemyMoveSpeedMultiplier: 0.5
+  enemyAttackMultiplier: 0.5
+  enemyDebuffRefreshInterval: 0.1
+  veilBarrierPrefab: {fileID: 100100000, guid: 733d5c480a51c5d459210aaa211a4215, type: 3}
+  veilBarrierScale: {x: 45, y: 45, z: 45}
+  veilBarrierLocalOffset: {x: 0, y: 0, z: 0}
   damageReduction: 0.4
   shieldPrefab: {fileID: 0}
 --- !u!114 &48694291259105405

@@ -79,6 +79,10 @@ public class Player01SkillController : MonoBehaviour
 
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
+            if (IsVeilBarrierActive())
+            {
+                Debug.Log("[Player01SkillController] Q pressed while W active", this);
+            }
             TryCastSkillFromInput("Q", qSkill);
         }
 
@@ -242,8 +246,9 @@ public class Player01SkillController : MonoBehaviour
     {
         bool allowLocomotionWhileRunningBoost =
             currentSkill is Player1Skill_E_BrokenDash eSkill && eSkill.IsRunningBoost;
+        bool skillLocksLocomotion = currentSkill != null && currentSkill.LocksLocomotionAnimation();
 
-        if (currentSkill != null && !force && !allowLocomotionWhileRunningBoost)
+        if (currentSkill != null && !force && skillLocksLocomotion && !allowLocomotionWhileRunningBoost)
         {
             return;
         }
@@ -620,6 +625,11 @@ public class Player01SkillController : MonoBehaviour
     public string GetCurrentSkillName()
     {
         return currentSkill != null ? currentSkill.GetType().Name : "<none>";
+    }
+
+    public bool IsVeilBarrierActive()
+    {
+        return wSkill is Player1Skill_W_ThreadFlow w && w.IsDefending;
     }
 
     private string DescribeSkeletonAnimation(SkeletonAnimation spine)
