@@ -13,6 +13,8 @@ public class SoulDropOnDeath : MonoBehaviour
     [Header("击杀掉落")]
     public SoulDropEntry[] drops;
 
+    private static SoulPickup cachedDefaultPrefab;
+
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
 
@@ -56,9 +58,28 @@ public class SoulDropOnDeath : MonoBehaviour
 
             for (int i = 0; i < entry.count; i++)
             {
-                SoulPickup soul = Instantiate(entry.prefab, transform.position, Quaternion.identity);
-                soul.soulType = entry.soulType;
+                SoulPickup prefab = entry.prefab != null ? entry.prefab : GetDefaultSoulPrefab();
+                if (prefab == null)
+                {
+                    continue;
+                }
+
+                SoulPickup soul = Instantiate(prefab, transform.position, Quaternion.identity);
+                soul.Configure(entry.soulType, soul.amount);
+                Debug.Log($"[SoulOrb] spawned prefab={soul.name}", soul);
             }
         }
+    }
+
+    private static SoulPickup GetDefaultSoulPrefab()
+    {
+        if (cachedDefaultPrefab != null)
+        {
+            return cachedDefaultPrefab;
+        }
+
+        cachedDefaultPrefab = Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrb")
+                            ?? Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrbPreview");
+        return cachedDefaultPrefab;
     }
 }

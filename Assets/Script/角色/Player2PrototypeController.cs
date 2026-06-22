@@ -16,10 +16,10 @@ public class Player2PrototypeController : MonoBehaviour
     [Header("E - 星痕瞬移 / 残影特效")]
     public PlayerSkillCooldownManager cooldownManager;
 
-    private const float Player2QManaCost = 15f;
-    private const float Player2WManaCost = 25f;
+    private const float Player2QManaCost = 10f;
+    private const float Player2WManaCost = 40f;
     private const float Player2EManaCost = 20f;
-    private const float Player2RManaCost = 40f;
+    private const float Player2RManaCost = 60f;
 
 
 

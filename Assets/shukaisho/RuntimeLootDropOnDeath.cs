@@ -5,6 +5,8 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     public float soulAmount = 15f;
     public float dropScatterRadius = 0.8f;
 
+    private static SoulPickup cachedSoulPrefab;
+
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
     private bool dropped;
@@ -82,24 +84,42 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private static void CreateSoul(SoulType type, float amount, Vector3 position)
     {
-        GameObject soulObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        SoulPickup prefab = GetDefaultSoulPrefab();
+        if (prefab != null)
+        {
+            SoulPickup soul = Object.Instantiate(prefab, position, Quaternion.identity);
+            soul.Configure(type, amount);
+            Debug.Log($"[SoulOrb] spawned prefab={soul.name}", soul);
+            return;
+        }
+
+        GameObject soulObject = new GameObject($"{type} Soul");
         soulObject.name = $"{type} Soul";
         soulObject.transform.position = position;
         soulObject.transform.localScale = Vector3.one * 0.35f;
 
-        Collider collider = soulObject.GetComponent<Collider>();
+        SphereCollider collider = soulObject.AddComponent<SphereCollider>();
         collider.isTrigger = true;
+        collider.radius = 0.55f;
 
         Rigidbody rb = soulObject.AddComponent<Rigidbody>();
         rb.isKinematic = true;
 
         SoulPickup pickup = soulObject.AddComponent<SoulPickup>();
-        pickup.soulType = type;
-        pickup.amount = amount;
+        pickup.Configure(type, amount);
+        Debug.Log($"[SoulOrb] spawned fallback={soulObject.name}", pickup);
+    }
 
-        Renderer renderer = soulObject.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        renderer.material.color = SoulColor(type);
+    private static SoulPickup GetDefaultSoulPrefab()
+    {
+        if (cachedSoulPrefab != null)
+        {
+            return cachedSoulPrefab;
+        }
+
+        cachedSoulPrefab = Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrb")
+                         ?? Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrbPreview");
+        return cachedSoulPrefab;
     }
 
     private void CreateRune(Vector3 position)
@@ -130,15 +150,4 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         renderer.material.color = new Color(0.72f, 0.35f, 1f, 1f);
     }
 
-    private static Color SoulColor(SoulType type)
-    {
-        return type switch
-        {
-            SoulType.Life => new Color(0.1f, 0.95f, 0.35f, 1f),
-            SoulType.Energy => new Color(0.15f, 0.45f, 1f, 1f),
-            SoulType.Growth => new Color(1f, 0.2f, 0.15f, 1f),
-            SoulType.Function => new Color(1f, 0.82f, 0.12f, 1f),
-            _ => Color.white
-        };
-    }
 }
