@@ -3,95 +3,197 @@ using UnityEngine;
 [System.Serializable]
 public struct SkillCostCDData
 {
-    [Tooltip("技能最大冷却 Q/W/E/R 顺序 0~3")]
+    [Tooltip("Q/W/E/R max cooldown in seconds")]
     public float maxCooldown;
-    [Tooltip("技能蓝耗")]
+    [Tooltip("Mana cost")]
     public float manaCost;
 }
 
 public class PlayerSkillCooldownManager : MonoBehaviour
 {
-    [Header("技能配置 Q(0) W(1) E(2) R(3)")]
+    [Header("Skill config: Q(0) W(1) E(2) R(3)")]
     public SkillCostCDData[] skillDatas = new SkillCostCDData[4]
     {
-        new SkillCostCDData(){maxCooldown = 3f, manaCost = 10f},
-        new SkillCostCDData(){maxCooldown = 8f, manaCost = 30f},
-        new SkillCostCDData(){maxCooldown = 5f, manaCost = 20f},
-        new SkillCostCDData(){maxCooldown = 20f, manaCost = 50f}
+        new SkillCostCDData { maxCooldown = 2f, manaCost = 10f },
+        new SkillCostCDData { maxCooldown = 6f, manaCost = 30f },
+        new SkillCostCDData { maxCooldown = 4f, manaCost = 20f },
+        new SkillCostCDData { maxCooldown = 12f, manaCost = 60f }
     };
 
-    [Header("全局蓝量设置")]
+    [Header("Mana")]
     public float maxMana = 100f;
     public float manaRecoverPerSecond = 2f;
+    public BattleResourceBank resourceBank;
 
-    // 运行时私有状态（不会在面板暴露干扰修改）
-    private float[] _runtimeCurrentCD;
-    private float _runtimeCurrentMana;
+    private float[] runtimeCurrentCD;
+    private float runtimeCurrentMana;
 
     private void Awake()
     {
-        // 初始化冷却数组，长度固定4个技能
-        _runtimeCurrentCD = new float[4];
-        _runtimeCurrentMana = maxMana;
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        runtimeCurrentCD = new float[4];
+
+        if (resourceBank != null)
+        {
+            resourceBank.maxEnergy = Mathf.Max(resourceBank.maxEnergy, maxMana);
+            if (resourceBank.currentEnergy <= 0f)
+            {
+                resourceBank.currentEnergy = resourceBank.maxEnergy;
+            }
+
+            runtimeCurrentMana = resourceBank.currentEnergy;
+        }
+        else
+        {
+            runtimeCurrentMana = maxMana;
+        }
     }
 
-    /// <summary>每帧更新冷却倒计时与自动回蓝，在控制器Update调用</summary>
+    private void Update()
+    {
+        TickCooldownAndMana(Time.deltaTime);
+    }
+
     public void TickCooldownAndMana(float deltaTime)
     {
-        // 冷却倒计时
-        for (int i = 0; i < 4; i++)
+        EnsureRuntimeArrays();
+
+        for (int i = 0; i < runtimeCurrentCD.Length; i++)
         {
-            if (_runtimeCurrentCD[i] > 0f)
-                _runtimeCurrentCD[i] -= deltaTime;
+            runtimeCurrentCD[i] = Mathf.Max(0f, runtimeCurrentCD[i] - deltaTime);
         }
 
-        // 自动回蓝，实时读取面板maxMana，改面板立刻生效
-        if (_runtimeCurrentMana < maxMana)
+        if (resourceBank != null)
         {
-            _runtimeCurrentMana = Mathf.Min(maxMana, _runtimeCurrentMana + manaRecoverPerSecond * deltaTime);
+            resourceBank.maxEnergy = Mathf.Max(resourceBank.maxEnergy, maxMana);
+            resourceBank.currentEnergy = Mathf.Min(resourceBank.maxEnergy, resourceBank.currentEnergy + manaRecoverPerSecond * deltaTime);
+            runtimeCurrentMana = resourceBank.currentEnergy;
+        }
+        else
+        {
+            runtimeCurrentMana = Mathf.Min(maxMana, runtimeCurrentMana + manaRecoverPerSecond * deltaTime);
         }
     }
 
-    /// <summary>判断技能是否可释放</summary>
     public bool IsSkillCastable(int skillIndex)
     {
-        if (skillIndex < 0 || skillIndex >= 4) return false;
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return false;
+        }
+
         SkillCostCDData data = skillDatas[skillIndex];
-        // 冷却完成 + 蓝量足够
-        return _runtimeCurrentCD[skillIndex] <= 0.01f && _runtimeCurrentMana >= data.manaCost;
+        float currentMana = resourceBank != null ? resourceBank.currentEnergy : runtimeCurrentMana;
+        return runtimeCurrentCD[skillIndex] <= 0.01f && currentMana >= data.manaCost;
     }
 
-    /// <summary>释放技能：扣除蓝量、刷新冷却</summary>
     public void ConsumeSkillResource(int skillIndex)
     {
-        if (skillIndex < 0 || skillIndex >= 4) return;
-        SkillCostCDData data = skillDatas[skillIndex];
-        _runtimeCurrentMana -= data.manaCost;
-        // 实时读取面板当前maxCD，修改面板数值下一次释放直接生效
-        _runtimeCurrentCD[skillIndex] = data.maxCooldown;
+        TryConsumeSkillResource(skillIndex);
     }
 
-    #region 外部只读接口（给UI/控制器读取）
+    public bool TryConsumeSkillResource(int skillIndex)
+    {
+        if (!IsValidSkillIndex(skillIndex) || !IsSkillCastable(skillIndex))
+        {
+            return false;
+        }
+
+        SkillCostCDData data = skillDatas[skillIndex];
+        if (resourceBank != null)
+        {
+            if (!resourceBank.TrySpendEnergy(data.manaCost))
+            {
+                return false;
+            }
+
+            runtimeCurrentMana = resourceBank.currentEnergy;
+        }
+        else
+        {
+            runtimeCurrentMana -= data.manaCost;
+        }
+
+        runtimeCurrentCD[skillIndex] = Mathf.Max(0f, data.maxCooldown * ResolveCooldownMultiplier());
+        return true;
+    }
+
     public float GetCurrentSkillCD(int idx)
     {
-        if (idx < 0 || idx >= 4) return 0f;
-        return Mathf.Max(0f, _runtimeCurrentCD[idx]);
+        if (!IsValidSkillIndex(idx))
+        {
+            return 0f;
+        }
+
+        return Mathf.Max(0f, runtimeCurrentCD[idx]);
     }
 
     public float GetSkillMaxCD(int idx)
     {
-        if (idx < 0 || idx >= 4) return 0f;
-        return skillDatas[idx].maxCooldown;
+        if (idx < 0 || skillDatas == null || idx >= skillDatas.Length)
+        {
+            return 0f;
+        }
+
+        return skillDatas[idx].maxCooldown * ResolveCooldownMultiplier();
     }
 
     public float GetSkillManaCost(int idx)
     {
-        if (idx < 0 || idx >= 4) return 0f;
+        if (idx < 0 || skillDatas == null || idx >= skillDatas.Length)
+        {
+            return 0f;
+        }
+
         return skillDatas[idx].manaCost;
     }
 
-    public float GetCurrentMana() => _runtimeCurrentMana;
-    public float GetMaxMana() => maxMana;
-    public bool IsSkillReady(int idx) => IsSkillCastable(idx);
-    #endregion
+    public float GetCurrentMana()
+    {
+        return resourceBank != null ? resourceBank.currentEnergy : runtimeCurrentMana;
+    }
+
+    public float GetMaxMana()
+    {
+        return resourceBank != null ? resourceBank.maxEnergy : maxMana;
+    }
+
+    public bool IsSkillReady(int idx)
+    {
+        return IsSkillCastable(idx);
+    }
+
+    private bool IsValidSkillIndex(int idx)
+    {
+        EnsureRuntimeArrays();
+        return idx >= 0 && skillDatas != null && idx < skillDatas.Length && idx < runtimeCurrentCD.Length;
+    }
+
+    private void EnsureRuntimeArrays()
+    {
+        if (runtimeCurrentCD == null || runtimeCurrentCD.Length != 4)
+        {
+            runtimeCurrentCD = new float[4];
+        }
+
+        if (skillDatas == null || skillDatas.Length != 4)
+        {
+            skillDatas = new SkillCostCDData[4]
+            {
+                new SkillCostCDData { maxCooldown = 2f, manaCost = 10f },
+                new SkillCostCDData { maxCooldown = 6f, manaCost = 30f },
+                new SkillCostCDData { maxCooldown = 4f, manaCost = 20f },
+                new SkillCostCDData { maxCooldown = 12f, manaCost = 60f }
+            };
+        }
+    }
+
+    private float ResolveCooldownMultiplier()
+    {
+        return resourceBank != null ? resourceBank.SkillCooldownMultiplier : 1f;
+    }
 }

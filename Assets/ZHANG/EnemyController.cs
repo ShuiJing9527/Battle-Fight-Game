@@ -17,6 +17,11 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float attackHitRange = 1.6f;
     [SerializeField] private float attackCooldown = 1.1f;
     [SerializeField] private float attackDamage = 3f;
+    [SerializeField] private MonsterAttackStyle attackStyle = MonsterAttackStyle.Melee;
+    [SerializeField] private float projectileSpeed = 8f;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugLog = false;
 
     private Rigidbody rb;
     private Player2Bootstrap playerBootstrap;
@@ -31,6 +36,7 @@ public class EnemyController : MonoBehaviour
 
     private void Start()
     {
+        MonsterCombatAutoSetup.Configure(gameObject);
         rb = GetComponent<Rigidbody>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
         initialRotation = transform.rotation;
@@ -94,7 +100,7 @@ public class EnemyController : MonoBehaviour
         Vector3 direction = toPlayer / distance;
         float moveMultiplier = ResolveMoveSpeedMultiplier();
         float currentMoveSpeed = moveSpeed * moveMultiplier;
-        if (Mathf.Abs(moveMultiplier - lastLoggedMoveMultiplier) > 0.001f)
+        if (debugLog && Mathf.Abs(moveMultiplier - lastLoggedMoveMultiplier) > 0.001f)
         {
             Debug.Log($"[EnemyController] finalMoveSpeed={currentMoveSpeed:F2} multiplier={moveMultiplier:F2}", this);
             lastLoggedMoveMultiplier = moveMultiplier;
@@ -116,6 +122,17 @@ public class EnemyController : MonoBehaviour
     public void SetTarget(Transform target)
     {
         playerTarget = target;
+    }
+
+    public void ConfigureRuntime(float moveSpeed, float stopDistance, float attackRange, float attackHitRange, float attackCooldown, float attackDamage, MonsterAttackStyle attackStyle)
+    {
+        this.moveSpeed = Mathf.Max(0f, moveSpeed);
+        this.stopDistance = Mathf.Max(0f, stopDistance);
+        this.attackRange = Mathf.Max(0.1f, attackRange);
+        this.attackHitRange = Mathf.Max(0.1f, attackHitRange);
+        this.attackCooldown = Mathf.Max(0.1f, attackCooldown);
+        this.attackDamage = Mathf.Max(0f, attackDamage);
+        this.attackStyle = attackStyle;
     }
 
     private void BeginAttack()
@@ -162,18 +179,30 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        CombatHealth combatHealth = hitTarget.GetComponentInParent<CombatHealth>();
-        if (combatHealth != null)
+        if (attackStyle == MonsterAttackStyle.Ranged || attackStyle == MonsterAttackStyle.ElementalBoss)
         {
-            float attackMultiplier = ResolveAttackMultiplier();
-            float currentAttackDamage = attackDamage * attackMultiplier;
-            if (Mathf.Abs(attackMultiplier - lastLoggedAttackMultiplier) > 0.001f)
+            FireProjectileAt(hitTarget);
+        }
+        else
+        {
+            if (!BattleTargetUtility.IsPlayer(hitTarget.gameObject))
             {
-                Debug.Log($"[EnemyController] finalAttackDamage={currentAttackDamage:F2} multiplier={attackMultiplier:F2}", this);
-                lastLoggedAttackMultiplier = attackMultiplier;
+                FinishAttackRecovery();
+                return;
             }
 
-            combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, BattleDamageType.Physical, gameObject));
+            CombatHealth combatHealth = hitTarget.GetComponentInParent<CombatHealth>();
+            if (combatHealth != null)
+            {
+                float currentAttackDamage = ResolveCurrentAttackDamage();
+                if (debugLog && Mathf.Abs(ResolveAttackMultiplier() - lastLoggedAttackMultiplier) > 0.001f)
+                {
+                    Debug.Log($"[EnemyController] finalAttackDamage={currentAttackDamage:F2} multiplier={ResolveAttackMultiplier():F2}", this);
+                    lastLoggedAttackMultiplier = ResolveAttackMultiplier();
+                }
+
+                combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, BattleDamageType.Physical, gameObject));
+            }
         }
 
         FinishAttackRecovery();
@@ -247,5 +276,66 @@ public class EnemyController : MonoBehaviour
     {
         EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
         return receiver != null ? receiver.GetAttackMultiplier() : 1f;
+    }
+
+    private float ResolveCurrentAttackDamage()
+    {
+        return attackDamage * ResolveAttackMultiplier();
+    }
+
+    private void FireProjectileAt(Transform hitTarget)
+    {
+        if (hitTarget == null)
+        {
+            return;
+        }
+
+        Vector3 direction = hitTarget.position - transform.position;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < 0.001f)
+        {
+            direction = transform.forward;
+        }
+
+        BattleDamageType damageType = attackStyle == MonsterAttackStyle.ElementalBoss && Random.value > 0.5f
+            ? BattleDamageType.Special
+            : BattleDamageType.Physical;
+
+        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Element Projectile" : "Monster Projectile";
+        projectile.transform.position = transform.position + Vector3.up * 0.8f + direction.normalized * 0.5f;
+        projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? 0.45f : 0.28f);
+
+        Collider projectileCollider = projectile.GetComponent<Collider>();
+        projectileCollider.isTrigger = true;
+
+        Rigidbody projectileBody = projectile.AddComponent<Rigidbody>();
+        projectileBody.isKinematic = true;
+
+        MonsterProjectile monsterProjectile = projectile.AddComponent<MonsterProjectile>();
+        monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(), damageType, gameObject);
+
+        Renderer renderer = projectile.GetComponent<Renderer>();
+        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+        renderer.material.color = ResolveProjectileColor(damageType);
+    }
+
+    private Color ResolveProjectileColor(BattleDamageType damageType)
+    {
+        if (attackStyle != MonsterAttackStyle.ElementalBoss)
+        {
+            return new Color(0.25f, 0.6f, 1f, 1f);
+        }
+
+        Color[] colors =
+        {
+            new Color(1f, 0.25f, 0.05f, 1f),
+            new Color(0.2f, 0.65f, 1f, 1f),
+            new Color(1f, 0.95f, 0.25f, 1f),
+            new Color(0.55f, 1f, 0.75f, 1f),
+            new Color(0.6f, 0.15f, 0.9f, 1f)
+        };
+
+        return damageType == BattleDamageType.Special ? colors[Random.Range(0, colors.Length)] : Color.white;
     }
 }

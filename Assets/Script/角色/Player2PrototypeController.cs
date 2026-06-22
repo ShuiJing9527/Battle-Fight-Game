@@ -588,8 +588,6 @@ public class Player2PrototypeController : MonoBehaviour
     private Vector3 lastMoveDir = Vector3.forward;
     private SkeletonAnimation cachedSpineAnimation;
     private int cachedSpineFacingScaleX = 1;
-    private Vector3 cachedSpineMirrorLastPosition;
-    private bool cachedSpineMirrorLastPositionInitialized;
     private int standbySwords;
     private bool isDashing;
     private bool isShielding;
@@ -665,8 +663,6 @@ public class Player2PrototypeController : MonoBehaviour
     private void Awake()
     {
         initialRotation = transform.rotation;
-        cachedSpineMirrorLastPosition = transform.position;
-        cachedSpineMirrorLastPositionInitialized = true;
         InitializeSkillSlots();
         InitializeEStarTrailDefaults();
         if (rb == null)
@@ -902,21 +898,34 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        if (!cachedSpineMirrorLastPositionInitialized)
+        float horizontalInput = ResolveHorizontalInput();
+        if (Mathf.Abs(horizontalInput) > 0.0001f)
         {
-            cachedSpineMirrorLastPosition = transform.position;
-            cachedSpineMirrorLastPositionInitialized = true;
+            cachedSpineFacingScaleX = horizontalInput > 0f ? -1 : 1;
         }
-
-        Vector3 delta = transform.position - cachedSpineMirrorLastPosition;
-        if (Mathf.Abs(delta.x) > 0.0001f)
-        {
-            cachedSpineFacingScaleX = delta.x > 0f ? -1 : 1;
-        }
-
-        cachedSpineMirrorLastPosition = transform.position;
 
         spineAnimation.Skeleton.ScaleX = cachedSpineFacingScaleX;
+    }
+
+    private float ResolveHorizontalInput()
+    {
+        if (Keyboard.current == null)
+        {
+            return 0f;
+        }
+
+        float horizontal = 0f;
+        if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
+        {
+            horizontal -= 1f;
+        }
+
+        if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
+        {
+            horizontal += 1f;
+        }
+
+        return horizontal;
     }
 
     private void ApplyVisualFloatOffset()
@@ -1121,8 +1130,6 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         transform.position = worldPosition;
-        cachedSpineMirrorLastPosition = worldPosition;
-        cachedSpineMirrorLastPositionInitialized = true;
         Physics.SyncTransforms();
     }
 

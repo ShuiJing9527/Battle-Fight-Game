@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class RuneLibrary : MonoBehaviour
 {
-    [Header("符文库")]
+    [Header("Rune Library")]
     public RuneDefinition[] runes;
 
     private void Reset()
@@ -18,14 +18,6 @@ public class RuneLibrary : MonoBehaviour
     private void OnValidate()
     {
         EnsureDefaults();
-    }
-
-    private void EnsureDefaults()
-    {
-        if (runes == null || runes.Length == 0)
-        {
-            LoadTableDefaults();
-        }
     }
 
     [ContextMenu("Load Table Defaults")]
@@ -48,11 +40,7 @@ public class RuneLibrary : MonoBehaviour
 
     public RuneDefinition Find(RuneMechanic mechanic)
     {
-        if (runes == null)
-        {
-            return null;
-        }
-
+        EnsureDefaults();
         foreach (RuneDefinition rune in runes)
         {
             if (rune != null && rune.mechanic == mechanic)
@@ -62,5 +50,24 @@ public class RuneLibrary : MonoBehaviour
         }
 
         return null;
+    }
+
+    public RuneDefinition GetRandomRune()
+    {
+        EnsureDefaults();
+        if (runes == null || runes.Length == 0)
+        {
+            return null;
+        }
+
+        return runes[Random.Range(0, runes.Length)];
+    }
+
+    private void EnsureDefaults()
+    {
+        if (runes == null || runes.Length == 0)
+        {
+            LoadTableDefaults();
+        }
     }
 }

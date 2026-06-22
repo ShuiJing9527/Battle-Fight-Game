@@ -101,8 +101,13 @@ public class ATTACK : MonoBehaviour
 
         foreach (Collider enemy in hitEnemies)
         {
-            CombatHealth combatHealth = enemy.GetComponentInParent<CombatHealth>();
-            EnemyHealth hp = enemy.GetComponentInParent<EnemyHealth>();
+            if (!BattleTargetUtility.IsMonster(enemy, transform))
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(enemy, transform);
+            EnemyHealth hp = BattleTargetUtility.GetMonsterLegacyHealth(enemy, transform);
 
             if (combatHealth != null)
             {

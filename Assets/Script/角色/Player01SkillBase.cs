@@ -16,6 +16,7 @@ public abstract class Player01SkillBase : MonoBehaviour
     [SerializeField] protected bool debugLog = true;
 
     protected Player01SkillController Controller { get; private set; }
+    protected PlayerSkillCooldownManager SkillResource { get; private set; }
 
     protected float nextCastTime;
     protected Coroutine castRoutine;
@@ -24,10 +25,16 @@ public abstract class Player01SkillBase : MonoBehaviour
     public virtual void Initialize(Player01SkillController controller)
     {
         Controller = controller;
+        SkillResource = GetComponent<PlayerSkillCooldownManager>();
     }
 
     public bool CanCastNow()
     {
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            return SkillResource.IsSkillCastable(SkillIndex);
+        }
+
         return Time.time >= nextCastTime;
     }
 
@@ -75,6 +82,8 @@ public abstract class Player01SkillBase : MonoBehaviour
     {
         return GetType().Name;
     }
+
+    protected virtual int SkillIndex => -1;
 
     protected virtual IEnumerator CastRoutine()
     {
@@ -136,7 +145,21 @@ public abstract class Player01SkillBase : MonoBehaviour
             return false;
         }
 
-        nextCastTime = Time.time + Mathf.Max(0f, cooldown);
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            if (!SkillResource.TryConsumeSkillResource(SkillIndex))
+            {
+                Controller?.FinishSkill(this);
+                return false;
+            }
+
+            nextCastTime = Time.time + SkillResource.GetSkillMaxCD(SkillIndex);
+        }
+        else
+        {
+            nextCastTime = Time.time + Mathf.Max(0f, cooldown);
+        }
+
         castFinished = false;
         return true;
     }
@@ -174,7 +197,9 @@ public abstract class Player01SkillBase : MonoBehaviour
         if (castRoutine != null)
         {
             StopCoroutine(castRoutine);
-    }
+        }
+
+        castRoutine = null;
 
         CompleteCast();
     }

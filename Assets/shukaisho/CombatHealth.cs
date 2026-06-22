@@ -10,7 +10,14 @@ public class CombatHealth : MonoBehaviour
     [Min(0f)] public float currentHealth = 3f;
     public bool destroyOnDeath = true;
 
+    [Header("Animation")]
+    public Animator animator;
+    public string hitTrigger = "Hit";
+    public string deathTrigger = "Die";
+    [Min(0f)] public float destroyDelayAfterDeath = 0.65f;
+
     public event Action<GameObject> Died;
+    public event Action<float, GameObject> Damaged;
     public event Action<float, float> OnShieldChanged;
 
     private bool dead;
@@ -19,6 +26,8 @@ public class CombatHealth : MonoBehaviour
     private readonly Dictionary<string, float> incomingDamageMultipliers = new Dictionary<string, float>();
 
     private float MaxHealth => stats != null ? stats.maxHealth : (resourceBank != null ? resourceBank.maxHealth : currentHealth);
+    public float MaxHealthValue => MaxHealth;
+    public bool IsDead => dead;
 
     private void Awake()
     {
@@ -30,6 +39,11 @@ public class CombatHealth : MonoBehaviour
         if (resourceBank == null)
         {
             resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (animator == null)
+        {
+            animator = GetComponentInChildren<Animator>();
         }
 
         if (resourceBank != null)
@@ -62,6 +76,11 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        if (ShouldIgnoreDamageFrom(damage.source))
+        {
+            return;
+        }
+
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : Mathf.Max(0f, damage.amount);
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
@@ -81,10 +100,41 @@ public class CombatHealth : MonoBehaviour
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
         }
 
+        if (finalDamage > 0f)
+        {
+            Damaged?.Invoke(finalDamage, damage.source);
+            TriggerAnimation(hitTrigger);
+        }
+
         if (currentHealth <= 0f)
         {
             Die(damage.source);
         }
+    }
+
+    private bool ShouldIgnoreDamageFrom(GameObject source)
+    {
+        if (source == null)
+        {
+            return false;
+        }
+
+        bool sourceIsPlayer = BattleTargetUtility.IsPlayer(source);
+        bool sourceIsMonster = BattleTargetUtility.IsMonster(source);
+        bool targetIsPlayer = BattleTargetUtility.IsPlayer(gameObject);
+        bool targetIsMonster = BattleTargetUtility.IsMonster(gameObject);
+
+        if (sourceIsPlayer)
+        {
+            return !targetIsMonster;
+        }
+
+        if (sourceIsMonster)
+        {
+            return !targetIsPlayer;
+        }
+
+        return false;
     }
 
     public void Heal(float amount)
@@ -247,10 +297,21 @@ public class CombatHealth : MonoBehaviour
 
         dead = true;
         Died?.Invoke(killer);
+        TriggerAnimation(deathTrigger);
 
         if (destroyOnDeath)
         {
-            Destroy(gameObject);
+            Destroy(gameObject, destroyDelayAfterDeath);
         }
+    }
+
+    private void TriggerAnimation(string triggerName)
+    {
+        if (animator == null || string.IsNullOrWhiteSpace(triggerName))
+        {
+            return;
+        }
+
+        animator.SetTrigger(triggerName);
     }
 }

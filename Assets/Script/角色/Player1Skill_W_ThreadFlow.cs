@@ -166,6 +166,8 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         return "W - Veil Barrier";
     }
 
+    protected override int SkillIndex => 1;
+
     private void SyncSkillTiming()
     {
         duration = Mathf.Max(0f, wDuration);

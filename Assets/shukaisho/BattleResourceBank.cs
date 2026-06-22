@@ -17,9 +17,11 @@ public class BattleResourceBank : MonoBehaviour
 
     [Header("Growth")]
     [Min(0)] public int growthSoul = 0;
+    [Min(0f)] public float growthAttackBonusPerSoul = 0.03f;
 
     [Header("Function")]
     [Min(0)] public int functionSoul = 0;
+    [Range(0.1f, 1f)] public float functionCooldownMultiplierPerSoul = 0.97f;
 
     public event Action<SoulType, float> SoulApplied;
     public event Action FunctionSoulTriggered;
@@ -41,6 +43,9 @@ public class BattleResourceBank : MonoBehaviour
             return skillDamageMultiplier;
         }
     }
+
+    public float AttributeDamageMultiplier => 1f + growthSoul * growthAttackBonusPerSoul;
+    public float SkillCooldownMultiplier => Mathf.Clamp(Mathf.Pow(functionCooldownMultiplierPerSoul, functionSoul), 0.35f, 1f);
 
     private void Awake()
     {

@@ -48,6 +48,7 @@ public class Player01SkillController : MonoBehaviour
 
     private void Awake()
     {
+        EnsureRuntimeCombatComponents();
         CacheReferences();
         AutoBindSkills();
         InitializeSkills();
@@ -255,7 +256,7 @@ public class Player01SkillController : MonoBehaviour
 
         if (IsSkillAnimationLocked())
         {
-            if (lastLocomotionLockLogFrame != Time.frameCount)
+            if (debugLog && lastLocomotionLockLogFrame != Time.frameCount)
             {
                 Debug.Log("[Locomotion] skipped because skill animation locked", this);
                 lastLocomotionLockLogFrame = Time.frameCount;
@@ -275,7 +276,10 @@ public class Player01SkillController : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[Locomotion] {source} -> {animation}", this);
+        if (debugLog)
+        {
+            Debug.Log($"[Locomotion] {source} -> {animation}", this);
+        }
 
         SkeletonAnimation spine = ResolveSkeletonAnimation();
         PlayAnimationEquivalent(spine, animation, true, false, false, source);
@@ -386,6 +390,51 @@ public class Player01SkillController : MonoBehaviour
         }
     }
 
+    private void EnsureRuntimeCombatComponents()
+    {
+        if (GetComponent<BattleResourceBank>() == null)
+        {
+            BattleResourceBank bank = gameObject.AddComponent<BattleResourceBank>();
+            bank.maxHealth = 100f;
+            bank.currentHealth = 100f;
+            bank.maxEnergy = 100f;
+            bank.currentEnergy = 100f;
+        }
+
+        if (GetComponent<CombatHealth>() == null)
+        {
+            CombatHealth health = gameObject.AddComponent<CombatHealth>();
+            health.resourceBank = GetComponent<BattleResourceBank>();
+            health.currentHealth = health.resourceBank.currentHealth;
+        }
+
+        if (GetComponent<PlayerSkillCooldownManager>() == null)
+        {
+            PlayerSkillCooldownManager cooldownManager = gameObject.AddComponent<PlayerSkillCooldownManager>();
+            cooldownManager.resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (GetComponent<CombatSkillCaster>() == null)
+        {
+            gameObject.AddComponent<CombatSkillCaster>();
+        }
+
+        if (GetComponent<RuneInventory>() == null)
+        {
+            gameObject.AddComponent<RuneInventory>();
+        }
+
+        if (GetComponent<RuneLibrary>() == null)
+        {
+            gameObject.AddComponent<RuneLibrary>();
+        }
+
+        if (GetComponent<RuneSkillPanel>() == null)
+        {
+            gameObject.AddComponent<RuneSkillPanel>();
+        }
+    }
+
     private void AutoBindSkills()
     {
         if (qSkill == null) qSkill = GetComponent<Player1Skill_Q_QuickShear>();
@@ -440,7 +489,7 @@ public class Player01SkillController : MonoBehaviour
         if (IsSkillAnimationLocked() || skillFacingLocked)
         {
             cachedFacingScaleX = lockedFacingScaleX;
-            if (lastFacingLockLogFrame != Time.frameCount)
+            if (debugLog && lastFacingLockLogFrame != Time.frameCount)
             {
                 Debug.Log("[Facing] skipped because skill animation locked", this);
                 lastFacingLockLogFrame = Time.frameCount;
@@ -449,13 +498,13 @@ public class Player01SkillController : MonoBehaviour
             return;
         }
 
-        float horizontalSpeed = ResolveHorizontalSpeed();
-        if (Mathf.Abs(horizontalSpeed) < 0.0001f)
+        float horizontalInput = ResolveHorizontalInput();
+        if (Mathf.Abs(horizontalInput) < 0.0001f)
         {
             return;
         }
 
-        cachedFacingScaleX = horizontalSpeed > 0f ? -1 : 1;
+        cachedFacingScaleX = horizontalInput > 0f ? -1 : 1;
 
         SkeletonAnimation spine = ResolveSkeletonAnimation();
         if (spine != null && spine.Skeleton != null)
@@ -464,19 +513,25 @@ public class Player01SkillController : MonoBehaviour
         }
     }
 
-    private float ResolveHorizontalSpeed()
+    private float ResolveHorizontalInput()
     {
-        if (cachedMovement != null && cachedMovement.rb != null)
+        if (Keyboard.current == null)
         {
-            return cachedMovement.rb.linearVelocity.x;
+            return 0f;
         }
 
-        if (cachedRigidbody != null)
+        float horizontal = 0f;
+        if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
         {
-            return cachedRigidbody.linearVelocity.x;
+            horizontal -= 1f;
         }
 
-        return 0f;
+        if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
+        {
+            horizontal += 1f;
+        }
+
+        return horizontal;
     }
 
     private void ApplyDisplayFixes(bool force)

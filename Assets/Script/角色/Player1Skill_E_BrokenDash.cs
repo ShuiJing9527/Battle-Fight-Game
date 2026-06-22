@@ -8,6 +8,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
     [SerializeField] private bool ignoreObstacleCollision = true;
     [SerializeField] private LayerMask obstacleLayers = 1 << 3;
+    [SerializeField, Min(0f)] private float dashDamage = 16f;
+    [SerializeField, Min(0.1f)] private float dashHitRadius = 1.2f;
+    [SerializeField] private LayerMask enemyLayer = ~0;
 
     [Header("E - Ghost Visual")]
     [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
@@ -26,6 +29,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private PlayerMovement cachedMovement;
     private float cachedOriginalMoveSpeed = -1f;
     private readonly Dictionary<int, bool> cachedLayerCollisionStates = new Dictionary<int, bool>();
+    private readonly HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
+    private readonly HashSet<EnemyHealth> damagedLegacyTargets = new HashSet<EnemyHealth>();
 
     private void Reset()
     {
@@ -35,6 +40,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         animationName = "Run";
         debugLog = true;
         speedMultiplier = 2f;
+        dashDamage = 16f;
+        dashHitRadius = 1.2f;
+        enemyLayer = ~0;
         ignoreObstacleCollision = true;
         obstacleLayers = 1 << 3;
     }
@@ -81,6 +89,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     protected override void OnCastStarted()
     {
         IsRunningBoost = true;
+        damagedCombatTargets.Clear();
+        damagedLegacyTargets.Clear();
         ApplySpeedBoost();
         ApplyObstacleCollisionIgnore(true);
         SetGhostStateVisible(true);
@@ -101,12 +111,11 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     protected override IEnumerator CastRoutine()
     {
         float waitTime = Mathf.Max(0f, duration);
-        if (waitTime > 0f)
+        float elapsed = 0f;
+        while (elapsed < waitTime)
         {
-            yield return new WaitForSeconds(waitTime);
-        }
-        else
-        {
+            ApplyDashDamage();
+            elapsed += Time.deltaTime;
             yield return null;
         }
 
@@ -132,6 +141,53 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     protected override string GetSkillLabel()
     {
         return "E - Run Boost";
+    }
+
+    protected override int SkillIndex => 2;
+
+    private void ApplyDashDamage()
+    {
+        Collider[] hits = Physics.OverlapSphere(transform.position, dashHitRadius, enemyLayer, QueryTriggerInteraction.Collide);
+        float finalDamage = ResolveDamage(dashDamage);
+
+        foreach (Collider hit in hits)
+        {
+            if (!BattleTargetUtility.IsMonster(hit, transform))
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
+            if (combatHealth != null && damagedCombatTargets.Add(combatHealth))
+            {
+                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject));
+                continue;
+            }
+
+            EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
+            if (legacyHealth != null && damagedLegacyTargets.Add(legacyHealth))
+            {
+                legacyHealth.TakeDamage(Mathf.RoundToInt(finalDamage), gameObject);
+            }
+        }
+    }
+
+    private float ResolveDamage(float baseDamage)
+    {
+        float damage = Mathf.Max(0f, baseDamage);
+        CombatStats stats = GetComponent<CombatStats>();
+        if (stats != null)
+        {
+            damage += stats.physicalAttack;
+        }
+
+        BattleResourceBank bank = GetComponent<BattleResourceBank>();
+        if (bank != null)
+        {
+            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
+        }
+
+        return damage;
     }
 
     private void ApplySpeedBoost()

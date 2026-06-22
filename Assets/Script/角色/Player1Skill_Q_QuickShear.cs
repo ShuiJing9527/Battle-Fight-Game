@@ -8,8 +8,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [Header("Q")]
     [SerializeField, Min(1)] private int slashCount = 3;
     [SerializeField, Min(0f)] private float slashInterval = 0.15f;
-    [SerializeField, Min(0f)] private float qDamage = 1.2f;
-    [SerializeField, Min(0f)] private float qRange = 1.5f;
+    [SerializeField, Min(0f)] private float qDamage = 10f;
+    [SerializeField, Min(0f)] private float qRange = 2f;
+    [SerializeField] private LayerMask enemyLayer = ~0;
+    [SerializeField] private Transform hitPoint;
+
+    private readonly System.Collections.Generic.HashSet<CombatHealth> castDamagedCombatTargets = new System.Collections.Generic.HashSet<CombatHealth>();
+    private readonly System.Collections.Generic.HashSet<EnemyHealth> castDamagedLegacyTargets = new System.Collections.Generic.HashSet<EnemyHealth>();
 
     private void Reset()
     {
@@ -17,11 +22,12 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         duration = 0.42f;
         effectPower = 1.2f;
         animationName = "AKT2";
-        debugLog = true;
+        debugLog = false;
         slashCount = 3;
         slashInterval = 0.15f;
-        qDamage = 1.2f;
-        qRange = 1.5f;
+        qDamage = 10f;
+        qRange = 2f;
+        enemyLayer = ~0;
     }
 
     private void OnValidate()
@@ -42,6 +48,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     protected override void OnCastStarted()
     {
+        castDamagedCombatTargets.Clear();
+        castDamagedLegacyTargets.Clear();
+
         if (debugLog)
         {
             Debug.Log($"[Q - QuickShear] Start. animation={animationName}, slashes={slashCount}, interval={slashInterval:F2}", this);
@@ -115,7 +124,11 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             Debug.Log($"[Q - QuickShear] Target: {Controller.GetSkeletonAnimationDebugSummary()}", this);
         }
 
-        Debug.Log($"[Q - QuickShear] TryPlayLockedSkillAnimation -> {animationName}.", this);
+        if (debugLog)
+        {
+            Debug.Log($"[Q - QuickShear] TryPlayLockedSkillAnimation -> {animationName}.", this);
+        }
+
         bool played = Controller.TryPlayLockedSkillAnimation(animationName, false, lockDuration, true, "Q");
         if (!played)
         {
@@ -133,7 +146,94 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             Debug.Log($"[Q - QuickShear] damage={qDamage:F2}, range={qRange:F2}", this);
         }
 
+        ApplySlashDamage();
         Controller.StartCoroutine(LogTrackNextFrame(slashIndex, slashTotal));
+    }
+
+    private void ApplySlashDamage()
+    {
+        Vector3 origin = transform.position;
+        Vector3 facing = Controller != null ? Controller.GetFacingWorldDirection() : transform.forward;
+        facing.y = 0f;
+        if (facing.sqrMagnitude < 0.0001f)
+        {
+            facing = transform.forward;
+            facing.y = 0f;
+        }
+
+        if (facing.sqrMagnitude < 0.0001f)
+        {
+            facing = Vector3.forward;
+        }
+
+        facing.Normalize();
+        Vector3 center = hitPoint != null ? hitPoint.position : origin + facing * (Mathf.Max(0.1f, qRange) * 0.5f);
+        float finalDamage = ResolveDamage(qDamage);
+        Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
+
+        foreach (Collider hit in hits)
+        {
+            if (!BattleTargetUtility.IsMonster(hit, transform))
+            {
+                continue;
+            }
+
+            if (!IsInFrontSlashArea(hit, origin, facing))
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
+            if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
+            {
+                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject));
+                continue;
+            }
+
+            EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
+            if (legacyHealth != null && castDamagedLegacyTargets.Add(legacyHealth))
+            {
+                legacyHealth.TakeDamage(Mathf.RoundToInt(finalDamage), gameObject);
+            }
+        }
+    }
+
+    private bool IsInFrontSlashArea(Collider hit, Vector3 origin, Vector3 facing)
+    {
+        Vector3 targetPoint = hit != null ? hit.bounds.center : origin;
+        Vector3 toTarget = targetPoint - origin;
+        toTarget.y = 0f;
+
+        float range = Mathf.Max(0.1f, qRange);
+        if (toTarget.sqrMagnitude > range * range)
+        {
+            return false;
+        }
+
+        if (toTarget.sqrMagnitude < 0.0001f)
+        {
+            return true;
+        }
+
+        return Vector3.Dot(toTarget.normalized, facing) >= 0.15f;
+    }
+
+    private float ResolveDamage(float baseDamage)
+    {
+        float damage = Mathf.Max(0f, baseDamage);
+        CombatStats stats = GetComponent<CombatStats>();
+        if (stats != null)
+        {
+            damage += stats.physicalAttack;
+        }
+
+        BattleResourceBank bank = GetComponent<BattleResourceBank>();
+        if (bank != null)
+        {
+            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
+        }
+
+        return damage;
     }
 
     private IEnumerator LogTrackNextFrame(int slashIndex, int slashTotal)
@@ -168,4 +268,6 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     {
         return "Q - QuickShear";
     }
+
+    protected override int SkillIndex => 0;
 }
