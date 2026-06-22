@@ -16,6 +16,11 @@ public class Player2PrototypeController : MonoBehaviour
     [Header("E - 星痕瞬移 / 残影特效")]
     public PlayerSkillCooldownManager cooldownManager;
 
+    private const float Player2QManaCost = 15f;
+    private const float Player2WManaCost = 25f;
+    private const float Player2EManaCost = 20f;
+    private const float Player2RManaCost = 40f;
+
 
 
     [Header("R - 神眷剑涡 / 基础")]
@@ -663,6 +668,7 @@ public class Player2PrototypeController : MonoBehaviour
     private void Awake()
     {
         initialRotation = transform.rotation;
+        EnsureCooldownManager();
         InitializeSkillSlots();
         InitializeEStarTrailDefaults();
         if (rb == null)
@@ -826,6 +832,51 @@ public class Player2PrototypeController : MonoBehaviour
         wSkill?.Initialize(this);
         eSkill?.Initialize(this);
         rSkill?.Initialize(this);
+        EnsureCooldownManager();
+        SyncPlayer2SkillManaCosts();
+    }
+
+    private void EnsureCooldownManager()
+    {
+        if (cooldownManager != null)
+        {
+            return;
+        }
+
+        cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        if (cooldownManager == null)
+        {
+            cooldownManager = GetComponentInChildren<PlayerSkillCooldownManager>(true);
+        }
+
+        if (cooldownManager == null)
+        {
+            cooldownManager = gameObject.AddComponent<PlayerSkillCooldownManager>();
+        }
+    }
+
+    private void SyncPlayer2SkillManaCosts()
+    {
+        if (cooldownManager == null || cooldownManager.skillDatas == null || cooldownManager.skillDatas.Length < 4)
+        {
+            return;
+        }
+
+        SkillCostCDData qCost = cooldownManager.skillDatas[0];
+        qCost.manaCost = Player2QManaCost;
+        cooldownManager.skillDatas[0] = qCost;
+
+        SkillCostCDData wCost = cooldownManager.skillDatas[1];
+        wCost.manaCost = Player2WManaCost;
+        cooldownManager.skillDatas[1] = wCost;
+
+        SkillCostCDData eCost = cooldownManager.skillDatas[2];
+        eCost.manaCost = Player2EManaCost;
+        cooldownManager.skillDatas[2] = eCost;
+
+        SkillCostCDData rCost = cooldownManager.skillDatas[3];
+        rCost.manaCost = Player2RManaCost;
+        cooldownManager.skillDatas[3] = rCost;
     }
 
     private void ResolveVisualFloatTargets()

@@ -121,6 +121,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qStarFallDamageRadius = 0.8f;
     [InspectorName("Q Star Fall Enable Damage")]
     [SerializeField] private bool qStarFallEnableDamage = false;
+    [InspectorName("Q Star Fall Damage")]
+    [SerializeField] private float qStarFallDamage = 20f;
     [InspectorName("Q Star Fall Damage Multiplier")]
     [SerializeField] private float qStarFallDamageMultiplier = 1f;
 
@@ -414,10 +416,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            if (qStarFallEnableDamage)
-            {
-                ApplyQStarFallDamage(targetPos);
-            }
+            ApplyQStarFallDamage(targetPos);
 
             SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
@@ -431,20 +430,24 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
     private void ApplyQStarFallDamage(Vector3 center)
     {
-        if (!qStarFallEnableDamage || qStarFallDamageRadius <= 0f)
+        if (qStarFallDamageRadius <= 0f)
         {
             return;
         }
 
-        float damageAmount = Mathf.Max(0f, qStarFallDamageMultiplier);
+        float damageAmount = Mathf.Max(0f, qStarFallDamage) * Mathf.Max(0f, qStarFallDamageMultiplier);
         if (damageAmount <= 0f)
         {
             return;
         }
 
-        Collider[] hits = Physics.OverlapSphere(center, qStarFallDamageRadius);
+        float damageRadius = Mathf.Max(1.2f, qStarFallDamageRadius);
+        Collider[] hits = Physics.OverlapSphere(center, damageRadius);
         HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
+        bool hitAnyEnemy = false;
+
+        Debug.Log($"[Player02 Q] damage check center={center}, radius={damageRadius:F2}", this);
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -464,6 +467,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
                 combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Physical, source));
+                Debug.Log($"[Player02 Q] hit enemy={combatHealth.name} damage={damageAmount:F2}", this);
+                hitAnyEnemy = true;
                 continue;
             }
 
@@ -472,7 +477,14 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             {
                 int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
                 enemyHealth.TakeDamage(damageInt, source);
+                Debug.Log($"[Player02 Q] hit enemy={enemyHealth.name} damage={damageInt}", this);
+                hitAnyEnemy = true;
             }
+        }
+
+        if (!hitAnyEnemy)
+        {
+            Debug.Log("[Player02 Q] no enemy hit", this);
         }
     }
 
