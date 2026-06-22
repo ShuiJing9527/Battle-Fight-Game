@@ -22,6 +22,10 @@ public class EnemySpawner : MonoBehaviour
     public float fallbackSpawnRadiusX = 10f;
     public float fallbackSpawnRadiusZ = 10f;
 
+    [Header("Generated missing archetypes")]
+    public bool includeGeneratedMissingArchetypes = true;
+    [Range(0f, 1f)] public float generatedArchetypeChance = 0.35f;
+
     [Header("Target")]
     public Transform playerTarget;
     public string playerTag = "Player";
@@ -62,6 +66,9 @@ public class EnemySpawner : MonoBehaviour
         GameObject selectedEnemy = enemyPrefabs[randomIndex];
         Vector3 spawnPosition = ResolveSpawnPosition(selectedEnemy);
         GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
+        MonsterSpecies? forcedSpecies = ResolveGeneratedSpecies();
+        MonsterRank? forcedRank = ResolveGeneratedRank(forcedSpecies);
+        MonsterCombatAutoSetup.Configure(spawnedEnemy, forcedSpecies, forcedRank);
 
         currentEnemyCount++;
 
@@ -77,6 +84,39 @@ public class EnemySpawner : MonoBehaviour
         {
             enemyController.SetTarget(ResolveActivePlayerTarget());
         }
+    }
+
+    private MonsterSpecies? ResolveGeneratedSpecies()
+    {
+        if (!includeGeneratedMissingArchetypes || Random.value > generatedArchetypeChance)
+        {
+            return null;
+        }
+
+        MonsterSpecies[] generated =
+        {
+            MonsterSpecies.Flying,
+            MonsterSpecies.Ranged,
+            MonsterSpecies.Tank,
+            MonsterSpecies.Assassin
+        };
+
+        return generated[Random.Range(0, generated.Length)];
+    }
+
+    private MonsterRank? ResolveGeneratedRank(MonsterSpecies? forcedSpecies)
+    {
+        if (!includeGeneratedMissingArchetypes)
+        {
+            return null;
+        }
+
+        if (forcedSpecies.HasValue && Random.value < 0.12f)
+        {
+            return MonsterRank.Elite;
+        }
+
+        return null;
     }
 
     private Vector3 ResolveSpawnPosition(GameObject selectedEnemyPrefab)

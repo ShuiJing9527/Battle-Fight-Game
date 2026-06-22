@@ -56882,6 +56882,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemySpawner
   enemyPrefabs:
   - {fileID: 8809199598531854168, guid: db8555b0844b6e44bbf5676127b1efc7, type: 3}
+  - {fileID: 8809199598531854168, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 3}
+  - {fileID: 8809199598531854168, guid: c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8, type: 3}
+  - {fileID: 8809199598531854168, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7, type: 3}
+  - {fileID: 8809199598531854168, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 3}
   maxEnemyCount: 5
   spawnInterval: 3
   startDelay: 2
@@ -56890,6 +56894,8 @@ MonoBehaviour:
   spawnMaxDistance: 12
   fallbackSpawnRadiusX: 10
   fallbackSpawnRadiusZ: 10
+  includeGeneratedMissingArchetypes: 1
+  generatedArchetypeChance: 0.35
   playerTarget: {fileID: 0}
   playerTag: Player
 --- !u!1 &1119862288

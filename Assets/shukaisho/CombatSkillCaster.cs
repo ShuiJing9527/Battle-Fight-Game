@@ -5,13 +5,10 @@ using UnityEngine;
 [System.Serializable]
 public class BattleSkill
 {
-    [Header("技能系统表")]
     public string skillName;
     public BattleSkillType skillType = BattleSkillType.SmallSkill;
     [Min(0f)] public float energyCost = 10f;
     [Min(0)] public int runeSlotCount = 5;
-
-    [Header("技能示例表")]
     [Min(1)] public int hitCount = 1;
     [Min(0f)] public float baseDamage = 1f;
     [Min(0f)] public float attackRange = 1.5f;
@@ -20,24 +17,19 @@ public class BattleSkill
 
 public class CombatSkillCaster : MonoBehaviour
 {
-    [Header("技能数量：2小技能 + 1大招")]
-    public BattleSkill[] skills = new BattleSkill[3];
+    [Header("Skill slots: Q/W/E/R")]
+    public BattleSkill[] skills = new BattleSkill[4];
 
-    [Header("释放目标")]
+    [Header("Attack Target")]
     public Transform attackPoint;
-    public LayerMask enemyLayer;
+    public LayerMask enemyLayer = ~0;
     public BattleDamageType damageType = BattleDamageType.Physical;
 
     private BattleResourceBank resourceBank;
 
     private void Reset()
     {
-        skills = new[]
-        {
-            new BattleSkill { skillName = "小技能1", skillType = BattleSkillType.SmallSkill, energyCost = 10f, runeSlotCount = 5, hitCount = 1, baseDamage = 1f },
-            new BattleSkill { skillName = "小技能2", skillType = BattleSkillType.SmallSkill, energyCost = 10f, runeSlotCount = 5, hitCount = 1, baseDamage = 1f },
-            new BattleSkill { skillName = "大招", skillType = BattleSkillType.Ultimate, energyCost = 100f, runeSlotCount = 5, hitCount = 1, baseDamage = 1f }
-        };
+        LoadDefaultSkills();
     }
 
     private void Awake()
@@ -53,28 +45,6 @@ public class CombatSkillCaster : MonoBehaviour
     private void OnValidate()
     {
         EnsureDefaultSkills();
-    }
-
-    private void EnsureDefaultSkills()
-    {
-        if (skills == null || skills.Length != 3)
-        {
-            Reset();
-        }
-
-        for (int i = 0; i < skills.Length; i++)
-        {
-            if (skills[i] == null)
-            {
-                Reset();
-                break;
-            }
-
-            if (skills[i].equippedRunes == null || skills[i].equippedRunes.Length != skills[i].runeSlotCount)
-            {
-                skills[i].equippedRunes = new RuneDefinition[Mathf.Max(0, skills[i].runeSlotCount)];
-            }
-        }
     }
 
     public bool CastSkill(int index)
@@ -95,7 +65,7 @@ public class CombatSkillCaster : MonoBehaviour
         }
 
         SkillRuntimePlan plan = BuildPlan(skill);
-        if (!PayCost(skill, plan))
+        if (resourceBank != null && skill.energyCost > 0f && !resourceBank.TrySpendEnergy(skill.energyCost))
         {
             return false;
         }
@@ -104,28 +74,34 @@ public class CombatSkillCaster : MonoBehaviour
         return true;
     }
 
-    private bool PayCost(BattleSkill skill, SkillRuntimePlan plan)
+    public SkillRuntimePlan BuildPlan(BattleSkill skill)
     {
-        if (skill.energyCost > 0f && resourceBank == null)
+        SkillRuntimePlan plan = new SkillRuntimePlan
         {
-            return false;
-        }
+            hitCount = Mathf.Max(1, skill.hitCount),
+            castCount = 1,
+            damageMultiplier = 1f
+        };
 
-        if (resourceBank != null && !resourceBank.TrySpendEnergy(skill.energyCost))
+        int slotLimit = Mathf.Min(skill.runeSlotCount, skill.equippedRunes == null ? 0 : skill.equippedRunes.Length);
+        for (int i = 0; i < slotLimit; i++)
         {
-            return false;
-        }
-
-        if (plan.healthCost > 0f)
-        {
-            BattleResourceBank bank = resourceBank != null ? resourceBank : GetComponent<BattleResourceBank>();
-            if (bank == null || !bank.TrySpendHealth(plan.healthCost))
+            RuneDefinition rune = skill.equippedRunes[i];
+            if (rune == null)
             {
-                return false;
+                continue;
             }
+
+            ApplyRuneToPlan(rune, ref plan);
         }
 
-        return true;
+        return plan;
+    }
+
+    public BattleSkill GetSkill(int index)
+    {
+        EnsureDefaultSkills();
+        return index >= 0 && index < skills.Length ? skills[index] : null;
     }
 
     private IEnumerator CastRoutine(BattleSkill skill, SkillRuntimePlan plan)
@@ -149,23 +125,27 @@ public class CombatSkillCaster : MonoBehaviour
         float damage = skill.baseDamage * plan.damageMultiplier;
         if (resourceBank != null)
         {
-            damage *= resourceBank.SkillDamageMultiplier;
+            damage *= resourceBank.SkillDamageMultiplier * resourceBank.AttributeDamageMultiplier;
         }
 
         for (int hit = 0; hit < plan.hitCount; hit++)
         {
-            Collider[] colliders = Physics.OverlapSphere(point.position, skill.attackRange, enemyLayer);
-            List<CombatHealth> hitTargets = new List<CombatHealth>();
+            Collider[] colliders = Physics.OverlapSphere(point.position, skill.attackRange, enemyLayer, QueryTriggerInteraction.Collide);
+            HashSet<CombatHealth> hitTargets = new HashSet<CombatHealth>();
 
             foreach (Collider collider in colliders)
             {
-                CombatHealth health = collider.GetComponentInParent<CombatHealth>();
-                EnemyHealth legacyHealth = collider.GetComponentInParent<EnemyHealth>();
+                if (!BattleTargetUtility.IsMonster(collider, transform))
+                {
+                    continue;
+                }
 
-                if (health != null)
+                CombatHealth health = BattleTargetUtility.GetMonsterCombatHealth(collider, transform);
+                EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(collider, transform);
+
+                if (health != null && hitTargets.Add(health))
                 {
                     health.TakeDamage(new BattleDamage(damage, damageType, gameObject));
-                    hitTargets.Add(health);
                     ApplyOnHitRunes(health, point.position, damage, plan);
                     ApplySplitDamage(health, damage, plan);
                 }
@@ -229,12 +209,17 @@ public class CombatSkillCaster : MonoBehaviour
             return;
         }
 
-        Collider[] colliders = Physics.OverlapSphere(sourceTarget.transform.position, plan.splitRange, enemyLayer);
+        Collider[] colliders = Physics.OverlapSphere(sourceTarget.transform.position, plan.splitRange, enemyLayer, QueryTriggerInteraction.Collide);
         HashSet<CombatHealth> damagedTargets = new HashSet<CombatHealth>();
 
         foreach (Collider collider in colliders)
         {
-            CombatHealth target = collider.GetComponentInParent<CombatHealth>();
+            if (!BattleTargetUtility.IsMonster(collider, transform))
+            {
+                continue;
+            }
+
+            CombatHealth target = BattleTargetUtility.GetMonsterCombatHealth(collider, transform);
             if (target == null || target == sourceTarget || damagedTargets.Contains(target))
             {
                 continue;
@@ -252,30 +237,6 @@ public class CombatSkillCaster : MonoBehaviour
         {
             target.TakeDamage(new BattleDamage(damage, damageType, gameObject));
         }
-    }
-
-    private SkillRuntimePlan BuildPlan(BattleSkill skill)
-    {
-        SkillRuntimePlan plan = new SkillRuntimePlan
-        {
-            hitCount = Mathf.Max(1, skill.hitCount),
-            castCount = 1,
-            damageMultiplier = 1f
-        };
-
-        int slotLimit = Mathf.Min(skill.runeSlotCount, skill.equippedRunes == null ? 0 : skill.equippedRunes.Length);
-        for (int i = 0; i < slotLimit; i++)
-        {
-            RuneDefinition rune = skill.equippedRunes[i];
-            if (rune == null)
-            {
-                continue;
-            }
-
-            ApplyRuneToPlan(rune, ref plan);
-        }
-
-        return plan;
     }
 
     private void ApplyRuneToPlan(RuneDefinition rune, ref SkillRuntimePlan plan)
@@ -309,7 +270,6 @@ public class CombatSkillCaster : MonoBehaviour
                 plan.regenerationHeal += rune.healAmount;
                 break;
             case RuneMechanic.Exchange:
-                plan.healthCost += rune.healthCost;
                 plan.exchangeHeal += rune.healAmount;
                 break;
             case RuneMechanic.SoulLink:
@@ -318,7 +278,41 @@ public class CombatSkillCaster : MonoBehaviour
         }
     }
 
-    private struct SkillRuntimePlan
+    private void EnsureDefaultSkills()
+    {
+        if (skills == null || skills.Length != 4)
+        {
+            LoadDefaultSkills();
+        }
+
+        for (int i = 0; i < skills.Length; i++)
+        {
+            if (skills[i] == null)
+            {
+                LoadDefaultSkills();
+                break;
+            }
+
+            int slotCount = Mathf.Max(0, skills[i].runeSlotCount);
+            if (skills[i].equippedRunes == null || skills[i].equippedRunes.Length != slotCount)
+            {
+                skills[i].equippedRunes = new RuneDefinition[slotCount];
+            }
+        }
+    }
+
+    private void LoadDefaultSkills()
+    {
+        skills = new[]
+        {
+            new BattleSkill { skillName = "Q Basic Skill", skillType = BattleSkillType.SmallSkill, energyCost = 10f, runeSlotCount = 5, hitCount = 1, baseDamage = 10f, attackRange = 2f },
+            new BattleSkill { skillName = "W Defense Skill", skillType = BattleSkillType.SmallSkill, energyCost = 30f, runeSlotCount = 5, hitCount = 1, baseDamage = 0f, attackRange = 0f },
+            new BattleSkill { skillName = "E Movement Skill", skillType = BattleSkillType.SmallSkill, energyCost = 20f, runeSlotCount = 5, hitCount = 1, baseDamage = 16f, attackRange = 1.2f },
+            new BattleSkill { skillName = "R Ultimate Skill", skillType = BattleSkillType.Ultimate, energyCost = 60f, runeSlotCount = 5, hitCount = 1, baseDamage = 50f, attackRange = 6f }
+        };
+    }
+
+    public struct SkillRuntimePlan
     {
         public int hitCount;
         public int castCount;
@@ -326,7 +320,6 @@ public class CombatSkillCaster : MonoBehaviour
         public float afterimageDelaySeconds;
         public float splitRange;
         public float echoDelaySeconds;
-        public float healthCost;
         public float exchangeHeal;
         public float drainMarkHeal;
         public float regenerationHeal;

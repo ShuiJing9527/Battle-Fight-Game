@@ -18,10 +18,10 @@ public class PlayerMovement : MonoBehaviour
         Vector2 input = Vector2.zero;
         if (Keyboard.current != null)
         {
-            if (Keyboard.current.leftArrowKey.isPressed) input.x -= 1f;
-            if (Keyboard.current.rightArrowKey.isPressed) input.x += 1f;
-            if (Keyboard.current.downArrowKey.isPressed) input.y -= 1f;
-            if (Keyboard.current.upArrowKey.isPressed) input.y += 1f;
+            if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed) input.x -= 1f;
+            if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed) input.x += 1f;
+            if (Keyboard.current.downArrowKey.isPressed || Keyboard.current.sKey.isPressed) input.y -= 1f;
+            if (Keyboard.current.upArrowKey.isPressed || Keyboard.current.wKey.isPressed) input.y += 1f;
             input = Vector2.ClampMagnitude(input, 1f);
         }
 

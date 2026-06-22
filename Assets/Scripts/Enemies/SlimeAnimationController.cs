@@ -271,6 +271,7 @@ public class SlimeAnimationController : MonoBehaviour
         }
 
         float totalDuration = Mathf.Max(0.08f, deathDuration);
+        EmitDeathParticles();
 
         for (float t = 0f; t < totalDuration; t += Time.deltaTime)
         {
