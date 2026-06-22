@@ -53,7 +53,7 @@ public class SimpleLoadBar : MonoBehaviour
         float p = Mathf.Clamp01(timer / loadTime);
         progressBar.fillAmount = p;
 
-        loadText.text = $"加载中 {Mathf.Round(p * 100)}%";
+        loadText.text = $"Loading {Mathf.Round(p * 100)}%";
 
         // 加载完成跳转
         if (p >= 1f)
