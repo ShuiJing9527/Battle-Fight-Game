@@ -13,13 +13,13 @@ public class SoulDropOnDeath : MonoBehaviour
     [Header("击杀掉落")]
     public SoulDropEntry[] drops;
 
-    private static SoulPickup cachedDefaultPrefab;
-
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
+    private bool dropped;
 
     private void OnEnable()
     {
+        dropped = false;
         combatHealth = GetComponent<CombatHealth>();
         enemyHealth = GetComponent<EnemyHealth>();
 
@@ -49,37 +49,40 @@ public class SoulDropOnDeath : MonoBehaviour
 
     private void DropSouls(GameObject killer)
     {
+        if (dropped)
+        {
+            return;
+        }
+
+        dropped = true;
+
         foreach (SoulDropEntry entry in drops)
         {
-            if (entry.prefab == null || entry.count <= 0)
+            if (entry.count <= 0)
             {
                 continue;
             }
 
             for (int i = 0; i < entry.count; i++)
             {
-                SoulPickup prefab = entry.prefab != null ? entry.prefab : GetDefaultSoulPrefab();
-                if (prefab == null)
-                {
-                    continue;
-                }
+                GameObject soulObject = new GameObject($"{entry.soulType} Soul");
+                soulObject.transform.position = transform.position;
+                soulObject.transform.localScale = Vector3.one * 0.35f;
 
-                SoulPickup soul = Instantiate(prefab, transform.position, Quaternion.identity);
+                SphereCollider collider = soulObject.AddComponent<SphereCollider>();
+                collider.isTrigger = true;
+                collider.radius = 0.55f;
+
+                Rigidbody rb = soulObject.AddComponent<Rigidbody>();
+                rb.isKinematic = true;
+                rb.useGravity = false;
+
+                SoulPickup soul = soulObject.AddComponent<SoulPickup>();
                 soul.Configure(entry.soulType, soul.amount);
-                Debug.Log($"[SoulOrb] spawned prefab={soul.name}", soul);
+                soulObject.SetActive(true);
+                Debug.Log($"[SoulDrop] spawn type={entry.soulType} amount={soul.amount:F2} position={soulObject.transform.position}", soul);
+                Debug.Log($"[SoulPickup] spawned type={entry.soulType} amount={soul.amount:F2}", soul);
             }
         }
-    }
-
-    private static SoulPickup GetDefaultSoulPrefab()
-    {
-        if (cachedDefaultPrefab != null)
-        {
-            return cachedDefaultPrefab;
-        }
-
-        cachedDefaultPrefab = Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrb")
-                            ?? Resources.Load<SoulPickup>("Prefabs/Drop/SoulOrbPreview");
-        return cachedDefaultPrefab;
     }
 }

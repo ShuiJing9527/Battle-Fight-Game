@@ -8,7 +8,7 @@ Material:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_Name: M_SoulParticle
-  m_Shader: {fileID: 4800000, guid: 7f8bc3d44bbd4f3fae0c0f1de7b0f3a1, type: 3}
+  m_Shader: {fileID: 4800000, guid: 0f159e2f67c7a3e4498cb70905d10b2d, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
   m_ValidKeywords: []
@@ -25,13 +25,13 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _MainTex:
-        m_Texture: {fileID: 2800000, guid: 5c16a6432d4e0194ca4f159605a42879, type: 3}
+        m_Texture: {fileID: 2800000, guid: 04d829157c4c9b640aff85fdfa3cffe4, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _Alpha: 1
+    - _Intensity: 0.95
     m_Colors:
-    - _TintColor: {r: 1, g: 1, b: 1, a: 1}
+    - _Color: {r: 1, g: 0.98, b: 0.86, a: 0.55}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
