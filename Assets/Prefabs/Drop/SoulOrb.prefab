@@ -78,7 +78,7 @@ MonoBehaviour:
   hoverHeight: 0.6
   hoverAmplitude: 0.12
   hoverSpeed: 3
-  targetChestHeight: 1
+  targetChestHeight: 0.5
   coreParticles: {fileID: 1100000000000000002}
   trailParticles: {fileID: 1200000000000000002}
   haloRingTransform: {fileID: 1300000000000000001}
@@ -5215,7 +5215,7 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 0
-      scalar: 0.055
+      scalar: 0.12
       minScalar: 0.055
       maxCurve:
         serializedVersion: 2

@@ -152,9 +152,11 @@ namespace UnderTheStars.GenerationMap
         {
             if (floorPoints == null) return;
 
-            // Get reference Tilemap
-            Tilemap refTilemap = paintTilemap.GetFloorTilemap(0);
-            if (refTilemap == null) return;
+            PlayerSpawnManager spawnManager = FindObjectOfType<PlayerSpawnManager>();
+            if (spawnManager != null && spawnManager.SpawnPartyAtRandomSafePoint(this))
+            {
+                return;
+            }
 
             Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
             if (bootstrap != null)
@@ -165,52 +167,120 @@ namespace UnderTheStars.GenerationMap
             Transform spawnTarget = ResolveSpawnTargetTransform();
             if (spawnTarget == null) return;
 
-            Vector2Int spawnCoord = Vector2Int.zero;
-            bool found = false;
-
-            // Try finding a valid spawn coordinate.
-            if (floorPoints[0, 0] != null && floorPoints[0, 0].Count > 0)
+            if (!TryGetRandomSafeSpawnWorldPosition(out Vector3 worldSpawnPos, out Vector2Int spawnCoord))
             {
-                foreach (var point in floorPoints[0, 0])
+                return;
+            }
+
+            Rigidbody targetRb = spawnTarget.GetComponent<Rigidbody>();
+            if (targetRb != null)
+            {
+                targetRb.linearVelocity = Vector3.zero;
+            }
+
+            PlayerMovement targetMovement = spawnTarget.GetComponent<PlayerMovement>();
+            if (targetMovement != null && targetMovement.rb != null)
+            {
+                targetMovement.rb.linearVelocity = Vector3.zero;
+            }
+
+            Vector3 spawnBasePosition = worldSpawnPos;
+            if (bootstrap != null)
+            {
+                spawnBasePosition = bootstrap.ApplyCharacterHeightOffset(spawnTarget.gameObject, worldSpawnPos);
+            }
+
+            spawnTarget.position = spawnBasePosition;
+
+            Debug.Log($"Player placed. Cell:{spawnCoord} -> World:{worldSpawnPos}");
+            Debug.Log($"[SPAWN] Spawn target = {spawnTarget.name}");
+        }
+
+        public void SetPlayer(PlayerMovement playerMovement)
+        {
+            player = playerMovement;
+        }
+
+        public bool TryGetRandomSafeSpawnWorldPosition(out Vector3 worldPosition, out Vector2Int spawnCoord)
+        {
+            return TryGetRandomGrassSafeSpawnWorldPosition(out worldPosition, out spawnCoord);
+        }
+
+        public bool TryGetRandomGrassSafeSpawnWorldPosition(out Vector3 worldPosition, out Vector2Int spawnCoord)
+        {
+            worldPosition = Vector3.zero;
+            spawnCoord = Vector2Int.zero;
+
+            if (floorPoints == null)
+            {
+                return false;
+            }
+
+            Tilemap refTilemap = paintTilemap != null ? paintTilemap.GetFloorTilemap(0) : null;
+            if (refTilemap == null)
+            {
+                return false;
+            }
+
+            Dictionary<Vector2Int, AreaType> areaByPoint = BuildPointAreaTypes();
+            HashSet<Vector2Int> allFloorPoints = new HashSet<Vector2Int>();
+            for (int x = 0; x < floorPoints.GetLength(0); x++)
+            {
+                for (int y = 0; y < floorPoints.GetLength(1); y++)
                 {
-                    spawnCoord = point;
-                    found = true;
-                    break;
+                    HashSet<Vector2Int> regionPoints = floorPoints[x, y];
+                    if (regionPoints == null)
+                    {
+                        continue;
+                    }
+
+                    allFloorPoints.UnionWith(regionPoints);
                 }
             }
 
-            if (found)
+            List<Vector2Int> grassCandidates = new List<Vector2Int>();
+            foreach (Vector2Int point in allFloorPoints)
             {
-                // Convert to cell position.
-                Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
-
-                // Convert to world position (handles tilemap transform/rotation).
-                Vector3 worldSpawnPos = refTilemap.GetCellCenterWorld(cellPos);
-
-                // Teleport player.
-                Rigidbody targetRb = spawnTarget.GetComponent<Rigidbody>();
-                if (targetRb != null)
+                if (!IsGrassSpawnPoint(point, allFloorPoints, areaByPoint))
                 {
-                    targetRb.linearVelocity = Vector3.zero;
+                    continue;
                 }
 
-                PlayerMovement targetMovement = spawnTarget.GetComponent<PlayerMovement>();
-                if (targetMovement != null && targetMovement.rb != null)
-                {
-                    targetMovement.rb.linearVelocity = Vector3.zero;
-                }
-
-                Vector3 spawnBasePosition = worldSpawnPos;
-                if (bootstrap != null)
-                {
-                    spawnBasePosition = bootstrap.ApplyCharacterHeightOffset(spawnTarget.gameObject, worldSpawnPos);
-                }
-
-                spawnTarget.position = spawnBasePosition;
-
-                Debug.Log($"Player placed. Cell:{cellPos} -> World:{worldSpawnPos}");
-                Debug.Log($"[SPAWN] Spawn target = {spawnTarget.name}");
+                grassCandidates.Add(point);
             }
+
+            if (grassCandidates.Count == 0)
+            {
+                return false;
+            }
+
+            spawnCoord = grassCandidates[UnityEngine.Random.Range(0, grassCandidates.Count)];
+            Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
+            worldPosition = refTilemap.GetCellCenterWorld(cellPos);
+            return true;
+        }
+
+        private static bool IsGrassSpawnPoint(Vector2Int point, HashSet<Vector2Int> allFloorPoints, Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            if (allFloorPoints == null || areaByPoint == null)
+            {
+                return false;
+            }
+
+            if (!areaByPoint.TryGetValue(point, out AreaType areaType) || areaType != AreaType.Grass)
+            {
+                return false;
+            }
+
+            if (!allFloorPoints.Contains(point + Vector2Int.up) ||
+                !allFloorPoints.Contains(point + Vector2Int.down) ||
+                !allFloorPoints.Contains(point + Vector2Int.left) ||
+                !allFloorPoints.Contains(point + Vector2Int.right))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         private Transform ResolveSpawnTargetTransform()

@@ -27,7 +27,7 @@ public class Player2Bootstrap : MonoBehaviour
 
     public GameObject CurrentPlayer { get; private set; }
     public Transform CurrentPlayerTransform => CurrentPlayer != null ? CurrentPlayer.transform : null;
-    public GameObject PartyLeader => partyLeader;
+    public GameObject PartyLeader => IsValidSceneObject(partyLeader) ? partyLeader : (IsValidSceneObject(player01) ? player01 : null);
 
     private PlayerCameraRig cameraRig;
     private Animator player1Animator;
@@ -77,6 +77,21 @@ public class Player2Bootstrap : MonoBehaviour
 
     private void ResolvePlayers()
     {
+        if (!IsValidSceneObject(player01))
+        {
+            player01 = null;
+        }
+
+        if (!IsValidSceneObject(player02))
+        {
+            player02 = null;
+        }
+
+        if (!IsValidSceneObject(partyLeader))
+        {
+            partyLeader = null;
+        }
+
         if (player01 == null)
         {
             player01 = FindSceneObjectByNameIncludingInactive(player01Name);
@@ -87,12 +102,6 @@ public class Player2Bootstrap : MonoBehaviour
             player02 = FindSceneObjectByNameIncludingInactive(player02Name);
         }
 
-        if (player01 == null || player02 == null)
-        {
-            Debug.LogError($"[PARTY] Could not resolve players. player01={player01Name}, player02={player02Name}", this);
-            return;
-        }
-
         if (player1Animator == null && player01 != null)
         {
             player1Animator = player01.GetComponent<Animator>();
@@ -101,6 +110,58 @@ public class Player2Bootstrap : MonoBehaviour
         if (player2Animator == null && player02 != null)
         {
             player2Animator = player02.GetComponent<Animator>();
+        }
+    }
+
+    public void SetPlayers(GameObject newPlayer01, GameObject newPlayer02, GameObject newPartyLeader = null)
+    {
+        player01 = IsValidSceneObject(newPlayer01) ? newPlayer01 : null;
+        player02 = IsValidSceneObject(newPlayer02) ? newPlayer02 : null;
+        partyLeader = IsValidSceneObject(newPartyLeader) ? newPartyLeader : player01;
+
+        player1Animator = player01 != null ? player01.GetComponent<Animator>() : null;
+        player2Animator = player02 != null ? player02.GetComponent<Animator>() : null;
+
+        ApplyInitialHealth(player01);
+        ApplyInitialHealth(player02);
+
+        if (player01 != null)
+        {
+            player01.SetActive(true);
+        }
+
+        if (player02 != null)
+        {
+            player02.SetActive(false);
+        }
+
+        CurrentPlayer = partyLeader != null ? partyLeader : player01;
+        if (CurrentPlayer == null)
+        {
+            CurrentPlayer = player01 != null ? player01 : player02;
+        }
+
+        if (cameraRig == null)
+        {
+            cameraRig = FindObjectOfType<PlayerCameraRig>();
+        }
+
+        if (cameraRig != null && CurrentPlayer != null)
+        {
+            cameraRig.playerSlot = CurrentPlayer.transform;
+        }
+
+        if (disablePlayer2AnimatorIfSharedController)
+        {
+            DisablePlayer2AnimatorIfUsingPlayer01Controller();
+        }
+
+        initialized = CurrentPlayer != null;
+
+        if (initialized)
+        {
+            Debug.Log($"[PARTY] Leader = {(partyLeader != null ? partyLeader.name : "null")}", this);
+            Debug.Log($"[PARTY] Current Player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
         }
     }
 
@@ -202,6 +263,11 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         ResolvePlayers();
+        if (player01 == null || player02 == null)
+        {
+            return;
+        }
+
         ApplyInitialHealth(player01);
         ApplyInitialHealth(player02);
         cameraRig = FindObjectOfType<PlayerCameraRig>();
@@ -656,5 +722,10 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static bool IsValidSceneObject(GameObject go)
+    {
+        return go != null && go.scene.IsValid();
     }
 }

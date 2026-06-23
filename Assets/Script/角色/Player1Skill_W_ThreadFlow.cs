@@ -440,6 +440,12 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     {
         StopBarrierDissolveRoutine();
 
+        if (!isActiveAndEnabled || !gameObject.activeInHierarchy)
+        {
+            CleanupBarrierVisualImmediate();
+            return;
+        }
+
         if (dissolveOverlayInstance == null && activeBarrierInstance == null)
         {
             DestroyBarrierMaterialInstance();

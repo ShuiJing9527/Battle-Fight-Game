@@ -45,6 +45,352 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::DistancePostion
   footTransform: {fileID: 2343996877811622976}
+--- !u!1 &6283368644540404569
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1083152521741729779}
+  - component: {fileID: 41707341156996491}
+  - component: {fileID: 6376434918463491421}
+  m_Layer: 0
+  m_Name: "\u5149\u8F6E"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1083152521741729779
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6283368644540404569}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 1.2, y: 4.5, z: 3}
+  m_LocalScale: {x: 1.8750001, y: 1.8750001, z: 187.5}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 922604953166537750}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &41707341156996491
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6283368644540404569}
+  m_Enabled: 1
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: d1ca3d7f5f8f4d149d6b4d84f7291d83, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 50
+  m_Sprite: {fileID: 21300000, guid: 308d712ed9b02684e9a4bfdd494655db, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 12.54, y: 12.54}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
+--- !u!114 &6376434918463491421
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6283368644540404569}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4b2f8c4d5d5b4df48abf5a6e4f2dbf11, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player2HaloRotateEffect
+  spineTarget: {fileID: 6561970759161859204}
+  followSpineFacingOffset: 1
+  leftFacingLocalOffset: {x: 1.2, y: 4.5, z: 3}
+  rightFacingLocalOffset: {x: -1.2, y: 4.5, z: 3}
+  rotateSpeed: 30
+  skillRotateSpeed: 260
+  skillBoostDuration: 0.65
+  speedLerpRate: 10
+  rotateClockwise: 1
+  unscaledTime: 0
+--- !u!1 &7168512462412306375
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9205788309606312631}
+  - component: {fileID: 5269848324019781677}
+  - component: {fileID: 5651160186026503639}
+  - component: {fileID: 6561970759161859204}
+  m_Layer: 0
+  m_Name: "\u795E\u7737\u4E4B\u5B50Spine"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9205788309606312631
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7168512462412306375}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 922604953166537750}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!33 &5269848324019781677
+MeshFilter:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7168512462412306375}
+  m_Mesh: {fileID: 0}
+--- !u!23 &5651160186026503639
+MeshRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7168512462412306375}
+  m_Enabled: 1
+  m_CastShadows: 1
+  m_ReceiveShadows: 1
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 2
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 6933f90c956b7fa4d99d44ce594ed241, type: 2}
+  - {fileID: 2100000, guid: c278272ffa8fedb48ab6cdf8b9f415fd, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  - {fileID: 2100000, guid: f263095d095a71c40ad93b6a7994e38e, type: 2}
+  - {fileID: 2100000, guid: 6933f90c956b7fa4d99d44ce594ed241, type: 2}
+  - {fileID: 2100000, guid: c278272ffa8fedb48ab6cdf8b9f415fd, type: 2}
+  - {fileID: 2100000, guid: 6933f90c956b7fa4d99d44ce594ed241, type: 2}
+  - {fileID: 2100000, guid: f263095d095a71c40ad93b6a7994e38e, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  - {fileID: 2100000, guid: f263095d095a71c40ad93b6a7994e38e, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  - {fileID: 2100000, guid: 6933f90c956b7fa4d99d44ce594ed241, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  - {fileID: 2100000, guid: c278272ffa8fedb48ab6cdf8b9f415fd, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  - {fileID: 2100000, guid: f263095d095a71c40ad93b6a7994e38e, type: 2}
+  - {fileID: 2100000, guid: 79910ae2e6e00974a81f44eeb47aeccd, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 3
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 100
+  m_AdditionalVertexStreams: {fileID: 0}
+--- !u!114 &6561970759161859204
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7168512462412306375}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d247ba06193faa74d9335f5481b2b56c, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: spine-unity::Spine.Unity.SkeletonAnimation
+  skeletonDataAsset: {fileID: 11400000, guid: db3112e7e00780441977f861dd4bf4da, type: 2}
+  initialSkinName: 
+  initialFlipX: 0
+  initialFlipY: 0
+  updateWhenInvisible: 3
+  separatorSlotNames: []
+  zSpacing: 0
+  useClipping: 1
+  immutableTriangles: 0
+  pmaVertexColors: 1
+  clearStateOnDisable: 0
+  tintBlack: 0
+  singleSubmesh: 0
+  fixDrawOrder: 0
+  addNormals: 0
+  calculateTangents: 0
+  maskInteraction: 0
+  maskMaterials:
+    materialsMaskDisabled: []
+    materialsInsideMask: []
+    materialsOutsideMask: []
+  disableRenderingOnOverride: 1
+  _animationName: idle
+  loop: 1
+  timeScale: 1
+--- !u!1 &7618050150768860302
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5212500314650028569}
+  - component: {fileID: 7009046691658483294}
+  m_Layer: 0
+  m_Name: "\u795E\u7737\u4E4B\u5B50 \u6B8B\u5F71"
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5212500314650028569
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7618050150768860302}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 922604953166537750}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!212 &7009046691658483294
+SpriteRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7618050150768860302}
+  m_Enabled: 0
+  m_CastShadows: 0
+  m_ReceiveShadows: 0
+  m_DynamicOccludee: 1
+  m_StaticShadowCaster: 0
+  m_MotionVectors: 1
+  m_LightProbeUsage: 1
+  m_ReflectionProbeUsage: 1
+  m_RayTracingMode: 0
+  m_RayTraceProcedural: 0
+  m_RayTracingAccelStructBuildFlagsOverride: 0
+  m_RayTracingAccelStructBuildFlags: 1
+  m_SmallMeshCulling: 1
+  m_ForceMeshLod: -1
+  m_MeshLodSelectionBias: 0
+  m_RenderingLayerMask: 1
+  m_RendererPriority: 0
+  m_Materials:
+  - {fileID: 2100000, guid: 94fb41062d04c104983d53140ae8efe2, type: 2}
+  m_StaticBatchInfo:
+    firstSubMesh: 0
+    subMeshCount: 0
+  m_StaticBatchRoot: {fileID: 0}
+  m_ProbeAnchor: {fileID: 0}
+  m_LightProbeVolumeOverride: {fileID: 0}
+  m_ScaleInLightmap: 1
+  m_ReceiveGI: 1
+  m_PreserveUVs: 0
+  m_IgnoreNormalsForChartDetection: 0
+  m_ImportantGI: 0
+  m_StitchLightmapSeams: 1
+  m_SelectedEditorRenderState: 0
+  m_MinimumChartSize: 4
+  m_AutoUVMaxDistance: 0.5
+  m_AutoUVMaxAngle: 89
+  m_LightmapParameters: {fileID: 0}
+  m_GlobalIlluminationMeshLod: 0
+  m_SortingLayerID: 0
+  m_SortingLayer: 0
+  m_SortingOrder: 0
+  m_Sprite: {fileID: 21300000, guid: 5d7b86b1fab425c47b65333a29fe2f2a, type: 3}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_FlipX: 0
+  m_FlipY: 0
+  m_DrawMode: 0
+  m_Size: {x: 22.49, y: 22.49}
+  m_AdaptiveModeThreshold: 0.5
+  m_SpriteTileMode: 0
+  m_WasSpriteAssigned: 1
+  m_MaskInteraction: 0
+  m_SpriteSortPoint: 0
 --- !u!1 &8605461027058166016
 GameObject:
   m_ObjectHideFlags: 0
@@ -84,11 +430,13 @@ Transform:
   m_GameObject: {fileID: 8605461027058166016}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0.682, y: 1.2, z: 0}
+  m_LocalPosition: {x: 99.50003, y: 1.2000153, z: 98.500015}
   m_LocalScale: {x: 0.08, y: 0.08, z: 0.08}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 778756803555556138}
+  - {fileID: 9205788309606312631}
+  - {fileID: 1083152521741729779}
+  - {fileID: 5212500314650028569}
   - {fileID: 2343996877811622976}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
@@ -194,7 +542,9 @@ MonoBehaviour:
   energyOverflowDamageBonusPerPoint: 0
   energyOverflowBuffSeconds: 0
   growthSoul: 0
+  growthAttackBonusPerSoul: 0.03
   functionSoul: 0
+  functionCooldownMultiplierPerSoul: 0.97
 --- !u!114 &2543590936332733996
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -211,6 +561,10 @@ MonoBehaviour:
   resourceBank: {fileID: 4540091804298959558}
   currentHealth: 100
   destroyOnDeath: 1
+  animator: {fileID: 0}
+  hitTrigger: Hit
+  deathTrigger: Die
+  destroyDelayAfterDeath: 0.65
 --- !u!114 &6060743048085689631
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -224,13 +578,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   skills:
-  - skillName: "\u5C0F\u6280\u80FD1"
+  - skillName: Q Basic Skill
     skillType: 0
     energyCost: 10
     runeSlotCount: 5
     hitCount: 1
-    baseDamage: 1
-    attackRange: 1.5
+    baseDamage: 10
+    attackRange: 2
     equippedRunes:
     - id: 0
       runeName: 
@@ -317,13 +671,13 @@ MonoBehaviour:
       healthCost: 0
       healAmount: 0
       lifeSoulPrefab: {fileID: 0}
-  - skillName: "\u5C0F\u6280\u80FD2"
+  - skillName: W Defense Skill
     skillType: 0
-    energyCost: 10
+    energyCost: 30
     runeSlotCount: 5
     hitCount: 1
-    baseDamage: 1
-    attackRange: 1.5
+    baseDamage: 0
+    attackRange: 0
     equippedRunes:
     - id: 0
       runeName: 
@@ -410,13 +764,106 @@ MonoBehaviour:
       healthCost: 0
       healAmount: 0
       lifeSoulPrefab: {fileID: 0}
-  - skillName: "\u5927\u62DB"
+  - skillName: E Movement Skill
+    skillType: 0
+    energyCost: 20
+    runeSlotCount: 5
+    hitCount: 1
+    baseDamage: 16
+    attackRange: 1.2
+    equippedRunes:
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+    - id: 0
+      runeName: 
+      category: 
+      rarity: 0
+      mechanic: 0
+      triggerCondition: 
+      limitOrSideEffect: 
+      playStyle: 
+      extraHitCount: 0
+      extraCastCount: 1
+      damageMultiplier: 1
+      delaySeconds: 0
+      cooldownMultiplier: 1
+      range: 0
+      healthCost: 0
+      healAmount: 0
+      lifeSoulPrefab: {fileID: 0}
+  - skillName: R Ultimate Skill
     skillType: 1
-    energyCost: 100
+    energyCost: 60
     runeSlotCount: 5
     hitCount: 1
-    baseDamage: 1
-    attackRange: 1.5
+    baseDamage: 50
+    attackRange: 6
     equippedRunes:
     - id: 0
       runeName: 
@@ -860,7 +1307,7 @@ MonoBehaviour:
   eStarFallSequentialDelay: 0.07
   currentSwordEnergy: 1
   rBaseSwordCount: 7
-  sharedSkillEffectPrefab: {fileID: 0}
+  sharedSkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
   qSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   wSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   eSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
@@ -1027,34 +1474,34 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_Q_DivineLightSword
   qDelay: 0.35
-  qSkillEffectPrefab: {fileID: 0}
+  qSkillEffectPrefab: {fileID: 7616733904698143582, guid: ef6ee5d37eeb0a640959838d03b086af, type: 3}
   qSpawnFallTrail: 0
   qFallTrailPrefab: {fileID: 0}
   qFallTrailLocalOffset: {x: 0, y: 0, z: 0}
   qFallTrailScale: {x: 1, y: 1, z: 1}
   qSpawnImpactConeSpark: 1
-  qImpactConeSparkPrefab: {fileID: 0}
+  qImpactConeSparkPrefab: {fileID: 6833502440394349509, guid: c2f3a4b5c6d7e8f90123456789abcde3, type: 3}
   qImpactConeSparkLifetime: 0.6
   qImpactConeSparkScale: {x: 1, y: 1, z: 1}
   qSpawnImpactDust: 1
-  qImpactDustPrefab: {fileID: 0}
+  qImpactDustPrefab: {fileID: 1278023953841578186, guid: 2ef252c769e88ff4a86bc9de4764ed5b, type: 3}
   qImpactDustLifetime: 1
-  qImpactDustLocalOffset: {x: 0, y: 0.2, z: 0}
+  qImpactDustLocalOffset: {x: 0, y: -0.5, z: 0}
   qImpactDustScale: {x: 1, y: 1, z: 1}
   qShowDustDebugMarker: 0
   qSpawnImpactLightning: 1
-  qImpactLightningPrefab: {fileID: 0}
+  qImpactLightningPrefab: {fileID: 6886712285888117183, guid: 8986621e08ddbcd4fb5e8010d305b92f, type: 3}
   qImpactLightningLifetime: 0.25
-  qImpactLightningLocalOffset: {x: 0, y: 0, z: 0}
+  qImpactLightningLocalOffset: {x: 0, y: -1, z: 0}
   qImpactLightningScale: {x: 1, y: 1, z: 1}
   qStarFallBladeCount: 5
   qStarFallMinBladeCount: 1
   qStarFallBaseMaxBladeCount: 3
-  qStarFallMaxBladeCountCap: 12
+  qStarFallMaxBladeCountCap: 7
   qStarFallBladeCountPerDivineMark: 1
   qStarFallUseDivineMarkScaling: 1
   qStarFallPathLength: 4.5
-  qStarFallStartOffset: 0.8
+  qStarFallStartOffset: 2
   qStarFallForwardJitter: 0.35
   qStarFallSideJitter: 0.8
   qStarFallSpreadGrowAlongPath: 1
@@ -1071,6 +1518,7 @@ MonoBehaviour:
   qRandomAreaYOffset: 0
   qStarFallDamageRadius: 0.8
   qStarFallEnableDamage: 0
+  qStarFallDamage: 5
   qStarFallDamageMultiplier: 1
   qSpawnImpactSeal: 0
   qImpactStarSealPrefab: {fileID: 0}
@@ -1125,10 +1573,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a1994dff4cc9c84cbcf8969b78086bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
-  wDuration: 2.5
+  wDuration: 5
   wDamageReduction: 0.4
-  wShieldMaxHpMultiplier: 2
-  wShieldBonusPerExtraSword: 0.1
+  wShieldMaxHpMultiplier: 1
+  wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
   wDamageReductionPerSword: 0.03
   wMaxDamageReduction: 0.8
@@ -1138,7 +1586,7 @@ MonoBehaviour:
   baseWSwordCount: 3
   useSwordEnergyForW: 1
   maxWSwordCount: 12
-  wEffectOrbitRadius: 1.2
+  wEffectOrbitRadius: 1.5
   wEffectHeight: 0
   wEffectOrbitSpeed: 80
   wSwordOrbitYawOffset: 90
@@ -1148,13 +1596,13 @@ MonoBehaviour:
   wMaxOrbitSpeedBonus: 0
   wRadiusPerSwordEnergy: 0
   wMaxRadiusBonus: 0
-  sharedSkillEffectPrefab: {fileID: 0}
-  wSkillEffectPrefab: {fileID: 0}
-  standbySkillEffectPrefab: {fileID: 0}
+  sharedSkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
+  wSkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
+  standbySkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
   wSpawnShieldBubble: 1
-  wShieldBubblePrefab: {fileID: 0}
-  wShieldBubbleLocalOffset: {x: 0, y: 0.2, z: 0}
-  wShieldBubbleScale: {x: 1.2, y: 1.5, z: 1}
+  wShieldBubblePrefab: {fileID: 7457087479993937334, guid: 733d5c480a51c5d459210aaa211a4215, type: 3}
+  wShieldBubbleLocalOffset: {x: 0, y: 0.12, z: 0}
+  wShieldBubbleScale: {x: 2.5, y: 2.5, z: 2.5}
   wShieldBubbleFadeInDuration: 0.15
   wShieldBubbleFadeOutDuration: 0.15
   wShieldBubblePulseAmount: 0.03
@@ -1171,14 +1619,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45276561a2769df41a45b9e9df485010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
-  eRailDuration: 0.6
+  eRailDuration: 0.4
   eEnableAfterimageShader: 1
-  eAfterimageSourceRenderer: {fileID: 0}
+  eAfterimageSourceRenderer: {fileID: 7009046691658483294}
   eAfterimageMaterial: {fileID: 0}
   eAfterimageCount: 12
-  eAfterimageDuration: 0.45
-  eAfterimageAlpha: 0.35
-  eAfterimageSpawnInterval: 0.03
+  eAfterimageDuration: 0.6
+  eAfterimageAlpha: 0.25
+  eAfterimageSpawnInterval: 0.05
   eAfterimageScale: {x: 1, y: 1, z: 1}
   eAfterimageTint: {r: 0.6, g: 0.85, b: 1, a: 0.45}
   eAfterimageSortingOrderOffset: 5
@@ -1196,10 +1644,10 @@ MonoBehaviour:
   eAfterimageUseActualMoveDirection: 1
   eAfterimageInvertMoveDirection: 0
   eAfterimageInvertFlip: 0
-  eAfterimageSpacing: 0.06
-  eAfterimageMaxPerDash: 24
-  eDashEffectPrefab: {fileID: 0}
-  eDashEffectLocalOffset: {x: 0, y: 0, z: 0}
+  eAfterimageSpacing: 0.08
+  eAfterimageMaxPerDash: 36
+  eDashEffectPrefab: {fileID: 4673030411506627938, guid: c176ae482ce3ef94eac9e73a4208a93b, type: 3}
+  eDashEffectLocalOffset: {x: 0, y: -0.5, z: 0}
   eDashEffectYawOffset: 0
   eSpawnDashEffect: 1
   eDashEffectLifetime: 0.7
@@ -1224,7 +1672,7 @@ MonoBehaviour:
   rEffectVisualPitch: 0
   rEffectVisualYaw: 0
   rEffectVisualRoll: 0
-  rSwarmDuration: 5
+  rSwarmDuration: 12
   rSwarmRadiusMin: 0.8
   rSwarmRadiusMax: 3.2
   rUseDivineMarkRadiusScaling: 1
@@ -1233,7 +1681,7 @@ MonoBehaviour:
   rUseScreenWideVortexRange: 1
   rBaseHorizontalRange: 3.8
   rHorizontalRangePerDivineMark: 1.1
-  rMaxHorizontalRange: 14.5
+  rMaxHorizontalRange: 12
   rBaseVerticalRange: 1
   rVerticalRangePerDivineMark: 0.2
   rMaxVerticalRange: 3
@@ -1271,7 +1719,7 @@ MonoBehaviour:
   rSwordSelfSpinMin: 30
   rSwordSelfSpinMax: 120
   rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
-  rSwarmDamageRadius: 3
+  rSwarmDamageRadius: 10
   rSwarmDamageInterval: 0.25
   rSwarmDamagePerTick: 2
   rSwarmEnemyLayer:
@@ -1297,109 +1745,19 @@ MonoBehaviour:
   rStarRainForcedVisualEuler: {x: 0, y: 180, z: 0}
   rStarRainVisualEulerOffset: {x: 0, y: 0, z: 0}
   rOrbitTrailEffectPrefab: {fileID: 7384281875577149491, guid: 5b784b14ab5db374587cfd38c1c0e0ff, type: 3}
-  rOrbitEnableTrailEffect: 1
+  rOrbitEnableTrailEffect: 0
   rOrbitTrailFollowWorldPosition: 1
   rOrbitTrailClearOnSpawn: 1
   rOrbitTrailLocalOffset: {x: 0, y: 0, z: 0}
   rOrbitTrailLocalEuler: {x: 0, y: 0, z: 0}
   rOrbitTrailLocalScale: {x: 1, y: 1, z: 1}
-  rCenterAuraPrefab: {fileID: 0}
-  rCenterAuraLocalOffset: {x: 0, y: 0.12, z: 0}
+  rCenterAuraPrefab: {fileID: 3132384233823924155, guid: 5ea980b7facadcc4e95e7eb452c96057, type: 3}
+  rCenterAuraLocalOffset: {x: 0, y: -1.2, z: -0.1}
   rEnableAuraHeal: 1
   rAuraHealInterval: 0.1
   rAuraHealPercentOfMaxHp: 0.01
   rAuraHealCanOverMaxHp: 0
   rOrbitClearWhenOrbitEnds: 1
   rOrbitFadeOutDuration: 0.15
-  sharedSkillEffectPrefab: {fileID: 0}
-  rSkillEffectPrefab: {fileID: 0}
---- !u!1 &9036763461328065666
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 778756803555556138}
-  - component: {fileID: 7441965272110360530}
-  m_Layer: 0
-  m_Name: "\u795E\u7737\u4E4B\u5B50 \u7ACB\u7ED8"
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &778756803555556138
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9036763461328065666}
-  serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0.0001}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 922604953166537750}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!212 &7441965272110360530
-SpriteRenderer:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 9036763461328065666}
-  m_Enabled: 1
-  m_CastShadows: 0
-  m_ReceiveShadows: 0
-  m_DynamicOccludee: 1
-  m_StaticShadowCaster: 0
-  m_MotionVectors: 1
-  m_LightProbeUsage: 1
-  m_ReflectionProbeUsage: 1
-  m_RayTracingMode: 0
-  m_RayTraceProcedural: 0
-  m_RayTracingAccelStructBuildFlagsOverride: 0
-  m_RayTracingAccelStructBuildFlags: 1
-  m_SmallMeshCulling: 1
-  m_ForceMeshLod: -1
-  m_MeshLodSelectionBias: 0
-  m_RenderingLayerMask: 1
-  m_RendererPriority: 0
-  m_Materials:
-  - {fileID: 2100000, guid: 9e82cb91011856b45ab291faf66d6e2e, type: 2}
-  m_StaticBatchInfo:
-    firstSubMesh: 0
-    subMeshCount: 0
-  m_StaticBatchRoot: {fileID: 0}
-  m_ProbeAnchor: {fileID: 0}
-  m_LightProbeVolumeOverride: {fileID: 0}
-  m_ScaleInLightmap: 1
-  m_ReceiveGI: 1
-  m_PreserveUVs: 0
-  m_IgnoreNormalsForChartDetection: 0
-  m_ImportantGI: 0
-  m_StitchLightmapSeams: 1
-  m_SelectedEditorRenderState: 0
-  m_MinimumChartSize: 4
-  m_AutoUVMaxDistance: 0.5
-  m_AutoUVMaxAngle: 89
-  m_LightmapParameters: {fileID: 0}
-  m_GlobalIlluminationMeshLod: 0
-  m_SortingLayerID: 0
-  m_SortingLayer: 0
-  m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 5d7b86b1fab425c47b65333a29fe2f2a, type: 3}
-  m_Color: {r: 1, g: 1, b: 1, a: 1}
-  m_FlipX: 0
-  m_FlipY: 0
-  m_DrawMode: 0
-  m_Size: {x: 22.49, y: 22.49}
-  m_AdaptiveModeThreshold: 0.5
-  m_SpriteTileMode: 0
-  m_WasSpriteAssigned: 1
-  m_MaskInteraction: 0
-  m_SpriteSortPoint: 0
+  sharedSkillEffectPrefab: {fileID: 4310600637676425702, guid: b0ed1843779c88c4a9dad816902bdb85, type: 3}
+  rSkillEffectPrefab: {fileID: 4310600637676425702, guid: b0ed1843779c88c4a9dad816902bdb85, type: 3}

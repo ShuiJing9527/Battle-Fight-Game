@@ -55,11 +55,6 @@ public class PlayerCameraRig : MonoBehaviour
     {
         if (playerSlot == null)
         {
-            if (!loggedMissingTarget)
-            {
-                Debug.LogError("PlayerCameraRig.playerSlot is empty and could not be auto-resolved.", this);
-                loggedMissingTarget = true;
-            }
             return;
         }
 
@@ -111,6 +106,8 @@ public class PlayerCameraRig : MonoBehaviour
                 playerSlot = cachedBootstrap.PartyLeader.transform;
                 return;
             }
+
+            return;
         }
 
         if (!string.IsNullOrEmpty(fallbackPlayerTag))
