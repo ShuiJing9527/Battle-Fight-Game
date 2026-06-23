@@ -141,11 +141,6 @@ public static class MonsterCombatAutoSetup
         {
             monster.AddComponent<WorldHealthBar>();
         }
-
-        if (monster.GetComponent<RuntimeLootDropOnDeath>() == null)
-        {
-            monster.AddComponent<RuntimeLootDropOnDeath>();
-        }
     }
 
     private static void ApplyScale(Transform transform, MonsterIdentity identity)

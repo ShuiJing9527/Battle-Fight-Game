@@ -22,11 +22,16 @@ public class PlayerSkillCooldownManager : MonoBehaviour
 
     [Header("Mana")]
     public float maxMana = 100f;
-    public float manaRecoverPerSecond = 2f;
+    public float manaRecoverPerSecond = 5f;
     public BattleResourceBank resourceBank;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugManaRegen = false;
+    [SerializeField, Min(0.1f)] private float debugManaRegenInterval = 1f;
 
     private float[] runtimeCurrentCD;
     private float runtimeCurrentMana;
+    private float nextDebugManaLogTime;
 
     private void Awake()
     {
@@ -76,6 +81,15 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         else
         {
             runtimeCurrentMana = Mathf.Min(maxMana, runtimeCurrentMana + manaRecoverPerSecond * deltaTime);
+        }
+
+        if (debugManaRegen && Time.time >= nextDebugManaLogTime)
+        {
+            nextDebugManaLogTime = Time.time + Mathf.Max(0.1f, debugManaRegenInterval);
+            float currentMana = GetCurrentMana();
+            float maxCurrentMana = GetMaxMana();
+            Debug.Log($"[Player MP Regen] regenPerSecond={manaRecoverPerSecond:F2}", this);
+            Debug.Log($"[Player MP Regen] currentMP={currentMana:F2} / maxMP={maxCurrentMana:F2}", this);
         }
     }
 

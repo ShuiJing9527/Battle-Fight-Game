@@ -104,6 +104,7 @@ GameObject:
   - component: {fileID: 6107465575505587999}
   - component: {fileID: 8844418258968848066}
   - component: {fileID: 2725362885038075655}
+  - component: {fileID: 3333333333333333333}
   m_Layer: 0
   m_Name: Enemy_Slime
   m_TagString: Untagged
@@ -137,7 +138,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 8b11d3eff6ff540ac864010dfc3ba890, type: 3}
-  m_Name: 
+  m_Name: ""
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
   playerTarget: {fileID: 0}
   playerTag: Player
@@ -257,3 +258,18 @@ MonoBehaviour:
   onAttackHit:
     m_PersistentCalls:
       m_Calls: []
+--- !u!114 &3333333333333333333
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e902bfc8af23ae3448413f6a8275f994, type: 3}
+  m_Name: ""
+  m_EditorClassIdentifier: Assembly-CSharp::RuntimeLootDropOnDeath
+  soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
+  soulAmount: 15
+  dropScatterRadius: 0.8

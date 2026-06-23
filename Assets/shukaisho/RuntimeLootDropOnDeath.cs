@@ -2,40 +2,52 @@ using UnityEngine;
 
 public class RuntimeLootDropOnDeath : MonoBehaviour
 {
+    [Header("Soul Drop")]
+    [SerializeField] private SoulPickup soulPrefab;
+    [SerializeField, Min(0f)] private float dropYOffset = 1f;
     public float soulAmount = 15f;
     public float dropScatterRadius = 0.8f;
 
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
     private bool dropped;
+    private bool triedMissingHealthLog;
+    private bool deathEventsBound;
 
     private void OnEnable()
     {
-        combatHealth = GetComponent<CombatHealth>();
-        enemyHealth = GetComponent<EnemyHealth>();
+        dropped = false;
+        triedMissingHealthLog = false;
+        deathEventsBound = false;
+        TryBindDeathEvents(true);
+    }
 
-        if (combatHealth != null)
-        {
-            combatHealth.Died += DropLoot;
-        }
+    private void Start()
+    {
+        TryBindDeathEvents(true);
+    }
 
-        if (enemyHealth != null)
+    private void Update()
+    {
+        if (!deathEventsBound)
         {
-            enemyHealth.Died += DropLoot;
+            TryBindDeathEvents(false);
         }
     }
 
     private void OnDisable()
     {
-        if (combatHealth != null)
+        if (deathEventsBound && combatHealth != null)
         {
             combatHealth.Died -= DropLoot;
         }
 
-        if (enemyHealth != null)
+        if (deathEventsBound && enemyHealth != null)
         {
             enemyHealth.Died -= DropLoot;
         }
+
+        deathEventsBound = false;
     }
 
     private void DropLoot(GameObject killer)
@@ -46,19 +58,20 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         dropped = true;
+        Debug.Log($"[RuntimeLootDropOnDeath] death triggered enemy={name} position={transform.position}", this);
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
 
         int soulCount = rank == MonsterRank.Boss ? 4 : (rank == MonsterRank.Elite ? 2 : 1);
         for (int i = 0; i < soulCount; i++)
         {
-            CreateSoul(RandomSoulType(), soulAmount, transform.position + RandomOffset());
+            CreateSoul(RandomSoulType(), soulAmount, transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
 
         int runeCount = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
         for (int i = 0; i < runeCount; i++)
         {
-            CreateRune(transform.position + RandomOffset());
+            CreateRune(transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
     }
 
@@ -80,26 +93,125 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         };
     }
 
-    private static void CreateSoul(SoulType type, float amount, Vector3 position)
+    private void CreateSoul(SoulType type, float amount, Vector3 position)
     {
-        GameObject soulObject = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        soulObject.name = $"{type} Soul";
+        Debug.Log($"[RuntimeLootDropOnDeath] spawn request prefab={(soulPrefab != null ? soulPrefab.name : "null")} amount={amount:F2} position={position}", this);
+        if (soulPrefab != null)
+        {
+            SoulPickup pickup = Instantiate(soulPrefab, position, Quaternion.identity);
+            pickup.soulType = type;
+            pickup.amount = amount;
+            pickup.destroyAfterPickup = true;
+            pickup.gameObject.SetActive(true);
+            pickup.Configure(type, amount);
+            Debug.Log($"[RuntimeLootDropOnDeath] spawned instance={pickup.name} active={pickup.gameObject.activeInHierarchy} position={pickup.transform.position} scale={pickup.transform.localScale}", pickup);
+            EnsureDebugVisible(pickup.gameObject);
+            return;
+        }
+
+        Debug.LogWarning("[SoulDrop] soulPrefab missing, fallback simple soul created.", this);
+        GameObject soulObject = new GameObject($"{type} Soul");
         soulObject.transform.position = position;
         soulObject.transform.localScale = Vector3.one * 0.35f;
 
-        Collider collider = soulObject.GetComponent<Collider>();
+        SphereCollider collider = soulObject.AddComponent<SphereCollider>();
         collider.isTrigger = true;
+        collider.radius = 0.55f;
 
         Rigidbody rb = soulObject.AddComponent<Rigidbody>();
         rb.isKinematic = true;
+        rb.useGravity = false;
 
-        SoulPickup pickup = soulObject.AddComponent<SoulPickup>();
-        pickup.soulType = type;
-        pickup.amount = amount;
+        SoulPickup fallbackPickup = soulObject.AddComponent<SoulPickup>();
+        fallbackPickup.Configure(type, amount);
+        soulObject.SetActive(true);
+        Debug.Log($"[RuntimeLootDropOnDeath] spawned instance={fallbackPickup.name} active={fallbackPickup.gameObject.activeInHierarchy} position={fallbackPickup.transform.position} scale={fallbackPickup.transform.localScale}", fallbackPickup);
+    }
 
-        Renderer renderer = soulObject.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        renderer.material.color = SoulColor(type);
+    private void TryBindDeathEvents(bool logMissing)
+    {
+        if (deathEventsBound)
+        {
+            return;
+        }
+
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        if (enemyHealth == null)
+        {
+            enemyHealth = GetComponent<EnemyHealth>();
+        }
+
+        if (combatHealth != null)
+        {
+            combatHealth.Died += DropLoot;
+            deathEventsBound = true;
+        }
+
+        if (enemyHealth != null)
+        {
+            enemyHealth.Died += DropLoot;
+            deathEventsBound = true;
+        }
+
+        if (deathEventsBound)
+        {
+            Debug.Log($"[RuntimeLootDropOnDeath] enabled enemy={name} health={(combatHealth != null ? combatHealth.name : (enemyHealth != null ? enemyHealth.name : "null"))} soulPrefab={(soulPrefab != null ? soulPrefab.name : "null")}", this);
+            return;
+        }
+
+        if (logMissing && !triedMissingHealthLog)
+        {
+            triedMissingHealthLog = true;
+            Debug.LogWarning($"[RuntimeLootDropOnDeath] no health component found enemy={name}", this);
+        }
+    }
+
+    private void EnsureDebugVisible(GameObject soulRoot)
+    {
+        if (soulRoot == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = soulRoot.GetComponentsInChildren<Renderer>(true);
+        bool hasVisibleRenderer = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (renderers[i] != null && renderers[i].enabled)
+            {
+                hasVisibleRenderer = true;
+                break;
+            }
+        }
+
+        if (hasVisibleRenderer)
+        {
+            return;
+        }
+
+        GameObject debugSphere = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        debugSphere.name = "SoulDropDebugVisible";
+        debugSphere.transform.SetParent(soulRoot.transform, false);
+        debugSphere.transform.localPosition = Vector3.zero;
+        debugSphere.transform.localScale = Vector3.one * 0.25f;
+
+        Collider collider = debugSphere.GetComponent<Collider>();
+        if (collider != null)
+        {
+            Object.Destroy(collider);
+        }
+
+        Renderer renderer = debugSphere.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            Material material = new Material(Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Standard"));
+            material.color = new Color(1f, 0.95f, 0.7f, 1f);
+            renderer.material = material;
+        }
     }
 
     private void CreateRune(Vector3 position)
@@ -130,15 +242,4 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         renderer.material.color = new Color(0.72f, 0.35f, 1f, 1f);
     }
 
-    private static Color SoulColor(SoulType type)
-    {
-        return type switch
-        {
-            SoulType.Life => new Color(0.1f, 0.95f, 0.35f, 1f),
-            SoulType.Energy => new Color(0.15f, 0.45f, 1f, 1f),
-            SoulType.Growth => new Color(1f, 0.2f, 0.15f, 1f),
-            SoulType.Function => new Color(1f, 0.82f, 0.12f, 1f),
-            _ => Color.white
-        };
-    }
 }

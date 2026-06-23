@@ -15,6 +15,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     private readonly System.Collections.Generic.HashSet<CombatHealth> castDamagedCombatTargets = new System.Collections.Generic.HashSet<CombatHealth>();
     private readonly System.Collections.Generic.HashSet<EnemyHealth> castDamagedLegacyTargets = new System.Collections.Generic.HashSet<EnemyHealth>();
+    private float qLifestealTotalThisCast;
 
     private void Reset()
     {
@@ -50,6 +51,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     {
         castDamagedCombatTargets.Clear();
         castDamagedLegacyTargets.Clear();
+        qLifestealTotalThisCast = 0f;
 
         if (debugLog)
         {
@@ -146,11 +148,16 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             Debug.Log($"[Q - QuickShear] damage={qDamage:F2}, range={qRange:F2}", this);
         }
 
-        ApplySlashDamage();
+        float dealtDamage = ApplySlashDamage();
+        if (dealtDamage > 0f)
+        {
+            ApplyQLifeSteal(dealtDamage);
+        }
+
         Controller.StartCoroutine(LogTrackNextFrame(slashIndex, slashTotal));
     }
 
-    private void ApplySlashDamage()
+    private float ApplySlashDamage()
     {
         Vector3 origin = transform.position;
         Vector3 facing = Controller != null ? Controller.GetFacingWorldDirection() : transform.forward;
@@ -170,6 +177,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         Vector3 center = hitPoint != null ? hitPoint.position : origin + facing * (Mathf.Max(0.1f, qRange) * 0.5f);
         float finalDamage = ResolveDamage(qDamage);
         Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
+        float totalDamageDealt = 0f;
 
         foreach (Collider hit in hits)
         {
@@ -186,16 +194,194 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
+                float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject));
+                float afterHealth = ResolveCurrentHealth(combatHealth);
+                float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+                totalDamageDealt += actualDamage;
                 continue;
             }
 
             EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
             if (legacyHealth != null && castDamagedLegacyTargets.Add(legacyHealth))
             {
-                legacyHealth.TakeDamage(Mathf.RoundToInt(finalDamage), gameObject);
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
+                int beforeHp = Mathf.Max(0, legacyHealth.hp);
+                legacyHealth.TakeDamage(damageInt, gameObject);
+                int actualDamage = Mathf.Clamp(beforeHp, 0, damageInt);
+                totalDamageDealt += actualDamage;
             }
         }
+
+        return totalDamageDealt;
+    }
+
+    private void ApplyQLifeSteal(float damageDealt)
+    {
+        float healAmount = Mathf.Max(0f, damageDealt);
+        if (healAmount <= 0f)
+        {
+            return;
+        }
+
+        float beforeHealth = ResolvePlayerCurrentHealth();
+        if (!TryHealPlayer(healAmount))
+        {
+            return;
+        }
+
+        float afterHealth = ResolvePlayerCurrentHealth();
+        float actualHeal = Mathf.Max(0f, afterHealth - beforeHealth);
+        if (actualHeal <= 0f)
+        {
+            return;
+        }
+
+        qLifestealTotalThisCast += actualHeal;
+        Debug.Log($"[Player01 Q Lifesteal] damage={damageDealt:F2} heal={actualHeal:F2}", this);
+    }
+
+    private float ResolveCurrentHealth(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return 0f;
+        }
+
+        if (combatHealth.resourceBank != null)
+        {
+            return combatHealth.resourceBank.currentHealth;
+        }
+
+        return combatHealth.currentHealth;
+    }
+
+    private float ResolvePlayerCurrentHealth()
+    {
+        CombatHealth combatHealth = ResolvePlayerCombatHealth();
+        if (combatHealth != null)
+        {
+            return ResolveCurrentHealth(combatHealth);
+        }
+
+        BattleResourceBank bank = ResolvePlayerResourceBank();
+        return bank != null ? bank.currentHealth : 0f;
+    }
+
+    private bool TryHealPlayer(float amount)
+    {
+        if (amount <= 0f)
+        {
+            return false;
+        }
+
+        CombatHealth combatHealth = ResolvePlayerCombatHealth();
+        if (combatHealth != null)
+        {
+            float maxHealth = ResolvePlayerMaxHealth(combatHealth);
+            if (maxHealth > 0f)
+            {
+                float before = ResolveCurrentHealth(combatHealth);
+                float healed = Mathf.Min(amount, Mathf.Max(0f, maxHealth - before));
+                if (healed > 0f)
+                {
+                    SetPlayerCurrentHealth(combatHealth, before + healed);
+                }
+            }
+            return true;
+        }
+
+        BattleResourceBank bank = ResolvePlayerResourceBank();
+        if (bank != null)
+        {
+            float before = Mathf.Max(0f, bank.currentHealth);
+            float healed = Mathf.Min(amount, Mathf.Max(0f, bank.maxHealth - before));
+            if (healed > 0f)
+            {
+                bank.currentHealth = before + healed;
+            }
+            return true;
+        }
+
+        return false;
+    }
+
+    private CombatHealth ResolvePlayerCombatHealth()
+    {
+        CombatHealth combatHealth = GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return combatHealth;
+        }
+
+        if (Controller != null)
+        {
+            combatHealth = Controller.GetComponent<CombatHealth>();
+            if (combatHealth != null)
+            {
+                return combatHealth;
+            }
+        }
+
+        return GetComponentInParent<CombatHealth>();
+    }
+
+    private BattleResourceBank ResolvePlayerResourceBank()
+    {
+        BattleResourceBank bank = GetComponent<BattleResourceBank>();
+        if (bank != null)
+        {
+            return bank;
+        }
+
+        if (Controller != null)
+        {
+            bank = Controller.GetComponent<BattleResourceBank>();
+            if (bank != null)
+            {
+                return bank;
+            }
+        }
+
+        return GetComponentInParent<BattleResourceBank>();
+    }
+
+    private float ResolvePlayerMaxHealth(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return 0f;
+        }
+
+        if (combatHealth.resourceBank != null)
+        {
+            return Mathf.Max(0f, combatHealth.resourceBank.maxHealth);
+        }
+
+        if (combatHealth.stats != null)
+        {
+            return Mathf.Max(0f, combatHealth.stats.maxHealth);
+        }
+
+        return Mathf.Max(0f, combatHealth.currentHealth);
+    }
+
+    private void SetPlayerCurrentHealth(CombatHealth combatHealth, float healthValue)
+    {
+        if (combatHealth == null)
+        {
+            return;
+        }
+
+        if (combatHealth.resourceBank != null)
+        {
+            float clamped = Mathf.Clamp(healthValue, 0f, combatHealth.resourceBank.maxHealth);
+            combatHealth.resourceBank.currentHealth = clamped;
+            combatHealth.currentHealth = clamped;
+            return;
+        }
+
+        combatHealth.currentHealth = Mathf.Clamp(healthValue, 0f, ResolvePlayerMaxHealth(combatHealth));
     }
 
     private bool IsInFrontSlashArea(Collider hit, Vector3 origin, Vector3 facing)
@@ -267,6 +453,14 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     protected override string GetSkillLabel()
     {
         return "Q - QuickShear";
+    }
+
+    protected override void OnCastFinished()
+    {
+        if (qLifestealTotalThisCast > 0f)
+        {
+            Debug.Log($"[Player01 Q Lifesteal] totalHeal={qLifestealTotalThisCast:F2}", this);
+        }
     }
 
     protected override int SkillIndex => 0;
