@@ -1,4 +1,4 @@
-using UnityEngine;
+﻿using UnityEngine;
 
 public class RuneSkillPanel : MonoBehaviour
 {
@@ -8,33 +8,31 @@ public class RuneSkillPanel : MonoBehaviour
     public KeyCode[] toggleKeys = { KeyCode.U, KeyCode.I, KeyCode.O };
     public bool visible;
 
+    [Header("UI Scale")]
+    [SerializeField, Min(1f)] private float fallbackWindowScale = 1.2f;
+
+    private Player2Bootstrap cachedBootstrap;
+    private Vector3 panelBaseScale = Vector3.one;
+    private bool panelBaseScaleCaptured;
+    private bool pauseApplied;
     private int selectedRuneIndex = -1;
 
     private void Awake()
     {
-        if (inventory == null)
-        {
-            inventory = GetComponent<RuneInventory>();
-        }
-
-        if (skillCaster == null)
-        {
-            skillCaster = GetComponent<CombatSkillCaster>();
-        }
-
-        SetPanelVisible(visible);
+        CacheBootstrap();
+        CapturePanelBaseScale();
+        ResolveReferences();
+        SetPanelVisible(visible, false);
     }
 
-    private void Update()
+    private void OnDisable()
     {
-        for (int i = 0; i < toggleKeys.Length; i++)
-        {
-            if (Input.GetKeyDown(toggleKeys[i]))
-            {
-                TogglePanel();
-                break;
-            }
-        }
+        SetPauseState(false);
+    }
+
+    private void OnDestroy()
+    {
+        SetPauseState(false);
     }
 
     public void TogglePanel()
@@ -44,15 +42,37 @@ public class RuneSkillPanel : MonoBehaviour
 
     public void SetPanelVisible(bool visible)
     {
+        SetPanelVisible(visible, true);
+    }
+
+    private void SetPanelVisible(bool visible, bool pauseGame)
+    {
         this.visible = visible;
+        ResolveReferences();
+
         if (panelRoot != null)
         {
+            EnsureAncestorChainActive(panelRoot);
             panelRoot.SetActive(visible);
+            if (visible)
+            {
+                CapturePanelBaseScale();
+                panelRoot.transform.localScale = Vector3.one;
+                panelRoot.transform.localScale = panelBaseScale * fallbackWindowScale;
+                panelRoot.transform.SetAsLastSibling();
+            }
+        }
+
+        if (pauseGame)
+        {
+            SetPauseState(visible);
         }
     }
 
     public bool EquipRuneByIndex(int inventoryIndex, int skillIndex, int slotIndex)
     {
+        ResolveReferences();
+
         if (inventory == null || skillCaster == null)
         {
             return false;
@@ -78,12 +98,12 @@ public class RuneSkillPanel : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!visible || panelRoot != null)
+        if (!visible || panelRoot == null)
         {
             return;
         }
 
-        Rect windowRect = new Rect(24f, 90f, 420f, 360f);
+        Rect windowRect = new Rect(24f, 90f, 540f, 460f);
         GUI.Window(GetInstanceID(), windowRect, DrawFallbackWindow, "Rune Skill Panel");
     }
 
@@ -100,23 +120,23 @@ public class RuneSkillPanel : MonoBehaviour
             {
                 RuneDefinition rune = inventory.GetRune(i);
                 string label = rune != null ? rune.runeName : "Empty";
-                if (GUILayout.Button(selectedRuneIndex == i ? $"> {label}" : label))
+                if (GUILayout.Button(selectedRuneIndex == i ? $"> {label}" : label, GUILayout.Height(34f)))
                 {
                     selectedRuneIndex = i;
                 }
             }
         }
 
-        GUILayout.Space(8f);
+        GUILayout.Space(10f);
         GUILayout.Label("Equip selected rune to skill slot");
         string[] skillLabels = { "Q", "W", "E", "R" };
         for (int skillIndex = 0; skillIndex < skillLabels.Length; skillIndex++)
         {
             GUILayout.BeginHorizontal();
-            GUILayout.Label(skillLabels[skillIndex], GUILayout.Width(24f));
+            GUILayout.Label(skillLabels[skillIndex], GUILayout.Width(30f));
             for (int slotIndex = 0; slotIndex < 5; slotIndex++)
             {
-                if (GUILayout.Button(slotIndex.ToString(), GUILayout.Width(44f)))
+                if (GUILayout.Button(slotIndex.ToString(), GUILayout.Width(56f), GUILayout.Height(32f)))
                 {
                     EquipRuneByIndex(selectedRuneIndex, skillIndex, slotIndex);
                 }
@@ -125,5 +145,154 @@ public class RuneSkillPanel : MonoBehaviour
         }
 
         GUI.DragWindow();
+    }
+
+    private void CacheBootstrap()
+    {
+        if (cachedBootstrap == null)
+        {
+            cachedBootstrap = FindObjectOfType<Player2Bootstrap>(true);
+        }
+    }
+
+    private void ResolveReferences()
+    {
+        CacheBootstrap();
+
+        if (inventory == null)
+        {
+            inventory = ResolveInventory();
+        }
+
+        if (skillCaster == null)
+        {
+            skillCaster = ResolveSkillCaster();
+        }
+    }
+
+    private RuneInventory ResolveInventory()
+    {
+        if (cachedBootstrap != null)
+        {
+            GameObject leader = cachedBootstrap.PartyLeader;
+            if (leader != null)
+            {
+                RuneInventory leaderInventory = leader.GetComponent<RuneInventory>();
+                if (leaderInventory != null)
+                {
+                    return leaderInventory;
+                }
+            }
+
+            GameObject current = cachedBootstrap.CurrentPlayer;
+            if (current != null)
+            {
+                RuneInventory currentInventory = current.GetComponent<RuneInventory>();
+                if (currentInventory != null)
+                {
+                    return currentInventory;
+                }
+            }
+        }
+
+        RuneInventory[] inventories = FindObjectsOfType<RuneInventory>(true);
+        if (inventories != null && inventories.Length > 0)
+        {
+            return inventories[0];
+        }
+
+        return null;
+    }
+
+    private CombatSkillCaster ResolveSkillCaster()
+    {
+        if (cachedBootstrap != null)
+        {
+            GameObject current = cachedBootstrap.CurrentPlayer;
+            if (current != null)
+            {
+                CombatSkillCaster currentCaster = current.GetComponent<CombatSkillCaster>();
+                if (currentCaster != null)
+                {
+                    return currentCaster;
+                }
+            }
+
+            GameObject leader = cachedBootstrap.PartyLeader;
+            if (leader != null)
+            {
+                CombatSkillCaster leaderCaster = leader.GetComponent<CombatSkillCaster>();
+                if (leaderCaster != null)
+                {
+                    return leaderCaster;
+                }
+            }
+        }
+
+        CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
+        if (casters != null && casters.Length > 0)
+        {
+            return casters[0];
+        }
+
+        return null;
+    }
+
+    private void CapturePanelBaseScale()
+    {
+        if (panelBaseScaleCaptured || panelRoot == null)
+        {
+            return;
+        }
+
+        panelBaseScale = panelRoot.transform.localScale;
+        panelBaseScaleCaptured = true;
+    }
+
+    private void EnsureAncestorChainActive(GameObject root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Transform current = root.transform.parent;
+        while (current != null)
+        {
+            if (!current.gameObject.activeSelf)
+            {
+                current.gameObject.SetActive(true);
+            }
+
+            if (current.GetComponent<Canvas>() != null)
+            {
+                break;
+            }
+
+            current = current.parent;
+        }
+    }
+
+    private void SetPauseState(bool shouldPause)
+    {
+        if (shouldPause)
+        {
+            if (pauseApplied)
+            {
+                return;
+            }
+
+            Time.timeScale = 0f;
+            pauseApplied = true;
+            return;
+        }
+
+        if (!pauseApplied && Time.timeScale != 0f)
+        {
+            return;
+        }
+
+        Time.timeScale = 1f;
+        pauseApplied = false;
     }
 }

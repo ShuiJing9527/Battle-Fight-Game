@@ -8,6 +8,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     public float soulAmount = 15f;
     public float dropScatterRadius = 0.8f;
 
+    [Header("Rune Drop")]
+    [SerializeField] private RunePickup runePickupPrefab;
+    [SerializeField, Min(0f)] private float runeDropYOffset = 0.25f;
+
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
     private bool dropped;
@@ -71,7 +75,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         int runeCount = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
         for (int i = 0; i < runeCount; i++)
         {
-            CreateRune(transform.position + Vector3.up * dropYOffset + RandomOffset());
+            CreateRune(transform.position + Vector3.up * runeDropYOffset);
         }
     }
 
@@ -216,6 +220,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private void CreateRune(Vector3 position)
     {
+        Debug.Log($"[RuneDrop] spawn request prefab={(runePickupPrefab != null ? runePickupPrefab.name : "null")} position={position}", this);
         RuneLibrary library = FindObjectOfType<RuneLibrary>();
         RuneDefinition rune = library != null ? library.GetRandomRune() : RuneDefinition.CreateTableRune(RuneMechanic.Combo);
         if (rune == null)
@@ -223,23 +228,43 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             return;
         }
 
+        if (runePickupPrefab != null)
+        {
+            RunePickup pickup = Instantiate(runePickupPrefab, position, Quaternion.identity);
+            pickup.rune = rune;
+            pickup.destroyAfterPickup = true;
+            pickup.gameObject.SetActive(true);
+            Debug.Log($"[RuneDrop] spawned instance={pickup.name} active={pickup.gameObject.activeInHierarchy} position={pickup.transform.position} scale={pickup.transform.localScale}", pickup);
+            return;
+        }
+
+        Debug.LogWarning("[RuneDrop] runePickupPrefab missing, fallback simple rune created.", this);
         GameObject runeObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
         runeObject.name = $"Rune - {rune.runeName}";
-        runeObject.transform.position = position + Vector3.up * 0.2f;
+        runeObject.transform.position = position;
         runeObject.transform.localScale = new Vector3(0.35f, 0.12f, 0.35f);
 
         Collider collider = runeObject.GetComponent<Collider>();
-        collider.isTrigger = true;
+        if (collider != null)
+        {
+            collider.isTrigger = true;
+        }
 
-        Rigidbody rb = runeObject.AddComponent<Rigidbody>();
+        Rigidbody rb = runeObject.GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = runeObject.AddComponent<Rigidbody>();
+        }
         rb.isKinematic = true;
+        rb.useGravity = false;
 
-        RunePickup pickup = runeObject.AddComponent<RunePickup>();
-        pickup.rune = rune;
-
-        Renderer renderer = runeObject.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        renderer.material.color = new Color(0.72f, 0.35f, 1f, 1f);
+        RunePickup fallbackPickup = runeObject.GetComponent<RunePickup>();
+        if (fallbackPickup == null)
+        {
+            fallbackPickup = runeObject.AddComponent<RunePickup>();
+        }
+        fallbackPickup.rune = rune;
+        fallbackPickup.destroyAfterPickup = true;
     }
 
 }

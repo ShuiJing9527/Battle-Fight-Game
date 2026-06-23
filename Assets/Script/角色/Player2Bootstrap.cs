@@ -21,6 +21,9 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField] private bool showSwitchHint = true;
     [SerializeField] private bool disablePlayer2AnimatorIfSharedController = true;
     [SerializeField] private bool showHealthBar = true;
+    [SerializeField] private bool showRuneHint = true;
+    [SerializeField] private RuneBagUI runeBagUI;
+    [SerializeField] private RuneSkillPanel runeSkillPanel;
 
     [Header("Player Health")]
     [SerializeField] private float playerStartHealth = 100f;
@@ -54,6 +57,11 @@ public class Player2Bootstrap : MonoBehaviour
         {
             ToggleCharacter();
         }
+
+        if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame)
+        {
+            ToggleRunePanel();
+        }
     }
 
     private void OnGUI()
@@ -66,6 +74,14 @@ public class Player2Bootstrap : MonoBehaviour
             const int height = 30;
             Rect rect = new Rect(20f, 20f, width, height);
             GUI.Label(rect, "T: Switch Player", switchHintStyle);
+        }
+
+        if (showRuneHint)
+        {
+            const int width = 260;
+            const int height = 30;
+            Rect rect = new Rect(20f, 48f, width, height);
+            GUI.Label(rect, "K: Rune Panel", switchHintStyle);
         }
 
         if (showHealthBar)
@@ -189,6 +205,28 @@ public class Player2Bootstrap : MonoBehaviour
         SetActivePlayer(next);
 
         Debug.Log($"[PARTY] Switched current player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
+    }
+
+    private void ToggleRunePanel()
+    {
+        if (runeBagUI != null)
+        {
+            runeBagUI.TogglePanel();
+            return;
+        }
+
+        if (runeSkillPanel != null)
+        {
+            runeSkillPanel.TogglePanel();
+            return;
+        }
+
+        Debug.LogWarning("[RuneUI] Missing scene references on Player2Bootstrap.", this);
+    }
+
+    private void EnsureRunePanelReferences()
+    {
+        // Intentionally left blank. Rune UI should be bound explicitly in the scene.
     }
 
     private void SetActivePlayer(GameObject nextActive)

@@ -274,6 +274,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RuntimeLootDropOnDeath
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
+  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
   dropYOffset: 0.5
   soulAmount: 15
   dropScatterRadius: 0.8
+  runeDropYOffset: 0.25
