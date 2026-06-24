@@ -1,4 +1,5 @@
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -46,6 +47,10 @@ public class RuneUIController : MonoBehaviour
     private bool warnedMissingSlotRefs;
     private bool warnedMissingSkillCaster;
     private bool warnedMissingRuneList;
+    private bool warnedMissingRuneInventory;
+    private bool warnedMissingRuneLibrary;
+    private bool warnedMissingSelectedRune;
+    private bool warnedAlreadyEquippedRune;
 
     private void Awake()
     {
@@ -138,15 +143,14 @@ public class RuneUIController : MonoBehaviour
         }
 
         CacheBootstrap();
-        ResolveCurrentPlayerContext();
-        SetPauseState(true);
-        SetOldHudVisible(false);
-
         if (mainPanel != null)
         {
             mainPanel.SetActive(true);
         }
 
+        SetPauseState(true);
+        SetOldHudVisible(false);
+        ResolveCurrentPlayerContext();
         RefreshRuneList();
         RefreshSkillSlots();
         Debug.Log("[RuneUI] Open panel, pause game, hide HUD", this);
@@ -177,8 +181,6 @@ public class RuneUIController : MonoBehaviour
         }
 
         ResolveCurrentPlayerContext();
-
-        int runeCount = GetRuneSourceCount();
         if (runeListContent == null)
         {
             if (!warnedMissingRuneList)
@@ -189,8 +191,11 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        List<RuneDefinition> visibleRunes = BuildVisibleRuneList();
+        int runeCount = visibleRunes.Count;
         int childCount = runeListContent.childCount;
         bool hasRuneEntries = runeCount > 0;
+        Dictionary<string, int> visibleRuneIndices = new Dictionary<string, int>();
 
         if (noRuneText != null)
         {
@@ -206,7 +211,7 @@ public class RuneUIController : MonoBehaviour
                 continue;
             }
 
-            RuneDefinition rune = i < runeCount ? GetRuneAtIndex(i) : null;
+            RuneDefinition rune = i < runeCount ? visibleRunes[i] : null;
             Button button = child.GetComponent<Button>();
             TextMeshProUGUI label = child.GetComponent<TextMeshProUGUI>();
             if (label == null)
@@ -214,9 +219,22 @@ public class RuneUIController : MonoBehaviour
                 label = child.GetComponentInChildren<TextMeshProUGUI>(true);
             }
 
+            child.gameObject.SetActive(rune != null);
             if (label != null)
             {
-                label.text = rune != null ? GetRuneName(rune) : "Empty";
+                if (rune != null)
+                {
+                    string runeKey = GetRuneStackKey(rune);
+                    int visibleIndex = 0;
+                    visibleRuneIndices.TryGetValue(runeKey, out visibleIndex);
+                    visibleIndex++;
+                    visibleRuneIndices[runeKey] = visibleIndex;
+                    label.text = $"{GetRuneName(rune)} x{visibleIndex}";
+                }
+                else
+                {
+                    label.text = "Empty";
+                }
             }
 
             if (button != null)
@@ -326,12 +344,6 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        if (selectedRune == null)
-        {
-            Debug.LogWarning("[RuneUI] No rune selected.");
-            return;
-        }
-
         ResolveCurrentPlayerContext();
         if (currentSkillCaster == null)
         {
@@ -354,7 +366,40 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        RuneDefinition equippedRune = skill.equippedRunes[slotIndex];
+        if (equippedRune != null)
+        {
+            skill.equippedRunes[slotIndex] = null;
+            RefreshRuneList();
+            RefreshSkillSlots();
+            Debug.Log($"[RuneUI] Unequipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}", this);
+            return;
+        }
+
+        if (selectedRune == null)
+        {
+            if (!warnedMissingSelectedRune)
+            {
+                warnedMissingSelectedRune = true;
+                Debug.LogWarning("[RuneUI] Please select a rune first.", this);
+            }
+            return;
+        }
+
+        int availableCount = GetAvailableRuneCount(selectedRune);
+        if (availableCount <= 0)
+        {
+            if (!warnedAlreadyEquippedRune)
+            {
+                warnedAlreadyEquippedRune = true;
+                Debug.LogWarning("[RuneUI] No available copy of this rune.", this);
+            }
+            return;
+        }
+
         skill.equippedRunes[slotIndex] = selectedRune;
+        SetSelectedRune(null);
+        RefreshRuneList();
         RefreshSkillSlots();
     }
 
@@ -391,21 +436,18 @@ public class RuneUIController : MonoBehaviour
             out currentRuneLibrary,
             out currentSkillCaster,
             out currentRuneInventory);
-    }
 
-    private int GetRuneSourceCount()
-    {
-        if (currentRuneInventory != null)
+        if (currentRuneInventory == null && !warnedMissingRuneInventory)
         {
-            return currentRuneInventory.Count;
+            warnedMissingRuneInventory = true;
+            Debug.LogWarning("[RuneUI] Missing RuneInventory on current player. Rune list will show No rune.", this);
         }
 
-        if (currentRuneLibrary != null && currentRuneLibrary.runes != null)
+        if (currentRuneLibrary == null && !warnedMissingRuneLibrary)
         {
-            return currentRuneLibrary.runes.Length;
+            warnedMissingRuneLibrary = true;
+            Debug.LogWarning("[RuneUI] Missing RuneLibrary in scene. Rune names may use fallback text.", this);
         }
-
-        return 0;
     }
 
     private RuneDefinition GetRuneAtIndex(int index)
@@ -415,14 +457,10 @@ public class RuneUIController : MonoBehaviour
             return null;
         }
 
-        if (currentRuneInventory != null && index < currentRuneInventory.Count)
+        List<RuneDefinition> visibleRunes = BuildVisibleRuneList();
+        if (index >= 0 && index < visibleRunes.Count)
         {
-            return currentRuneInventory.GetRune(index);
-        }
-
-        if (currentRuneLibrary != null && currentRuneLibrary.runes != null && index < currentRuneLibrary.runes.Length)
-        {
-            return currentRuneLibrary.runes[index];
+            return visibleRunes[index];
         }
 
         return null;
@@ -457,6 +495,182 @@ public class RuneUIController : MonoBehaviour
         }
 
         return "Rune";
+    }
+
+    private string GetSkillKeyName(int skillIndex)
+    {
+        switch (skillIndex)
+        {
+            case 0:
+                return "Q";
+            case 1:
+                return "W";
+            case 2:
+                return "E";
+            case 3:
+                return "R";
+            default:
+                return $"Skill{skillIndex}";
+        }
+    }
+
+    private List<RuneDefinition> BuildVisibleRuneList()
+    {
+        List<RuneDefinition> visibleRunes = new List<RuneDefinition>();
+        if (currentRuneInventory == null || currentRuneInventory.Count <= 0)
+        {
+            return visibleRunes;
+        }
+
+        Dictionary<string, int> hiddenCopiesByKey = new Dictionary<string, int>();
+        for (int i = 0; i < currentRuneInventory.Count; i++)
+        {
+            RuneDefinition rune = currentRuneInventory.GetRune(i);
+            if (rune == null)
+            {
+                continue;
+            }
+
+            string runeKey = GetRuneStackKey(rune);
+            int equippedCopies = CountEquippedRuneCopies(rune);
+            int hiddenCopies = 0;
+            hiddenCopiesByKey.TryGetValue(runeKey, out hiddenCopies);
+            if (hiddenCopies < equippedCopies)
+            {
+                hiddenCopiesByKey[runeKey] = hiddenCopies + 1;
+                continue;
+            }
+
+            visibleRunes.Add(rune);
+        }
+
+        return visibleRunes;
+    }
+
+    private bool IsRuneAlreadyEquipped(RuneDefinition rune)
+    {
+        return GetAvailableRuneCount(rune) <= 0;
+    }
+
+    private int GetAvailableRuneCount(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return 0;
+        }
+
+        int inventoryCount = CountRuneCopiesInInventory(rune);
+        int equippedCount = CountEquippedRuneCopies(rune);
+        return Mathf.Max(0, inventoryCount - equippedCount);
+    }
+
+    private int CountRuneCopiesInInventory(RuneDefinition rune)
+    {
+        if (rune == null || currentRuneInventory == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < currentRuneInventory.Count; i++)
+        {
+            if (RuneMatches(currentRuneInventory.GetRune(i), rune))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int CountEquippedRuneCopies(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        CombatSkillCaster[] casters = Object.FindObjectsOfType<CombatSkillCaster>(true);
+        for (int casterIndex = 0; casterIndex < casters.Length; casterIndex++)
+        {
+            count += CountEquippedRuneCopies(casters[casterIndex], rune);
+        }
+
+        return count;
+    }
+
+    private int CountEquippedRuneCopies(CombatSkillCaster caster, RuneDefinition rune)
+    {
+        if (caster == null || rune == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < SkillCount; skillIndex++)
+        {
+            BattleSkill skill = caster.GetSkill(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < skill.equippedRunes.Length; i++)
+            {
+                if (RuneMatches(skill.equippedRunes[i], rune))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private string GetRuneStackKey(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return "null";
+        }
+
+        if (rune.id != 0)
+        {
+            return $"id:{rune.id}";
+        }
+
+        if (!string.IsNullOrEmpty(rune.runeName))
+        {
+            return $"name:{rune.runeName}";
+        }
+
+        return $"ref:{rune.GetHashCode()}";
+    }
+
+    private bool RuneMatches(RuneDefinition a, RuneDefinition b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return true;
+        }
+
+        if (a == null || b == null)
+        {
+            return false;
+        }
+
+        if (a.id != 0 && a.id == b.id)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(a.runeName) && !string.IsNullOrEmpty(b.runeName) && a.runeName == b.runeName)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void RefreshSelectedRuneDetails(RuneDefinition rune)
@@ -631,12 +845,16 @@ public static class RuneUIContextResolver
 
         if (player != null)
         {
-            runeLibrary = player.GetComponentInChildren<RuneLibrary>(true) ?? player.GetComponent<RuneLibrary>();
-            runeInventory = player.GetComponentInChildren<RuneInventory>(true) ?? player.GetComponent<RuneInventory>();
             if (skillCaster == null)
             {
                 skillCaster = player.GetComponentInChildren<CombatSkillCaster>(true) ?? player.GetComponent<CombatSkillCaster>();
             }
+        }
+
+        runeInventory = FindSharedRuneInventory();
+        if (runeInventory == null && player != null)
+        {
+            runeInventory = player.GetComponentInChildren<RuneInventory>(true) ?? player.GetComponent<RuneInventory>();
         }
 
         if (runeLibrary == null)
@@ -648,20 +866,49 @@ public static class RuneUIContextResolver
             }
         }
 
-        if (runeInventory == null)
+        return player != null || runeLibrary != null || runeInventory != null || skillCaster != null;
+    }
+
+    private static RuneInventory FindSharedRuneInventory()
+    {
+        RuneDropManager dropManager = Object.FindObjectOfType<RuneDropManager>(true);
+        if (dropManager != null)
         {
-            RuneInventory[] inventories = Object.FindObjectsOfType<RuneInventory>(true);
-            if (inventories != null && inventories.Length > 0)
+            RuneInventory inventory = dropManager.GetComponent<RuneInventory>();
+            if (inventory != null)
             {
-                runeInventory = inventories[0];
+                return inventory;
+            }
+
+            inventory = dropManager.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
             }
         }
 
-        if (skillCaster == null && player != null)
+        RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
+        for (int i = 0; i < libraries.Length; i++)
         {
-            skillCaster = player.GetComponentInChildren<CombatSkillCaster>(true) ?? player.GetComponent<CombatSkillCaster>();
+            RuneLibrary library = libraries[i];
+            if (library == null)
+            {
+                continue;
+            }
+
+            RuneInventory inventory = library.GetComponent<RuneInventory>();
+            if (inventory != null)
+            {
+                return inventory;
+            }
+
+            inventory = library.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
+            }
         }
 
-        return player != null || runeLibrary != null || runeInventory != null || skillCaster != null;
+        return null;
     }
 }

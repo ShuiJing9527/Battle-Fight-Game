@@ -14,9 +14,11 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
+    private RuneDropManager runeDropManager;
     private bool dropped;
     private bool triedMissingHealthLog;
     private bool deathEventsBound;
+    private bool triedMissingRuneDropManager;
 
     private void OnEnable()
     {
@@ -220,6 +222,11 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private void CreateRune(Vector3 position)
     {
+        if (TrySpawnRuneFromManager(position))
+        {
+            return;
+        }
+
         Debug.Log($"[RuneDrop] spawn request prefab={(runePickupPrefab != null ? runePickupPrefab.name : "null")} position={position}", this);
         RuneLibrary library = FindObjectOfType<RuneLibrary>();
         RuneDefinition rune = library != null ? library.GetRandomRune() : RuneDefinition.CreateTableRune(RuneMechanic.Combo);
@@ -265,6 +272,35 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
         fallbackPickup.rune = rune;
         fallbackPickup.destroyAfterPickup = true;
+    }
+
+    private bool TrySpawnRuneFromManager(Vector3 position)
+    {
+        RuneDropManager manager = ResolveRuneDropManager();
+        if (manager == null)
+        {
+            return false;
+        }
+
+        RunePickup pickup = manager.SpawnRandomRune(position);
+        return pickup != null;
+    }
+
+    private RuneDropManager ResolveRuneDropManager()
+    {
+        if (runeDropManager != null)
+        {
+            return runeDropManager;
+        }
+
+        runeDropManager = Object.FindFirstObjectByType<RuneDropManager>();
+        if (runeDropManager == null && !triedMissingRuneDropManager)
+        {
+            triedMissingRuneDropManager = true;
+            Debug.LogWarning($"[RuntimeLootDropOnDeath] RuneDropManager not found in scene. Falling back to local runePrefab on {name}.", this);
+        }
+
+        return runeDropManager;
     }
 
 }

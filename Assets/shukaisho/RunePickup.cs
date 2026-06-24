@@ -6,6 +6,13 @@ public class RunePickup : MonoBehaviour
     public RuneDefinition rune;
     public bool destroyAfterPickup = true;
 
+    private static bool warnedMissingSharedInventory;
+
+    public void SetRune(RuneDefinition newRune)
+    {
+        rune = newRune;
+    }
+
     private void Reset()
     {
         Collider pickupCollider = GetComponent<Collider>();
@@ -30,6 +37,14 @@ public class RunePickup : MonoBehaviour
 
     private RuneInventory ResolveInventory(Collider other)
     {
+        RuneInventory sharedInventory = ResolveSharedInventory();
+        if (sharedInventory != null)
+        {
+            return sharedInventory;
+        }
+
+        WarnMissingSharedInventoryOnce();
+
         if (other == null)
         {
             return null;
@@ -60,5 +75,59 @@ public class RunePickup : MonoBehaviour
         }
 
         return null;
+    }
+
+    private RuneInventory ResolveSharedInventory()
+    {
+        RuneDropManager dropManager = RuneDropManager.Instance;
+        if (dropManager != null)
+        {
+            RuneInventory inventory = dropManager.GetComponent<RuneInventory>();
+            if (inventory != null)
+            {
+                return inventory;
+            }
+
+            inventory = dropManager.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
+            }
+        }
+
+        RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
+        for (int i = 0; i < libraries.Length; i++)
+        {
+            RuneLibrary library = libraries[i];
+            if (library == null)
+            {
+                continue;
+            }
+
+            RuneInventory inventory = library.GetComponent<RuneInventory>();
+            if (inventory != null)
+            {
+                return inventory;
+            }
+
+            inventory = library.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
+            }
+        }
+
+        return null;
+    }
+
+    private void WarnMissingSharedInventoryOnce()
+    {
+        if (warnedMissingSharedInventory)
+        {
+            return;
+        }
+
+        warnedMissingSharedInventory = true;
+        Debug.LogWarning("[RunePickup] Missing shared RuneInventory on RuneSystem. Falling back to player RuneInventory.", this);
     }
 }
