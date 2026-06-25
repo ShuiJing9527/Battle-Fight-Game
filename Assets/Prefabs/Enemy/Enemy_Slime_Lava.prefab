@@ -107,6 +107,7 @@ GameObject:
   - component: {fileID: 3333333333333333333}
   - component: {fileID: 6856757296233924673}
   - component: {fileID: 1335638924281345140}
+  - component: {fileID: -1209823531993012852}
   m_Layer: 0
   m_Name: Enemy_Slime_Lava
   m_TagString: Untagged
@@ -323,3 +324,26 @@ MonoBehaviour:
   bossScale: 2.4
   applyScale: 1
   createFallbackLight: 1
+--- !u!114 &-1209823531993012852
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 3090e076f6119654daeade9b650c5014, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::WorldHealthBar
+  offset: {x: 0, y: 0.75, z: 0}
+  size: {x: 1.6, y: 0.12}
+  backgroundColor: {r: 0.05, g: 0.05, b: 0.05, a: 0.85}
+  fillColor: {r: 0.9, g: 0.15, b: 0.12, a: 0.95}
+  sortingOrder: 200
+  usePrefabBar: 1
+  createFallbackBarIfMissing: 1
+  healthBarPrefab: {fileID: 4514870386728799672, guid: 18802855a1b39f1499e49ce4684f4e18, type: 3}
+  barInstanceRoot: {fileID: 0}
+  backgroundRenderer: {fileID: 0}
+  fillRenderer: {fileID: 0}

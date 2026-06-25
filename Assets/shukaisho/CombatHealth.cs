@@ -258,7 +258,6 @@ public class CombatHealth : MonoBehaviour
             OnShieldChanged?.Invoke(localShield, localMaxShield);
         }
 
-        Debug.Log($"[Shield] absorbed={shieldUsed:F2}, remaining={remainingShield:F2}, incoming={amount:F2}", this);
         return amount - shieldUsed;
     }
 

@@ -80,8 +80,6 @@ public class SoulDropOnDeath : MonoBehaviour
                 SoulPickup soul = soulObject.AddComponent<SoulPickup>();
                 soul.Configure(entry.soulType, soul.amount);
                 soulObject.SetActive(true);
-                Debug.Log($"[SoulDrop] spawn type={entry.soulType} amount={soul.amount:F2} position={soulObject.transform.position}", soul);
-                Debug.Log($"[SoulPickup] spawned type={entry.soulType} amount={soul.amount:F2}", soul);
             }
         }
     }

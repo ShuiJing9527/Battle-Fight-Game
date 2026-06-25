@@ -181,7 +181,6 @@ public class BattleResourceBank : MonoBehaviour
         shield -= shieldUsed;
         if (shieldUsed > 0f)
         {
-            Debug.Log($"[Shield] absorbed={shieldUsed:F2}, remaining={shield:F2}, incoming={amount:F2}", this);
             OnShieldChanged?.Invoke(shield, maxShield);
         }
         return amount - shieldUsed;

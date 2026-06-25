@@ -19,12 +19,16 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     private bool triedMissingHealthLog;
     private bool deathEventsBound;
     private bool triedMissingRuneDropManager;
+    private bool warnedMissingSoulPrefab;
+    private bool warnedMissingRunePickupPrefab;
 
     private void OnEnable()
     {
         dropped = false;
         triedMissingHealthLog = false;
         deathEventsBound = false;
+        warnedMissingSoulPrefab = false;
+        warnedMissingRunePickupPrefab = false;
         TryBindDeathEvents(true);
     }
 
@@ -64,7 +68,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         dropped = true;
-        Debug.Log($"[RuntimeLootDropOnDeath] death triggered enemy={name} position={transform.position}", this);
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
 
@@ -101,7 +104,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private void CreateSoul(SoulType type, float amount, Vector3 position)
     {
-        Debug.Log($"[RuntimeLootDropOnDeath] spawn request prefab={(soulPrefab != null ? soulPrefab.name : "null")} amount={amount:F2} position={position}", this);
         if (soulPrefab != null)
         {
             SoulPickup pickup = Instantiate(soulPrefab, position, Quaternion.identity);
@@ -110,12 +112,11 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             pickup.destroyAfterPickup = true;
             pickup.gameObject.SetActive(true);
             pickup.Configure(type, amount);
-            Debug.Log($"[RuntimeLootDropOnDeath] spawned instance={pickup.name} active={pickup.gameObject.activeInHierarchy} position={pickup.transform.position} scale={pickup.transform.localScale}", pickup);
             EnsureDebugVisible(pickup.gameObject);
             return;
         }
 
-        Debug.LogWarning("[SoulDrop] soulPrefab missing, fallback simple soul created.", this);
+        WarnMissingSoulPrefabOnce();
         GameObject soulObject = new GameObject($"{type} Soul");
         soulObject.transform.position = position;
         soulObject.transform.localScale = Vector3.one * 0.35f;
@@ -131,7 +132,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         SoulPickup fallbackPickup = soulObject.AddComponent<SoulPickup>();
         fallbackPickup.Configure(type, amount);
         soulObject.SetActive(true);
-        Debug.Log($"[RuntimeLootDropOnDeath] spawned instance={fallbackPickup.name} active={fallbackPickup.gameObject.activeInHierarchy} position={fallbackPickup.transform.position} scale={fallbackPickup.transform.localScale}", fallbackPickup);
     }
 
     private void TryBindDeathEvents(bool logMissing)
@@ -165,7 +165,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
         if (deathEventsBound)
         {
-            Debug.Log($"[RuntimeLootDropOnDeath] enabled enemy={name} health={(combatHealth != null ? combatHealth.name : (enemyHealth != null ? enemyHealth.name : "null"))} soulPrefab={(soulPrefab != null ? soulPrefab.name : "null")}", this);
             return;
         }
 
@@ -227,7 +226,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[RuneDrop] spawn request prefab={(runePickupPrefab != null ? runePickupPrefab.name : "null")} position={position}", this);
         RuneLibrary library = FindObjectOfType<RuneLibrary>();
         RuneDefinition rune = library != null ? library.GetRandomRune() : RuneDefinition.CreateTableRune(RuneMechanic.Combo);
         if (rune == null)
@@ -241,11 +239,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             pickup.rune = rune;
             pickup.destroyAfterPickup = true;
             pickup.gameObject.SetActive(true);
-            Debug.Log($"[RuneDrop] spawned instance={pickup.name} active={pickup.gameObject.activeInHierarchy} position={pickup.transform.position} scale={pickup.transform.localScale}", pickup);
             return;
         }
 
-        Debug.LogWarning("[RuneDrop] runePickupPrefab missing, fallback simple rune created.", this);
+        WarnMissingRunePickupPrefabOnce();
         GameObject runeObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
         runeObject.name = $"Rune - {rune.runeName}";
         runeObject.transform.position = position;
@@ -301,6 +298,28 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         return runeDropManager;
+    }
+
+    private void WarnMissingSoulPrefabOnce()
+    {
+        if (warnedMissingSoulPrefab)
+        {
+            return;
+        }
+
+        warnedMissingSoulPrefab = true;
+        Debug.LogWarning("[SoulDrop] soulPrefab missing, fallback simple soul created.", this);
+    }
+
+    private void WarnMissingRunePickupPrefabOnce()
+    {
+        if (warnedMissingRunePickupPrefab)
+        {
+            return;
+        }
+
+        warnedMissingRunePickupPrefab = true;
+        Debug.LogWarning("[RuneDrop] runePickupPrefab missing, fallback simple rune created.", this);
     }
 
 }

@@ -7,27 +7,33 @@ public class WorldHealthBar : MonoBehaviour
     public Color backgroundColor = new Color(0.05f, 0.05f, 0.05f, 0.85f);
     public Color fillColor = new Color(0.9f, 0.15f, 0.12f, 0.95f);
     public int sortingOrder = 200;
+    public bool usePrefabBar = true;
+    public bool createFallbackBarIfMissing = true;
+    public GameObject healthBarPrefab;
+    public Transform barInstanceRoot;
+    public SpriteRenderer backgroundRenderer;
+    public SpriteRenderer fillRenderer;
 
     private static Sprite whiteSprite;
 
     private CombatHealth combatHealth;
     private EnemyHealth legacyHealth;
     private Transform cameraTransform;
-    private GameObject root;
-    private Transform fill;
     private int legacyMaxHp;
-
+    private bool initialized;
+    private bool usingFallbackBar;
+    private float backgroundLocalZ;
+    private float fillLocalZ;
     private void Awake()
     {
-        combatHealth = GetComponent<CombatHealth>();
-        legacyHealth = GetComponent<EnemyHealth>();
-        legacyMaxHp = legacyHealth != null ? Mathf.Max(1, legacyHealth.hp) : 1;
-        CreateBar();
+        RefreshHealthBindings();
+        EnsureBarInitialized();
     }
 
     private void LateUpdate()
     {
-        if (root == null)
+        EnsureBarInitialized();
+        if (barInstanceRoot == null)
         {
             return;
         }
@@ -37,56 +43,273 @@ public class WorldHealthBar : MonoBehaviour
             cameraTransform = Camera.main.transform;
         }
 
-        root.transform.position = transform.position + offset;
+        barInstanceRoot.position = transform.position + offset;
         if (cameraTransform != null)
         {
-            root.transform.rotation = cameraTransform.rotation;
+            barInstanceRoot.rotation = cameraTransform.rotation;
         }
 
+        RefreshHealthBindings();
         float ratio = ResolveHealthRatio();
-        fill.localScale = new Vector3(size.x * ratio, size.y, 1f);
-        fill.localPosition = new Vector3((ratio - 1f) * size.x * 0.5f, 0f, -0.01f);
+        ApplyBarSize(ratio);
+    }
+
+    private void EnsureBarInitialized()
+    {
+        if (initialized)
+        {
+            return;
+        }
+
+        initialized = true;
+
+        if (usePrefabBar && healthBarPrefab != null)
+        {
+            CreateBarFromPrefab();
+        }
+
+        if (barInstanceRoot == null && createFallbackBarIfMissing)
+        {
+            CreateFallbackBar();
+        }
+
+        CacheRendererReferencesFromChildren();
+        EnsureRendererSprites();
+        CacheDepthOffsets();
     }
 
     private float ResolveHealthRatio()
     {
-        if (combatHealth != null)
+        bool hasValue = false;
+        float ratio = 1f;
+
+        if (TryGetCombatHealthRatio(out float combatRatio))
         {
-            return combatHealth.MaxHealthValue > 0f ? Mathf.Clamp01(combatHealth.currentHealth / combatHealth.MaxHealthValue) : 0f;
+            ratio = combatRatio;
+            hasValue = true;
         }
 
-        if (legacyHealth != null)
+        if (TryGetLegacyHealthRatio(out float legacyRatio))
         {
-            return Mathf.Clamp01((float)legacyHealth.hp / Mathf.Max(1, legacyMaxHp));
+            ratio = hasValue ? Mathf.Min(ratio, legacyRatio) : legacyRatio;
+            hasValue = true;
         }
 
-        return 1f;
+        return hasValue ? Mathf.Clamp01(ratio) : -1f;
     }
 
-    private void CreateBar()
+    private bool TryGetCombatHealthRatio(out float ratio)
     {
-        root = new GameObject("WorldHealthBar");
+        ratio = 1f;
+        if (combatHealth == null)
+        {
+            return false;
+        }
+
+        float currentHealth = combatHealth.currentHealth;
+        float maxHealth = combatHealth.MaxHealthValue;
+
+        if (combatHealth.resourceBank != null)
+        {
+            currentHealth = combatHealth.resourceBank.currentHealth;
+            maxHealth = combatHealth.resourceBank.maxHealth;
+        }
+
+        if (maxHealth <= 0f)
+        {
+            ratio = 0f;
+            return true;
+        }
+
+        ratio = Mathf.Clamp01(currentHealth / maxHealth);
+        return true;
+    }
+
+    private bool TryGetLegacyHealthRatio(out float ratio)
+    {
+        ratio = 1f;
+        if (legacyHealth == null)
+        {
+            return false;
+        }
+
+        ratio = Mathf.Clamp01((float)legacyHealth.hp / Mathf.Max(1, legacyMaxHp));
+        return true;
+    }
+
+    private void CreateBarFromPrefab()
+    {
+        GameObject instance = Instantiate(healthBarPrefab, transform);
+        instance.name = "WorldHealthBar";
+        barInstanceRoot = instance.transform;
+    }
+
+    private void CreateFallbackBar()
+    {
+        usingFallbackBar = true;
+
+        GameObject root = new GameObject("WorldHealthBar");
         root.transform.SetParent(transform, false);
+        barInstanceRoot = root.transform;
 
-        GameObject background = CreateSpritePart("Background", backgroundColor, sortingOrder);
+        GameObject background = CreateFallbackSpritePart("Background", backgroundColor, sortingOrder);
         background.transform.localScale = new Vector3(size.x, size.y, 1f);
+        backgroundRenderer = background.GetComponent<SpriteRenderer>();
 
-        GameObject fillObject = CreateSpritePart("Fill", fillColor, sortingOrder + 1);
+        GameObject fillObject = CreateFallbackSpritePart("Fill", fillColor, sortingOrder + 1);
         fillObject.transform.localScale = new Vector3(size.x, size.y, 1f);
         fillObject.transform.localPosition = new Vector3(0f, 0f, -0.01f);
-        fill = fillObject.transform;
+        fillRenderer = fillObject.GetComponent<SpriteRenderer>();
     }
 
-    private GameObject CreateSpritePart(string partName, Color color, int order)
+    private GameObject CreateFallbackSpritePart(string partName, Color color, int order)
     {
         GameObject part = new GameObject(partName);
-        part.transform.SetParent(root.transform, false);
+        part.transform.SetParent(barInstanceRoot, false);
 
         SpriteRenderer renderer = part.AddComponent<SpriteRenderer>();
         renderer.sprite = GetWhiteSprite();
         renderer.color = color;
         renderer.sortingOrder = order;
         return part;
+    }
+
+    private void CacheRendererReferencesFromChildren()
+    {
+        if (barInstanceRoot == null)
+        {
+            return;
+        }
+
+        if (backgroundRenderer == null)
+        {
+            Transform background = barInstanceRoot.Find("Background");
+            if (background != null)
+            {
+                backgroundRenderer = background.GetComponent<SpriteRenderer>();
+            }
+        }
+
+        if (fillRenderer == null)
+        {
+            Transform fill = barInstanceRoot.Find("Fill");
+            if (fill != null)
+            {
+                fillRenderer = fill.GetComponent<SpriteRenderer>();
+            }
+        }
+    }
+
+    private void EnsureRendererSprites()
+    {
+        if (backgroundRenderer != null && backgroundRenderer.sprite == null)
+        {
+            backgroundRenderer.sprite = GetWhiteSprite();
+        }
+
+        if (fillRenderer != null && fillRenderer.sprite == null)
+        {
+            fillRenderer.sprite = GetWhiteSprite();
+        }
+    }
+
+    private void CacheDepthOffsets()
+    {
+        if (backgroundRenderer != null)
+        {
+            backgroundLocalZ = backgroundRenderer.transform.localPosition.z;
+        }
+
+        if (fillRenderer != null)
+        {
+            fillLocalZ = fillRenderer.transform.localPosition.z;
+        }
+    }
+
+    private void ApplyBarSize(float ratio)
+    {
+        if (backgroundRenderer == null || fillRenderer == null)
+        {
+            return;
+        }
+
+        bool hasHealthSource = ratio >= 0f;
+        ratio = hasHealthSource ? Mathf.Clamp01(ratio) : 0f;
+        EnsureRendererSprites();
+
+        backgroundRenderer.sortingOrder = sortingOrder;
+        fillRenderer.sortingOrder = sortingOrder + 1;
+        backgroundRenderer.enabled = hasHealthSource;
+        fillRenderer.enabled = hasHealthSource && ratio > 0f;
+
+        if (!hasHealthSource)
+        {
+            return;
+        }
+
+        ApplyRendererDimensions(backgroundRenderer, size.x, size.y);
+        backgroundRenderer.transform.localPosition = new Vector3(0f, 0f, backgroundLocalZ);
+
+        ApplyRendererDimensions(fillRenderer, size.x * ratio, size.y);
+        float fillX = -(size.x * (1f - ratio)) * 0.5f;
+        float fillZ = usingFallbackBar ? -0.01f : fillLocalZ;
+        fillRenderer.transform.localPosition = new Vector3(fillX, 0f, fillZ);
+    }
+
+    private static void ApplyRendererDimensions(SpriteRenderer renderer, float width, float height)
+    {
+        if (renderer == null)
+        {
+            return;
+        }
+
+        Sprite sprite = renderer.sprite;
+        float spriteWidth = 1f;
+        float spriteHeight = 1f;
+        if (sprite != null)
+        {
+            Vector2 spriteSize = sprite.bounds.size;
+            spriteWidth = Mathf.Max(0.0001f, spriteSize.x);
+            spriteHeight = Mathf.Max(0.0001f, spriteSize.y);
+        }
+
+        renderer.transform.localScale = new Vector3(
+            Mathf.Max(0f, width) / spriteWidth,
+            Mathf.Max(0f, height) / spriteHeight,
+            1f);
+    }
+
+    private void RefreshHealthBindings()
+    {
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+            if (combatHealth == null)
+            {
+                combatHealth = GetComponentInParent<CombatHealth>();
+            }
+            if (combatHealth == null)
+            {
+                combatHealth = GetComponentInChildren<CombatHealth>(true);
+            }
+        }
+
+        if (legacyHealth == null)
+        {
+            legacyHealth = GetComponent<EnemyHealth>();
+            if (legacyHealth == null)
+            {
+                legacyHealth = GetComponentInParent<EnemyHealth>();
+            }
+            if (legacyHealth == null)
+            {
+                legacyHealth = GetComponentInChildren<EnemyHealth>(true);
+            }
+            if (legacyHealth != null)
+            {
+                legacyMaxHp = Mathf.Max(1, legacyHealth.hp);
+            }
+        }
     }
 
     private static Sprite GetWhiteSprite()
@@ -105,4 +328,5 @@ public class WorldHealthBar : MonoBehaviour
         whiteSprite.name = "RuntimeHealthBarWhiteSprite";
         return whiteSprite;
     }
+
 }

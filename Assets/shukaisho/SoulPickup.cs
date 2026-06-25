@@ -59,6 +59,9 @@ public class SoulPickup : MonoBehaviour
     private bool absorbTargetLogged;
     private bool noTargetLogged;
     private bool isAbsorbing;
+    private bool warnedMissingHaloRing;
+    private bool warnedMissingCoreParticles;
+    private bool warnedMissingTrailParticles;
 
     private void Awake()
     {
@@ -78,12 +81,13 @@ public class SoulPickup : MonoBehaviour
         absorbTargetLogged = false;
         noTargetLogged = false;
         isAbsorbing = false;
+        warnedMissingHaloRing = false;
+        warnedMissingCoreParticles = false;
+        warnedMissingTrailParticles = false;
 
         CacheReferences();
         EnsureTriggerCollider();
         EnsureVisuals();
-        Debug.Log($"[SoulPickup] spawned name={name} type={soulType} amount={amount:F2} position={transform.position}", this);
-        Debug.Log($"[SoulPickup] refs core={(coreParticles != null ? coreParticles.name : "null")} trail={(trailParticles != null ? trailParticles.name : "null")} halo={(haloRingRenderer != null ? haloRingRenderer.name : "null")}", this);
     }
 
     private void OnDisable()
@@ -124,7 +128,6 @@ public class SoulPickup : MonoBehaviour
         if (!absorbTargetLogged)
         {
             absorbTargetLogged = true;
-            Debug.Log($"[SoulPickup] start absorb target={target.name}", this);
         }
 
         if (Time.time < spawnTime + absorbDelay)
@@ -192,10 +195,8 @@ public class SoulPickup : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[SoulPickup] ApplySoul called type={soulType} amount={amount:F2} target={bank.name}", this);
         bank.ApplySoul(soulType, amount);
         absorbed = true;
-        Debug.Log($"[SoulPickup] absorbed type={soulType} target={bank.name}", this);
 
         if (destroyAfterPickup)
         {
@@ -325,18 +326,21 @@ public class SoulPickup : MonoBehaviour
             ApplyHaloRingTransform();
             ConfigureHaloRing();
         }
-        else if (EnableHaloRingVisuals)
+        else if (EnableHaloRingVisuals && !warnedMissingHaloRing)
         {
+            warnedMissingHaloRing = true;
             Debug.LogWarning("[SoulPickup] Missing halo ring reference on prefab", this);
         }
 
-        if (coreParticles == null)
+        if (coreParticles == null && !warnedMissingCoreParticles)
         {
+            warnedMissingCoreParticles = true;
             Debug.LogWarning("[SoulPickup] Missing coreParticles reference on prefab", this);
         }
 
-        if (trailParticles == null)
+        if (trailParticles == null && !warnedMissingTrailParticles)
         {
+            warnedMissingTrailParticles = true;
             Debug.LogWarning("[SoulPickup] Missing trailParticles reference on prefab", this);
         }
 
@@ -447,25 +451,6 @@ public class SoulPickup : MonoBehaviour
             ParticleSystem.MainModule trail = trailParticles.main;
             Color trailColor = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(tint.a * TrailTintAlphaMultiplier));
             trail.startColor = new ParticleSystem.MinMaxGradient(trailColor);
-        }
-    }
-
-    private void LogParticleState(string stage)
-    {
-        Debug.Log($"[SoulPickup] {stage} root={name} coreParticles={(coreParticles != null ? coreParticles.name : "null")} haloRing={(haloRingRenderer != null ? haloRingRenderer.name : "null")} trailParticles={(trailParticles != null ? trailParticles.name : "null")}", this);
-    }
-
-    private void LogHaloState()
-    {
-        if (!EnableHaloRingVisuals)
-        {
-            return;
-        }
-
-        if (haloRingRenderer == null)
-        {
-            Debug.Log("[SoulOrb Halo] active=false sprite=null rendererEnabled=false color=null alpha=0 scale=0 sortingOrder=0 cameraFacing=false", this);
-            return;
         }
     }
 

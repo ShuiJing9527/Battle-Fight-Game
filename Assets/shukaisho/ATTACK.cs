@@ -22,6 +22,7 @@ public class ATTACK : MonoBehaviour
     private Vector3 lastMoveDir = Vector3.forward;
 
     private float nextAttackTime = 0f;
+    private bool warnedMissingAttackPoint;
 
     void Start()
     {
@@ -89,7 +90,11 @@ public class ATTACK : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("ATTACK requires attackPoint for normal attacks.");
+            if (!warnedMissingAttackPoint)
+            {
+                warnedMissingAttackPoint = true;
+                Debug.LogWarning("ATTACK requires attackPoint for normal attacks.");
+            }
             return;
         }
 
