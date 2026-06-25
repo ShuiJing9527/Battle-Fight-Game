@@ -37,6 +37,7 @@ public class RunePickup : MonoBehaviour
 
     private RuneInventory ResolveInventory(Collider other)
     {
+        // Shared RuneSystem inventory takes priority so both players see the same bag state.
         RuneInventory sharedInventory = ResolveSharedInventory();
         if (sharedInventory != null)
         {

@@ -11,13 +11,24 @@ public struct SkillCostCDData
 
 public class PlayerSkillCooldownManager : MonoBehaviour
 {
+    private const int SkillCount = 4;
+    private const float ReadyCooldownThreshold = 0.01f;
+    private const float DefaultQCooldown = 2f;
+    private const float DefaultWCooldown = 6f;
+    private const float DefaultECooldown = 4f;
+    private const float DefaultRCooldown = 12f;
+    private const float DefaultQManaCost = 10f;
+    private const float DefaultWManaCost = 30f;
+    private const float DefaultEManaCost = 20f;
+    private const float DefaultRManaCost = 60f;
+
     [Header("Skill config: Q(0) W(1) E(2) R(3)")]
-    public SkillCostCDData[] skillDatas = new SkillCostCDData[4]
+    public SkillCostCDData[] skillDatas = new SkillCostCDData[SkillCount]
     {
-        new SkillCostCDData { maxCooldown = 2f, manaCost = 10f },
-        new SkillCostCDData { maxCooldown = 6f, manaCost = 30f },
-        new SkillCostCDData { maxCooldown = 4f, manaCost = 20f },
-        new SkillCostCDData { maxCooldown = 12f, manaCost = 60f }
+        new SkillCostCDData { maxCooldown = DefaultQCooldown, manaCost = DefaultQManaCost },
+        new SkillCostCDData { maxCooldown = DefaultWCooldown, manaCost = DefaultWManaCost },
+        new SkillCostCDData { maxCooldown = DefaultECooldown, manaCost = DefaultEManaCost },
+        new SkillCostCDData { maxCooldown = DefaultRCooldown, manaCost = DefaultRManaCost }
     };
 
     [Header("Mana")]
@@ -40,7 +51,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
             resourceBank = GetComponent<BattleResourceBank>();
         }
 
-        runtimeCurrentCD = new float[4];
+        runtimeCurrentCD = new float[SkillCount];
 
         if (resourceBank != null)
         {
@@ -67,6 +78,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     {
         EnsureRuntimeArrays();
 
+        // Cooldown and mana are advanced together so the HUD can read a consistent state.
         for (int i = 0; i < runtimeCurrentCD.Length; i++)
         {
             runtimeCurrentCD[i] = Mathf.Max(0f, runtimeCurrentCD[i] - deltaTime);
@@ -102,7 +114,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
 
         SkillCostCDData data = skillDatas[skillIndex];
         float currentMana = resourceBank != null ? resourceBank.currentEnergy : runtimeCurrentMana;
-        return runtimeCurrentCD[skillIndex] <= 0.01f && currentMana >= data.manaCost;
+        return runtimeCurrentCD[skillIndex] <= ReadyCooldownThreshold && currentMana >= data.manaCost;
     }
 
     public void ConsumeSkillResource(int skillIndex)
@@ -189,19 +201,19 @@ public class PlayerSkillCooldownManager : MonoBehaviour
 
     private void EnsureRuntimeArrays()
     {
-        if (runtimeCurrentCD == null || runtimeCurrentCD.Length != 4)
+        if (runtimeCurrentCD == null || runtimeCurrentCD.Length != SkillCount)
         {
-            runtimeCurrentCD = new float[4];
+            runtimeCurrentCD = new float[SkillCount];
         }
 
-        if (skillDatas == null || skillDatas.Length != 4)
+        if (skillDatas == null || skillDatas.Length != SkillCount)
         {
-            skillDatas = new SkillCostCDData[4]
+            skillDatas = new SkillCostCDData[SkillCount]
             {
-                new SkillCostCDData { maxCooldown = 2f, manaCost = 10f },
-                new SkillCostCDData { maxCooldown = 6f, manaCost = 30f },
-                new SkillCostCDData { maxCooldown = 4f, manaCost = 20f },
-                new SkillCostCDData { maxCooldown = 12f, manaCost = 60f }
+                new SkillCostCDData { maxCooldown = DefaultQCooldown, manaCost = DefaultQManaCost },
+                new SkillCostCDData { maxCooldown = DefaultWCooldown, manaCost = DefaultWManaCost },
+                new SkillCostCDData { maxCooldown = DefaultECooldown, manaCost = DefaultEManaCost },
+                new SkillCostCDData { maxCooldown = DefaultRCooldown, manaCost = DefaultRManaCost }
             };
         }
     }

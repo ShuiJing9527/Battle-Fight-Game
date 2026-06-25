@@ -5,20 +5,44 @@ using UnityEngine;
 [System.Serializable]
 public class BattleSkill
 {
+    public const int DefaultRuneSlotCount = 5;
+
     public string skillName;
     public BattleSkillType skillType = BattleSkillType.SmallSkill;
     [Min(0f)] public float energyCost = 10f;
-    [Min(0)] public int runeSlotCount = 5;
+    [Min(0)] public int runeSlotCount = DefaultRuneSlotCount;
     [Min(1)] public int hitCount = 1;
     [Min(0f)] public float baseDamage = 1f;
     [Min(0f)] public float attackRange = 1.5f;
-    public RuneDefinition[] equippedRunes = new RuneDefinition[5];
+    public RuneDefinition[] equippedRunes = new RuneDefinition[DefaultRuneSlotCount];
 }
 
 public class CombatSkillCaster : MonoBehaviour
 {
+    private const string DefaultQSkillName = "Q Basic Skill";
+    private const float DefaultQEnergyCost = 10f;
+    private const float DefaultQBaseDamage = 10f;
+    private const float DefaultQAttackRange = 2f;
+
+    private const string DefaultWSkillName = "W Defense Skill";
+    private const float DefaultWEnergyCost = 30f;
+    private const float DefaultWBaseDamage = 0f;
+    private const float DefaultWAttackRange = 0f;
+
+    private const string DefaultESkillName = "E Movement Skill";
+    private const float DefaultEEnergyCost = 20f;
+    private const float DefaultEBaseDamage = 16f;
+    private const float DefaultEAttackRange = 1.2f;
+
+    private const string DefaultRSkillName = "R Ultimate Skill";
+    private const float DefaultREnergyCost = 60f;
+    private const float DefaultRBaseDamage = 50f;
+    private const float DefaultRAttackRange = 6f;
+
+    private const int SkillCount = 4;
+
     [Header("Skill slots: Q/W/E/R")]
-    public BattleSkill[] skills = new BattleSkill[4];
+    public BattleSkill[] skills = new BattleSkill[SkillCount];
 
     [Header("Attack Target")]
     public Transform attackPoint;
@@ -280,7 +304,7 @@ public class CombatSkillCaster : MonoBehaviour
 
     private void EnsureDefaultSkills()
     {
-        if (skills == null || skills.Length != 4)
+        if (skills == null || skills.Length != SkillCount)
         {
             LoadDefaultSkills();
         }
@@ -303,12 +327,13 @@ public class CombatSkillCaster : MonoBehaviour
 
     private void LoadDefaultSkills()
     {
+        // These defaults keep the four-slot Q/W/E/R setup readable and consistent across players.
         skills = new[]
         {
-            new BattleSkill { skillName = "Q Basic Skill", skillType = BattleSkillType.SmallSkill, energyCost = 10f, runeSlotCount = 5, hitCount = 1, baseDamage = 10f, attackRange = 2f },
-            new BattleSkill { skillName = "W Defense Skill", skillType = BattleSkillType.SmallSkill, energyCost = 30f, runeSlotCount = 5, hitCount = 1, baseDamage = 0f, attackRange = 0f },
-            new BattleSkill { skillName = "E Movement Skill", skillType = BattleSkillType.SmallSkill, energyCost = 20f, runeSlotCount = 5, hitCount = 1, baseDamage = 16f, attackRange = 1.2f },
-            new BattleSkill { skillName = "R Ultimate Skill", skillType = BattleSkillType.Ultimate, energyCost = 60f, runeSlotCount = 5, hitCount = 1, baseDamage = 50f, attackRange = 6f }
+            new BattleSkill { skillName = DefaultQSkillName, skillType = BattleSkillType.SmallSkill, energyCost = DefaultQEnergyCost, runeSlotCount = BattleSkill.DefaultRuneSlotCount, hitCount = 1, baseDamage = DefaultQBaseDamage, attackRange = DefaultQAttackRange },
+            new BattleSkill { skillName = DefaultWSkillName, skillType = BattleSkillType.SmallSkill, energyCost = DefaultWEnergyCost, runeSlotCount = BattleSkill.DefaultRuneSlotCount, hitCount = 1, baseDamage = DefaultWBaseDamage, attackRange = DefaultWAttackRange },
+            new BattleSkill { skillName = DefaultESkillName, skillType = BattleSkillType.SmallSkill, energyCost = DefaultEEnergyCost, runeSlotCount = BattleSkill.DefaultRuneSlotCount, hitCount = 1, baseDamage = DefaultEBaseDamage, attackRange = DefaultEAttackRange },
+            new BattleSkill { skillName = DefaultRSkillName, skillType = BattleSkillType.Ultimate, energyCost = DefaultREnergyCost, runeSlotCount = BattleSkill.DefaultRuneSlotCount, hitCount = 1, baseDamage = DefaultRBaseDamage, attackRange = DefaultRAttackRange }
         };
     }
 

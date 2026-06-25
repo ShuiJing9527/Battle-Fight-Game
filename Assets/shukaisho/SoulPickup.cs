@@ -4,6 +4,22 @@
 public class SoulPickup : MonoBehaviour
 {
     private const bool EnableHaloRingVisuals = true;
+    private const float HoverMoveSpeedMultiplier = 0.25f;
+    private const float MinHoverSpeed = 0.01f;
+    private const float HoverXFrequency = 1.07f;
+    private const float HoverYFrequency = 1.33f;
+    private const float HoverZFrequency = 0.91f;
+    private const float HoverYAmplitudeScale = 0.5f;
+    private const float HoverZAmplitudeScale = 0.35f;
+    private const float AbsorbHoverBlend = 0.15f;
+    private const float AbsorbTargetBlend = 0.75f;
+    private const float TrailIdleDistanceRate = 0f;
+    private const float TrailAbsorbDistanceRate = 35f;
+    private const float TrailLengthScale = 1f;
+    private const float TrailVelocityScale = 0.12f;
+    private const float TrailCameraVelocityScale = 0f;
+    private const float TrailTintAlphaMultiplier = 0.7f;
+    private const float HaloTintAlpha = 1f;
 
     [Header("Soul")]
     public SoulType soulType = SoulType.Life;
@@ -101,7 +117,7 @@ public class SoulPickup : MonoBehaviour
                 Debug.LogWarning("[SoulPickup] no target player found", this);
             }
             SetAbsorbingVisualState(false);
-            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * 0.25f));
+            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
             return;
         }
 
@@ -114,13 +130,13 @@ public class SoulPickup : MonoBehaviour
         if (Time.time < spawnTime + absorbDelay)
         {
             SetAbsorbingVisualState(false);
-            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * 0.25f));
+            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
             return;
         }
 
         SetAbsorbingVisualState(true);
         Vector3 targetPoint = target.position + Vector3.up * targetChestHeight;
-        Vector3 moveTarget = Vector3.Lerp(targetPoint + hoverOffset * 0.15f, targetPoint, 0.75f);
+        Vector3 moveTarget = Vector3.Lerp(targetPoint + hoverOffset * AbsorbHoverBlend, targetPoint, AbsorbTargetBlend);
         transform.position = Vector3.MoveTowards(transform.position, moveTarget, absorbSpeed * Time.deltaTime);
 
         if (Vector3.Distance(transform.position, targetPoint) <= pickupDistance)
@@ -236,10 +252,10 @@ public class SoulPickup : MonoBehaviour
 
     private Vector3 GetHoverOffset()
     {
-        float time = Time.time * Mathf.Max(0.01f, hoverSpeed);
-        float x = Mathf.Sin(time * 1.07f) * hoverAmplitude;
-        float y = hoverHeight + Mathf.Sin(time * 1.33f) * hoverAmplitude * 0.5f;
-        float z = Mathf.Cos(time * 0.91f) * hoverAmplitude * 0.35f;
+        float time = Time.time * Mathf.Max(MinHoverSpeed, hoverSpeed);
+        float x = Mathf.Sin(time * HoverXFrequency) * hoverAmplitude;
+        float y = hoverHeight + Mathf.Sin(time * HoverYFrequency) * hoverAmplitude * HoverYAmplitudeScale;
+        float z = Mathf.Cos(time * HoverZFrequency) * hoverAmplitude * HoverZAmplitudeScale;
         return new Vector3(x, y, z);
     }
 
@@ -389,15 +405,15 @@ public class SoulPickup : MonoBehaviour
 
         ParticleSystem.EmissionModule emission = trailParticles.emission;
         emission.rateOverTime = absorbing ? trailAbsorbEmissionRate : trailEmissionRate;
-        emission.rateOverDistance = absorbing ? 35f : 0f;
+        emission.rateOverDistance = absorbing ? TrailAbsorbDistanceRate : TrailIdleDistanceRate;
 
         ParticleSystemRenderer renderer = trailParticles.GetComponent<ParticleSystemRenderer>();
         if (renderer != null)
         {
             renderer.renderMode = ParticleSystemRenderMode.Billboard;
-            renderer.lengthScale = 1f;
-            renderer.velocityScale = 0.12f;
-            renderer.cameraVelocityScale = 0f;
+            renderer.lengthScale = TrailLengthScale;
+            renderer.velocityScale = TrailVelocityScale;
+            renderer.cameraVelocityScale = TrailCameraVelocityScale;
         }
 
     }
@@ -409,7 +425,7 @@ public class SoulPickup : MonoBehaviour
         if (coreParticles != null)
         {
             ParticleSystem.MainModule main = coreParticles.main;
-            main.startColor = new ParticleSystem.MinMaxGradient(new Color(tint.r, tint.g, tint.b, 1f));
+            main.startColor = new ParticleSystem.MinMaxGradient(new Color(tint.r, tint.g, tint.b, HaloTintAlpha));
         }
 
         if (haloRingRenderer != null)
@@ -421,7 +437,7 @@ public class SoulPickup : MonoBehaviour
                     haloRingTransform.gameObject.SetActive(true);
                 }
                 haloRingRenderer.enabled = true;
-                Color ringColor = new Color(tint.r, tint.g, tint.b, 1f);
+                Color ringColor = new Color(tint.r, tint.g, tint.b, HaloTintAlpha);
                 haloRingRenderer.color = ringColor;
             }
         }
@@ -429,7 +445,7 @@ public class SoulPickup : MonoBehaviour
         if (trailParticles != null)
         {
             ParticleSystem.MainModule trail = trailParticles.main;
-            Color trailColor = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(tint.a * 0.7f));
+            Color trailColor = new Color(tint.r, tint.g, tint.b, Mathf.Clamp01(tint.a * TrailTintAlphaMultiplier));
             trail.startColor = new ParticleSystem.MinMaxGradient(trailColor);
         }
     }

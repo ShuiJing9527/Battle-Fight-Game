@@ -7,6 +7,21 @@ public class RuneUIController : MonoBehaviour
 {
     private const int SkillCount = 4;
     private const int SlotsPerSkill = 5;
+    private const string LabelEmpty = "Empty";
+    private const string LabelNoRune = "No rune";
+    private const string LabelSelectedRuneNone = "Selected Rune: None";
+    private const string LabelRuneNameNone = "Rune Name: None";
+    private const string LabelTypePlaceholder = "Type: -";
+    private const string LabelDescriptionPlaceholder = "Description: -";
+    private const string LabelEffectPlaceholder = "Effect: -";
+    private const string LabelRuneFallback = "Rune";
+    private const string LogNoRuneSelected = "[RuneUI] Please select a rune first.";
+    private const string LogNoAvailableRuneCopy = "[RuneUI] No available copy of this rune.";
+    private const string LogMissingRuneInventory = "[RuneUI] Missing RuneInventory on current player. Rune list will show No rune.";
+    private const string LogMissingRuneLibrary = "[RuneUI] Missing RuneLibrary in scene. Rune names may use fallback text.";
+    private const string LogMissingRuneList = "[RuneUI] Missing runeListContent reference.";
+    private const string LogMissingCombatSkillCaster = "[RuneUI] Missing CombatSkillCaster.";
+    private const string LogMissingSlotRefs = "[RuneUI] Manual skill slot references are missing. Please assign qSlots / wSlots / eSlots / rSlots in the Inspector.";
 
     [System.Serializable]
     public class RuneSlotView
@@ -186,7 +201,7 @@ public class RuneUIController : MonoBehaviour
             if (!warnedMissingRuneList)
             {
                 warnedMissingRuneList = true;
-                Debug.LogWarning("[RuneUI] Missing runeListContent reference.", this);
+                Debug.LogWarning(LogMissingRuneList, this);
             }
             return;
         }
@@ -200,7 +215,7 @@ public class RuneUIController : MonoBehaviour
         if (noRuneText != null)
         {
             noRuneText.gameObject.SetActive(!hasRuneEntries);
-            noRuneText.text = hasRuneEntries ? string.Empty : "No rune";
+            noRuneText.text = hasRuneEntries ? string.Empty : LabelNoRune;
         }
 
         for (int i = 0; i < childCount; i++)
@@ -233,7 +248,7 @@ public class RuneUIController : MonoBehaviour
                 }
                 else
                 {
-                    label.text = "Empty";
+                    label.text = LabelEmpty;
                 }
             }
 
@@ -333,7 +348,7 @@ public class RuneUIController : MonoBehaviour
             }
 
             RuneDefinition rune = GetEquippedRune(skillIndex, i);
-            slotView.label.text = rune != null ? GetRuneName(rune) : "Empty";
+            slotView.label.text = rune != null ? GetRuneName(rune) : LabelEmpty;
         }
     }
 
@@ -350,7 +365,7 @@ public class RuneUIController : MonoBehaviour
             if (!warnedMissingSkillCaster)
             {
                 warnedMissingSkillCaster = true;
-                Debug.LogWarning("[RuneUI] Missing CombatSkillCaster.", this);
+                Debug.LogWarning(LogMissingCombatSkillCaster, this);
             }
             return;
         }
@@ -366,6 +381,7 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        // Slot clicks behave as a toggle: occupied slots unequip, empty slots consume one available copy.
         RuneDefinition equippedRune = skill.equippedRunes[slotIndex];
         if (equippedRune != null)
         {
@@ -381,7 +397,7 @@ public class RuneUIController : MonoBehaviour
             if (!warnedMissingSelectedRune)
             {
                 warnedMissingSelectedRune = true;
-                Debug.LogWarning("[RuneUI] Please select a rune first.", this);
+                Debug.LogWarning(LogNoRuneSelected, this);
             }
             return;
         }
@@ -392,7 +408,7 @@ public class RuneUIController : MonoBehaviour
             if (!warnedAlreadyEquippedRune)
             {
                 warnedAlreadyEquippedRune = true;
-                Debug.LogWarning("[RuneUI] No available copy of this rune.", this);
+                Debug.LogWarning(LogNoAvailableRuneCopy, this);
             }
             return;
         }
@@ -418,7 +434,7 @@ public class RuneUIController : MonoBehaviour
         selectedRune = rune;
         if (selectedRuneText != null)
         {
-            selectedRuneText.text = selectedRune != null ? $"Selected Rune: {GetRuneName(selectedRune)}" : "Selected Rune: None";
+            selectedRuneText.text = selectedRune != null ? $"Selected Rune: {GetRuneName(selectedRune)}" : LabelSelectedRuneNone;
         }
 
         RefreshSelectedRuneDetails(selectedRune);
@@ -440,13 +456,13 @@ public class RuneUIController : MonoBehaviour
         if (currentRuneInventory == null && !warnedMissingRuneInventory)
         {
             warnedMissingRuneInventory = true;
-            Debug.LogWarning("[RuneUI] Missing RuneInventory on current player. Rune list will show No rune.", this);
+            Debug.LogWarning(LogMissingRuneInventory, this);
         }
 
         if (currentRuneLibrary == null && !warnedMissingRuneLibrary)
         {
             warnedMissingRuneLibrary = true;
-            Debug.LogWarning("[RuneUI] Missing RuneLibrary in scene. Rune names may use fallback text.", this);
+            Debug.LogWarning(LogMissingRuneLibrary, this);
         }
     }
 
@@ -486,7 +502,7 @@ public class RuneUIController : MonoBehaviour
     {
         if (rune == null)
         {
-            return "Empty";
+            return LabelEmpty;
         }
 
         if (!string.IsNullOrEmpty(rune.runeName))
@@ -494,7 +510,7 @@ public class RuneUIController : MonoBehaviour
             return rune.runeName;
         }
 
-        return "Rune";
+        return LabelRuneFallback;
     }
 
     private string GetSkillKeyName(int skillIndex)
@@ -516,6 +532,7 @@ public class RuneUIController : MonoBehaviour
 
     private List<RuneDefinition> BuildVisibleRuneList()
     {
+        // The bag is a filtered view of inventory: equipped copies are hidden, not deleted.
         List<RuneDefinition> visibleRunes = new List<RuneDefinition>();
         if (currentRuneInventory == null || currentRuneInventory.Count <= 0)
         {
@@ -590,6 +607,7 @@ public class RuneUIController : MonoBehaviour
             return 0;
         }
 
+        // Multiple copies can exist, so we count equipped copies instead of using a boolean flag.
         int count = 0;
         CombatSkillCaster[] casters = Object.FindObjectsOfType<CombatSkillCaster>(true);
         for (int casterIndex = 0; casterIndex < casters.Length; casterIndex++)
@@ -679,22 +697,22 @@ public class RuneUIController : MonoBehaviour
         {
             if (runeNameText != null)
             {
-                runeNameText.text = "Rune Name: None";
+                runeNameText.text = LabelRuneNameNone;
             }
 
             if (runeTypeText != null)
             {
-                runeTypeText.text = "Type: -";
+                runeTypeText.text = LabelTypePlaceholder;
             }
 
             if (runeDescriptionText != null)
             {
-                runeDescriptionText.text = "Description: -";
+                runeDescriptionText.text = LabelDescriptionPlaceholder;
             }
 
             if (runeEffectText != null)
             {
-                runeEffectText.text = "Effect: -";
+                runeEffectText.text = LabelEffectPlaceholder;
             }
 
             return;
@@ -805,7 +823,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         warnedMissingSlotRefs = true;
-        Debug.LogWarning("[RuneUI] Manual skill slot references are missing. Please assign qSlots / wSlots / eSlots / rSlots in the Inspector.", this);
+        Debug.LogWarning(LogMissingSlotRefs, this);
     }
 }
 

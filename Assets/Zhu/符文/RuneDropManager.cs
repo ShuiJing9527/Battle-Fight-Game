@@ -51,6 +51,7 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
+        // Keep drop visuals data-driven: the rune definition selects the prefab, not the enemy.
         RunePickup prefab = GetDropPrefabForRune(rune);
         if (prefab == null)
         {
@@ -91,6 +92,7 @@ public class RuneDropManager : MonoBehaviour
         int startIndex = 0;
         if (rune != null && runeDropPrefabs.Length > 1)
         {
+            // Spread different rune ids across prefabs so the test drop set stays varied.
             startIndex = Mathf.Abs(rune.id) % runeDropPrefabs.Length;
         }
 
