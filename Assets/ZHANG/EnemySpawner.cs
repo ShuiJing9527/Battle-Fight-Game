@@ -1,10 +1,16 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
+using AHD2TimeOfDay;
 
 public class EnemySpawner : MonoBehaviour
 {
     [Header("Enemy")]
     public GameObject[] enemyPrefabs;
+    public GameObject[] normalEnemyPrefabs;
+    public GameObject[] eliteEnemyPrefabs;
+    public GameObject[] bossEnemyPrefabs;
+    public bool useRuntimeRankOverride = true;
 
     [Header("Quantity limit")]
     [Tooltip("Maximum concurrent enemies allowed for this spawner in the scene")]
@@ -14,6 +20,7 @@ public class EnemySpawner : MonoBehaviour
     [Header("Spawn time")]
     public float spawnInterval = 3f;
     public float startDelay = 2f;
+    public float eliteSpawnInterval = 30f;
 
     [Header("Spawn Around Player")]
     public bool spawnAroundPlayer = true;
@@ -22,23 +29,34 @@ public class EnemySpawner : MonoBehaviour
     public float fallbackSpawnRadiusX = 10f;
     public float fallbackSpawnRadiusZ = 10f;
 
-    [Header("Generated missing archetypes")]
-    public bool includeGeneratedMissingArchetypes = true;
-    [Range(0f, 1f)] public float generatedArchetypeChance = 0.35f;
-
     [Header("Target")]
     public Transform playerTarget;
     public string playerTag = "Player";
 
     private Player2Bootstrap playerBootstrap;
+    private TODController todController;
+    private float previousTodTime;
+    private bool todTimeInitialized;
+    private readonly List<GameObject> fallbackNormalEnemyPrefabs = new List<GameObject>();
+    private readonly List<GameObject> fallbackEliteEnemyPrefabs = new List<GameObject>();
+    private readonly List<GameObject> fallbackBossEnemyPrefabs = new List<GameObject>();
 
     private void Start()
     {
+        CachePrefabPools();
         ResolvePlayerTarget();
-        StartCoroutine(SpawnRoutine());
+        InitializeTodTracking();
+        StartCoroutine(NormalSpawnRoutine());
+        StartCoroutine(EliteSpawnRoutine());
     }
 
-    private IEnumerator SpawnRoutine()
+    private void Update()
+    {
+        ResolvePlayerTarget();
+        CheckBossSpawnAtMidnight();
+    }
+
+    private IEnumerator NormalSpawnRoutine()
     {
         yield return new WaitForSeconds(startDelay);
 
@@ -48,27 +66,79 @@ public class EnemySpawner : MonoBehaviour
 
             if (currentEnemyCount < maxEnemyCount)
             {
-                SpawnEnemy();
+                SpawnNormalEnemy();
             }
 
             yield return new WaitForSeconds(spawnInterval);
         }
     }
 
-    private void SpawnEnemy()
+    private IEnumerator EliteSpawnRoutine()
     {
-        if (enemyPrefabs == null || enemyPrefabs.Length == 0)
+        yield return new WaitForSeconds(Mathf.Max(0f, eliteSpawnInterval));
+
+        while (true)
+        {
+            ResolvePlayerTarget();
+
+            if (currentEnemyCount < maxEnemyCount)
+            {
+                SpawnEliteEnemy();
+            }
+
+            yield return new WaitForSeconds(Mathf.Max(0.1f, eliteSpawnInterval));
+        }
+    }
+
+    private void SpawnNormalEnemy()
+    {
+        SpawnFromPool(ResolvePool(normalEnemyPrefabs, fallbackNormalEnemyPrefabs), MonsterRank.Normal);
+    }
+
+    private void SpawnEliteEnemy()
+    {
+        SpawnFromPool(ResolvePool(eliteEnemyPrefabs, fallbackEliteEnemyPrefabs), MonsterRank.Elite);
+    }
+
+    private void SpawnBossEnemy()
+    {
+        SpawnFromPool(ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs), MonsterRank.Boss);
+    }
+
+    private void SpawnFromPool(List<GameObject> sourcePool, MonsterRank forcedRank)
+    {
+        if (sourcePool == null || sourcePool.Count == 0)
         {
             return;
         }
 
-        int randomIndex = Random.Range(0, enemyPrefabs.Length);
-        GameObject selectedEnemy = enemyPrefabs[randomIndex];
+        int randomIndex = Random.Range(0, sourcePool.Count);
+        GameObject selectedEnemy = sourcePool[randomIndex];
+        if (selectedEnemy == null)
+        {
+            return;
+        }
+
+        MonsterIdentity prefabIdentity = selectedEnemy.GetComponent<MonsterIdentity>();
+        MonsterSpecies? runtimeSpecies = prefabIdentity != null ? prefabIdentity.species : (MonsterSpecies?)null;
+        MonsterRank runtimeRank = forcedRank;
+
         Vector3 spawnPosition = ResolveSpawnPosition(selectedEnemy);
         GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
-        MonsterSpecies? forcedSpecies = ResolveGeneratedSpecies();
-        MonsterRank? forcedRank = ResolveGeneratedRank(forcedSpecies);
-        MonsterCombatAutoSetup.Configure(spawnedEnemy, forcedSpecies, forcedRank);
+        MonsterIdentity cloneIdentity = spawnedEnemy.GetComponent<MonsterIdentity>();
+        if (cloneIdentity == null)
+        {
+            cloneIdentity = spawnedEnemy.AddComponent<MonsterIdentity>();
+        }
+
+        if (runtimeSpecies.HasValue)
+        {
+            cloneIdentity.species = runtimeSpecies.Value;
+        }
+
+        cloneIdentity.rank = runtimeRank;
+
+        MonsterCombatAutoSetup.Configure(spawnedEnemy, runtimeSpecies, runtimeRank);
 
         currentEnemyCount++;
 
@@ -84,39 +154,6 @@ public class EnemySpawner : MonoBehaviour
         {
             enemyController.SetTarget(ResolveActivePlayerTarget());
         }
-    }
-
-    private MonsterSpecies? ResolveGeneratedSpecies()
-    {
-        if (!includeGeneratedMissingArchetypes || Random.value > generatedArchetypeChance)
-        {
-            return null;
-        }
-
-        MonsterSpecies[] generated =
-        {
-            MonsterSpecies.Flying,
-            MonsterSpecies.Ranged,
-            MonsterSpecies.Tank,
-            MonsterSpecies.Assassin
-        };
-
-        return generated[Random.Range(0, generated.Length)];
-    }
-
-    private MonsterRank? ResolveGeneratedRank(MonsterSpecies? forcedSpecies)
-    {
-        if (!includeGeneratedMissingArchetypes)
-        {
-            return null;
-        }
-
-        if (forcedSpecies.HasValue && Random.value < 0.12f)
-        {
-            return MonsterRank.Elite;
-        }
-
-        return null;
     }
 
     private Vector3 ResolveSpawnPosition(GameObject selectedEnemyPrefab)
@@ -183,6 +220,100 @@ public class EnemySpawner : MonoBehaviour
         }
 
         return playerTarget;
+    }
+
+    private void CachePrefabPools()
+    {
+        fallbackNormalEnemyPrefabs.Clear();
+        fallbackEliteEnemyPrefabs.Clear();
+        fallbackBossEnemyPrefabs.Clear();
+
+        if (enemyPrefabs == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < enemyPrefabs.Length; i++)
+        {
+            GameObject prefab = enemyPrefabs[i];
+            if (prefab == null)
+            {
+                continue;
+            }
+
+            MonsterIdentity identity = prefab.GetComponent<MonsterIdentity>();
+            MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+            switch (rank)
+            {
+                case MonsterRank.Boss:
+                    fallbackBossEnemyPrefabs.Add(prefab);
+                    break;
+                case MonsterRank.Elite:
+                    fallbackEliteEnemyPrefabs.Add(prefab);
+                    break;
+                default:
+                    fallbackNormalEnemyPrefabs.Add(prefab);
+                    break;
+            }
+        }
+    }
+
+    private static List<GameObject> ResolvePool(GameObject[] primaryPool, List<GameObject> fallbackPool)
+    {
+        List<GameObject> resolved = new List<GameObject>();
+        if (primaryPool != null)
+        {
+            for (int i = 0; i < primaryPool.Length; i++)
+            {
+                if (primaryPool[i] != null)
+                {
+                    resolved.Add(primaryPool[i]);
+                }
+            }
+        }
+
+        return resolved.Count > 0 ? resolved : fallbackPool;
+    }
+
+    private void InitializeTodTracking()
+    {
+        todController = FindObjectOfType<TODController>();
+        if (todController != null && todController.todGlobalParameters != null)
+        {
+            previousTodTime = todController.todGlobalParameters.CurrentTime;
+            todTimeInitialized = true;
+        }
+    }
+
+    private void CheckBossSpawnAtMidnight()
+    {
+        if (todController == null)
+        {
+            todController = FindObjectOfType<TODController>();
+        }
+
+        if (todController == null || todController.todGlobalParameters == null)
+        {
+            return;
+        }
+
+        float currentTodTime = todController.todGlobalParameters.CurrentTime;
+        if (!todTimeInitialized)
+        {
+            previousTodTime = currentTodTime;
+            todTimeInitialized = true;
+            return;
+        }
+
+        bool crossedMidnight = currentTodTime < previousTodTime;
+        previousTodTime = currentTodTime;
+
+        if (!crossedMidnight || currentEnemyCount >= maxEnemyCount)
+        {
+            return;
+        }
+
+        SpawnBossEnemy();
     }
 
     public void OnEnemyDestroyed()

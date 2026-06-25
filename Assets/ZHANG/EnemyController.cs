@@ -26,14 +26,21 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float attackDamage = 3f;
     [SerializeField] private MonsterAttackStyle attackStyle = MonsterAttackStyle.Melee;
     [SerializeField] private float projectileSpeed = 8f;
+    [SerializeField] private float meleeHitAngle = 100f;
+    [SerializeField] private float meleeHitForwardOffset = 0f;
+    [SerializeField] private float closeHitRadius = 0f;
+    [SerializeField] private float meleeBodyContactRadius = 0.45f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
+    [SerializeField] private bool debugMeleeHitCheck = false;
 
     private Rigidbody rb;
     private Player2Bootstrap playerBootstrap;
     private SlimeAnimationController slimeAnimation;
     private EnemyDebuffReceiver debuffReceiver;
+    private Collider meleeEnemyCollider;
+    private SpriteRenderer meleeEnemySpriteRenderer;
     private Quaternion initialRotation;
     private float nextAttackTime;
     private Transform pendingAttackTarget;
@@ -46,6 +53,7 @@ public class EnemyController : MonoBehaviour
         MonsterCombatAutoSetup.Configure(gameObject);
         rb = GetComponent<Rigidbody>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
+        ResolveMeleeHitSources();
         initialRotation = transform.rotation;
         ResolvePlayerTarget();
 
@@ -184,18 +192,24 @@ public class EnemyController : MonoBehaviour
 
         Vector3 toTarget = hitTarget.position - transform.position;
         toTarget.y = 0f;
-        if (toTarget.sqrMagnitude > attackHitRange * attackHitRange)
+        if (UsesProjectileAttack())
         {
-            FinishAttackRecovery();
-            return;
-        }
+            if (toTarget.sqrMagnitude > attackHitRange * attackHitRange)
+            {
+                FinishAttackRecovery();
+                return;
+            }
 
-        if (attackStyle == MonsterAttackStyle.Ranged || attackStyle == MonsterAttackStyle.ElementalBoss)
-        {
-            FireProjectileAt(hitTarget);
+            ExecuteProjectileAttack(hitTarget);
         }
         else
         {
+            if (!CanHitMeleeTarget(hitTarget))
+            {
+                FinishAttackRecovery();
+                return;
+            }
+
             if (!BattleTargetUtility.IsPlayer(hitTarget.gameObject))
             {
                 FinishAttackRecovery();
@@ -217,6 +231,184 @@ public class EnemyController : MonoBehaviour
         }
 
         FinishAttackRecovery();
+    }
+
+    private bool CanHitMeleeTarget(Transform hitTarget)
+    {
+        if (hitTarget == null)
+        {
+            return false;
+        }
+
+        Vector3 playerCenter = ResolvePlayerBodyCenter(hitTarget);
+        Vector3 enemyClosest = ResolveEnemyClosestPoint(playerCenter);
+        Vector3 playerClosest = ResolvePlayerClosestPoint(hitTarget, enemyClosest);
+
+        Vector3 flatEnemyPoint = enemyClosest;
+        flatEnemyPoint.y = 0f;
+        Vector3 flatPlayerPoint = playerClosest;
+        flatPlayerPoint.y = 0f;
+        float distance = Vector3.Distance(flatEnemyPoint, flatPlayerPoint);
+        float hitRadius = Mathf.Max(0f, meleeBodyContactRadius);
+
+        if (debugMeleeHitCheck)
+        {
+            Color debugColor = distance <= hitRadius ? Color.red : Color.cyan;
+            Debug.DrawLine(enemyClosest, playerClosest, debugColor, 0.4f, false);
+            Debug.DrawRay(enemyClosest, Vector3.up * 0.5f, debugColor, 0.4f, false);
+            Debug.DrawRay(playerClosest, Vector3.up * 0.5f, debugColor, 0.4f, false);
+        }
+
+        if (distance <= hitRadius)
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private void ResolveMeleeHitSources()
+    {
+        if (meleeEnemyCollider == null)
+        {
+            Collider[] colliders = GetComponentsInChildren<Collider>(true);
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider candidate = colliders[i];
+                if (candidate == null || !candidate.enabled || candidate.isTrigger)
+                {
+                    continue;
+                }
+
+                meleeEnemyCollider = candidate;
+                break;
+            }
+        }
+
+        if (meleeEnemySpriteRenderer == null)
+        {
+            Transform namedVisual = transform.Find("Visual_Slime");
+            if (namedVisual != null)
+            {
+                meleeEnemySpriteRenderer = namedVisual.GetComponent<SpriteRenderer>();
+            }
+        }
+
+        if (meleeEnemySpriteRenderer == null && slimeAnimation != null)
+        {
+            SpriteRenderer spriteRenderer = slimeAnimation.GetComponentInChildren<SpriteRenderer>(true);
+            if (spriteRenderer != null)
+            {
+                meleeEnemySpriteRenderer = spriteRenderer;
+            }
+        }
+    }
+
+    private Vector3 ResolveEnemyBodyCenter()
+    {
+        ResolveMeleeHitSources();
+
+        if (meleeEnemyCollider != null)
+        {
+            return meleeEnemyCollider.bounds.center;
+        }
+
+        if (meleeEnemySpriteRenderer != null)
+        {
+            return meleeEnemySpriteRenderer.bounds.center;
+        }
+
+        return transform.position;
+    }
+
+    private Vector3 ResolveEnemyClosestPoint(Vector3 playerCenter)
+    {
+        ResolveMeleeHitSources();
+
+        if (meleeEnemyCollider != null)
+        {
+            return meleeEnemyCollider.ClosestPoint(playerCenter);
+        }
+
+        if (meleeEnemySpriteRenderer != null)
+        {
+            Bounds bounds = meleeEnemySpriteRenderer.bounds;
+            return bounds.ClosestPoint(playerCenter);
+        }
+
+        return transform.position;
+    }
+
+    private Vector3 ResolvePlayerBodyCenter(Transform hitTarget)
+    {
+        Collider playerCollider = ResolvePlayerCollider(hitTarget);
+        if (playerCollider != null)
+        {
+            return playerCollider.bounds.center;
+        }
+
+        return hitTarget.position;
+    }
+
+    private Vector3 ResolvePlayerClosestPoint(Transform hitTarget, Vector3 enemyPoint)
+    {
+        Collider playerCollider = ResolvePlayerCollider(hitTarget);
+        if (playerCollider != null)
+        {
+            return playerCollider.ClosestPoint(enemyPoint);
+        }
+
+        return hitTarget.position;
+    }
+
+    private Collider ResolvePlayerCollider(Transform hitTarget)
+    {
+        if (hitTarget == null)
+        {
+            return null;
+        }
+
+        CapsuleCollider capsule = hitTarget.GetComponentInParent<CapsuleCollider>();
+        if (capsule != null && capsule.enabled)
+        {
+            return capsule;
+        }
+
+        CharacterController characterController = hitTarget.GetComponentInParent<CharacterController>();
+        if (characterController != null && characterController.enabled)
+        {
+            return characterController;
+        }
+
+        Collider[] colliders = hitTarget.GetComponentsInParent<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider candidate = colliders[i];
+            if (candidate != null && candidate.enabled && !candidate.isTrigger)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private bool UsesProjectileAttack()
+    {
+        return attackStyle == MonsterAttackStyle.Ranged || attackStyle == MonsterAttackStyle.ElementalBoss;
+    }
+
+    private void ExecuteProjectileAttack(Transform hitTarget)
+    {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            // Boss multi-skill expansion point: keep projectile as the phase-one fallback
+            // until fire ring / ground spike attacks are introduced.
+            FireProjectileAt(hitTarget);
+            return;
+        }
+
+        FireProjectileAt(hitTarget);
     }
 
     private void PlayMoveAnimation(Vector3 direction, float currentMoveSpeed)

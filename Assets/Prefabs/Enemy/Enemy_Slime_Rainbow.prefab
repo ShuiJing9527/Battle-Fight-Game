@@ -105,6 +105,8 @@ GameObject:
   - component: {fileID: 8844418258968848066}
   - component: {fileID: 2725362885038075655}
   - component: {fileID: 3333333333333333333}
+  - component: {fileID: 8801316921577575015}
+  - component: {fileID: 8793765161300815962}
   m_Layer: 0
   m_Name: Enemy_Slime_Rainbow
   m_TagString: Untagged
@@ -152,7 +154,12 @@ MonoBehaviour:
   attackDamage: 3
   attackStyle: 0
   projectileSpeed: 8
+  meleeHitAngle: 100
+  meleeHitForwardOffset: 0
+  closeHitRadius: 0
+  meleeBodyContactRadius: 0.45
   debugLog: 0
+  debugMeleeHitCheck: 0
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -274,8 +281,45 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RuntimeLootDropOnDeath
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
-  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
   dropYOffset: 0.5
   soulAmount: 15
   dropScatterRadius: 0.8
+  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
   runeDropYOffset: 0.25
+--- !u!114 &8801316921577575015
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a1d4f091687dea941af558adc94d5656, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterIdentity
+  species: 4
+  rank: 0
+  attackStyle: 0
+--- !u!114 &8793765161300815962
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5b6804dda85d09645aa2f2b50865d074, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::MonsterRankVisual
+  visualRoot: {fileID: 6587736263089903195}
+  effectRoot: {fileID: 6587736263089903195}
+  normalEffectPrefab: {fileID: 0}
+  eliteAuraPrefab: {fileID: 0}
+  bossAuraPrefab: {fileID: 0}
+  normalScale: 1
+  eliteScale: 1.45
+  bossScale: 2.4
+  applyScale: 1
+  createFallbackLight: 1

@@ -2,6 +2,10 @@ using UnityEngine;
 
 public static class MonsterCombatAutoSetup
 {
+    public static bool enableStatVariance = true;
+    public static float minStatVariance = 0.10f;
+    public static float maxStatVariance = 0.20f;
+
     public static void Configure(GameObject monster, MonsterSpecies? forcedSpecies = null, MonsterRank? forcedRank = null)
     {
         if (monster == null)
@@ -10,28 +14,24 @@ public static class MonsterCombatAutoSetup
         }
 
         MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        bool createdIdentity = false;
         if (identity == null)
         {
             identity = monster.AddComponent<MonsterIdentity>();
+            createdIdentity = true;
         }
 
-        identity.species = forcedSpecies ?? identity.species;
-        if (!forcedSpecies.HasValue && identity.species == MonsterSpecies.BlueSlime)
+        if (createdIdentity)
         {
-            identity.species = ResolveSpecies(monster.name);
+            identity.species = forcedSpecies ?? ResolveSpecies(monster.name);
+            identity.rank = forcedRank ?? ResolveRank(identity.species);
         }
 
-        identity.rank = forcedRank ?? identity.rank;
-        if (!forcedRank.HasValue && identity.rank == MonsterRank.Normal)
-        {
-            identity.rank = ResolveRank(identity.species);
-        }
-        identity.attackStyle = ResolveAttackStyle(identity.species, identity.rank);
+        identity.attackStyle = ResolveAttackStyle(identity.rank);
 
-        ApplyScale(monster.transform, identity);
         ApplyStats(monster, identity);
         EnsureRuntimeComponents(monster);
-        ApplyVisualMarker(monster, identity);
+        EnsureRankVisual(monster, identity);
     }
 
     private static MonsterSpecies ResolveSpecies(string monsterName)
@@ -49,16 +49,14 @@ public static class MonsterCombatAutoSetup
         return species == MonsterSpecies.RainbowSlime ? MonsterRank.Boss : MonsterRank.Normal;
     }
 
-    private static MonsterAttackStyle ResolveAttackStyle(MonsterSpecies species, MonsterRank rank)
+    private static MonsterAttackStyle ResolveAttackStyle(MonsterRank rank)
     {
-        if (rank == MonsterRank.Boss || species == MonsterSpecies.RainbowSlime)
+        if (rank == MonsterRank.Boss)
         {
             return MonsterAttackStyle.ElementalBoss;
         }
 
-        return species == MonsterSpecies.Ranged || species == MonsterSpecies.Flying
-            ? MonsterAttackStyle.Ranged
-            : MonsterAttackStyle.Melee;
+        return rank == MonsterRank.Elite ? MonsterAttackStyle.Ranged : MonsterAttackStyle.Melee;
     }
 
     private static void ApplyStats(GameObject monster, MonsterIdentity identity)
@@ -69,9 +67,11 @@ public static class MonsterCombatAutoSetup
             stats = monster.AddComponent<CombatStats>();
         }
 
-        float maxHealth = 35f;
-        float attack = 7f;
-        float defense = 0f;
+        float maxHealth = 55f;
+        float physicalAttack = 8f;
+        float specialAttack = 8f;
+        float physicalDefense = 0f;
+        float specialDefense = 0f;
         float speed = 2.5f;
         float range = 1.35f;
         float hitRange = 1.6f;
@@ -80,40 +80,100 @@ public static class MonsterCombatAutoSetup
         switch (identity.species)
         {
             case MonsterSpecies.GreenSlime:
-                maxHealth = 42f; attack = 6f; speed = 2.8f; break;
+                maxHealth = 60f;
+                physicalAttack = 7f;
+                specialAttack = 7f;
+                speed = 2.9f;
+                break;
             case MonsterSpecies.LavaSlime:
-                maxHealth = 48f; attack = 11f; defense = 1f; speed = 2.2f; break;
+                maxHealth = 75f;
+                physicalAttack = 13f;
+                specialAttack = 13f;
+                physicalDefense = 1f;
+                specialDefense = 1f;
+                speed = 2.1f;
+                break;
             case MonsterSpecies.PoisonSlime:
-                maxHealth = 44f; attack = 8f; speed = 2.4f; cooldown = 0.95f; break;
+                maxHealth = 50f;
+                physicalAttack = 9f;
+                specialAttack = 12f;
+                speed = 2.7f;
+                break;
             case MonsterSpecies.RainbowSlime:
-                maxHealth = 220f; attack = 18f; defense = 2f; speed = 2f; range = 8f; hitRange = 8f; cooldown = 2.2f; break;
+                maxHealth = 105f;
+                physicalAttack = 15f;
+                specialAttack = 15f;
+                physicalDefense = 2f;
+                specialDefense = 2f;
+                speed = 2.3f;
+                break;
             case MonsterSpecies.Flying:
-                maxHealth = 28f; attack = 7f; speed = 3.6f; range = 5.5f; hitRange = 5.5f; break;
+                maxHealth = 28f;
+                physicalAttack = 7f;
+                specialAttack = 7f;
+                speed = 3.6f;
+                range = 5.5f;
+                hitRange = 5.5f;
+                break;
             case MonsterSpecies.Ranged:
-                maxHealth = 32f; attack = 9f; speed = 2f; range = 7f; hitRange = 7f; cooldown = 1.7f; break;
+                maxHealth = 32f;
+                physicalAttack = 9f;
+                specialAttack = 9f;
+                speed = 2f;
+                range = 7f;
+                hitRange = 7f;
+                cooldown = 1.7f;
+                break;
             case MonsterSpecies.Tank:
-                maxHealth = 95f; attack = 10f; defense = 4f; speed = 1.25f; cooldown = 1.4f; break;
+                maxHealth = 95f;
+                physicalAttack = 10f;
+                specialAttack = 10f;
+                physicalDefense = 4f;
+                specialDefense = 4f;
+                speed = 1.25f;
+                cooldown = 1.4f;
+                break;
             case MonsterSpecies.Assassin:
-                maxHealth = 26f; attack = 14f; speed = 4.4f; cooldown = 0.75f; break;
+                maxHealth = 26f;
+                physicalAttack = 14f;
+                specialAttack = 14f;
+                speed = 4.4f;
+                cooldown = 0.75f;
+                break;
         }
 
         if (identity.rank == MonsterRank.Elite)
         {
-            maxHealth *= 1.8f;
-            attack *= 1.35f;
-            defense += 1f;
+            maxHealth *= 2.5f;
+            physicalAttack *= 2f;
+            specialAttack *= 2f;
+            physicalDefense += 2f;
+            specialDefense += 2f;
+            speed *= 1.05f;
+            range = 5f;
+            hitRange = 6f;
+            cooldown = 1.6f;
         }
         else if (identity.rank == MonsterRank.Boss)
         {
-            maxHealth *= 1.2f;
-            attack *= 1.25f;
+            maxHealth *= 9f;
+            physicalAttack *= 4f;
+            specialAttack *= 4f;
+            physicalDefense += 5f;
+            specialDefense += 5f;
+            speed *= 1.1f;
+            range = 8f;
+            hitRange = 8f;
+            cooldown = 2.2f;
         }
 
+        ApplyStatVariance(monster, ref maxHealth, ref physicalAttack, ref specialAttack, ref physicalDefense, ref specialDefense, ref speed);
+
         stats.maxHealth = maxHealth;
-        stats.physicalAttack = attack;
-        stats.specialAttack = attack;
-        stats.physicalDefense = defense;
-        stats.specialDefense = defense;
+        stats.physicalAttack = physicalAttack;
+        stats.specialAttack = specialAttack;
+        stats.physicalDefense = physicalDefense;
+        stats.specialDefense = specialDefense;
         stats.speed = speed;
 
         CombatHealth health = monster.GetComponent<CombatHealth>();
@@ -123,15 +183,12 @@ public static class MonsterCombatAutoSetup
         }
 
         health.stats = stats;
-        if (health.currentHealth <= 3f || health.currentHealth > stats.maxHealth)
-        {
-            health.currentHealth = stats.maxHealth;
-        }
+        health.currentHealth = stats.maxHealth;
 
         EnemyController controller = monster.GetComponent<EnemyController>();
         if (controller != null)
         {
-            controller.ConfigureRuntime(speed, 0.8f, range, hitRange, cooldown, attack, identity.attackStyle);
+            controller.ConfigureRuntime(speed, 0.8f, range, hitRange, cooldown, physicalAttack, identity.attackStyle);
         }
     }
 
@@ -143,44 +200,94 @@ public static class MonsterCombatAutoSetup
         }
     }
 
-    private static void ApplyScale(Transform transform, MonsterIdentity identity)
+    private static void EnsureRankVisual(GameObject monster, MonsterIdentity identity)
     {
-        if (identity.rank == MonsterRank.Boss)
+        MonsterRankVisual rankVisual = monster.GetComponent<MonsterRankVisual>();
+        if (rankVisual == null)
         {
-            transform.localScale = Vector3.one * 2.4f;
+            rankVisual = monster.AddComponent<MonsterRankVisual>();
         }
-        else if (identity.rank == MonsterRank.Elite)
+
+        if (rankVisual.visualRoot == null)
         {
-            transform.localScale = Vector3.one * 1.45f;
+            rankVisual.visualRoot = monster.transform;
         }
+
+        if (rankVisual.effectRoot == null)
+        {
+            rankVisual.effectRoot = monster.transform;
+        }
+
+        rankVisual.Apply(identity);
     }
 
-    private static void ApplyVisualMarker(GameObject monster, MonsterIdentity identity)
+    private static void ApplyStatVariance(
+        GameObject monster,
+        ref float maxHealth,
+        ref float physicalAttack,
+        ref float specialAttack,
+        ref float physicalDefense,
+        ref float specialDefense,
+        ref float speed)
     {
-        Transform oldMarker = monster.transform.Find("RankMarker");
-        if (oldMarker != null)
+        if (monster == null || !enableStatVariance)
         {
-            Object.Destroy(oldMarker.gameObject);
-        }
-
-        if (identity.rank == MonsterRank.Normal)
-        {
+            maxHealth = Mathf.Max(1f, Mathf.Round(maxHealth));
+            physicalAttack = Mathf.Max(1f, Mathf.Round(physicalAttack));
+            specialAttack = Mathf.Max(1f, Mathf.Round(specialAttack));
+            physicalDefense = Mathf.Max(0f, Mathf.Round(physicalDefense));
+            specialDefense = Mathf.Max(0f, Mathf.Round(specialDefense));
+            speed = Mathf.Max(0.1f, RoundToDecimals(speed, 2));
             return;
         }
 
-        Color markerColor = identity.rank == MonsterRank.Boss
-            ? new Color(1f, 0.7f, 0.15f, 0.85f)
-            : new Color(0.85f, 0.25f, 1f, 0.75f);
-
-        Light light = monster.GetComponent<Light>();
-        if (light == null)
+        MonsterStatVarianceState varianceState = monster.GetComponent<MonsterStatVarianceState>();
+        if (varianceState == null)
         {
-            light = monster.AddComponent<Light>();
+            varianceState = monster.AddComponent<MonsterStatVarianceState>();
         }
 
-        light.type = LightType.Point;
-        light.range = identity.rank == MonsterRank.Boss ? 6f : 3f;
-        light.intensity = identity.rank == MonsterRank.Boss ? 1.4f : 0.7f;
-        light.color = markerColor;
+        if (!varianceState.initialized)
+        {
+            varianceState.healthMultiplier = RollVarianceMultiplier();
+            varianceState.physicalAttackMultiplier = RollVarianceMultiplier();
+            varianceState.specialAttackMultiplier = RollVarianceMultiplier();
+            varianceState.physicalDefenseMultiplier = RollVarianceMultiplier();
+            varianceState.specialDefenseMultiplier = RollVarianceMultiplier();
+            varianceState.speedMultiplier = RollVarianceMultiplier();
+            varianceState.initialized = true;
+        }
+
+        maxHealth = Mathf.Max(1f, Mathf.Round(maxHealth * varianceState.healthMultiplier));
+        physicalAttack = Mathf.Max(1f, Mathf.Round(physicalAttack * varianceState.physicalAttackMultiplier));
+        specialAttack = Mathf.Max(1f, Mathf.Round(specialAttack * varianceState.specialAttackMultiplier));
+        physicalDefense = Mathf.Max(0f, Mathf.Round(physicalDefense * varianceState.physicalDefenseMultiplier));
+        specialDefense = Mathf.Max(0f, Mathf.Round(specialDefense * varianceState.specialDefenseMultiplier));
+        speed = Mathf.Max(0.1f, RoundToDecimals(speed * varianceState.speedMultiplier, 2));
     }
+
+    private static float RollVarianceMultiplier()
+    {
+        float minVariance = Mathf.Clamp01(Mathf.Min(minStatVariance, maxStatVariance));
+        float maxVariance = Mathf.Clamp01(Mathf.Max(minStatVariance, maxStatVariance));
+        float variance = Random.Range(minVariance, maxVariance);
+        return Random.Range(1f - variance, 1f + variance);
+    }
+
+    private static float RoundToDecimals(float value, int decimals)
+    {
+        float factor = Mathf.Pow(10f, Mathf.Max(0, decimals));
+        return Mathf.Round(value * factor) / factor;
+    }
+}
+
+public sealed class MonsterStatVarianceState : MonoBehaviour
+{
+    public bool initialized;
+    public float healthMultiplier = 1f;
+    public float physicalAttackMultiplier = 1f;
+    public float specialAttackMultiplier = 1f;
+    public float physicalDefenseMultiplier = 1f;
+    public float specialDefenseMultiplier = 1f;
+    public float speedMultiplier = 1f;
 }
