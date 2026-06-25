@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class RuneDropManager : MonoBehaviour
 {
+    private const float DefaultDropYOffset = 0.3f;
+
     public static RuneDropManager Instance { get; private set; }
 
     [Header("Rune Source")]
@@ -11,7 +13,7 @@ public class RuneDropManager : MonoBehaviour
     [SerializeField] private RunePickup[] runeDropPrefabs;
 
     [Header("Drop Offset")]
-    [SerializeField, Min(0f)] private float dropYOffset = 0.3f;
+    [SerializeField, Min(0f)] private float dropYOffset = DefaultDropYOffset;
 
     private bool warnedMissingLibrary;
     private bool warnedMissingPrefabs;
@@ -51,7 +53,8 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
-        // Keep drop visuals data-driven: the rune definition selects the prefab, not the enemy.
+        // 掉落外观由符文定义驱动：先按符文 id 选一个起始 prefab，
+        // 再向后扫描到第一个可用 prefab，避免空引用影响掉落结果。
         RunePickup prefab = GetDropPrefabForRune(rune);
         if (prefab == null)
         {
@@ -92,7 +95,7 @@ public class RuneDropManager : MonoBehaviour
         int startIndex = 0;
         if (rune != null && runeDropPrefabs.Length > 1)
         {
-            // Spread different rune ids across prefabs so the test drop set stays varied.
+            // 用 rune.id 作为起点，只影响 prefab 轮询顺序，不改变掉落内容本身。
             startIndex = Mathf.Abs(rune.id) % runeDropPrefabs.Length;
         }
 

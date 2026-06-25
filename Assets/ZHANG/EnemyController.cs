@@ -2,6 +2,13 @@ using UnityEngine;
 
 public class EnemyController : MonoBehaviour
 {
+    private const float MovementZeroEpsilon = 0.001f;
+    private const float AttackRecoveryDurationSeconds = 0.7f;
+    private const float ProjectileSpawnHeightOffset = 0.8f;
+    private const float ProjectileSpawnForwardOffset = 0.5f;
+    private const float BossProjectileScale = 0.45f;
+    private const float NormalProjectileScale = 0.28f;
+
     [Header("Target")]
     [SerializeField] private Transform playerTarget;
     [SerializeField] private string playerTag = "Player";
@@ -70,12 +77,14 @@ public class EnemyController : MonoBehaviour
         toPlayer.y = 0f;
         float distance = toPlayer.magnitude;
 
+        // 进入攻击范围后，优先切到攻击流程，避免追击和出手同时发生。
         if (distance <= attackRange && Time.time >= nextAttackTime)
         {
             BeginAttack();
             return;
         }
 
+        // 攻击动作进行中时，原地停住并保持当前朝向，等待攻击回调结算。
         if (attackInProgress)
         {
             rb.linearVelocity = Vector3.zero;
@@ -86,7 +95,8 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        if (distance <= stopDistance || distance < 0.001f)
+        // 追击到停止距离内就停下，避免贴脸抖动和过冲。
+        if (distance <= stopDistance || distance < MovementZeroEpsilon)
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
@@ -143,11 +153,12 @@ public class EnemyController : MonoBehaviour
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
 
+        // 触发攻击动画后，按动画时序进入冷却恢复阶段。
         if (slimeAnimation != null)
         {
             slimeAnimation.PlayAttack(pendingAttackTarget);
             CancelInvoke(nameof(FinishAttackRecovery));
-            Invoke(nameof(FinishAttackRecovery), 0.7f);
+            Invoke(nameof(FinishAttackRecovery), AttackRecoveryDurationSeconds);
         }
         else
         {
@@ -292,7 +303,7 @@ public class EnemyController : MonoBehaviour
 
         Vector3 direction = hitTarget.position - transform.position;
         direction.y = 0f;
-        if (direction.sqrMagnitude < 0.001f)
+        if (direction.sqrMagnitude < MovementZeroEpsilon)
         {
             direction = transform.forward;
         }
@@ -301,10 +312,11 @@ public class EnemyController : MonoBehaviour
             ? BattleDamageType.Special
             : BattleDamageType.Physical;
 
+        // 投射物出生点维持在角色前上方，避免和本体碰撞体重叠。
         GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Element Projectile" : "Monster Projectile";
-        projectile.transform.position = transform.position + Vector3.up * 0.8f + direction.normalized * 0.5f;
-        projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? 0.45f : 0.28f);
+        projectile.transform.position = transform.position + Vector3.up * ProjectileSpawnHeightOffset + direction.normalized * ProjectileSpawnForwardOffset;
+        projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? BossProjectileScale : NormalProjectileScale);
 
         Collider projectileCollider = projectile.GetComponent<Collider>();
         projectileCollider.isTrigger = true;

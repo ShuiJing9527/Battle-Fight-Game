@@ -37,7 +37,8 @@ public class RunePickup : MonoBehaviour
 
     private RuneInventory ResolveInventory(Collider other)
     {
-        // Shared RuneSystem inventory takes priority so both players see the same bag state.
+        // 先找共享 RuneSystem 背包，是为了让所有角色看到同一份符文状态。
+        // 只有共享背包不存在时，才回退到触发碰撞的玩家背包，避免拾取结果分叉。
         RuneInventory sharedInventory = ResolveSharedInventory();
         if (sharedInventory != null)
         {
@@ -60,22 +61,27 @@ public class RunePickup : MonoBehaviour
         PlayerMovement playerMovement = other.GetComponentInParent<PlayerMovement>();
         if (playerMovement != null)
         {
-            return playerMovement.GetComponent<RuneInventory>() ?? playerMovement.gameObject.AddComponent<RuneInventory>();
+            return GetOrAddRuneInventory(playerMovement.gameObject);
         }
 
         Player01SkillController playerSkillController = other.GetComponentInParent<Player01SkillController>();
         if (playerSkillController != null)
         {
-            return playerSkillController.GetComponent<RuneInventory>() ?? playerSkillController.gameObject.AddComponent<RuneInventory>();
+            return GetOrAddRuneInventory(playerSkillController.gameObject);
         }
 
         Transform root = other.transform.root;
         if (root != null && root.CompareTag("Player"))
         {
-            return root.GetComponent<RuneInventory>() ?? root.gameObject.AddComponent<RuneInventory>();
+            return GetOrAddRuneInventory(root.gameObject);
         }
 
         return null;
+    }
+
+    private RuneInventory GetOrAddRuneInventory(GameObject owner)
+    {
+        return owner.GetComponent<RuneInventory>() ?? owner.AddComponent<RuneInventory>();
     }
 
     private RuneInventory ResolveSharedInventory()
