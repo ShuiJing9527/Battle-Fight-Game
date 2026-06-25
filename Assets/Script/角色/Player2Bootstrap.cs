@@ -18,6 +18,7 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField] private string partyLeaderName = "Player01";
 
     [Header("UI")]
+    [SerializeField] private bool drawLegacyHud = false;
     [SerializeField] private bool showSwitchHint = true;
     [SerializeField] private bool disablePlayer2AnimatorIfSharedController = true;
     [SerializeField] private bool showHealthBar = true;
@@ -66,6 +67,11 @@ public class Player2Bootstrap : MonoBehaviour
 
     private void OnGUI()
     {
+        if (!drawLegacyHud)
+        {
+            return;
+        }
+
         EnsureGuiResources();
 
         if (showSwitchHint)
