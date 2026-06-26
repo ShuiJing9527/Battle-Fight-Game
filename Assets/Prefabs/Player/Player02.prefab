@@ -413,6 +413,7 @@ GameObject:
   - component: {fileID: 6660332782158251141}
   - component: {fileID: 5650248378318002330}
   - component: {fileID: 1446829692210700123}
+  - component: {fileID: 9102200000000000001}
   m_Layer: 0
   m_Name: Player02
   m_TagString: Player
@@ -513,13 +514,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 100
-  physicalAttack: 1
-  physicalDefense: 0
-  specialAttack: 1
-  specialDefense: 0
-  speed: 1
-  luck: 0
+  maxHealth: 180
+  physicalAttack: 6
+  physicalDefense: 8
+  specialAttack: 30
+  specialDefense: 14
+  speed: 14
+  luck: 10
 --- !u!114 &4540091804298959558
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1244,7 +1245,7 @@ MonoBehaviour:
   rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
   rSwarmDamageRadius: 3
   rSwarmDamageInterval: 0.25
-  rSwarmDamagePerTick: 2
+  rSwarmDamagePerTick: 12
   rSwarmEnemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -1334,7 +1335,7 @@ MonoBehaviour:
   qRandomAreaYOffset: 0
   qStarFallDamageRadius: 0.8
   qStarFallEnableDamage: 0
-  qStarFallDamage: 5
+  qStarFallDamage: 15
   qStarFallDamageMultiplier: 1
   qSpawnImpactSeal: 0
   qImpactStarSealPrefab: {fileID: 0}
@@ -1537,7 +1538,7 @@ MonoBehaviour:
   rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
   rSwarmDamageRadius: 10
   rSwarmDamageInterval: 0.25
-  rSwarmDamagePerTick: 2
+  rSwarmDamagePerTick: 12
   rSwarmEnemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295
@@ -1577,3 +1578,61 @@ MonoBehaviour:
   rOrbitFadeOutDuration: 0.15
   sharedSkillEffectPrefab: {fileID: 4310600637676425702, guid: b0ed1843779c88c4a9dad816902bdb85, type: 3}
   rSkillEffectPrefab: {fileID: 4310600637676425702, guid: b0ed1843779c88c4a9dad816902bdb85, type: 3}
+--- !u!114 &9102200000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8acf7b985da7f5148a221eb09166ab5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOnDeath
+  dissolveProfile: {fileID: 11400000, guid: 0c1d4ef98a564a8ea7bc4eaa2a590c33, type: 2}
+  dissolveShaderOverride: {fileID: 0}
+  dissolveDuration: 1.6
+  destroyAfterDissolve: 1
+  disableCollidersOnDeath: 1
+  disableBehavioursOnDeath: 1
+  hideHealthBarOnDeath: 1
+  dissolvePropertyName: _DissolveAmount
+  dissolveNoise: 12
+  edgeColor: {r: 1, g: 0.62, b: 0.18, a: 1}
+  edgeWidth: 0.12
+  emissionStrength: 2.8
+  dissolveCurve:
+    serializedVersion: 2
+    m_Curve:
+    - serializedVersion: 3
+      time: 0
+      value: 0
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    - serializedVersion: 3
+      time: 1
+      value: 1
+      inSlope: 1
+      outSlope: 1
+      tangentMode: 0
+      weightedMode: 0
+      inWeight: 0.33333334
+      outWeight: 0.33333334
+    m_PreInfinity: 2
+    m_PostInfinity: 2
+    m_RotationOrder: 4
+  debugLog: 0
+  deathVfxPrefab: {fileID: 9101000000000000001, guid: 7a89d72a26314ca0b2f0895c1b49f9b6, type: 3}
+  deathVfxOffset: {x: 0, y: 0.2, z: 0}
+  parentVfxToOwner: 0
+  vfxAutoDestroyDelay: 2
+  useDifferentVfxForPlayer: 0
+  delayBeforeDestroy: 0
+  includeRendererRoots:
+  - {fileID: 9205788309606312631}
+  excludeRendererRoots: []

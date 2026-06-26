@@ -2,13 +2,17 @@ using System.Collections;
 using UnityEngine;
 using Spine;
 using Spine.Unity;
+using UnityEngine.Serialization;
 
 public class Player1Skill_Q_QuickShear : Player01SkillBase
 {
     [Header("Q")]
     [SerializeField, Min(1)] private int slashCount = 3;
     [SerializeField, Min(0f)] private float slashInterval = 0.15f;
-    [SerializeField, Min(0f)] private float qDamage = 10f;
+    [FormerlySerializedAs("qDamage")]
+    [SerializeField, Min(0f)] private float baseDamage = 20f;
+    [SerializeField, Min(0f)] private float physicalScaling = 0.6f;
+    [SerializeField, Min(0f)] private float specialScaling = 0.8f;
     [SerializeField, Min(0f)] private float qRange = 2f;
     [SerializeField] private LayerMask enemyLayer = ~0;
     [SerializeField] private Transform hitPoint;
@@ -26,7 +30,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         debugLog = false;
         slashCount = 3;
         slashInterval = 0.15f;
-        qDamage = 10f;
+        baseDamage = 20f;
+        physicalScaling = 0.6f;
+        specialScaling = 0.8f;
         qRange = 2f;
         enemyLayer = ~0;
     }
@@ -145,7 +151,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         if (debugLog)
         {
             Debug.Log($"[Q - QuickShear] Slash {slashIndex}/{slashTotal} requested '{animationName}' via shared controller entry.", this);
-            Debug.Log($"[Q - QuickShear] damage={qDamage:F2}, range={qRange:F2}", this);
+            Debug.Log($"[Q - QuickShear] damage={baseDamage:F2}, range={qRange:F2}", this);
         }
 
         float dealtDamage = ApplySlashDamage();
@@ -175,7 +181,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
         facing.Normalize();
         Vector3 center = hitPoint != null ? hitPoint.position : origin + facing * (Mathf.Max(0.1f, qRange) * 0.5f);
-        float finalDamage = ResolveDamage(qDamage);
+        float finalDamage = ResolveDamage();
         Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
         float totalDamageDealt = 0f;
 
@@ -404,22 +410,15 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         return Vector3.Dot(toTarget.normalized, facing) >= 0.15f;
     }
 
-    private float ResolveDamage(float baseDamage)
+    private float ResolveDamage()
     {
-        float damage = Mathf.Max(0f, baseDamage);
-        CombatStats stats = GetComponent<CombatStats>();
-        if (stats != null)
-        {
-            damage += stats.physicalAttack;
-        }
-
-        BattleResourceBank bank = GetComponent<BattleResourceBank>();
-        if (bank != null)
-        {
-            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
-        }
-
-        return damage;
+        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
+            this,
+            gameObject,
+            baseDamage,
+            physicalScaling,
+            specialScaling,
+            "Player01 Q");
     }
 
     private IEnumerator LogTrackNextFrame(int slashIndex, int slashTotal)

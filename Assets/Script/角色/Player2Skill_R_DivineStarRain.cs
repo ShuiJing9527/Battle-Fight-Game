@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 {
@@ -69,7 +70,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [Header("R - 神眷剑涡 / 漩涡伤害")]
     [SerializeField] private float rSwarmDamageRadius = 3.0f;
     [SerializeField] private float rSwarmDamageInterval = 0.25f;
-    [SerializeField] private float rSwarmDamagePerTick = 2.0f;
+    [FormerlySerializedAs("rSwarmDamagePerTick")]
+    [SerializeField] private float baseDamage = 12.0f;
+    [SerializeField] private float physicalScaling = 0.5f;
+    [SerializeField] private float specialScaling = 1.3f;
     [SerializeField] private LayerMask rSwarmEnemyLayer = ~0;
 
     [Header("R - 神眷剑涡 / 备用星雨")]
@@ -944,12 +948,12 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, rSwarmDamagePerTick);
+        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, ResolveDamage());
     }
 
     private void ApplyRSwarmImpactDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), rSwarmDamagePerTick * Mathf.Max(0f, rStarRainDamageMultiplier));
+        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), ResolveDamage() * Mathf.Max(0f, rStarRainDamageMultiplier));
     }
 
     private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageAmount)
@@ -978,7 +982,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Physical, Owner != null ? Owner.gameObject : gameObject));
+                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Special, Owner != null ? Owner.gameObject : gameObject));
                 continue;
             }
 
@@ -989,6 +993,17 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 enemyHealth.TakeDamage(damageInt, Owner != null ? Owner.gameObject : gameObject);
             }
         }
+    }
+
+    private float ResolveDamage()
+    {
+        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
+            this,
+            Owner != null ? Owner.gameObject : gameObject,
+            baseDamage,
+            physicalScaling,
+            specialScaling,
+            "Player02 R");
     }
 
     private GameObject ResolveRSkillEffectPrefab()
@@ -1628,7 +1643,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         if (Approximately(rSwordLengthLocalAxis, Vector3.up)) rSwordLengthLocalAxis = Owner.rSwordLengthLocalAxis;
         if (Approximately(rSwarmDamageRadius, 3.0f)) rSwarmDamageRadius = Owner.rSwarmDamageRadius;
         if (Approximately(rSwarmDamageInterval, 0.25f)) rSwarmDamageInterval = Owner.rSwarmDamageInterval;
-        if (Approximately(rSwarmDamagePerTick, 2.0f)) rSwarmDamagePerTick = Owner.rSwarmDamagePerTick;
+        if (Approximately(baseDamage, 12.0f)) baseDamage = Owner.rSwarmDamagePerTick;
         if (rSwarmEnemyLayer == ~0) rSwarmEnemyLayer = Owner.rSwarmEnemyLayer;
         if (Approximately(rStarRainStartRatio, 0.5f)) rStarRainStartRatio = Owner.rStarRainStartRatio;
         if (Approximately(rStarRainInterval, 0.12f)) rStarRainInterval = Owner.rStarRainInterval;

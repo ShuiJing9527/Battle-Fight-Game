@@ -169,7 +169,8 @@ public class CombatSkillCaster : MonoBehaviour
 
                 if (health != null && hitTargets.Add(health))
                 {
-                    health.TakeDamage(new BattleDamage(damage, damageType, gameObject));
+                    float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
+                    health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
                     ApplyOnHitRunes(health, point.position, damage, plan);
                     ApplySplitDamage(health, damage, plan);
                 }
@@ -249,7 +250,8 @@ public class CombatSkillCaster : MonoBehaviour
                 continue;
             }
 
-            target.TakeDamage(new BattleDamage(damage, damageType, gameObject));
+            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
+            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
             damagedTargets.Add(target);
         }
     }
@@ -259,7 +261,8 @@ public class CombatSkillCaster : MonoBehaviour
         yield return new WaitForSeconds(delay);
         if (target != null)
         {
-            target.TakeDamage(new BattleDamage(damage, damageType, gameObject));
+            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
+            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
         }
     }
 

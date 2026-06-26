@@ -5,10 +5,12 @@ public class PlayerMovement : MonoBehaviour
 {
     public float moveSpeed = 5f;
     public Rigidbody rb;
+    private CombatStats combatStats;
 
     private void Awake()
     {
         if (rb == null) rb = GetComponent<Rigidbody>();
+        combatStats = GetComponent<CombatStats>();
     }
 
     private void FixedUpdate()
@@ -26,6 +28,6 @@ public class PlayerMovement : MonoBehaviour
         }
 
         Vector3 moveDirection = new Vector3(input.x, 0f, input.y);
-        rb.linearVelocity = moveDirection * moveSpeed;
+        rb.linearVelocity = moveDirection * (moveSpeed * BattleStatUtility.GetMoveSpeedMultiplier(combatStats));
     }
 }

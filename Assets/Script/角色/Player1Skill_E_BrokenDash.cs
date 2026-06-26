@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
@@ -8,7 +9,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
     [SerializeField] private bool ignoreObstacleCollision = true;
     [SerializeField] private LayerMask obstacleLayers = 1 << 3;
-    [SerializeField, Min(0f)] private float dashDamage = 16f;
+    [FormerlySerializedAs("dashDamage")]
+    [SerializeField, Min(0f)] private float baseDamage = 16f;
+    [SerializeField, Min(0f)] private float physicalScaling = 0.7f;
+    [SerializeField, Min(0f)] private float specialScaling = 0.6f;
     [SerializeField, Min(0.1f)] private float dashHitRadius = 1.2f;
     [SerializeField] private LayerMask enemyLayer = ~0;
 
@@ -40,7 +44,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         animationName = "Run";
         debugLog = true;
         speedMultiplier = 2f;
-        dashDamage = 16f;
+        baseDamage = 16f;
+        physicalScaling = 0.7f;
+        specialScaling = 0.6f;
         dashHitRadius = 1.2f;
         enemyLayer = ~0;
         ignoreObstacleCollision = true;
@@ -148,7 +154,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private void ApplyDashDamage()
     {
         Collider[] hits = Physics.OverlapSphere(transform.position, dashHitRadius, enemyLayer, QueryTriggerInteraction.Collide);
-        float finalDamage = ResolveDamage(dashDamage);
+        float finalDamage = ResolveDamage();
 
         foreach (Collider hit in hits)
         {
@@ -172,22 +178,15 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
-    private float ResolveDamage(float baseDamage)
+    private float ResolveDamage()
     {
-        float damage = Mathf.Max(0f, baseDamage);
-        CombatStats stats = GetComponent<CombatStats>();
-        if (stats != null)
-        {
-            damage += stats.physicalAttack;
-        }
-
-        BattleResourceBank bank = GetComponent<BattleResourceBank>();
-        if (bank != null)
-        {
-            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
-        }
-
-        return damage;
+        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
+            this,
+            gameObject,
+            baseDamage,
+            physicalScaling,
+            specialScaling,
+            "Player01 E");
     }
 
     private void ApplySpeedBoost()

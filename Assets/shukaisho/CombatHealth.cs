@@ -46,6 +46,14 @@ public class CombatHealth : MonoBehaviour
             animator = GetComponentInChildren<Animator>();
         }
 
+        DissolveOnDeath dissolveOnDeath = GetComponent<DissolveOnDeath>();
+        if (dissolveOnDeath == null)
+        {
+            dissolveOnDeath = gameObject.AddComponent<DissolveOnDeath>();
+        }
+
+        dissolveOnDeath.EnsureHealthBindings();
+
         if (resourceBank != null)
         {
             resourceBank.OnShieldChanged += HandleResourceBankOnShieldChanged;
@@ -300,7 +308,14 @@ public class CombatHealth : MonoBehaviour
 
         if (destroyOnDeath)
         {
-            Destroy(gameObject, destroyDelayAfterDeath);
+            if (GetComponent<DissolveOnDeath>() != null)
+            {
+                Debug.Log($"[DeathFlow] Skip immediate destroy because DissolveOnDeath exists owner={name}", this);
+            }
+            else
+            {
+                Destroy(gameObject, destroyDelayAfterDeath);
+            }
         }
     }
 

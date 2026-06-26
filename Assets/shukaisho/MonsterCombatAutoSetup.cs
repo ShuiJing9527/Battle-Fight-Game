@@ -72,54 +72,83 @@ public static class MonsterCombatAutoSetup
         float specialAttack = 8f;
         float physicalDefense = 0f;
         float specialDefense = 0f;
-        float speed = 2.5f;
+        float speed = 4f;
+        float luck = 2f;
+        float moveSpeed = 2.5f;
         float range = 1.35f;
         float hitRange = 1.6f;
         float cooldown = 1.1f;
 
         switch (identity.species)
         {
+            case MonsterSpecies.BlueSlime:
+                maxHealth = 55f;
+                physicalAttack = 8f;
+                specialAttack = 4f;
+                speed = 4f;
+                luck = 2f;
+                moveSpeed = 2.5f;
+                cooldown = 1.1f;
+                break;
             case MonsterSpecies.GreenSlime:
                 maxHealth = 60f;
-                physicalAttack = 7f;
-                specialAttack = 7f;
-                speed = 2.9f;
+                physicalAttack = 9f;
+                specialAttack = 5f;
+                speed = 5f;
+                luck = 3f;
+                moveSpeed = 2.9f;
+                cooldown = 1f;
                 break;
             case MonsterSpecies.LavaSlime:
                 maxHealth = 75f;
                 physicalAttack = 13f;
-                specialAttack = 13f;
-                physicalDefense = 1f;
+                specialAttack = 7f;
+                physicalDefense = 2f;
                 specialDefense = 1f;
-                speed = 2.1f;
+                speed = 3f;
+                luck = 1f;
+                moveSpeed = 2.1f;
+                cooldown = 1.2f;
                 break;
             case MonsterSpecies.PoisonSlime:
                 maxHealth = 50f;
-                physicalAttack = 9f;
+                physicalAttack = 7f;
                 specialAttack = 12f;
-                speed = 2.7f;
+                specialDefense = 1f;
+                speed = 5f;
+                luck = 4f;
+                moveSpeed = 2.7f;
+                cooldown = 1.15f;
                 break;
             case MonsterSpecies.RainbowSlime:
                 maxHealth = 105f;
                 physicalAttack = 15f;
-                specialAttack = 15f;
+                specialAttack = 18f;
                 physicalDefense = 2f;
-                specialDefense = 2f;
-                speed = 2.3f;
+                specialDefense = 3f;
+                speed = 6f;
+                luck = 6f;
+                moveSpeed = 2.3f;
+                cooldown = 1.05f;
                 break;
             case MonsterSpecies.Flying:
                 maxHealth = 28f;
-                physicalAttack = 7f;
-                specialAttack = 7f;
-                speed = 3.6f;
+                physicalAttack = 5f;
+                specialAttack = 10f;
+                speed = 8f;
+                luck = 5f;
+                moveSpeed = 3.6f;
                 range = 5.5f;
                 hitRange = 5.5f;
+                cooldown = 1.3f;
                 break;
             case MonsterSpecies.Ranged:
                 maxHealth = 32f;
-                physicalAttack = 9f;
-                specialAttack = 9f;
-                speed = 2f;
+                physicalAttack = 4f;
+                specialAttack = 11f;
+                speed = 6f;
+                luck = 4f;
+                moveSpeed = 2f;
                 range = 7f;
                 hitRange = 7f;
                 cooldown = 1.7f;
@@ -127,17 +156,21 @@ public static class MonsterCombatAutoSetup
             case MonsterSpecies.Tank:
                 maxHealth = 95f;
                 physicalAttack = 10f;
-                specialAttack = 10f;
+                specialAttack = 5f;
                 physicalDefense = 4f;
-                specialDefense = 4f;
-                speed = 1.25f;
+                specialDefense = 2f;
+                speed = 2f;
+                luck = 1f;
+                moveSpeed = 1.25f;
                 cooldown = 1.4f;
                 break;
             case MonsterSpecies.Assassin:
                 maxHealth = 26f;
                 physicalAttack = 14f;
-                specialAttack = 14f;
-                speed = 4.4f;
+                specialAttack = 8f;
+                speed = 10f;
+                luck = 6f;
+                moveSpeed = 4.4f;
                 cooldown = 0.75f;
                 break;
         }
@@ -150,6 +183,7 @@ public static class MonsterCombatAutoSetup
             physicalDefense += 2f;
             specialDefense += 2f;
             speed *= 1.05f;
+            luck += 2f;
             range = 5f;
             hitRange = 6f;
             cooldown = 1.6f;
@@ -162,6 +196,7 @@ public static class MonsterCombatAutoSetup
             physicalDefense += 5f;
             specialDefense += 5f;
             speed *= 1.1f;
+            luck += 4f;
             range = 8f;
             hitRange = 8f;
             cooldown = 2.2f;
@@ -175,6 +210,7 @@ public static class MonsterCombatAutoSetup
         stats.physicalDefense = physicalDefense;
         stats.specialDefense = specialDefense;
         stats.speed = speed;
+        stats.luck = luck;
 
         CombatHealth health = monster.GetComponent<CombatHealth>();
         if (health == null)
@@ -185,10 +221,18 @@ public static class MonsterCombatAutoSetup
         health.stats = stats;
         health.currentHealth = stats.maxHealth;
 
+        DissolveOnDeath dissolveOnDeath = monster.GetComponent<DissolveOnDeath>();
+        if (dissolveOnDeath != null)
+        {
+            dissolveOnDeath.EnsureHealthBindings();
+        }
+
         EnemyController controller = monster.GetComponent<EnemyController>();
         if (controller != null)
         {
-            controller.ConfigureRuntime(speed, 0.8f, range, hitRange, cooldown, physicalAttack, identity.attackStyle);
+            BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
+            float attackPower = damageType == BattleDamageType.Physical ? physicalAttack : specialAttack;
+            controller.ConfigureRuntime(moveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
         }
     }
 

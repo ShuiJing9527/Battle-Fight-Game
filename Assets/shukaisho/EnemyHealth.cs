@@ -21,6 +21,11 @@ public class EnemyHealth : MonoBehaviour
         {
             animator = GetComponentInChildren<Animator>();
         }
+
+        if (GetComponent<DissolveOnDeath>() == null)
+        {
+            gameObject.AddComponent<DissolveOnDeath>();
+        }
     }
 
     public void TakeDamage(int damage)
@@ -51,7 +56,14 @@ public class EnemyHealth : MonoBehaviour
             TriggerAnimation(deathTrigger);
             if (destroyOnDeath)
             {
-                Destroy(gameObject, destroyDelayAfterDeath);
+                if (GetComponent<DissolveOnDeath>() != null)
+                {
+                    Debug.Log($"[DeathFlow] Skip immediate destroy because DissolveOnDeath exists owner={name}", this);
+                }
+                else
+                {
+                    Destroy(gameObject, destroyDelayAfterDeath);
+                }
             }
         }
     }

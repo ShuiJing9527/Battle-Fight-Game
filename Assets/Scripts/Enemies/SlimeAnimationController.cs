@@ -286,6 +286,12 @@ public class SlimeAnimationController : MonoBehaviour
         }
 
         SetVisualAlpha(0f);
+        if (GetComponent<DissolveOnDeath>() != null)
+        {
+            Debug.Log($"[DeathFlow] Skip immediate destroy because DissolveOnDeath exists owner={name}", this);
+            yield break;
+        }
+
         if (destroyAfterDeath)
         {
             Destroy(gameObject);
@@ -324,6 +330,12 @@ public class SlimeAnimationController : MonoBehaviour
     private void RestoreVisualPose(float blendSpeed)
     {
         if (visualRoot == null)
+        {
+            return;
+        }
+
+        DissolveOnDeath dissolveOnDeath = GetComponent<DissolveOnDeath>();
+        if (dissolveOnDeath != null && dissolveOnDeath.IsDeathStarted)
         {
             return;
         }
@@ -491,6 +503,12 @@ public class SlimeAnimationController : MonoBehaviour
     private void SetVisualAlpha(float alpha)
     {
         if (visualSpriteRenderer == null)
+        {
+            return;
+        }
+
+        DissolveOnDeath dissolveOnDeath = GetComponent<DissolveOnDeath>();
+        if (dissolveOnDeath != null && dissolveOnDeath.IsDeathFinished)
         {
             return;
         }

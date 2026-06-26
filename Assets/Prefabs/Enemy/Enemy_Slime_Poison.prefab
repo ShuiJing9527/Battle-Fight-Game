@@ -106,8 +106,10 @@ GameObject:
   - component: {fileID: 2725362885038075655}
   - component: {fileID: 3333333333333333333}
   - component: {fileID: 4867309581870666108}
+  - component: {fileID: 1144444444444444443}
   - component: {fileID: 6628814007878360940}
   - component: {fileID: -5861998377959674883}
+  - component: {fileID: -4019637321156011623}
   m_Layer: 0
   m_Name: Enemy_Slime_Poison
   m_TagString: Untagged
@@ -324,6 +326,25 @@ MonoBehaviour:
   bossScale: 2.4
   applyScale: 1
   createFallbackLight: 1
+--- !u!114 &1144444444444444443
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  maxHealth: 50
+  physicalAttack: 7
+  physicalDefense: 0
+  specialAttack: 12
+  specialDefense: 1
+  speed: 5
+  luck: 4
 --- !u!114 &-5861998377959674883
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -347,3 +368,32 @@ MonoBehaviour:
   barInstanceRoot: {fileID: 0}
   backgroundRenderer: {fileID: 0}
   fillRenderer: {fileID: 0}
+--- !u!114 &-4019637321156011623
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8acf7b985da7f5148a221eb09166ab5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::DissolveOnDeath
+  dissolveDuration: 1.1
+  destroyAfterDissolve: 1
+  disableCollidersOnDeath: 1
+  disableBehavioursOnDeath: 1
+  hideHealthBarOnDeath: 1
+  dissolvePropertyName: _DissolveAmount
+  dissolveNoise: 12
+  edgeColor: {r: 1, g: 0.62, b: 0.18, a: 1}
+  edgeWidth: 0.12
+  emissionStrength: 2.8
+  debugLog: 0
+  deathVfxPrefab: {fileID: 9101000000000000001, guid: 67e5fd766af741f1ab2fb1ab2b89322b, type: 3}
+  deathVfxOffset: {x: 0, y: 0.15, z: 0}
+  parentVfxToOwner: 0
+  vfxAutoDestroyDelay: 2
+  useDifferentVfxForPlayer: 0
+  delayBeforeDestroy: 0

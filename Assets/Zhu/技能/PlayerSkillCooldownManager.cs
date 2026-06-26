@@ -43,6 +43,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     private float[] runtimeCurrentCD;
     private float runtimeCurrentMana;
     private float nextDebugManaLogTime;
+    private CombatStats combatStats;
 
     private void Awake()
     {
@@ -51,6 +52,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
             resourceBank = GetComponent<BattleResourceBank>();
         }
 
+        combatStats = GetComponent<CombatStats>();
         runtimeCurrentCD = new float[SkillCount];
 
         if (resourceBank != null)
@@ -220,6 +222,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
 
     private float ResolveCooldownMultiplier()
     {
-        return resourceBank != null ? resourceBank.SkillCooldownMultiplier : 1f;
+        float resourceMultiplier = resourceBank != null ? resourceBank.SkillCooldownMultiplier : 1f;
+        return resourceMultiplier * BattleStatUtility.GetCooldownMultiplier(combatStats);
     }
 }

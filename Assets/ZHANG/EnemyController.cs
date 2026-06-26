@@ -39,6 +39,7 @@ public class EnemyController : MonoBehaviour
     private Player2Bootstrap playerBootstrap;
     private SlimeAnimationController slimeAnimation;
     private EnemyDebuffReceiver debuffReceiver;
+    private CombatStats combatStats;
     private Collider meleeEnemyCollider;
     private SpriteRenderer meleeEnemySpriteRenderer;
     private Quaternion initialRotation;
@@ -52,6 +53,7 @@ public class EnemyController : MonoBehaviour
     {
         MonsterCombatAutoSetup.Configure(gameObject);
         rb = GetComponent<Rigidbody>();
+        combatStats = GetComponent<CombatStats>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
         ResolveMeleeHitSources();
         initialRotation = transform.rotation;
@@ -155,7 +157,7 @@ public class EnemyController : MonoBehaviour
 
     private void BeginAttack()
     {
-        nextAttackTime = Time.time + Mathf.Max(0.1f, attackCooldown);
+        nextAttackTime = Time.time + ResolveCurrentAttackCooldown();
         pendingAttackTarget = playerTarget;
         attackInProgress = true;
         rb.linearVelocity = Vector3.zero;
@@ -219,14 +221,15 @@ public class EnemyController : MonoBehaviour
             CombatHealth combatHealth = hitTarget.GetComponentInParent<CombatHealth>();
             if (combatHealth != null)
             {
-                float currentAttackDamage = ResolveCurrentAttackDamage();
+                BattleDamageType damageType = ResolvePrimaryDamageType();
+                float currentAttackDamage = ResolveCurrentAttackDamage(damageType);
                 if (debugLog && Mathf.Abs(ResolveAttackMultiplier() - lastLoggedAttackMultiplier) > 0.001f)
                 {
                     Debug.Log($"[EnemyController] finalAttackDamage={currentAttackDamage:F2} multiplier={ResolveAttackMultiplier():F2}", this);
                     lastLoggedAttackMultiplier = ResolveAttackMultiplier();
                 }
 
-                combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, BattleDamageType.Physical, gameObject));
+                combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, damageType, gameObject));
             }
         }
 
@@ -472,7 +475,8 @@ public class EnemyController : MonoBehaviour
     private float ResolveMoveSpeedMultiplier()
     {
         EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
-        return receiver != null ? receiver.GetMoveSpeedMultiplier() : 1f;
+        float debuffMultiplier = receiver != null ? receiver.GetMoveSpeedMultiplier() : 1f;
+        return BattleStatUtility.GetMoveSpeedMultiplier(combatStats) * debuffMultiplier;
     }
 
     private float ResolveAttackMultiplier()
@@ -481,9 +485,21 @@ public class EnemyController : MonoBehaviour
         return receiver != null ? receiver.GetAttackMultiplier() : 1f;
     }
 
-    private float ResolveCurrentAttackDamage()
+    private float ResolveCurrentAttackCooldown()
     {
-        return attackDamage * ResolveAttackMultiplier();
+        return Mathf.Max(0.1f, attackCooldown * BattleStatUtility.GetCooldownMultiplier(combatStats));
+    }
+
+    private BattleDamageType ResolvePrimaryDamageType()
+    {
+        return attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
+    }
+
+    private float ResolveCurrentAttackDamage(BattleDamageType damageType)
+    {
+        float attackPower = BattleStatUtility.ResolveAttackPower(gameObject, damageType, attackDamage);
+        float damage = attackPower * ResolveAttackMultiplier();
+        return BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
     }
 
     private void FireProjectileAt(Transform hitTarget)
@@ -500,9 +516,7 @@ public class EnemyController : MonoBehaviour
             direction = transform.forward;
         }
 
-        BattleDamageType damageType = attackStyle == MonsterAttackStyle.ElementalBoss && Random.value > 0.5f
-            ? BattleDamageType.Special
-            : BattleDamageType.Physical;
+        BattleDamageType damageType = ResolvePrimaryDamageType();
 
         // 投射物出生点维持在角色前上方，避免和本体碰撞体重叠。
         GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -517,7 +531,7 @@ public class EnemyController : MonoBehaviour
         projectileBody.isKinematic = true;
 
         MonsterProjectile monsterProjectile = projectile.AddComponent<MonsterProjectile>();
-        monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(), damageType, gameObject);
+        monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(damageType), damageType, gameObject);
 
         Renderer renderer = projectile.GetComponent<Renderer>();
         renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));

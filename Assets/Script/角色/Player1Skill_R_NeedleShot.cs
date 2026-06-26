@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player1Skill_R_NeedleShot : Player01SkillBase
 {
@@ -7,7 +8,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField, Min(1)] private int needleCount = 3;
     [SerializeField] private float needleSpreadAngle = 10f;
     [SerializeField, Min(0f)] private float needleSpeed = 14f;
-    [SerializeField, Min(0f)] private float needleDamage = 50f;
+    [FormerlySerializedAs("needleDamage")]
+    [SerializeField, Min(0f)] private float baseDamage = 50f;
+    [SerializeField, Min(0f)] private float physicalScaling = 0.25f;
+    [SerializeField, Min(0f)] private float specialScaling = 1.1f;
     [SerializeField, Range(0f, 1f)] private float healPercentOfDamage = 0.25f;
     [SerializeField] private LayerMask enemyLayer = ~0;
     [SerializeField] private Vector3 spawnOffset = new Vector3(0.85f, 0.15f, 0f);
@@ -22,7 +26,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         needleCount = 3;
         needleSpreadAngle = 10f;
         needleSpeed = 14f;
-        needleDamage = 50f;
+        baseDamage = 50f;
+        physicalScaling = 0.25f;
+        specialScaling = 1.1f;
         healPercentOfDamage = 0.25f;
         enemyLayer = ~0;
         spawnOffset = new Vector3(0.85f, 0.15f, 0f);
@@ -63,7 +69,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         int count = Mathf.Max(1, needleCount);
         float halfSpread = Mathf.Max(0f, needleSpreadAngle) * 0.5f;
         float step = count > 1 ? (halfSpread * 2f) / (count - 1) : 0f;
-        float finalDamage = ResolveDamage(needleDamage);
+        float finalDamage = ResolveDamage();
 
         for (int i = 0; i < count; i++)
         {
@@ -83,21 +89,14 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         }
     }
 
-    private float ResolveDamage(float baseDamage)
+    private float ResolveDamage()
     {
-        float damage = Mathf.Max(0f, baseDamage);
-        CombatStats stats = GetComponent<CombatStats>();
-        if (stats != null)
-        {
-            damage += stats.specialAttack;
-        }
-
-        BattleResourceBank bank = GetComponent<BattleResourceBank>();
-        if (bank != null)
-        {
-            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
-        }
-
-        return damage;
+        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
+            this,
+            gameObject,
+            baseDamage,
+            physicalScaling,
+            specialScaling,
+            "Player01 R");
     }
 }

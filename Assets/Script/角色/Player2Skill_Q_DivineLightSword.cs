@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 {
@@ -121,8 +122,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qStarFallDamageRadius = 0.8f;
     [InspectorName("Q Star Fall Enable Damage")]
     [SerializeField] private bool qStarFallEnableDamage = false;
-    [InspectorName("Q Star Fall Damage")]
-    [SerializeField] private float qStarFallDamage = 20f;
+    [FormerlySerializedAs("qStarFallDamage")]
+    [InspectorName("Q Base Damage")]
+    [SerializeField] private float baseDamage = 15f;
+    [InspectorName("Q Physical Scaling")]
+    [SerializeField] private float physicalScaling = 0.8f;
+    [InspectorName("Q Special Scaling")]
+    [SerializeField] private float specialScaling = 1.0f;
     [InspectorName("Q Star Fall Damage Multiplier")]
     [SerializeField] private float qStarFallDamageMultiplier = 1f;
 
@@ -435,7 +441,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             return;
         }
 
-        float damageAmount = Mathf.Max(0f, qStarFallDamage) * Mathf.Max(0f, qStarFallDamageMultiplier);
+        float damageAmount = ResolveDamage() * Mathf.Max(0f, qStarFallDamageMultiplier);
         if (damageAmount <= 0f)
         {
             return;
@@ -466,7 +472,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Physical, source));
+                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Special, source));
                 Debug.Log($"[Player02 Q] hit enemy={combatHealth.name} damage={damageAmount:F2}", this);
                 hitAnyEnemy = true;
                 continue;
@@ -486,6 +492,17 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         {
             Debug.Log("[Player02 Q] no enemy hit", this);
         }
+    }
+
+    private float ResolveDamage()
+    {
+        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
+            this,
+            Owner != null ? Owner.gameObject : gameObject,
+            baseDamage,
+            physicalScaling,
+            specialScaling,
+            "Player02 Q");
     }
 
     private void SpawnQImpactDust(Vector3 impactPosition)
