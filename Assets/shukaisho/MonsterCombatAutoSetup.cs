@@ -219,7 +219,7 @@ public static class MonsterCombatAutoSetup
         }
 
         health.stats = stats;
-        health.currentHealth = stats.maxHealth;
+        health.SyncHealthFromStats(refillCurrentHealth: true);
 
         DissolveOnDeath dissolveOnDeath = monster.GetComponent<DissolveOnDeath>();
         if (dissolveOnDeath != null)

@@ -53,7 +53,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         obstacleLayers = 1 << 3;
     }
 
-    public override void Cast()
+    public override bool Cast()
     {
         if (IsRunningBoost)
         {
@@ -62,10 +62,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 Debug.Log("[Player01 E Run] already running, ignored.", this);
             }
 
-            return;
+            return false;
         }
 
-        base.Cast();
+        return base.Cast();
     }
 
     private void Awake()

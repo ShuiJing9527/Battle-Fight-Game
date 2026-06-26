@@ -223,6 +223,13 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R Base Sword Count")]
     public int rBaseSwordCount = 1;
 
+    [Header("HUD Cooldowns")]
+    [SerializeField, Min(0f)] private float qCooldown = 3f;
+    [SerializeField, Min(0f)] private float wCooldown = 5f;
+    [SerializeField, Min(0f)] private float eCooldown = 8f;
+    [SerializeField, Min(0f)] private float rCooldown = 12f;
+    [SerializeField] private bool debugSkillCooldownFlow = true;
+
     [Header("R - 神眷剑涡 / 收场")]
     public GameObject sharedSkillEffectPrefab;
     [HideInInspector]
@@ -780,44 +787,248 @@ public class Player2PrototypeController : MonoBehaviour
         // Q 鎶€鑳?
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
-            if (CanCastSkill(0))
+            if (debugSkillCooldownFlow)
             {
-                ConsumeSkill(0);
-                if (qSkill != null) qSkill.Cast();
-                else CastQ();
+                Debug.Log("[SkillCD] Player02 Q pressed", this);
+            }
+
+            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+            if (skillHud != null && skillHud.IsSkillOnCooldown("Q"))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 Q blocked by HUD cooldown", this);
+                }
+
+                return;
+            }
+
+            if (!CanCastSkill(0))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 Q blocked by runtime cooldown or MP", this);
+                }
+
+                return;
+            }
+
+            bool castSucceeded = qSkill != null ? qSkill.Cast() : TryCastQFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 Q cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                return;
+            }
+
+            bool consumeSucceeded = TryConsumeSkill(0);
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 Q consume result = {consumeSucceeded}", this);
+            }
+
+            if (!consumeSucceeded)
+            {
+                return;
+            }
+
+            if (skillHud != null)
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 Q start HUD cooldown", this);
+                }
+
+                skillHud.StartSkillCooldown("Q", qCooldown);
             }
         }
 
         // W 鎶€鑳?
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
-            if (CanCastSkill(1))
+            if (debugSkillCooldownFlow)
             {
-                ConsumeSkill(1);
-                if (wSkill != null) wSkill.Cast();
-                else CastW();
+                Debug.Log("[SkillCD] Player02 W pressed", this);
+            }
+
+            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+            if (skillHud != null && skillHud.IsSkillOnCooldown("W"))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 W blocked by HUD cooldown", this);
+                }
+
+                return;
+            }
+
+            if (!CanCastSkill(1))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 W blocked by runtime cooldown or MP", this);
+                }
+
+                return;
+            }
+
+            bool castSucceeded = wSkill != null ? wSkill.Cast() : TryCastWFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 W cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                return;
+            }
+
+            bool consumeSucceeded = TryConsumeSkill(1);
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 W consume result = {consumeSucceeded}", this);
+            }
+
+            if (!consumeSucceeded)
+            {
+                return;
+            }
+
+            if (skillHud != null)
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 W start HUD cooldown", this);
+                }
+
+                skillHud.StartSkillCooldown("W", wCooldown);
             }
         }
 
         // E 鎶€鑳?
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
-            if (CanCastSkill(2))
+            if (debugSkillCooldownFlow)
             {
-                ConsumeSkill(2);
-                if (eSkill != null) eSkill.Cast();
-                else CastE();
+                Debug.Log("[SkillCD] Player02 E pressed", this);
+            }
+
+            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+            if (skillHud != null && skillHud.IsSkillOnCooldown("E"))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 E blocked by HUD cooldown", this);
+                }
+
+                return;
+            }
+
+            if (!CanCastSkill(2))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 E blocked by runtime cooldown or MP", this);
+                }
+
+                return;
+            }
+
+            bool castSucceeded = eSkill != null ? eSkill.Cast() : TryCastEFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 E cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                return;
+            }
+
+            bool consumeSucceeded = TryConsumeSkill(2);
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 E consume result = {consumeSucceeded}", this);
+            }
+
+            if (!consumeSucceeded)
+            {
+                return;
+            }
+
+            if (skillHud != null)
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 E start HUD cooldown", this);
+                }
+
+                skillHud.StartSkillCooldown("E", eCooldown);
             }
         }
 
         // R 鎶€鑳?
         if (Keyboard.current.rKey.wasPressedThisFrame)
         {
-            if (CanCastSkill(3))
+            if (debugSkillCooldownFlow)
             {
-                ConsumeSkill(3);
-                if (rSkill != null) rSkill.Cast();
-                else CastR();
+                Debug.Log("[SkillCD] Player02 R pressed", this);
+            }
+
+            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+            if (skillHud != null && skillHud.IsSkillOnCooldown("R"))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 R blocked by HUD cooldown", this);
+                }
+
+                return;
+            }
+
+            if (!CanCastSkill(3))
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 R blocked by runtime cooldown or MP", this);
+                }
+
+                return;
+            }
+
+            bool castSucceeded = rSkill != null ? rSkill.Cast() : TryCastRFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 R cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                return;
+            }
+
+            bool consumeSucceeded = TryConsumeSkill(3);
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 R consume result = {consumeSucceeded}", this);
+            }
+
+            if (!consumeSucceeded)
+            {
+                return;
+            }
+
+            if (skillHud != null)
+            {
+                if (debugSkillCooldownFlow)
+                {
+                    Debug.Log("[SkillCD] Player02 R start HUD cooldown", this);
+                }
+
+                skillHud.StartSkillCooldown("R", rCooldown);
             }
         }
     }
@@ -833,6 +1044,7 @@ public class Player2PrototypeController : MonoBehaviour
         eSkill?.Initialize(this);
         rSkill?.Initialize(this);
         EnsureCooldownManager();
+        SyncPlayer2SkillCooldowns();
         SyncPlayer2SkillManaCosts();
     }
 
@@ -863,20 +1075,48 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         SkillCostCDData qCost = cooldownManager.skillDatas[0];
+        qCost.maxCooldown = qCooldown;
         qCost.manaCost = Player2QManaCost;
         cooldownManager.skillDatas[0] = qCost;
 
         SkillCostCDData wCost = cooldownManager.skillDatas[1];
+        wCost.maxCooldown = wCooldown;
         wCost.manaCost = Player2WManaCost;
         cooldownManager.skillDatas[1] = wCost;
 
         SkillCostCDData eCost = cooldownManager.skillDatas[2];
+        eCost.maxCooldown = eCooldown;
         eCost.manaCost = Player2EManaCost;
         cooldownManager.skillDatas[2] = eCost;
 
         SkillCostCDData rCost = cooldownManager.skillDatas[3];
+        rCost.maxCooldown = rCooldown;
         rCost.manaCost = Player2RManaCost;
         cooldownManager.skillDatas[3] = rCost;
+    }
+
+    private void SyncPlayer2SkillCooldowns()
+    {
+        if (cooldownManager == null || cooldownManager.skillDatas == null || cooldownManager.skillDatas.Length < 4)
+        {
+            return;
+        }
+
+        SkillCostCDData qData = cooldownManager.skillDatas[0];
+        qData.maxCooldown = qCooldown;
+        cooldownManager.skillDatas[0] = qData;
+
+        SkillCostCDData wData = cooldownManager.skillDatas[1];
+        wData.maxCooldown = wCooldown;
+        cooldownManager.skillDatas[1] = wData;
+
+        SkillCostCDData eData = cooldownManager.skillDatas[2];
+        eData.maxCooldown = eCooldown;
+        cooldownManager.skillDatas[2] = eData;
+
+        SkillCostCDData rData = cooldownManager.skillDatas[3];
+        rData.maxCooldown = rCooldown;
+        cooldownManager.skillDatas[3] = rData;
     }
 
     private void ResolveVisualFloatTargets()
@@ -1234,6 +1474,12 @@ public class Player2PrototypeController : MonoBehaviour
         currentSwordEnergy += 1;
     }
 
+    private bool TryCastQFallback()
+    {
+        CastQ();
+        return true;
+    }
+
     public void CastW()
     {
         if (wSkill != null)
@@ -1252,6 +1498,12 @@ public class Player2PrototypeController : MonoBehaviour
         wSkillRoutine = StartCoroutine(ShieldRoutine());
     }
 
+    private bool TryCastWFallback()
+    {
+        CastW();
+        return true;
+    }
+
     public void CastE()
     {
         if (eSkill != null)
@@ -1264,6 +1516,17 @@ public class Player2PrototypeController : MonoBehaviour
         {
             StartCoroutine(DashRoutine());
         }
+    }
+
+    private bool TryCastEFallback()
+    {
+        if (isDashing)
+        {
+            return false;
+        }
+
+        CastE();
+        return true;
     }
 
     public void CastR()
@@ -1289,6 +1552,19 @@ public class Player2PrototypeController : MonoBehaviour
         Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
         currentSwordEnergy = 0;
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+    }
+
+    private bool TryCastRFallback()
+    {
+        int energyForR = Mathf.Max(0, currentSwordEnergy);
+        int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
+        if (rSwarmRoutine == null && count <= 0)
+        {
+            return false;
+        }
+
+        CastR();
+        return true;
     }
 
     private IEnumerator RSwarmRoutine(int count)
@@ -3667,10 +3943,14 @@ public class Player2PrototypeController : MonoBehaviour
     }
 
     // 鍐呴儴娑堣€楋細鎵ｈ摑 + 杩涘叆鍐峰嵈
-    private void ConsumeSkill(int index)
+    private bool TryConsumeSkill(int index)
     {
-        if (cooldownManager == null) return;
-        cooldownManager.ConsumeSkillResource(index);
+        if (cooldownManager == null)
+        {
+            return true;
+        }
+
+        return cooldownManager.TryConsumeSkillResource(index);
     }
 
     // ========== UI 鍙鎺ュ彛锛岀粰鎶€鑳芥爮UI璋冪敤 ==========

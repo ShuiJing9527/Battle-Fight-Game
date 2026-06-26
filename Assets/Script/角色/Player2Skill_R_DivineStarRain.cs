@@ -213,11 +213,11 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         SyncLegacyOwnerValuesIfNeeded();
     }
 
-    public override void Cast()
+    public override bool Cast()
     {
         if (Owner == null)
         {
-            return;
+            return false;
         }
 
         if (rSwarmRoutine != null)
@@ -229,6 +229,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         Cleanup();
         CastInternal();
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
+        return true;
     }
 
     public override void Cleanup()

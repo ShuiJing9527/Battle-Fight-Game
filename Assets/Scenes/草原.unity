@@ -76080,7 +76080,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1512536994}
+  m_CustomBakedTexture: {fileID: 1270886425}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -76227,6 +76227,43 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!84 &1270886425
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1273902273
 GameObject:
   m_ObjectHideFlags: 0
@@ -96889,6 +96926,64 @@ Tilemap:
     e31: 0
     e32: 0
     e33: 1
+--- !u!1 &1280988651 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 3798037429257487106, guid: 6e31c4a0444482e428f906349ae8d103, type: 3}
+  m_PrefabInstance: {fileID: 3955234288904209553}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1280988653
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1280988651}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 42eca0026390f984bb5d993a20b1f2ce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerSkillHUD
+  skillHudRoot: {fileID: 0}
+  targetCanvas: {fileID: 0}
+  skillSlotPrefab: {fileID: 3344534873852857039, guid: 5c372e52c0ad64442bd89f6e771cd7c6, type: 3}
+  defaultPlayerIndex: 1
+  player01Icons:
+    qIcon: {fileID: 21300000, guid: 4055f343aa0e41c49a569ad7a33b7acf, type: 3}
+    wIcon: {fileID: 21300000, guid: 4055f343aa0e41c49a569ad7a33b7acf, type: 3}
+    eIcon: {fileID: 21300000, guid: 4055f343aa0e41c49a569ad7a33b7acf, type: 3}
+    rIcon: {fileID: 21300000, guid: 4055f343aa0e41c49a569ad7a33b7acf, type: 3}
+    qKeyText: Q
+    wKeyText: W
+    eKeyText: E
+    rKeyText: R
+  player02Icons:
+    qIcon: {fileID: 21300000, guid: 0dc7499c4c0882d4f9f3faf28179fdee, type: 3}
+    wIcon: {fileID: 21300000, guid: da39aa22fb8026841b90a78ad537541c, type: 3}
+    eIcon: {fileID: 21300000, guid: 77496346a451bac4eaf3dd7baefaa08c, type: 3}
+    rIcon: {fileID: 21300000, guid: b1e233fbde763ac44b9dca7b08f298e1, type: 3}
+    qKeyText: Q
+    wKeyText: W
+    eKeyText: E
+    rKeyText: R
+  rootAnchoredPosition: {x: -60, y: 35}
+  slotSize: 160
+  slotSpacing: 12
+  keyLabelFontSize: 32
+  backgroundColor: {r: 0.08, g: 0.1, b: 0.14, a: 0.92}
+  iconColor: {r: 0.85, g: 0.87, b: 0.92, a: 1}
+  cooldownIconDimColor: {r: 0.35, g: 0.35, b: 0.35, a: 1}
+  useIconDimOnCooldown: 0
+  cooldownOverlayColor: {r: 0.1853465, g: 0.06128161, b: 0.21509439, a: 0.78431374}
+  cooldownFillClockwise: 1
+  cooldownFillOrigin: 2
+  keyLabelColor: {r: 1, g: 1, b: 1, a: 1}
+  showCooldownText: 1
+  cooldownTextFontSize: 36
+  cooldownTextColor: {r: 1, g: 1, b: 1, a: 1}
+  cooldownTextUseOutline: 1
+  cooldownTextOutlineColor: {r: 0, g: 0, b: 0, a: 1}
+  cooldownOverlayDiagnosticMode: 0
+  enableCooldownDebugKeys: 0
 --- !u!1 &1373474694
 GameObject:
   m_ObjectHideFlags: 0
@@ -96918,8 +97013,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.38659382, g: 0.49553275, b: 0.17731534, a: 0.51613307}
-  m_Intensity: 1.5483992
+  m_Color: {r: 0.069290325, g: 0.08849019, b: 0.2932886, a: 0}
+  m_Intensity: 0
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -96981,7 +97076,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.16773129, y: 0.044943463, z: 0.254887, w: 0.95125127}
+  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -97048,43 +97143,6 @@ MonoBehaviour:
   maxRuntimeResolution: 256
   maxRuntimeBlurRadius: 4
   minRuntimeUpdateInterval: 0.25
---- !u!84 &1512536994
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1614742716
 GameObject:
   m_ObjectHideFlags: 0
@@ -98115,7 +98173,10 @@ PrefabInstance:
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 3798037429257487106, guid: 6e31c4a0444482e428f906349ae8d103, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1280988653}
   m_SourcePrefab: {fileID: 100100000, guid: 6e31c4a0444482e428f906349ae8d103, type: 3}
 --- !u!1001 &8440771652044630702
 PrefabInstance:

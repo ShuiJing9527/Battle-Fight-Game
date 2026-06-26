@@ -30,6 +30,35 @@ public class BattleResourceBank : MonoBehaviour
     private float skillDamageMultiplier = 1f;
     private float skillDamageBuffEndTime = -1f;
 
+    public float ResolveConfiguredMaxHealth(float fallback = 100f)
+    {
+        CombatStats stats = GetComponent<CombatStats>();
+        if (stats != null && stats.maxHealth > 0f)
+        {
+            return stats.maxHealth;
+        }
+
+        return maxHealth > 0f ? maxHealth : fallback;
+    }
+
+    public void SyncHealthFromCombatStats(bool refillCurrentHealth)
+    {
+        float previousMaxHealth = maxHealth;
+        bool hadMatchingSerializedHealth = Mathf.Approximately(currentHealth, previousMaxHealth);
+        float resolvedMaxHealth = ResolveConfiguredMaxHealth(previousMaxHealth > 0f ? previousMaxHealth : 100f);
+
+        maxHealth = Mathf.Max(0f, resolvedMaxHealth);
+
+        if (refillCurrentHealth || hadMatchingSerializedHealth || currentHealth <= 0f)
+        {
+            currentHealth = maxHealth;
+        }
+        else
+        {
+            currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        }
+    }
+
     public float SkillDamageMultiplier
     {
         get
@@ -49,7 +78,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private void Awake()
     {
-        currentHealth = Mathf.Clamp(currentHealth, 0f, maxHealth);
+        SyncHealthFromCombatStats(refillCurrentHealth: false);
         currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy);
     }
 

@@ -29,6 +29,45 @@ public class CombatHealth : MonoBehaviour
     public float MaxHealthValue => MaxHealth;
     public bool IsDead => dead;
 
+    public float ResolveConfiguredMaxHealth(float fallback = 100f)
+    {
+        if (stats != null && stats.maxHealth > 0f)
+        {
+            return stats.maxHealth;
+        }
+
+        if (resourceBank != null && resourceBank.maxHealth > 0f)
+        {
+            return resourceBank.maxHealth;
+        }
+
+        return currentHealth > 0f ? currentHealth : fallback;
+    }
+
+    public void SyncHealthFromStats(bool refillCurrentHealth)
+    {
+        float previousCurrentHealth = currentHealth;
+        float previousMaxHealth = resourceBank != null ? resourceBank.maxHealth : ResolveConfiguredMaxHealth();
+        bool hadMatchingSerializedHealth = Mathf.Approximately(previousCurrentHealth, previousMaxHealth);
+
+        if (resourceBank != null)
+        {
+            resourceBank.SyncHealthFromCombatStats(refillCurrentHealth);
+            currentHealth = Mathf.Clamp(resourceBank.currentHealth, 0f, Mathf.Max(0f, resourceBank.maxHealth));
+            return;
+        }
+
+        float resolvedMaxHealth = ResolveConfiguredMaxHealth(previousMaxHealth);
+        if (refillCurrentHealth || hadMatchingSerializedHealth || currentHealth <= 0f)
+        {
+            currentHealth = Mathf.Max(0f, resolvedMaxHealth);
+        }
+        else
+        {
+            currentHealth = Mathf.Clamp(currentHealth, 0f, Mathf.Max(0f, resolvedMaxHealth));
+        }
+    }
+
     private void Awake()
     {
         if (stats == null)
@@ -59,7 +98,7 @@ public class CombatHealth : MonoBehaviour
             resourceBank.OnShieldChanged += HandleResourceBankOnShieldChanged;
         }
 
-        currentHealth = Mathf.Clamp(currentHealth, 0f, MaxHealth);
+        SyncHealthFromStats(refillCurrentHealth: false);
         localShield = Mathf.Max(0f, localShield);
         localMaxShield = Mathf.Max(0f, localMaxShield);
     }

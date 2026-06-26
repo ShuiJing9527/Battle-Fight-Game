@@ -9,7 +9,7 @@ public abstract class PlayerSkillBase : MonoBehaviour
         Owner = owner;
     }
 
-    public abstract void Cast();
+    public abstract bool Cast();
 
     public virtual void Cleanup()
     {

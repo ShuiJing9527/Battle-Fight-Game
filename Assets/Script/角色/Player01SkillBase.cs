@@ -38,11 +38,11 @@ public abstract class Player01SkillBase : MonoBehaviour
         return Time.time >= nextCastTime;
     }
 
-    public virtual void Cast()
+    public virtual bool Cast()
     {
         if (!TryReserveCast())
         {
-            return;
+            return false;
         }
 
         if (debugLog)
@@ -53,6 +53,7 @@ public abstract class Player01SkillBase : MonoBehaviour
         OnCastStarted();
 
         StartManagedCast(CastRoutine());
+        return true;
     }
 
     protected virtual void OnCastStarted()

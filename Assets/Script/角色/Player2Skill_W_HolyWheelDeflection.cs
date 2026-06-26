@@ -115,11 +115,11 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         SyncLegacyOwnerValuesIfNeeded();
     }
 
-    public override void Cast()
+    public override bool Cast()
     {
         if (Owner == null)
         {
-            return;
+            return false;
         }
 
         if (wSkillRoutine != null)
@@ -131,6 +131,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         Cleanup();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
+        return true;
     }
 
     public override void Cleanup()

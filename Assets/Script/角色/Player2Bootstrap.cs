@@ -292,6 +292,13 @@ public class Player2Bootstrap : MonoBehaviour
         {
             cameraRig.playerSlot = nextActive.transform;
         }
+
+        PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+        if (skillHud != null)
+        {
+            int playerIndex = nextActive == player01 ? 1 : (nextActive == player02 ? 2 : 0);
+            skillHud.SetSkillIconSet(playerIndex);
+        }
     }
 
     public void EnsureInitializedForSpawn()
@@ -542,22 +549,31 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         CombatStats stats = player.GetComponent<CombatStats>();
-        if (stats != null)
-        {
-            stats.maxHealth = playerStartHealth;
-        }
+        float resolvedMaxHealth = stats != null && stats.maxHealth > 0f ? stats.maxHealth : playerStartHealth;
 
         BattleResourceBank resourceBank = player.GetComponent<BattleResourceBank>();
         if (resourceBank != null)
         {
-            resourceBank.maxHealth = playerStartHealth;
-            resourceBank.currentHealth = playerStartHealth;
+            resourceBank.maxHealth = resolvedMaxHealth;
+            resourceBank.currentHealth = resolvedMaxHealth;
         }
 
         CombatHealth combatHealth = player.GetComponent<CombatHealth>();
         if (combatHealth != null)
         {
-            combatHealth.currentHealth = playerStartHealth;
+            combatHealth.stats = stats;
+            combatHealth.resourceBank = resourceBank;
+            combatHealth.currentHealth = resolvedMaxHealth;
+        }
+
+        if (resourceBank != null)
+        {
+            resourceBank.SyncHealthFromCombatStats(refillCurrentHealth: true);
+        }
+
+        if (combatHealth != null)
+        {
+            combatHealth.SyncHealthFromStats(refillCurrentHealth: true);
         }
     }
 

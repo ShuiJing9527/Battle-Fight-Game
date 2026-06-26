@@ -23,6 +23,13 @@ public class Player01SkillController : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
+    [SerializeField] private bool debugSkillCooldownFlow = true;
+
+    [Header("HUD Cooldowns")]
+    [SerializeField, Min(0f)] private float qCooldown = 3f;
+    [SerializeField, Min(0f)] private float wCooldown = 5f;
+    [SerializeField, Min(0f)] private float eCooldown = 8f;
+    [SerializeField, Min(0f)] private float rCooldown = 12f;
 
     private SkeletonAnimation cachedSkeletonAnimation;
     private MeshRenderer cachedSpineRenderer;
@@ -52,6 +59,7 @@ public class Player01SkillController : MonoBehaviour
         CacheReferences();
         AutoBindSkills();
         InitializeSkills();
+        SyncHudCooldownsToResourceManager();
         RestoreLocomotionAnimation(true);
         ApplyDisplayFixes(true);
     }
@@ -126,6 +134,7 @@ public class Player01SkillController : MonoBehaviour
         if (wSkill != null) wSkill.Initialize(this);
         if (eSkill != null) eSkill.Initialize(this);
         if (rSkill != null) rSkill.Initialize(this);
+        SyncHudCooldownsToResourceManager();
     }
 
     public bool TryBeginSkill(Player01SkillBase skill)
@@ -392,26 +401,37 @@ public class Player01SkillController : MonoBehaviour
 
     private void EnsureRuntimeCombatComponents()
     {
-        if (GetComponent<BattleResourceBank>() == null)
+        CombatStats stats = GetComponent<CombatStats>();
+        float resolvedMaxHealth = stats != null && stats.maxHealth > 0f ? stats.maxHealth : 100f;
+
+        BattleResourceBank bank = GetComponent<BattleResourceBank>();
+        if (bank == null)
         {
-            BattleResourceBank bank = gameObject.AddComponent<BattleResourceBank>();
-            bank.maxHealth = 100f;
-            bank.currentHealth = 100f;
+            bank = gameObject.AddComponent<BattleResourceBank>();
+            bank.maxHealth = resolvedMaxHealth;
+            bank.currentHealth = resolvedMaxHealth;
             bank.maxEnergy = 100f;
             bank.currentEnergy = 100f;
         }
-
-        if (GetComponent<CombatHealth>() == null)
+        else
         {
-            CombatHealth health = gameObject.AddComponent<CombatHealth>();
-            health.resourceBank = GetComponent<BattleResourceBank>();
-            health.currentHealth = health.resourceBank.currentHealth;
+            bank.SyncHealthFromCombatStats(refillCurrentHealth: true);
         }
+
+        CombatHealth health = GetComponent<CombatHealth>();
+        if (health == null)
+        {
+            health = gameObject.AddComponent<CombatHealth>();
+        }
+
+        health.stats = stats;
+        health.resourceBank = bank;
+        health.SyncHealthFromStats(refillCurrentHealth: true);
 
         if (GetComponent<PlayerSkillCooldownManager>() == null)
         {
             PlayerSkillCooldownManager cooldownManager = gameObject.AddComponent<PlayerSkillCooldownManager>();
-            cooldownManager.resourceBank = GetComponent<BattleResourceBank>();
+            cooldownManager.resourceBank = bank;
         }
 
         if (GetComponent<CombatSkillCaster>() == null)
@@ -614,26 +634,110 @@ public class Player01SkillController : MonoBehaviour
 
     private void TryCastSkillFromInput(string keyLabel, Player01SkillBase skill)
     {
+        if (debugSkillCooldownFlow)
+        {
+            Debug.Log($"[SkillCD] Player01 {keyLabel} pressed", this);
+        }
+
         if (skill == null)
         {
             Debug.LogWarning($"[Player01SkillController] {keyLabel} pressed, but no skill component is bound.", this);
             return;
         }
 
+        PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+        if (skillHud != null && skillHud.IsSkillOnCooldown(keyLabel))
+        {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player01 {keyLabel} blocked by HUD cooldown", this);
+            }
+            return;
+        }
+
         if (currentSkill != null && currentSkill != skill)
         {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player01 {keyLabel} blocked by active skill {currentSkill.name}", this);
+            }
             Debug.Log($"[Player01SkillController] {keyLabel} pressed, but {currentSkill.name} is still active.", this);
             return;
         }
 
         if (!skill.CanCastNow())
         {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player01 {keyLabel} blocked by runtime cooldown or MP", this);
+            }
             Debug.Log($"[Player01SkillController] {keyLabel} pressed, but {skill.name} is on cooldown.", this);
             return;
         }
 
         Debug.Log($"[Player01SkillController] {keyLabel} pressed -> {skill.name}.", this);
-        skill.Cast();
+        bool castSuccess = skill.Cast();
+        if (debugSkillCooldownFlow)
+        {
+            Debug.Log($"[SkillCD] Player01 {keyLabel} cast result = {castSuccess}", this);
+        }
+
+        if (!castSuccess)
+        {
+            return;
+        }
+
+        if (skillHud != null)
+        {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player01 {keyLabel} start HUD cooldown", this);
+            }
+
+            skillHud.StartSkillCooldown(keyLabel, ResolveHudCooldown(keyLabel));
+        }
+    }
+
+    private float ResolveHudCooldown(string keyLabel)
+    {
+        switch (keyLabel.Trim().ToUpperInvariant())
+        {
+            case "Q":
+                return qCooldown;
+            case "W":
+                return wCooldown;
+            case "E":
+                return eCooldown;
+            case "R":
+                return rCooldown;
+            default:
+                return 0f;
+        }
+    }
+
+    private void SyncHudCooldownsToResourceManager()
+    {
+        PlayerSkillCooldownManager cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        if (cooldownManager == null || cooldownManager.skillDatas == null || cooldownManager.skillDatas.Length < 4)
+        {
+            return;
+        }
+
+        SkillCostCDData qData = cooldownManager.skillDatas[0];
+        qData.maxCooldown = qCooldown;
+        cooldownManager.skillDatas[0] = qData;
+
+        SkillCostCDData wData = cooldownManager.skillDatas[1];
+        wData.maxCooldown = wCooldown;
+        cooldownManager.skillDatas[1] = wData;
+
+        SkillCostCDData eData = cooldownManager.skillDatas[2];
+        eData.maxCooldown = eCooldown;
+        cooldownManager.skillDatas[2] = eData;
+
+        SkillCostCDData rData = cooldownManager.skillDatas[3];
+        rData.maxCooldown = rCooldown;
+        cooldownManager.skillDatas[3] = rData;
     }
 
     private System.Collections.IEnumerator LogTrackAfterOneFrame(SkeletonAnimation spine, string expectedAnimation)

@@ -77,15 +77,16 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         base.Initialize(owner);
     }
 
-    public override void Cast()
+    public override bool Cast()
     {
         if (Owner == null || isDashing)
         {
-            return;
+            return false;
         }
 
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
+        return true;
     }
 
     public override void Cleanup()
