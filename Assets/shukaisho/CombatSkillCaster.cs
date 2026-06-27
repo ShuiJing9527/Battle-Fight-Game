@@ -149,7 +149,7 @@ public class CombatSkillCaster : MonoBehaviour
         float damage = skill.baseDamage * plan.damageMultiplier;
         if (resourceBank != null)
         {
-            damage *= resourceBank.SkillDamageMultiplier * resourceBank.AttributeDamageMultiplier;
+            damage *= resourceBank.SkillDamageMultiplier;
         }
 
         for (int hit = 0; hit < plan.hitCount; hit++)
@@ -169,8 +169,8 @@ public class CombatSkillCaster : MonoBehaviour
 
                 if (health != null && hitTargets.Add(health))
                 {
-                    float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
-                    health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
+                    float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out bool isCritical);
+                    health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
                     ApplyOnHitRunes(health, point.position, damage, plan);
                     ApplySplitDamage(health, damage, plan);
                 }
@@ -250,8 +250,8 @@ public class CombatSkillCaster : MonoBehaviour
                 continue;
             }
 
-            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
-            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
+            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out bool isCritical);
+            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
             damagedTargets.Add(target);
         }
     }
@@ -261,8 +261,8 @@ public class CombatSkillCaster : MonoBehaviour
         yield return new WaitForSeconds(delay);
         if (target != null)
         {
-            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
-            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject));
+            float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out bool isCritical);
+            target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
         }
     }
 

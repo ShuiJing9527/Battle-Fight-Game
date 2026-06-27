@@ -25,6 +25,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [InspectorName("Q Star Fall Damage Multiplier")]
     [SerializeField] private float qStarFallDamageMultiplier = 1f;
     [SerializeField] private bool qDamageDebugLog = false;
+    [SerializeField] private bool debugCriticalLog = false;
 
     [Header("Q - 神圣星刃 / 预制体")]
     [InspectorName("Q Skill Effect Prefab")]
@@ -482,7 +483,14 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     continue;
                 }
 
-                combatHealth.ApplyDirectDamage(damageAmount, source);
+                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
+                if (debugCriticalLog)
+                {
+                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
+                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
+                }
+
+                combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
                 hitAnyEnemy = true;
                 continue;
             }
@@ -496,11 +504,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     continue;
                 }
 
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
+                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
                 enemyHealth.TakeDamage(damageInt, source);
-                if (qDamageDebugLog)
+                if (qDamageDebugLog || debugCriticalLog)
                 {
-                    Debug.Log($"[Player02 Q] legacy hit enemy={enemyHealth.name} damage={damageInt}", this);
+                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
+                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={damageInt} Type=Special Target={enemyHealth.name}", this);
                 }
                 hitAnyEnemy = true;
             }

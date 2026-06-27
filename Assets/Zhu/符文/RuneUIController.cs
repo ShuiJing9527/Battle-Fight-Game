@@ -70,14 +70,20 @@ public class RuneUIController : MonoBehaviour
     private readonly Dictionary<string, Image> skillRowIcons = new Dictionary<string, Image>();
     private readonly Dictionary<string, Image> skillRowHighlights = new Dictionary<string, Image>();
     private readonly Dictionary<string, SkillHoverTrigger> skillRowHoverTriggers = new Dictionary<string, SkillHoverTrigger>();
+    private readonly Dictionary<string, Image> attributeBarFills = new Dictionary<string, Image>();
+    private readonly Dictionary<string, TextMeshProUGUI> attributeValueTexts = new Dictionary<string, TextMeshProUGUI>();
     private TextMeshProUGUI runeSkillPanelTitleText;
     private Vector2 runeSkillPanelTitleBaseAnchoredPosition;
     private bool hasRuneSkillPanelTitleBasePosition;
     private float skillRowFirstY;
     private bool hasSkillRowFirstY;
     private GameObject skillDescriptionPanel;
+    private GameObject attributePanel;
     private TextMeshProUGUI skillDescriptionTitleText;
     private TextMeshProUGUI skillDescriptionBodyText;
+    private TextMeshProUGUI attributePanelTitleText;
+    private TextMeshProUGUI attributeFooterText;
+    private RuntimeLootDropOnDeath lootDropPreview;
 
     [Header("Skill UI Info")]
     [SerializeField] private Color skillHoverHighlightColor = new Color(1f, 0.9f, 0.35f, 0.5f);
@@ -91,6 +97,25 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private Vector2 skillDescriptionPanelSize = new Vector2(0f, 150f);
     [SerializeField] private Vector2 skillDescriptionPanelOffset = new Vector2(20f, 60f);
     [SerializeField] private Vector2 skillDescriptionPanelPadding = new Vector2(18f, 18f);
+
+    [Header("Attribute Panel")]
+    [SerializeField] private Color attributePanelColor = new Color(0.10f, 0.12f, 0.18f, 0.96f);
+    [SerializeField] private Color attributeBarBackgroundColor = new Color(0.16f, 0.18f, 0.24f, 1f);
+    [SerializeField] private Color attributeBarFillColor = new Color(0.92f, 0.76f, 0.30f, 1f);
+    [SerializeField] private Vector2 attributePanelSize = new Vector2(320f, 300f);
+    [SerializeField] private Vector2 attributePanelOffset = new Vector2(-24f, -20f);
+    [SerializeField] private Vector2 attributePanelPadding = new Vector2(18f, 16f);
+    [SerializeField] private float attributeRowHeight = 26f;
+    [SerializeField] private float attributeRowSpacing = 12f;
+    [SerializeField] private float attributeLabelWidth = 46f;
+    [SerializeField] private float attributeValueWidth = 54f;
+    [SerializeField] private float attributeTitleHeight = 28f;
+    [SerializeField] private float attributeFooterHeight = 90f;
+    [SerializeField, Min(1f)] private float attributeHpDisplayMax = 300f;
+    [SerializeField, Min(1f)] private float attributeAtkDisplayMax = 40f;
+    [SerializeField, Min(1f)] private float attributeDefDisplayMax = 30f;
+    [SerializeField, Min(1f)] private float attributeMagDisplayMax = 40f;
+    [SerializeField, Min(1f)] private float attributeResDisplayMax = 30f;
 
     private void Awake()
     {
@@ -138,6 +163,7 @@ public class RuneUIController : MonoBehaviour
         {
             TogglePanel();
         }
+
     }
 
     private void OnDisable()
@@ -946,6 +972,133 @@ public class RuneUIController : MonoBehaviour
         skillDescriptionPanel.SetActive(false);
     }
 
+    private void EnsureAttributePanel()
+    {
+        Transform panelParent = FindChildRecursive(mainPanel.transform, "RuneSkillPanel");
+        if (panelParent == null)
+        {
+            panelParent = mainPanel.transform;
+        }
+
+        if (attributePanel != null)
+        {
+            ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
+            return;
+        }
+
+        Transform existing = FindChildRecursive(panelParent, "AttributePanel");
+        if (existing != null)
+        {
+            attributePanel = existing.gameObject;
+            attributePanelTitleText = existing.Find("Title")?.GetComponent<TextMeshProUGUI>();
+            attributeFooterText = existing.Find("Footer")?.GetComponent<TextMeshProUGUI>();
+            CacheAttributeRows(existing);
+            ApplyAttributePanelLayout(existing as RectTransform);
+            ApplyAttributePanelTextLayout();
+            return;
+        }
+
+        GameObject panel = new GameObject("AttributePanel", typeof(RectTransform), typeof(Image));
+        panel.transform.SetParent(panelParent, false);
+        RectTransform rect = panel.GetComponent<RectTransform>();
+        ApplyAttributePanelLayout(rect);
+
+        Image background = panel.GetComponent<Image>();
+        background.color = attributePanelColor;
+        background.raycastTarget = false;
+
+        GameObject title = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+        title.transform.SetParent(panel.transform, false);
+        attributePanelTitleText = title.GetComponent<TextMeshProUGUI>();
+        attributePanelTitleText.fontSize = 24f;
+        attributePanelTitleText.alignment = TextAlignmentOptions.MidlineLeft;
+        attributePanelTitleText.enableWordWrapping = false;
+        attributePanelTitleText.text = "Attributes";
+
+        CreateAttributeRow(panel.transform, "HP");
+        CreateAttributeRow(panel.transform, "ATK");
+        CreateAttributeRow(panel.transform, "DEF");
+        CreateAttributeRow(panel.transform, "MAG");
+        CreateAttributeRow(panel.transform, "RES");
+
+        GameObject footer = new GameObject("Footer", typeof(RectTransform), typeof(TextMeshProUGUI));
+        footer.transform.SetParent(panel.transform, false);
+        attributeFooterText = footer.GetComponent<TextMeshProUGUI>();
+        attributeFooterText.fontSize = 18f;
+        attributeFooterText.alignment = TextAlignmentOptions.TopLeft;
+        attributeFooterText.enableWordWrapping = true;
+        attributeFooterText.overflowMode = TextOverflowModes.Overflow;
+        attributeFooterText.text = string.Empty;
+
+        attributePanel = panel;
+        ApplyAttributePanelTextLayout();
+    }
+
+    private void CreateAttributeRow(Transform parent, string key)
+    {
+        GameObject row = new GameObject($"{key}Row", typeof(RectTransform));
+        row.transform.SetParent(parent, false);
+
+        GameObject labelObject = new GameObject("Label", typeof(RectTransform), typeof(TextMeshProUGUI));
+        labelObject.transform.SetParent(row.transform, false);
+        TextMeshProUGUI label = labelObject.GetComponent<TextMeshProUGUI>();
+        label.fontSize = 18f;
+        label.alignment = TextAlignmentOptions.MidlineLeft;
+        label.enableWordWrapping = false;
+        label.text = key;
+
+        GameObject barBackgroundObject = new GameObject("BarBackground", typeof(RectTransform), typeof(Image));
+        barBackgroundObject.transform.SetParent(row.transform, false);
+        Image barBackground = barBackgroundObject.GetComponent<Image>();
+        barBackground.color = attributeBarBackgroundColor;
+        barBackground.raycastTarget = false;
+
+        GameObject barFillObject = new GameObject("BarFill", typeof(RectTransform), typeof(Image));
+        barFillObject.transform.SetParent(barBackgroundObject.transform, false);
+        Image barFill = barFillObject.GetComponent<Image>();
+        barFill.color = attributeBarFillColor;
+        barFill.raycastTarget = false;
+
+        GameObject valueObject = new GameObject("Value", typeof(RectTransform), typeof(TextMeshProUGUI));
+        valueObject.transform.SetParent(row.transform, false);
+        TextMeshProUGUI value = valueObject.GetComponent<TextMeshProUGUI>();
+        value.fontSize = 18f;
+        value.alignment = TextAlignmentOptions.MidlineRight;
+        value.enableWordWrapping = false;
+        value.text = "0";
+
+        attributeBarFills[key] = barFill;
+        attributeValueTexts[key] = value;
+    }
+
+    private void CacheAttributeRows(Transform panelRoot)
+    {
+        attributeBarFills.Clear();
+        attributeValueTexts.Clear();
+
+        string[] keys = { "HP", "ATK", "DEF", "MAG", "RES" };
+        for (int i = 0; i < keys.Length; i++)
+        {
+            Transform row = panelRoot.Find($"{keys[i]}Row");
+            if (row == null)
+            {
+                continue;
+            }
+
+            Image fill = row.Find("BarBackground/BarFill")?.GetComponent<Image>();
+            TextMeshProUGUI value = row.Find("Value")?.GetComponent<TextMeshProUGUI>();
+            if (fill != null)
+            {
+                attributeBarFills[keys[i]] = fill;
+            }
+
+            if (value != null)
+            {
+                attributeValueTexts[keys[i]] = value;
+            }
+        }
+    }
+
     private void ApplyRuneSkillPanelTitleLayout()
     {
         if (mainPanel == null)
@@ -1160,6 +1313,118 @@ public class RuneUIController : MonoBehaviour
         }
     }
 
+    private void ApplyAttributePanelLayout(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(1f, 1f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(1f, 1f);
+        rect.sizeDelta = attributePanelSize;
+        rect.anchoredPosition = attributePanelOffset;
+    }
+
+    private void ApplyAttributePanelTextLayout()
+    {
+        if (attributePanel == null)
+        {
+            return;
+        }
+
+        RectTransform panelRect = attributePanel.transform as RectTransform;
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        float panelWidth = panelRect.sizeDelta.x;
+
+        if (attributePanelTitleText != null)
+        {
+            RectTransform titleRect = attributePanelTitleText.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(attributePanelPadding.x, -attributeTitleHeight);
+            titleRect.offsetMax = new Vector2(-attributePanelPadding.x, 0f);
+        }
+
+        string[] keys = { "HP", "ATK", "DEF", "MAG", "RES" };
+        float rowsTopY = -attributePanelPadding.y - attributeTitleHeight - 8f;
+        float barStartX = attributePanelPadding.x + attributeLabelWidth + 10f;
+        float barEndX = panelWidth - attributePanelPadding.x - attributeValueWidth - 10f;
+        float barWidth = Mathf.Max(40f, barEndX - barStartX);
+
+        for (int i = 0; i < keys.Length; i++)
+        {
+            Transform row = attributePanel.transform.Find($"{keys[i]}Row");
+            if (row == null)
+            {
+                continue;
+            }
+
+            RectTransform rowRect = row as RectTransform;
+            float top = rowsTopY - i * (attributeRowHeight + attributeRowSpacing);
+            rowRect.anchorMin = new Vector2(0f, 1f);
+            rowRect.anchorMax = new Vector2(1f, 1f);
+            rowRect.pivot = new Vector2(0f, 1f);
+            rowRect.offsetMin = new Vector2(0f, top - attributeRowHeight);
+            rowRect.offsetMax = new Vector2(0f, top);
+
+            RectTransform labelRect = row.Find("Label") as RectTransform;
+            if (labelRect != null)
+            {
+                labelRect.anchorMin = new Vector2(0f, 0f);
+                labelRect.anchorMax = new Vector2(0f, 1f);
+                labelRect.pivot = new Vector2(0f, 0.5f);
+                labelRect.anchoredPosition = new Vector2(attributePanelPadding.x, 0f);
+                labelRect.sizeDelta = new Vector2(attributeLabelWidth, 0f);
+            }
+
+            RectTransform backgroundRect = row.Find("BarBackground") as RectTransform;
+            if (backgroundRect != null)
+            {
+                backgroundRect.anchorMin = new Vector2(0f, 0.5f);
+                backgroundRect.anchorMax = new Vector2(0f, 0.5f);
+                backgroundRect.pivot = new Vector2(0f, 0.5f);
+                backgroundRect.anchoredPosition = new Vector2(barStartX, 0f);
+                backgroundRect.sizeDelta = new Vector2(barWidth, attributeRowHeight - 6f);
+            }
+
+            RectTransform fillRect = row.Find("BarBackground/BarFill") as RectTransform;
+            if (fillRect != null)
+            {
+                fillRect.anchorMin = new Vector2(0f, 0f);
+                fillRect.anchorMax = new Vector2(1f, 1f);
+                fillRect.offsetMin = Vector2.zero;
+                fillRect.offsetMax = Vector2.zero;
+            }
+
+            RectTransform valueRect = row.Find("Value") as RectTransform;
+            if (valueRect != null)
+            {
+                valueRect.anchorMin = new Vector2(1f, 0f);
+                valueRect.anchorMax = new Vector2(1f, 1f);
+                valueRect.pivot = new Vector2(1f, 0.5f);
+                valueRect.anchoredPosition = new Vector2(-attributePanelPadding.x, 0f);
+                valueRect.sizeDelta = new Vector2(attributeValueWidth, 0f);
+            }
+        }
+
+        if (attributeFooterText != null)
+        {
+            RectTransform footerRect = attributeFooterText.rectTransform;
+            footerRect.anchorMin = new Vector2(0f, 0f);
+            footerRect.anchorMax = new Vector2(1f, 0f);
+            footerRect.pivot = new Vector2(0.5f, 0f);
+            footerRect.offsetMin = new Vector2(attributePanelPadding.x, attributePanelPadding.y);
+            footerRect.offsetMax = new Vector2(-attributePanelPadding.x, attributePanelPadding.y + attributeFooterHeight);
+        }
+    }
+
     private void ApplySkillRowLayout(string key)
     {
         if (mainPanel == null || string.IsNullOrWhiteSpace(key))
@@ -1215,6 +1480,93 @@ public class RuneUIController : MonoBehaviour
             slotRect.pivot = new Vector2(0f, 0.5f);
             slotRect.anchoredPosition = new Vector2(skillRowSlotsStartX + (skillRowSlotSpacing * i), 0f);
         }
+    }
+
+    private void RefreshAttributePanel()
+    {
+        if (attributePanel == null)
+        {
+            return;
+        }
+
+        ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
+        ApplyAttributePanelTextLayout();
+
+        CombatStats stats = currentPlayer != null ? BattleStatUtility.GetCombatStats(currentPlayer) : null;
+        if (attributePanelTitleText != null)
+        {
+            attributePanelTitleText.text = "Attributes";
+        }
+
+        RefreshAttributeBar("HP", stats != null ? stats.maxHealth : 0f, attributeHpDisplayMax);
+        RefreshAttributeBar("ATK", stats != null ? stats.physicalAttack : 0f, attributeAtkDisplayMax);
+        RefreshAttributeBar("DEF", stats != null ? stats.physicalDefense : 0f, attributeDefDisplayMax);
+        RefreshAttributeBar("MAG", stats != null ? stats.specialAttack : 0f, attributeMagDisplayMax);
+        RefreshAttributeBar("RES", stats != null ? stats.specialDefense : 0f, attributeResDisplayMax);
+
+        if (attributeFooterText == null)
+        {
+            return;
+        }
+
+        float speed = stats != null ? Mathf.Max(0f, stats.speed) : 0f;
+        float luck = stats != null ? Mathf.Max(0f, stats.luck) : 0f;
+        float critRate = BattleStatUtility.GetCritRate(stats) * 100f;
+        float extraSoulDrop = ResolveExtraSoulDropChance(luck) * 100f;
+        float extraRuneDrop = ResolveExtraRuneDropChance(luck) * 100f;
+
+        attributeFooterText.text =
+            $"SPD  {speed:0.0}\n" +
+            $"LUCK {luck:0}\n" +
+            $"Crit Rate        {critRate:0.#}%\n" +
+            $"Extra Soul Drop  {extraSoulDrop:0.#}%\n" +
+            $"Extra Rune Drop  {extraRuneDrop:0.#}%";
+    }
+
+    private void RefreshAttributeBar(string key, float value, float displayMax)
+    {
+        if (attributeValueTexts.TryGetValue(key, out TextMeshProUGUI valueText) && valueText != null)
+        {
+            valueText.text = Mathf.RoundToInt(Mathf.Max(0f, value)).ToString();
+        }
+
+        if (!attributeBarFills.TryGetValue(key, out Image fill) || fill == null)
+        {
+            return;
+        }
+
+        float ratio = displayMax > 0f ? Mathf.Clamp01(Mathf.Max(0f, value) / displayMax) : 0f;
+        RectTransform rect = fill.rectTransform;
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(ratio, 1f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+    }
+
+    private float ResolveExtraSoulDropChance(float luck)
+    {
+        RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
+        return preview != null
+            ? preview.GetExtraSoulDropChanceForLuck(luck)
+            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.01f, 0f, 0.5f);
+    }
+
+    private float ResolveExtraRuneDropChance(float luck)
+    {
+        RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
+        return preview != null
+            ? preview.GetExtraRuneDropChanceForLuck(luck)
+            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.005f, 0f, 0.3f);
+    }
+
+    private RuntimeLootDropOnDeath ResolveLootDropPreview()
+    {
+        if (lootDropPreview == null)
+        {
+            lootDropPreview = Object.FindObjectOfType<RuntimeLootDropOnDeath>(true);
+        }
+
+        return lootDropPreview;
     }
 
     private static int ExtractSlotIndex(string name)

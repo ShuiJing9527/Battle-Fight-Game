@@ -100,11 +100,11 @@ public class PlayerStatusHUD : MonoBehaviour
 
         SetFill(hpFill, hpMax > 0f ? hpCurrent / hpMax : 0f);
         SetFill(mpFill, mpMax > 0f ? mpCurrent / mpMax : 0f);
-        SetFill(shieldFill, shieldMax > 0f ? shieldCurrent / shieldMax : 0f);
+        SetFill(shieldFill, ResolveShieldRatio(shieldCurrent, shieldMax));
 
         SetText(hpText, $"HP {Mathf.CeilToInt(hpCurrent)}/{Mathf.CeilToInt(hpMax)}");
         SetText(mpText, $"MP {Mathf.CeilToInt(mpCurrent)}/{Mathf.CeilToInt(mpMax)}");
-        SetText(shieldText, $"Shield {Mathf.CeilToInt(shieldCurrent)}/{Mathf.CeilToInt(shieldMax)}");
+        SetText(shieldText, $"Shield {Mathf.CeilToInt(shieldCurrent)}");
     }
 
     private void ResolveHealth(out float current, out float max)
@@ -158,6 +158,21 @@ public class PlayerStatusHUD : MonoBehaviour
 
         current = 0f;
         max = 0f;
+    }
+
+    private static float ResolveShieldRatio(float current, float max)
+    {
+        if (current <= 0f)
+        {
+            return 0f;
+        }
+
+        if (max > 0f)
+        {
+            return current / max;
+        }
+
+        return 1f;
     }
 
     private static void SetFill(Image fill, float ratio)

@@ -105,23 +105,16 @@ public static class CreateRuneUIPrefab
         GameObject skillPanel = CreatePanel(root.transform, "RuneSkillPanel", new Vector2(540f, 460f), new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f));
         skillPanel.AddComponent<CanvasGroup>();
         skillPanel.GetComponent<Image>().color = new Color(0.08f, 0.10f, 0.12f, 0.94f);
-        RuneSkillPanel runeSkillPanel = skillPanel.AddComponent<RuneSkillPanel>();
 
         TextMeshProUGUI skillTitle = CreateText(skillPanel.transform, "TitleText", "Rune Skill Panel", fontAsset, 22f, TextAlignmentOptions.Center);
         ConfigureRect(skillTitle.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(280f, 40f), new Vector2(0f, -18f));
 
         bagUI.panelRoot = bagPanel;
-        bagUI.runeSkillPanel = runeSkillPanel;
         bagUI.runeContent = runeContent.transform;
         bagUI.runeButtonPrefab = runeButtonPrefab;
         bagUI.skillSlots = slots;
         bagUI.skillSlotUIs = slotUIs;
         bagUI.selectedRuneText = selectedRuneText.GetComponent<TextMeshProUGUI>();
-
-        runeSkillPanel.panelRoot = skillPanel;
-        runeSkillPanel.inventory = null;
-        runeSkillPanel.skillCaster = null;
-        runeSkillPanel.visible = false;
 
         if (closeButtonComponent != null)
         {

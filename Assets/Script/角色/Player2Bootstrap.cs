@@ -24,7 +24,6 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField] private bool showHealthBar = true;
     [SerializeField] private bool showRuneHint = true;
     [SerializeField] private RuneBagUI runeBagUI;
-    [SerializeField] private RuneSkillPanel runeSkillPanel;
 
     [Header("Player Health")]
     [SerializeField] private float playerStartHealth = 100f;
@@ -218,12 +217,6 @@ public class Player2Bootstrap : MonoBehaviour
         if (runeBagUI != null)
         {
             runeBagUI.TogglePanel();
-            return;
-        }
-
-        if (runeSkillPanel != null)
-        {
-            runeSkillPanel.TogglePanel();
             return;
         }
 

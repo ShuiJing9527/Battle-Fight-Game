@@ -26,9 +26,6 @@ public class RuneBagUI : MonoBehaviour
     [Header("UI Root")]
     public GameObject panelRoot;
 
-    [Header("Linked Rune Panel")]
-    public RuneSkillPanel runeSkillPanel;
-
     [Header("Rune List Content")]
     public Transform runeContent;
 
@@ -105,10 +102,6 @@ public class RuneBagUI : MonoBehaviour
     {
         ResolveRuntimeReferences();
         EnsurePanelVisible(true);
-        if (runeSkillPanel != null)
-        {
-            runeSkillPanel.SetPanelVisible(true);
-        }
         SetPauseState(true);
 
         RefreshAll();
@@ -118,10 +111,6 @@ public class RuneBagUI : MonoBehaviour
     public void ClosePanel()
     {
         EnsurePanelVisible(false);
-        if (runeSkillPanel != null)
-        {
-            runeSkillPanel.SetPanelVisible(false);
-        }
         SetPauseState(false);
     }
 
@@ -789,15 +778,6 @@ public class RuneBagUI : MonoBehaviour
             if (selectedRuneText == null && texts.Length > 0)
             {
                 selectedRuneText = texts[0];
-            }
-        }
-
-        if (runeSkillPanel == null)
-        {
-            Transform root = panelRoot != null ? panelRoot.transform.parent : transform.parent;
-            if (root != null)
-            {
-                runeSkillPanel = root.GetComponentInChildren<RuneSkillPanel>(true);
             }
         }
 

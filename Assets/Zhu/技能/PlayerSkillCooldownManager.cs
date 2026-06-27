@@ -222,7 +222,6 @@ public class PlayerSkillCooldownManager : MonoBehaviour
 
     private float ResolveCooldownMultiplier()
     {
-        float resourceMultiplier = resourceBank != null ? resourceBank.SkillCooldownMultiplier : 1f;
-        return resourceMultiplier * BattleStatUtility.GetCooldownMultiplier(combatStats);
+        return BattleStatUtility.GetCooldownMultiplier(combatStats);
     }
 }

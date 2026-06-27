@@ -83,6 +83,7 @@ MonoBehaviour:
   trailParticles: {fileID: 1200000000000000002}
   haloRingTransform: {fileID: 1300000000000000001}
   haloRingRenderer: {fileID: 1300000000000000002}
+  soulPickupFloatingTextPrefab: {fileID: 11400001, guid: 8c08fb81fb254154bb5ea564953a908d, type: 3}
   mainBurstCount: 24
   trailBurstCount: 12
   mainEmissionRate: 80

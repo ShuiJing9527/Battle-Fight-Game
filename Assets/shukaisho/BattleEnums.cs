@@ -6,6 +6,13 @@ public enum BattleDamageType
     Special
 }
 
+public enum DamagePopupType
+{
+    Normal,
+    Physical,
+    Special
+}
+
 public enum SoulType
 {
     Life = 1,
@@ -47,11 +54,13 @@ public struct BattleDamage
     public float amount;
     public BattleDamageType damageType;
     public GameObject source;
+    public bool isCritical;
 
-    public BattleDamage(float amount, BattleDamageType damageType, GameObject source)
+    public BattleDamage(float amount, BattleDamageType damageType, GameObject source, bool isCritical = false)
     {
         this.amount = Mathf.Max(0f, amount);
         this.damageType = damageType;
         this.source = source;
+        this.isCritical = isCritical;
     }
 }

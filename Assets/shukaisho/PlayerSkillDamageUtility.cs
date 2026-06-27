@@ -44,7 +44,7 @@ public static class PlayerSkillDamageUtility
 
         if (bank != null)
         {
-            damage *= bank.SkillDamageMultiplier * bank.AttributeDamageMultiplier;
+            damage *= bank.SkillDamageMultiplier;
         }
 
         return BattleStatUtility.ApplyCriticalDamage(ownerObject, damage, out _);

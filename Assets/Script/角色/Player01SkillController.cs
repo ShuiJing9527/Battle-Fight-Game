@@ -449,10 +449,6 @@ public class Player01SkillController : MonoBehaviour
             gameObject.AddComponent<RuneLibrary>();
         }
 
-        if (GetComponent<RuneSkillPanel>() == null)
-        {
-            gameObject.AddComponent<RuneSkillPanel>();
-        }
     }
 
     private void AutoBindSkills()

@@ -1,5 +1,10 @@
 ﻿using UnityEngine;
 
+/// <summary>
+/// Legacy / deprecated rune panel compatibility script.
+/// The current production rune UI flow is RuneUIController + RuneBagUI, opened via K.
+/// Keep this script only for backwards compatibility; do not use it as a primary UI entry.
+/// </summary>
 public class RuneSkillPanel : MonoBehaviour
 {
     public GameObject panelRoot;

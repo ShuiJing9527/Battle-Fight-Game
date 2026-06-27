@@ -19,6 +19,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float rSwarmMaxRotationSpeed = 360f;
     [SerializeField] private bool rDamageDebugLog = false;
     [SerializeField] private bool rSwarmDebugLog = false;
+    [SerializeField] private bool debugCriticalLog = false;
     [Header("R - 旧伤害参数（当前直伤公式未使用）")]
     [FormerlySerializedAs("rSwarmDamagePerTick")]
     [HideInInspector]
@@ -1025,7 +1026,14 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
                 float damageAmount = ResolveRHitDamage(attackerStats, combatHealth.stats, combatHealth, source, damageMultiplier);
-                combatHealth.ApplyDirectDamage(damageAmount, source);
+                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
+                if (debugCriticalLog)
+                {
+                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
+                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
+                }
+
+                combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
                 continue;
             }
 
@@ -1034,8 +1042,14 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             {
                 CombatStats targetStats = targetRoot.GetComponentInParent<CombatStats>();
                 float damageAmount = ResolveRHitDamage(attackerStats, targetStats, null, source, damageMultiplier);
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
+                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
                 enemyHealth.TakeDamage(damageInt, source);
+                if (debugCriticalLog)
+                {
+                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
+                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={damageInt} Type=Special Target={enemyHealth.name}", this);
+                }
             }
         }
     }

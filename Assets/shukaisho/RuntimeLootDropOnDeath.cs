@@ -5,12 +5,29 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     [Header("Soul Drop")]
     [SerializeField] private SoulPickup soulPrefab;
     [SerializeField, Min(0f)] private float dropYOffset = 1f;
-    public float soulAmount = 15f;
     public float dropScatterRadius = 0.8f;
+    [SerializeField, Min(0)] private int lifeSoulWeight = 25;
+    [SerializeField, Min(0)] private int energySoulWeight = 20;
+    [SerializeField, Min(0)] private int functionSoulWeight = 15;
+    [SerializeField, Min(0)] private int growthSoulWeight = 40;
+    [SerializeField, Min(0)] private int resourcePoint1Weight = 50;
+    [SerializeField, Min(0)] private int resourcePoint2Weight = 25;
+    [SerializeField, Min(0)] private int resourcePoint3Weight = 15;
+    [SerializeField, Min(0)] private int resourcePoint4Weight = 7;
+    [SerializeField, Min(0)] private int resourcePoint5Weight = 3;
+    [SerializeField, Min(0)] private int growthPoint1Weight = 70;
+    [SerializeField, Min(0)] private int growthPoint2Weight = 18;
+    [SerializeField, Min(0)] private int growthPoint3Weight = 8;
+    [SerializeField, Min(0)] private int growthPoint4Weight = 3;
+    [SerializeField, Min(0)] private int growthPoint5Weight = 1;
+    [SerializeField, Min(0f)] private float extraSoulDropChancePerLuck = 0.01f;
+    [SerializeField, Min(0f)] private float maxExtraSoulDropChance = 0.5f;
 
     [Header("Rune Drop")]
     [SerializeField] private RunePickup runePickupPrefab;
     [SerializeField, Min(0f)] private float runeDropYOffset = 0.25f;
+    [SerializeField, Min(0f)] private float extraRuneDropChancePerLuck = 0.005f;
+    [SerializeField, Min(0f)] private float maxExtraRuneDropChance = 0.3f;
 
     private CombatHealth combatHealth;
     private EnemyHealth enemyHealth;
@@ -70,17 +87,32 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         dropped = true;
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        float killerLuck = ResolveLuck(killer);
 
         int soulCount = rank == MonsterRank.Boss ? 4 : (rank == MonsterRank.Elite ? 2 : 1);
         for (int i = 0; i < soulCount; i++)
         {
-            CreateSoul(RandomSoulType(), soulAmount, transform.position + Vector3.up * dropYOffset + RandomOffset());
+            SoulType soulType = GetRandomSoulTypeByWeight();
+            int soulPoint = soulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            CreateSoul(soulType, soulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
+        }
+
+        if (ShouldDropExtraSoul(killerLuck))
+        {
+            SoulType extraSoulType = GetRandomSoulTypeByWeight();
+            int extraSoulPoint = extraSoulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            CreateSoul(extraSoulType, extraSoulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
 
         int runeCount = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
         for (int i = 0; i < runeCount; i++)
         {
             CreateRune(transform.position + Vector3.up * runeDropYOffset);
+        }
+
+        if (ShouldDropExtraRune(killerLuck))
+        {
+            CreateRune(transform.position + Vector3.up * runeDropYOffset + RandomOffset());
         }
     }
 
@@ -90,28 +122,155 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return new Vector3(offset.x, 0.15f, offset.y);
     }
 
-    private static SoulType RandomSoulType()
+    private SoulType GetRandomSoulTypeByWeight()
     {
-        int roll = Random.Range(0, 4);
-        return roll switch
+        int lifeWeight = Mathf.Max(0, lifeSoulWeight);
+        int energyWeight = Mathf.Max(0, energySoulWeight);
+        int functionWeight = Mathf.Max(0, functionSoulWeight);
+        int growthWeight = Mathf.Max(0, growthSoulWeight);
+
+        int totalWeight = lifeWeight + energyWeight + functionWeight + growthWeight;
+        if (totalWeight <= 0)
         {
-            0 => SoulType.Life,
-            1 => SoulType.Energy,
-            2 => SoulType.Growth,
-            _ => SoulType.Function
-        };
+            return SoulType.Life;
+        }
+
+        int roll = Random.Range(0, totalWeight);
+        if (roll < lifeWeight)
+        {
+            return SoulType.Life;
+        }
+
+        roll -= lifeWeight;
+        if (roll < energyWeight)
+        {
+            return SoulType.Energy;
+        }
+
+        roll -= energyWeight;
+        if (roll < functionWeight)
+        {
+            return SoulType.Function;
+        }
+
+        return SoulType.Growth;
     }
 
-    private void CreateSoul(SoulType type, float amount, Vector3 position)
+    private int GetRandomResourceSoulPoint()
+    {
+        return GetWeightedPoint(
+            resourcePoint1Weight,
+            resourcePoint2Weight,
+            resourcePoint3Weight,
+            resourcePoint4Weight,
+            resourcePoint5Weight);
+    }
+
+    private int GetRandomGrowthSoulPoint()
+    {
+        return GetWeightedPoint(
+            growthPoint1Weight,
+            growthPoint2Weight,
+            growthPoint3Weight,
+            growthPoint4Weight,
+            growthPoint5Weight);
+    }
+
+    private static int GetWeightedPoint(int point1Weight, int point2Weight, int point3Weight, int point4Weight, int point5Weight)
+    {
+        int weight1 = Mathf.Max(0, point1Weight);
+        int weight2 = Mathf.Max(0, point2Weight);
+        int weight3 = Mathf.Max(0, point3Weight);
+        int weight4 = Mathf.Max(0, point4Weight);
+        int weight5 = Mathf.Max(0, point5Weight);
+        int totalWeight = weight1 + weight2 + weight3 + weight4 + weight5;
+        if (totalWeight <= 0)
+        {
+            return 1;
+        }
+
+        int roll = Random.Range(0, totalWeight);
+        if (roll < weight1)
+        {
+            return 1;
+        }
+
+        roll -= weight1;
+        if (roll < weight2)
+        {
+            return 2;
+        }
+
+        roll -= weight2;
+        if (roll < weight3)
+        {
+            return 3;
+        }
+
+        roll -= weight3;
+        if (roll < weight4)
+        {
+            return 4;
+        }
+
+        return 5;
+    }
+
+    private bool ShouldDropExtraSoul(float luck)
+    {
+        float extraChance = GetExtraSoulDropChanceForLuck(luck);
+        return extraChance > 0f && Random.value < extraChance;
+    }
+
+    private bool ShouldDropExtraRune(float luck)
+    {
+        float extraChance = GetExtraRuneDropChanceForLuck(luck);
+        return extraChance > 0f && Random.value < extraChance;
+    }
+
+    public float GetExtraSoulDropChanceForLuck(float luck)
+    {
+        return Mathf.Clamp(Mathf.Max(0f, luck) * extraSoulDropChancePerLuck, 0f, maxExtraSoulDropChance);
+    }
+
+    public float GetExtraRuneDropChanceForLuck(float luck)
+    {
+        return Mathf.Clamp(Mathf.Max(0f, luck) * extraRuneDropChancePerLuck, 0f, maxExtraRuneDropChance);
+    }
+
+    private float ResolveLuck(GameObject killer)
+    {
+        CombatStats killerStats = BattleStatUtility.GetCombatStats(killer);
+        if (killerStats != null)
+        {
+            return Mathf.Max(0f, killerStats.luck);
+        }
+
+        Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+        if (bootstrap != null && bootstrap.CurrentPlayer != null)
+        {
+            CombatStats currentPlayerStats = BattleStatUtility.GetCombatStats(bootstrap.CurrentPlayer);
+            if (currentPlayerStats != null)
+            {
+                return Mathf.Max(0f, currentPlayerStats.luck);
+            }
+        }
+
+        GameObject taggedPlayer = GameObject.FindWithTag("Player");
+        CombatStats taggedPlayerStats = BattleStatUtility.GetCombatStats(taggedPlayer);
+        return taggedPlayerStats != null ? Mathf.Max(0f, taggedPlayerStats.luck) : 0f;
+    }
+
+    private void CreateSoul(SoulType type, int soulPoint, Vector3 position)
     {
         if (soulPrefab != null)
         {
             SoulPickup pickup = Instantiate(soulPrefab, position, Quaternion.identity);
             pickup.soulType = type;
-            pickup.amount = amount;
+            pickup.soulPoint = soulPoint;
             pickup.destroyAfterPickup = true;
             pickup.gameObject.SetActive(true);
-            pickup.Configure(type, amount);
+            pickup.Configure(type, soulPoint);
             EnsureDebugVisible(pickup.gameObject);
             return;
         }
@@ -130,7 +289,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         rb.useGravity = false;
 
         SoulPickup fallbackPickup = soulObject.AddComponent<SoulPickup>();
-        fallbackPickup.Configure(type, amount);
+        fallbackPickup.Configure(type, soulPoint);
         soulObject.SetActive(true);
     }
 

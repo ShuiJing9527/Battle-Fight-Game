@@ -78,7 +78,7 @@ public class SoulDropOnDeath : MonoBehaviour
                 rb.useGravity = false;
 
                 SoulPickup soul = soulObject.AddComponent<SoulPickup>();
-                soul.Configure(entry.soulType, soul.amount);
+                soul.Configure(entry.soulType, 1);
                 soulObject.SetActive(true);
             }
         }

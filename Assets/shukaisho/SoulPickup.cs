@@ -23,7 +23,7 @@ public class SoulPickup : MonoBehaviour
 
     [Header("Soul")]
     public SoulType soulType = SoulType.Life;
-    [Min(0f)] public float amount = 1f;
+    [Min(1)] public int soulPoint = 1;
     public bool destroyAfterPickup = true;
 
     [Header("Auto Absorb")]
@@ -40,6 +40,7 @@ public class SoulPickup : MonoBehaviour
     [SerializeField] private ParticleSystem trailParticles;
     [SerializeField] private Transform haloRingTransform;
     [SerializeField] private SpriteRenderer haloRingRenderer;
+    [SerializeField] private SoulPickupFloatingText soulPickupFloatingTextPrefab;
     [SerializeField, Min(0)] private int mainBurstCount = 24;
     [SerializeField, Min(0)] private int trailBurstCount = 12;
     [SerializeField, Min(0f)] private float mainEmissionRate = 80f;
@@ -62,6 +63,9 @@ public class SoulPickup : MonoBehaviour
     private bool warnedMissingHaloRing;
     private bool warnedMissingCoreParticles;
     private bool warnedMissingTrailParticles;
+    private bool warnedMissingSoulPopupPrefab;
+    private static SoulPickupFloatingText defaultSoulPickupFloatingTextPrefab;
+    private static bool attemptedLoadDefaultSoulPickupFloatingTextPrefab;
 
     private void Awake()
     {
@@ -169,10 +173,10 @@ public class SoulPickup : MonoBehaviour
         ApplySoulToTarget(target);
     }
 
-    public void Configure(SoulType type, float soulAmount)
+    public void Configure(SoulType type, int point)
     {
         soulType = type;
-        amount = soulAmount;
+        soulPoint = Mathf.Max(1, point);
         RefreshVisualColors();
 
         if (Application.isPlaying && isActiveAndEnabled)
@@ -195,7 +199,29 @@ public class SoulPickup : MonoBehaviour
             return;
         }
 
-        bank.ApplySoul(soulType, amount);
+        string feedback = bank.ApplySoulWithFeedback(soulType, soulPoint);
+        if (!string.IsNullOrWhiteSpace(feedback))
+        {
+            Vector3 popupPosition = target.position + Vector3.up * Mathf.Max(1.2f, targetChestHeight);
+            Color soulColor = ResolveSoulColor(soulType);
+            SoulPickupFloatingText popupPrefab = ResolveSoulPickupFloatingTextPrefab();
+            if (popupPrefab != null)
+            {
+                SoulPickupFloatingText popup = Instantiate(popupPrefab, popupPosition, Quaternion.identity);
+                popup.Show(feedback, soulColor);
+            }
+            else
+            {
+                if (!warnedMissingSoulPopupPrefab)
+                {
+                    warnedMissingSoulPopupPrefab = true;
+                    Debug.LogWarning("[SoulPickup] soulPickupFloatingTextPrefab is not assigned and no default prefab was found at Resources/Prefabs/UI/SoulPickupFloatingText. Using runtime fallback popup.", this);
+                }
+
+                SoulPickupFloatingText.SpawnFallback(feedback, popupPosition, soulColor);
+            }
+        }
+
         absorbed = true;
 
         if (destroyAfterPickup)
@@ -501,6 +527,22 @@ public class SoulPickup : MonoBehaviour
             SoulType.Function => new Color(1f, 0.76f, 0.22f, 1f),
             _ => Color.white
         };
+    }
+
+    private SoulPickupFloatingText ResolveSoulPickupFloatingTextPrefab()
+    {
+        if (soulPickupFloatingTextPrefab != null)
+        {
+            return soulPickupFloatingTextPrefab;
+        }
+
+        if (!attemptedLoadDefaultSoulPickupFloatingTextPrefab)
+        {
+            attemptedLoadDefaultSoulPickupFloatingTextPrefab = true;
+            defaultSoulPickupFloatingTextPrefab = Resources.Load<SoulPickupFloatingText>("Prefabs/UI/SoulPickupFloatingText");
+        }
+
+        return defaultSoulPickupFloatingTextPrefab;
     }
 
     private static GameObject FindSceneObjectByNameIncludingInactive(string targetName)

@@ -16,6 +16,16 @@ public class CombatHealth : MonoBehaviour
     public string deathTrigger = "Die";
     [Min(0f)] public float destroyDelayAfterDeath = 0.65f;
 
+    [Header("Damage Popup")]
+    [SerializeField] private bool showDamageNumbers = true;
+    [SerializeField] private DamagePopupFloatingText damagePopupPrefab;
+    [SerializeField] private Color normalDamageColor = Color.white;
+    [SerializeField] private Color physicalDamageColor = new Color(1f, 0.25f, 0.25f, 1f);
+    [SerializeField] private Color specialDamageColor = new Color(0.78f, 0.35f, 1f, 1f);
+    [SerializeField] private Color criticalDamageColor = new Color(1f, 0.84f, 0.2f, 1f);
+    [SerializeField] private Vector3 damagePopupOffset = new Vector3(0f, 1f, 0f);
+    [SerializeField] private Vector2 damagePopupRandomOffset = new Vector2(0.3f, 0.15f);
+
     public event Action<GameObject> Died;
     public event Action<float, GameObject> Damaged;
     public event Action<float, float> OnShieldChanged;
@@ -24,6 +34,9 @@ public class CombatHealth : MonoBehaviour
     private float localShield;
     private float localMaxShield;
     private readonly Dictionary<string, float> incomingDamageMultipliers = new Dictionary<string, float>();
+    private bool warnedMissingDamagePopupPrefab;
+    private static DamagePopupFloatingText defaultDamagePopupPrefab;
+    private static bool attemptedLoadDefaultDamagePopupPrefab;
 
     private float MaxHealth => stats != null ? stats.maxHealth : (resourceBank != null ? resourceBank.maxHealth : currentHealth);
     public float MaxHealthValue => MaxHealth;
@@ -150,6 +163,7 @@ public class CombatHealth : MonoBehaviour
         if (finalDamage > 0f)
         {
             Damaged?.Invoke(finalDamage, damage.source);
+            ShowDamagePopup(finalDamage, ResolvePopupType(damage.damageType), damage.isCritical);
             TriggerAnimation(hitTrigger);
         }
 
@@ -160,6 +174,11 @@ public class CombatHealth : MonoBehaviour
     }
 
     public void ApplyDirectDamage(float amount, GameObject source)
+    {
+        ApplyDirectDamage(amount, source, DamagePopupType.Normal, false);
+    }
+
+    public void ApplyDirectDamage(float amount, GameObject source, DamagePopupType popupType, bool isCritical = false)
     {
         if (dead)
         {
@@ -188,6 +207,7 @@ public class CombatHealth : MonoBehaviour
         if (finalDamage > 0f)
         {
             Damaged?.Invoke(finalDamage, source);
+            ShowDamagePopup(finalDamage, popupType, isCritical);
             TriggerAnimation(hitTrigger);
         }
 
@@ -370,6 +390,70 @@ public class CombatHealth : MonoBehaviour
     private void HandleResourceBankOnShieldChanged(float currentShield, float maxShield)
     {
         OnShieldChanged?.Invoke(currentShield, maxShield);
+    }
+
+    private DamagePopupType ResolvePopupType(BattleDamageType damageType)
+    {
+        return damageType == BattleDamageType.Special ? DamagePopupType.Special : DamagePopupType.Physical;
+    }
+
+    private void ShowDamagePopup(float damage, DamagePopupType popupType, bool isCritical)
+    {
+        if (!showDamageNumbers || damage <= 0f)
+        {
+            return;
+        }
+
+        Vector3 worldPosition = transform.position + damagePopupOffset;
+        worldPosition.x += UnityEngine.Random.Range(-damagePopupRandomOffset.x, damagePopupRandomOffset.x);
+        worldPosition.y += UnityEngine.Random.Range(-damagePopupRandomOffset.y, damagePopupRandomOffset.y);
+        worldPosition.z += UnityEngine.Random.Range(-damagePopupRandomOffset.x, damagePopupRandomOffset.x);
+
+        string message = Mathf.RoundToInt(damage).ToString();
+
+        Color color = ResolveDamagePopupColor(popupType, isCritical);
+        DamagePopupFloatingText popupPrefab = ResolveDamagePopupPrefab();
+        if (popupPrefab != null)
+        {
+            DamagePopupFloatingText popup = Instantiate(popupPrefab, worldPosition, Quaternion.identity);
+            popup.Show(message, color);
+        }
+        else
+        {
+            if (!warnedMissingDamagePopupPrefab)
+            {
+                warnedMissingDamagePopupPrefab = true;
+                Debug.LogWarning("[CombatHealth] damagePopupPrefab is not assigned and no default prefab was found at Resources/Prefabs/UI/DamagePopupFloatingText. Using runtime fallback popup.", this);
+            }
+
+            DamagePopupFloatingText.SpawnFallback(message, worldPosition, color);
+        }
+    }
+
+    private DamagePopupFloatingText ResolveDamagePopupPrefab()
+    {
+        if (damagePopupPrefab != null)
+        {
+            return damagePopupPrefab;
+        }
+
+        if (!attemptedLoadDefaultDamagePopupPrefab)
+        {
+            attemptedLoadDefaultDamagePopupPrefab = true;
+            defaultDamagePopupPrefab = Resources.Load<DamagePopupFloatingText>("Prefabs/UI/DamagePopupFloatingText");
+        }
+
+        return defaultDamagePopupPrefab;
+    }
+
+    private Color ResolveDamagePopupColor(DamagePopupType popupType, bool isCritical)
+    {
+        if (isCritical)
+        {
+            return criticalDamageColor;
+        }
+
+        return normalDamageColor;
     }
 
     private void Die(GameObject killer)

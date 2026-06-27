@@ -73,8 +73,9 @@ public class BattleResourceBank : MonoBehaviour
         }
     }
 
-    public float AttributeDamageMultiplier => 1f + growthSoul * growthAttackBonusPerSoul;
-    public float SkillCooldownMultiplier => Mathf.Clamp(Mathf.Pow(functionCooldownMultiplierPerSoul, functionSoul), 0.35f, 1f);
+    // Legacy soul multiplier hooks are intentionally neutralized.
+    public float AttributeDamageMultiplier => 1f;
+    public float SkillCooldownMultiplier => 1f;
 
     private void Awake()
     {
@@ -108,26 +109,39 @@ public class BattleResourceBank : MonoBehaviour
 
     public void ApplySoul(SoulType type, float amount)
     {
-        amount = Mathf.Max(0f, amount);
+        ApplySoulWithFeedback(type, Mathf.RoundToInt(amount));
+    }
+
+    public string ApplySoulWithFeedback(SoulType type, int soulPoint)
+    {
+        soulPoint = Mathf.Clamp(soulPoint, 1, 5);
+        float resolvedValue = ResolveSoulValue(type, soulPoint);
+        string feedback;
 
         switch (type)
         {
             case SoulType.Life:
-                ApplyLifeSoul(amount);
+                ApplyLifeSoul(resolvedValue);
+                feedback = $"Heal +{Mathf.CeilToInt(resolvedValue)}";
                 break;
             case SoulType.Energy:
-                ApplyEnergySoul(amount);
+                ApplyEnergySoul(resolvedValue);
+                feedback = $"MP +{Mathf.CeilToInt(resolvedValue)}";
                 break;
             case SoulType.Growth:
-                growthSoul += Mathf.RoundToInt(amount);
+                feedback = ApplyGrowthSoul(soulPoint);
                 break;
             case SoulType.Function:
-                functionSoul += Mathf.RoundToInt(amount);
-                FunctionSoulTriggered?.Invoke();
+                ApplyFunctionSoul(resolvedValue);
+                feedback = $"Shield +{Mathf.CeilToInt(resolvedValue)}";
+                break;
+            default:
+                feedback = string.Empty;
                 break;
         }
 
-        SoulApplied?.Invoke(type, amount);
+        SoulApplied?.Invoke(type, soulPoint);
+        return feedback;
     }
 
     public void Heal(float amount)
@@ -174,32 +188,93 @@ public class BattleResourceBank : MonoBehaviour
         return shield > 0f;
     }
 
+    public void AddShield(float amount)
+    {
+        amount = Mathf.Max(0f, amount);
+        if (amount <= 0f)
+        {
+            return;
+        }
+
+        shield += amount;
+        maxShield = Mathf.Max(maxShield, shield);
+        OnShieldChanged?.Invoke(shield, maxShield);
+    }
+
     private void ApplyLifeSoul(float amount)
     {
-        float before = currentHealth;
         currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
-        float used = currentHealth - before;
-        float overflow = amount - used;
-
-        if (overflow > 0f)
-        {
-            shield += overflow;
-            maxShield = Mathf.Max(maxShield, shield);
-            OnShieldChanged?.Invoke(shield, maxShield);
-        }
     }
 
     private void ApplyEnergySoul(float amount)
     {
-        float before = currentEnergy;
         currentEnergy = Mathf.Min(maxEnergy, currentEnergy + amount);
-        float used = currentEnergy - before;
-        float overflow = amount - used;
+    }
 
-        if (overflow > 0f && energyOverflowDamageBonusPerPoint > 0f && energyOverflowBuffSeconds > 0f)
+    private void ApplyFunctionSoul(float amount)
+    {
+        AddShield(amount);
+    }
+
+    private float ResolveSoulValue(SoulType type, int soulPoint)
+    {
+        soulPoint = Mathf.Clamp(soulPoint, 1, 5);
+        return type == SoulType.Growth ? soulPoint : soulPoint * 10f;
+    }
+
+    private string ApplyGrowthSoul(int soulPoint)
+    {
+        CombatStats stats = GetComponent<CombatStats>();
+        CombatHealth combatHealth = GetComponent<CombatHealth>();
+        int growthChoice = UnityEngine.Random.Range(0, 5);
+        int growthAmount = Mathf.Clamp(soulPoint, 1, 5);
+        float healthGrowth = growthAmount * 10f;
+
+        if (stats == null)
         {
-            skillDamageMultiplier = 1f + overflow * energyOverflowDamageBonusPerPoint;
-            skillDamageBuffEndTime = Time.time + energyOverflowBuffSeconds;
+            if (growthChoice == 0)
+            {
+                maxHealth += healthGrowth;
+                currentHealth = Mathf.Min(maxHealth, currentHealth + healthGrowth);
+                if (combatHealth != null)
+                {
+                    combatHealth.currentHealth = currentHealth;
+                }
+
+                return $"HP +{Mathf.CeilToInt(healthGrowth)}";
+            }
+
+            return string.Empty;
+        }
+
+        switch (growthChoice)
+        {
+            case 0:
+            {
+                stats.maxHealth += healthGrowth;
+                maxHealth = Mathf.Max(0f, stats.maxHealth);
+                currentHealth = Mathf.Min(maxHealth, currentHealth + healthGrowth);
+                if (combatHealth != null)
+                {
+                    combatHealth.stats = stats;
+                    combatHealth.resourceBank = this;
+                    combatHealth.currentHealth = currentHealth;
+                }
+
+                return $"HP +{Mathf.CeilToInt(healthGrowth)}";
+            }
+            case 1:
+                stats.physicalAttack += growthAmount;
+                return $"ATK +{growthAmount}";
+            case 2:
+                stats.physicalDefense += growthAmount;
+                return $"DEF +{growthAmount}";
+            case 3:
+                stats.specialAttack += growthAmount;
+                return $"MAG +{growthAmount}";
+            default:
+                stats.specialDefense += growthAmount;
+                return $"RES +{growthAmount}";
         }
     }
 
