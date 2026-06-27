@@ -1,6 +1,8 @@
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.InputSystem;
+using UnityEngine.EventSystems;
+using TMPro;
 
 [System.Serializable]
 public class SkillIconSet
@@ -57,16 +59,31 @@ public class PlayerSkillHUD : MonoBehaviour
     [SerializeField] private bool cooldownOverlayDiagnosticMode = true;
     [SerializeField] private bool enableCooldownDebugKeys = false;
 
+    [Header("Hover")]
+    [SerializeField] private Color hoverHighlightColor = new Color(1f, 0.9f, 0.35f, 0.5f);
+    [SerializeField] private float hoverHighlightScale = 1.18f;
+    [SerializeField] private Color tooltipBackgroundColor = new Color(0.08f, 0.1f, 0.14f, 0.96f);
+    [SerializeField] private Color tooltipTextColor = Color.white;
+    [SerializeField] private int tooltipFontSize = 18;
+    [SerializeField] private float tooltipWidth = 340f;
+    [SerializeField] private Vector2 tooltipPadding = new Vector2(12f, 10f);
+    [SerializeField] private Vector2 tooltipOffset = new Vector2(0f, 26f);
+
     private readonly Image[] slotIconImages = new Image[4];
     private readonly Image[] slotCooldownOverlays = new Image[4];
     private readonly Text[] slotCooldownTexts = new Text[4];
     private readonly Text[] slotKeyLabels = new Text[4];
+    private readonly Image[] slotHoverHighlights = new Image[4];
+    private readonly SkillHoverTrigger[] slotHoverTriggers = new SkillHoverTrigger[4];
     private readonly float[] cooldownDurations = new float[4];
     private readonly float[] cooldownRemaining = new float[4];
     private readonly bool[] cooldownWasActive = new bool[4];
     private static Sprite sharedCooldownCircleSprite;
     private bool initialized;
     private int currentPlayerIndex;
+    private RectTransform canvasRectTransform;
+    private RectTransform tooltipRoot;
+    private TextMeshProUGUI tooltipText;
 
     private void Awake()
     {
@@ -108,6 +125,8 @@ public class PlayerSkillHUD : MonoBehaviour
             return;
         }
 
+        canvasRectTransform = canvasRect;
+
         if (skillHudRoot == null)
         {
             Transform existing = canvas.transform.Find("SkillHUDRoot");
@@ -125,6 +144,7 @@ public class PlayerSkillHUD : MonoBehaviour
         SetupRoot(skillHudRoot);
         EnsureSlots(skillHudRoot);
         CacheSlotReferences(skillHudRoot);
+        EnsureTooltip();
         SetSkillIconSet(defaultPlayerIndex);
         initialized = true;
     }
@@ -208,6 +228,8 @@ public class PlayerSkillHUD : MonoBehaviour
             ConfigureSlotRect(slotRect, i);
             ConfigureSlotVisuals(slotRect, i);
             EnsureCooldownText(slotRect);
+            EnsureHoverVisuals(slotRect);
+            EnsureHoverTrigger(slotRect, i);
         }
     }
 
@@ -245,6 +267,14 @@ public class PlayerSkillHUD : MonoBehaviour
             {
                 slotKeyLabels[i] = label.GetComponent<Text>();
             }
+
+            Transform highlight = slot.Find("HoverHighlight");
+            if (highlight != null)
+            {
+                slotHoverHighlights[i] = highlight.GetComponent<Image>();
+            }
+
+            slotHoverTriggers[i] = slot.GetComponent<SkillHoverTrigger>();
         }
     }
 
@@ -412,6 +442,31 @@ public class PlayerSkillHUD : MonoBehaviour
         ApplySlotHierarchy(slotRect);
     }
 
+    public int CurrentPlayerIndex => currentPlayerIndex > 0 ? currentPlayerIndex : defaultPlayerIndex;
+
+    public Sprite GetConfiguredSkillIcon(int playerIndex, string key)
+    {
+        SkillIconSet iconSet = playerIndex == 2 ? player02Icons : player01Icons;
+        if (iconSet == null)
+        {
+            return null;
+        }
+
+        switch ((key ?? string.Empty).Trim().ToUpperInvariant())
+        {
+            case "Q":
+                return iconSet.qIcon;
+            case "W":
+                return iconSet.wIcon;
+            case "E":
+                return iconSet.eIcon;
+            case "R":
+                return iconSet.rIcon;
+            default:
+                return null;
+        }
+    }
+
     public void SetSkillIconSet(int playerIndex)
     {
         if (playerIndex != 1 && playerIndex != 2)
@@ -436,6 +491,7 @@ public class PlayerSkillHUD : MonoBehaviour
         ApplySlotVisual(2, iconSet.eIcon, iconSet.eKeyText, "E");
         ApplySlotVisual(3, iconSet.rIcon, iconSet.rKeyText, "R");
         RefreshAllCooldownVisuals();
+        RefreshHoverBindings();
     }
 
     public void StartSkillCooldown(string key, float duration)
@@ -683,6 +739,199 @@ public class PlayerSkillHUD : MonoBehaviour
         }
     }
 
+    private void EnsureHoverVisuals(RectTransform slotRect)
+    {
+        if (slotRect == null)
+        {
+            return;
+        }
+
+        RectTransform highlight = slotRect.Find("HoverHighlight") as RectTransform;
+        if (highlight == null)
+        {
+            GameObject highlightObject = CreateUiChild(slotRect, "HoverHighlight");
+            highlight = highlightObject.GetComponent<RectTransform>();
+        }
+
+        RectTransform icon = slotRect.Find("Icon") as RectTransform;
+        MatchOverlayToIconOrSlot(highlight, icon, slotRect);
+        highlight.localScale = Vector3.one * Mathf.Max(1f, hoverHighlightScale);
+
+        Image image = highlight.GetComponent<Image>();
+        if (image == null)
+        {
+            image = highlight.gameObject.AddComponent<Image>();
+        }
+
+        image.sprite = GetSharedCooldownCircleSprite();
+        image.color = hoverHighlightColor;
+        image.raycastTarget = false;
+        image.enabled = false;
+        highlight.gameObject.SetActive(false);
+    }
+
+    private void EnsureHoverTrigger(RectTransform slotRect, int index)
+    {
+        if (slotRect == null)
+        {
+            return;
+        }
+
+        SkillHoverTrigger trigger = slotRect.GetComponent<SkillHoverTrigger>();
+        if (trigger == null)
+        {
+            trigger = slotRect.gameObject.AddComponent<SkillHoverTrigger>();
+        }
+
+        string key = GetDefaultSlotKey(index);
+        trigger.skillKey = key;
+        trigger.playerIndex = CurrentPlayerIndex;
+        trigger.entered = HandleSlotHoverEnter;
+        trigger.exited = HandleSlotHoverExit;
+        slotHoverTriggers[index] = trigger;
+    }
+
+    private void EnsureTooltip()
+    {
+        if (canvasRectTransform == null)
+        {
+            return;
+        }
+
+        Transform existing = canvasRectTransform.Find("SkillTooltip");
+        if (existing == null)
+        {
+            GameObject tooltipObject = CreateUiChild(canvasRectTransform, "SkillTooltip");
+            tooltipRoot = tooltipObject.GetComponent<RectTransform>();
+
+            GameObject background = CreateUiChild(tooltipRoot, "Background");
+            Image backgroundImage = EnsureImage(background, tooltipBackgroundColor);
+            backgroundImage.raycastTarget = false;
+
+            GameObject textObject = CreateUiChild(tooltipRoot, "Text");
+            tooltipText = EnsureTmpText(textObject, string.Empty);
+            tooltipText.alignment = TextAlignmentOptions.TopLeft;
+            tooltipText.color = tooltipTextColor;
+            tooltipText.fontSize = tooltipFontSize;
+            tooltipText.enableWordWrapping = true;
+            tooltipText.overflowMode = TextOverflowModes.Overflow;
+            tooltipText.lineSpacing = 4f;
+            tooltipText.raycastTarget = false;
+
+            Stretch(background.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Stretch(textObject.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, new Vector2(tooltipPadding.x, tooltipPadding.y), new Vector2(-tooltipPadding.x, -tooltipPadding.y));
+        }
+        else
+        {
+            tooltipRoot = existing as RectTransform;
+            Transform textTransform = existing.Find("Text");
+            if (textTransform != null)
+            {
+                tooltipText = textTransform.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        if (tooltipRoot != null)
+        {
+            tooltipRoot.anchorMin = new Vector2(0.5f, 0.5f);
+            tooltipRoot.anchorMax = new Vector2(0.5f, 0.5f);
+            tooltipRoot.pivot = new Vector2(0.5f, 0f);
+            tooltipRoot.sizeDelta = new Vector2(tooltipWidth, 64f);
+            tooltipRoot.gameObject.SetActive(false);
+            tooltipRoot.SetAsLastSibling();
+        }
+    }
+
+    private void RefreshHoverBindings()
+    {
+        for (int i = 0; i < slotHoverTriggers.Length; i++)
+        {
+            SkillHoverTrigger trigger = slotHoverTriggers[i];
+            if (trigger == null)
+            {
+                continue;
+            }
+
+            trigger.skillKey = GetDefaultSlotKey(i);
+            trigger.playerIndex = CurrentPlayerIndex;
+        }
+    }
+
+    private void HandleSlotHoverEnter(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        int index = ResolveSlotIndex(trigger.skillKey);
+        if (index >= 0 && index < slotHoverHighlights.Length && slotHoverHighlights[index] != null)
+        {
+            slotHoverHighlights[index].color = hoverHighlightColor;
+            slotHoverHighlights[index].enabled = true;
+            slotHoverHighlights[index].gameObject.SetActive(true);
+        }
+
+        SkillUIDefinitionEntry entry = SkillUIDefinitionDatabase.Get(CurrentPlayerIndex, trigger.skillKey);
+        string tooltip = SkillUIDefinitionDatabase.BuildTooltipText(entry);
+        if (tooltipRoot == null || tooltipText == null || string.IsNullOrWhiteSpace(tooltip))
+        {
+            return;
+        }
+
+        tooltipText.text = tooltip;
+        tooltipText.color = tooltipTextColor;
+        tooltipText.fontSize = tooltipFontSize;
+        tooltipText.enableWordWrapping = true;
+        tooltipText.overflowMode = TextOverflowModes.Overflow;
+        tooltipText.ForceMeshUpdate();
+
+        float contentWidth = Mathf.Max(40f, tooltipWidth - (tooltipPadding.x * 2f));
+        Vector2 preferred = tooltipText.GetPreferredValues(tooltip, contentWidth, 0f);
+        float tooltipHeight = Mathf.Ceil(preferred.y + (tooltipPadding.y * 2f));
+        tooltipRoot.sizeDelta = new Vector2(tooltipWidth, tooltipHeight);
+
+        RectTransform textRect = tooltipText.rectTransform;
+        if (textRect != null)
+        {
+            Stretch(textRect, Vector2.zero, Vector2.one, new Vector2(tooltipPadding.x, tooltipPadding.y), new Vector2(-tooltipPadding.x, -tooltipPadding.y));
+        }
+
+        RectTransform slotRect = trigger.transform as RectTransform;
+        if (slotRect != null && canvasRectTransform != null)
+        {
+            Vector3 worldTopCenter = slotRect.TransformPoint(new Vector3(slotRect.rect.center.x, slotRect.rect.yMax, 0f));
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, worldTopCenter);
+            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRectTransform, screenPoint, null, out Vector2 localPoint))
+            {
+                tooltipRoot.anchoredPosition = localPoint + tooltipOffset;
+            }
+        }
+
+        tooltipRoot.gameObject.SetActive(true);
+        tooltipRoot.SetAsLastSibling();
+    }
+
+    private void HandleSlotHoverExit(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        int index = ResolveSlotIndex(trigger.skillKey);
+        if (index >= 0 && index < slotHoverHighlights.Length && slotHoverHighlights[index] != null)
+        {
+            slotHoverHighlights[index].enabled = false;
+            slotHoverHighlights[index].gameObject.SetActive(false);
+        }
+
+        if (tooltipRoot != null)
+        {
+            tooltipRoot.gameObject.SetActive(false);
+        }
+    }
+
     private void EnsureCooldownText(RectTransform slotRect)
     {
         if (slotRect == null)
@@ -766,6 +1015,7 @@ public class PlayerSkillHUD : MonoBehaviour
         }
 
         Transform background = slotRect.Find("Background");
+        Transform hoverHighlight = slotRect.Find("HoverHighlight");
         Transform icon = slotRect.Find("Icon");
         Transform overlay = slotRect.Find("CooldownOverlay");
         Transform cooldownText = slotRect.Find("CooldownText");
@@ -775,6 +1025,11 @@ public class PlayerSkillHUD : MonoBehaviour
         if (background != null)
         {
             background.SetSiblingIndex(siblingIndex++);
+        }
+
+        if (hoverHighlight != null)
+        {
+            hoverHighlight.SetSiblingIndex(siblingIndex++);
         }
 
         if (icon != null)
@@ -953,6 +1208,21 @@ public class PlayerSkillHUD : MonoBehaviour
         text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
         text.horizontalOverflow = HorizontalWrapMode.Overflow;
         text.verticalOverflow = VerticalWrapMode.Overflow;
+        text.raycastTarget = false;
+        return text;
+    }
+
+    private static TextMeshProUGUI EnsureTmpText(GameObject gameObject, string value)
+    {
+        TextMeshProUGUI text = gameObject.GetComponent<TextMeshProUGUI>();
+        if (text == null)
+        {
+            text = gameObject.AddComponent<TextMeshProUGUI>();
+        }
+
+        text.text = value;
+        text.enableWordWrapping = true;
+        text.overflowMode = TextOverflowModes.Overflow;
         text.raycastTarget = false;
         return text;
     }

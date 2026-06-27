@@ -1,0 +1,84 @@
+{
+  "entries": [
+    {
+      "playerIndex": 1,
+      "key": "Q",
+      "displayName": "Q - Quick Shear",
+      "cooldownText": "Cooldown: 3s",
+      "costText": "Cost: Medium MP",
+      "rangeText": "Range: Melee",
+      "damageText": "Damage: Fast physical burst",
+      "descriptionText": "A quick close-range slash used to pressure nearby enemies and trigger rune synergies."
+    },
+    {
+      "playerIndex": 1,
+      "key": "W",
+      "displayName": "W - Thread Flow",
+      "cooldownText": "Cooldown: 5s",
+      "costText": "Cost: Medium MP",
+      "rangeText": "Range: Self / Guard",
+      "damageText": "Damage: Defensive utility",
+      "descriptionText": "Enter a guarded state to reduce incoming damage and support safer spacing."
+    },
+    {
+      "playerIndex": 1,
+      "key": "E",
+      "displayName": "E - Broken Dash",
+      "cooldownText": "Cooldown: 8s",
+      "costText": "Cost: Medium MP",
+      "rangeText": "Range: Mobility",
+      "damageText": "Damage: Low contact damage",
+      "descriptionText": "A forward burst movement skill that improves mobility and can clip enemies during the dash."
+    },
+    {
+      "playerIndex": 1,
+      "key": "R",
+      "displayName": "R - Needle Shot",
+      "cooldownText": "Cooldown: 12s",
+      "costText": "Cost: High MP",
+      "rangeText": "Range: Long",
+      "damageText": "Damage: Special projectile burst",
+      "descriptionText": "Launch a stronger ranged finisher to pressure targets from a safer distance."
+    },
+    {
+      "playerIndex": 2,
+      "key": "Q",
+      "displayName": "Q - Divine Light Sword",
+      "cooldownText": "Cooldown: 0.8s",
+      "costText": "Cost: 10 MP",
+      "rangeText": "Range: Targeted fall zone",
+      "damageText": "Damage: Multi-hit mixed blade rain",
+      "descriptionText": "Summon falling star blades into a selected area. Each blade calculates physical and special damage independently on impact."
+    },
+    {
+      "playerIndex": 2,
+      "key": "W",
+      "displayName": "W - Holy Wheel Deflection",
+      "cooldownText": "Cooldown: 6s",
+      "costText": "Cost: 40 MP",
+      "rangeText": "Range: Self / Orbit",
+      "damageText": "Damage: Low, defense-focused",
+      "descriptionText": "Create a defensive sword wheel that grants shield and damage reduction instead of acting as a main damage skill."
+    },
+    {
+      "playerIndex": 2,
+      "key": "E",
+      "displayName": "E - Celestial Shift",
+      "cooldownText": "Cooldown: 8s",
+      "costText": "Cost: 20 MP",
+      "rangeText": "Range: Dash",
+      "damageText": "Damage: Utility movement",
+      "descriptionText": "A short celestial dash used for repositioning, spacing, and avoiding danger."
+    },
+    {
+      "playerIndex": 2,
+      "key": "R",
+      "displayName": "R - Divine Star Rain",
+      "cooldownText": "Cooldown: 15s",
+      "costText": "Cost: 60 MP",
+      "rangeText": "Range: Wide vortex zone",
+      "damageText": "Damage: Repeating special damage over time",
+      "descriptionText": "Create a sword vortex and star rain field that repeatedly damages enemies inside the control area."
+    }
+  ]
+}

@@ -2,6 +2,7 @@ using TMPro;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 
 public class RuneUIController : MonoBehaviour
 {
@@ -66,6 +67,30 @@ public class RuneUIController : MonoBehaviour
     private bool warnedMissingRuneLibrary;
     private bool warnedMissingSelectedRune;
     private bool warnedAlreadyEquippedRune;
+    private readonly Dictionary<string, Image> skillRowIcons = new Dictionary<string, Image>();
+    private readonly Dictionary<string, Image> skillRowHighlights = new Dictionary<string, Image>();
+    private readonly Dictionary<string, SkillHoverTrigger> skillRowHoverTriggers = new Dictionary<string, SkillHoverTrigger>();
+    private TextMeshProUGUI runeSkillPanelTitleText;
+    private Vector2 runeSkillPanelTitleBaseAnchoredPosition;
+    private bool hasRuneSkillPanelTitleBasePosition;
+    private float skillRowFirstY;
+    private bool hasSkillRowFirstY;
+    private GameObject skillDescriptionPanel;
+    private TextMeshProUGUI skillDescriptionTitleText;
+    private TextMeshProUGUI skillDescriptionBodyText;
+
+    [Header("Skill UI Info")]
+    [SerializeField] private Color skillHoverHighlightColor = new Color(1f, 0.9f, 0.35f, 0.5f);
+    [SerializeField] private Color skillDescriptionPanelColor = new Color(0.09f, 0.11f, 0.16f, 0.94f);
+    [SerializeField] private Vector2 skillRowIconSize = new Vector2(64f, 64f);
+    [SerializeField] private Vector2 runeSkillPanelTitleOffset = new Vector2(20f, 0f);
+    [SerializeField] private float skillRowIconX = 58f;
+    [SerializeField] private float skillRowSlotsStartX = 160f;
+    [SerializeField] private float skillRowSlotSpacing = 96f;
+    [SerializeField] private float skillRowVerticalSpacing = 42f;
+    [SerializeField] private Vector2 skillDescriptionPanelSize = new Vector2(0f, 150f);
+    [SerializeField] private Vector2 skillDescriptionPanelOffset = new Vector2(20f, 60f);
+    [SerializeField] private Vector2 skillDescriptionPanelPadding = new Vector2(18f, 18f);
 
     private void Awake()
     {
@@ -82,8 +107,10 @@ public class RuneUIController : MonoBehaviour
         BindCloseButton();
         BindSlotButtons();
         ResolveCurrentPlayerContext();
+        EnsureSkillInfoUI();
         RefreshRuneList();
         RefreshSkillSlots();
+        RefreshSkillInfoVisuals();
         SetSelectedRune(null);
     }
 
@@ -166,8 +193,10 @@ public class RuneUIController : MonoBehaviour
         SetPauseState(true);
         SetOldHudVisible(false);
         ResolveCurrentPlayerContext();
+        EnsureSkillInfoUI();
         RefreshRuneList();
         RefreshSkillSlots();
+        RefreshSkillInfoVisuals();
         Debug.Log("[RuneUI] Open panel, pause game, hide HUD", this);
     }
 
@@ -276,6 +305,7 @@ public class RuneUIController : MonoBehaviour
         RefreshSkillGroup(wSlots, 1);
         RefreshSkillGroup(eSlots, 2);
         RefreshSkillGroup(rSlots, 3);
+        RefreshSkillInfoVisuals();
     }
 
     public RuneDefinition GetSelectedRune()
@@ -824,6 +854,516 @@ public class RuneUIController : MonoBehaviour
 
         warnedMissingSlotRefs = true;
         Debug.LogWarning(LogMissingSlotRefs, this);
+    }
+
+    private void EnsureSkillInfoUI()
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        EnsureSkillDescriptionPanel();
+        EnsureSkillRowIcon("Q");
+        EnsureSkillRowIcon("W");
+        EnsureSkillRowIcon("E");
+        EnsureSkillRowIcon("R");
+        ApplyRuneSkillPanelTitleLayout();
+        ApplySkillRowVerticalLayout();
+        ApplySkillRowLayout("Q");
+        ApplySkillRowLayout("W");
+        ApplySkillRowLayout("E");
+        ApplySkillRowLayout("R");
+    }
+
+    private void RefreshSkillInfoVisuals()
+    {
+        int playerIndex = ResolveCurrentPlayerIndex();
+        PlayerSkillHUD skillHud = Object.FindObjectOfType<PlayerSkillHUD>(true);
+        RefreshSkillRowIcon("Q", playerIndex, skillHud);
+        RefreshSkillRowIcon("W", playerIndex, skillHud);
+        RefreshSkillRowIcon("E", playerIndex, skillHud);
+        RefreshSkillRowIcon("R", playerIndex, skillHud);
+    }
+
+    private void EnsureSkillDescriptionPanel()
+    {
+        Transform panelParent = FindChildRecursive(mainPanel.transform, "RuneSkillPanel");
+        if (panelParent == null)
+        {
+            panelParent = mainPanel.transform;
+        }
+
+        if (skillDescriptionPanel != null)
+        {
+            ApplySkillDescriptionPanelLayout(skillDescriptionPanel.transform as RectTransform);
+            return;
+        }
+
+        Transform existing = FindChildRecursive(panelParent, "SkillDescriptionPanel");
+        if (existing != null)
+        {
+            skillDescriptionPanel = existing.gameObject;
+            skillDescriptionTitleText = existing.Find("Title")?.GetComponent<TextMeshProUGUI>();
+            skillDescriptionBodyText = existing.Find("Body")?.GetComponent<TextMeshProUGUI>();
+            ApplySkillDescriptionPanelLayout(existing as RectTransform);
+            ApplySkillDescriptionTextLayout();
+            skillDescriptionPanel.SetActive(false);
+            return;
+        }
+
+        GameObject panel = new GameObject("SkillDescriptionPanel", typeof(RectTransform), typeof(Image));
+        panel.transform.SetParent(panelParent, false);
+        RectTransform rect = panel.GetComponent<RectTransform>();
+        ApplySkillDescriptionPanelLayout(rect);
+
+        Image background = panel.GetComponent<Image>();
+        background.color = skillDescriptionPanelColor;
+        background.raycastTarget = false;
+
+        GameObject title = new GameObject("Title", typeof(RectTransform), typeof(TextMeshProUGUI));
+        title.transform.SetParent(panel.transform, false);
+        RectTransform titleRect = title.GetComponent<RectTransform>();
+        skillDescriptionTitleText = title.GetComponent<TextMeshProUGUI>();
+        skillDescriptionTitleText.fontSize = 24f;
+        skillDescriptionTitleText.alignment = TextAlignmentOptions.MidlineLeft;
+        skillDescriptionTitleText.enableWordWrapping = true;
+        skillDescriptionTitleText.overflowMode = TextOverflowModes.Overflow;
+        skillDescriptionTitleText.text = string.Empty;
+
+        GameObject body = new GameObject("Body", typeof(RectTransform), typeof(TextMeshProUGUI));
+        body.transform.SetParent(panel.transform, false);
+        RectTransform bodyRect = body.GetComponent<RectTransform>();
+        skillDescriptionBodyText = body.GetComponent<TextMeshProUGUI>();
+        skillDescriptionBodyText.fontSize = 18f;
+        skillDescriptionBodyText.alignment = TextAlignmentOptions.TopLeft;
+        skillDescriptionBodyText.enableWordWrapping = true;
+        skillDescriptionBodyText.overflowMode = TextOverflowModes.Overflow;
+        skillDescriptionBodyText.text = string.Empty;
+
+        skillDescriptionPanel = panel;
+        ApplySkillDescriptionTextLayout();
+        skillDescriptionPanel.SetActive(false);
+    }
+
+    private void ApplyRuneSkillPanelTitleLayout()
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        if (runeSkillPanelTitleText == null)
+        {
+            Transform titleTransform = FindChildRecursive(mainPanel.transform, "SkillTitleText");
+            if (titleTransform != null)
+            {
+                runeSkillPanelTitleText = titleTransform.GetComponent<TextMeshProUGUI>();
+            }
+        }
+
+        if (runeSkillPanelTitleText == null)
+        {
+            return;
+        }
+
+        RectTransform titleRect = runeSkillPanelTitleText.rectTransform;
+        if (!hasRuneSkillPanelTitleBasePosition)
+        {
+            runeSkillPanelTitleBaseAnchoredPosition = titleRect.anchoredPosition;
+            hasRuneSkillPanelTitleBasePosition = true;
+        }
+
+        titleRect.anchoredPosition = runeSkillPanelTitleBaseAnchoredPosition + runeSkillPanelTitleOffset;
+    }
+
+    private void ApplySkillRowVerticalLayout()
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        RectTransform qRow = FindChildRecursive(mainPanel.transform, "QRow") as RectTransform;
+        if (qRow == null)
+        {
+            return;
+        }
+
+        if (!hasSkillRowFirstY)
+        {
+            skillRowFirstY = qRow.anchoredPosition.y;
+            hasSkillRowFirstY = true;
+        }
+
+        string[] rowKeys = { "Q", "W", "E", "R" };
+        for (int i = 0; i < rowKeys.Length; i++)
+        {
+            RectTransform rowRect = FindChildRecursive(mainPanel.transform, $"{rowKeys[i]}Row") as RectTransform;
+            if (rowRect == null)
+            {
+                continue;
+            }
+
+            Vector2 anchoredPosition = rowRect.anchoredPosition;
+            anchoredPosition.y = skillRowFirstY - (skillRowVerticalSpacing * i);
+            rowRect.anchoredPosition = anchoredPosition;
+        }
+    }
+
+    private void EnsureSkillRowIcon(string key)
+    {
+        if (mainPanel == null || string.IsNullOrWhiteSpace(key) || skillRowIcons.ContainsKey(key))
+        {
+            return;
+        }
+
+        Transform row = FindChildRecursive(mainPanel.transform, $"{key.ToUpperInvariant()}Row");
+        if (row == null)
+        {
+            return;
+        }
+
+        TextMeshProUGUI keyLabel = row.GetComponentInChildren<TextMeshProUGUI>(true);
+        if (keyLabel == null)
+        {
+            return;
+        }
+
+        GameObject iconObject = new GameObject($"{key.ToUpperInvariant()}SkillIcon", typeof(RectTransform), typeof(Image));
+        iconObject.transform.SetParent(row, false);
+        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
+        iconRect.anchorMin = new Vector2(0f, 0.5f);
+        iconRect.anchorMax = new Vector2(0f, 0.5f);
+        iconRect.pivot = new Vector2(0f, 0.5f);
+        iconRect.sizeDelta = skillRowIconSize;
+        iconRect.anchoredPosition = new Vector2(skillRowIconX, 0f);
+
+        Image iconImage = iconObject.GetComponent<Image>();
+        iconImage.preserveAspect = true;
+
+        GameObject highlightObject = new GameObject("HoverHighlight", typeof(RectTransform), typeof(Image));
+        highlightObject.transform.SetParent(iconObject.transform, false);
+        RectTransform highlightRect = highlightObject.GetComponent<RectTransform>();
+        highlightRect.anchorMin = Vector2.zero;
+        highlightRect.anchorMax = Vector2.one;
+        highlightRect.offsetMin = Vector2.zero;
+        highlightRect.offsetMax = Vector2.zero;
+        highlightRect.localScale = Vector3.one * 1.2f;
+        Image highlightImage = highlightObject.GetComponent<Image>();
+        highlightImage.sprite = iconImage.sprite;
+        highlightImage.color = skillHoverHighlightColor;
+        highlightImage.raycastTarget = false;
+        highlightImage.enabled = false;
+        highlightObject.SetActive(false);
+
+        SkillHoverTrigger trigger = iconObject.AddComponent<SkillHoverTrigger>();
+        trigger.skillKey = key.ToUpperInvariant();
+        trigger.entered = HandleRuneSkillHoverEnter;
+        trigger.exited = HandleRuneSkillHoverExit;
+
+        skillRowIcons[key.ToUpperInvariant()] = iconImage;
+        skillRowHighlights[key.ToUpperInvariant()] = highlightImage;
+        skillRowHoverTriggers[key.ToUpperInvariant()] = trigger;
+    }
+
+    private void ApplySkillDescriptionPanelLayout(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        RectTransform parentRect = rect.parent as RectTransform;
+        float width = skillDescriptionPanelSize.x;
+        if (width <= 0f && parentRect != null)
+        {
+            width = Mathf.Max(0f, parentRect.rect.width - (skillDescriptionPanelOffset.x * 2f));
+        }
+
+        if (parentRect != null)
+        {
+            float maxWidth = Mathf.Max(0f, parentRect.rect.width - skillDescriptionPanelOffset.x);
+            width = Mathf.Min(width, maxWidth);
+        }
+
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 0f);
+        rect.pivot = new Vector2(0f, 0f);
+        rect.sizeDelta = new Vector2(width, skillDescriptionPanelSize.y);
+        rect.anchoredPosition = new Vector2(
+            skillDescriptionPanelOffset.x,
+            skillDescriptionPanelOffset.y);
+    }
+
+    private void RefreshSkillDescriptionPanelHeight()
+    {
+        if (skillDescriptionPanel == null)
+        {
+            return;
+        }
+
+        RectTransform panelRect = skillDescriptionPanel.transform as RectTransform;
+        if (panelRect == null)
+        {
+            return;
+        }
+
+        ApplySkillDescriptionPanelLayout(panelRect);
+
+        float panelWidth = panelRect.sizeDelta.x;
+        float contentWidth = Mathf.Max(40f, panelWidth - (skillDescriptionPanelPadding.x * 2f));
+        float titleHeight = 0f;
+        float bodyHeight = 0f;
+
+        if (skillDescriptionTitleText != null)
+        {
+            skillDescriptionTitleText.enableWordWrapping = true;
+            skillDescriptionTitleText.overflowMode = TextOverflowModes.Overflow;
+            titleHeight = skillDescriptionTitleText.GetPreferredValues(skillDescriptionTitleText.text, contentWidth, Mathf.Infinity).y;
+        }
+
+        if (skillDescriptionBodyText != null)
+        {
+            skillDescriptionBodyText.enableWordWrapping = true;
+            skillDescriptionBodyText.overflowMode = TextOverflowModes.Overflow;
+            bodyHeight = skillDescriptionBodyText.GetPreferredValues(skillDescriptionBodyText.text, contentWidth, Mathf.Infinity).y;
+        }
+
+        float titleBodySpacing = titleHeight > 0f && bodyHeight > 0f ? 14f : 0f;
+        float calculatedTextHeight = titleHeight + titleBodySpacing + bodyHeight;
+        float finalHeight = Mathf.Max(skillDescriptionPanelSize.y, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
+        panelRect.sizeDelta = new Vector2(panelWidth, finalHeight);
+
+        ApplySkillDescriptionTextLayout();
+    }
+
+    private void ApplySkillDescriptionTextLayout()
+    {
+        if (skillDescriptionTitleText != null)
+        {
+            RectTransform titleRect = skillDescriptionTitleText.rectTransform;
+            titleRect.anchorMin = new Vector2(0f, 1f);
+            titleRect.anchorMax = new Vector2(1f, 1f);
+            titleRect.pivot = new Vector2(0.5f, 1f);
+            titleRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, -42f);
+            titleRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, -10f);
+        }
+
+        if (skillDescriptionBodyText != null)
+        {
+            RectTransform bodyRect = skillDescriptionBodyText.rectTransform;
+            bodyRect.anchorMin = new Vector2(0f, 0f);
+            bodyRect.anchorMax = new Vector2(1f, 1f);
+            bodyRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, skillDescriptionPanelPadding.y);
+            bodyRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, -46f);
+        }
+    }
+
+    private void ApplySkillRowLayout(string key)
+    {
+        if (mainPanel == null || string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        string upperKey = key.Trim().ToUpperInvariant();
+        Transform row = FindChildRecursive(mainPanel.transform, $"{upperKey}Row");
+        if (row == null)
+        {
+            return;
+        }
+
+        if (skillRowIcons.TryGetValue(upperKey, out Image icon) && icon != null)
+        {
+            RectTransform iconRect = icon.rectTransform;
+            iconRect.sizeDelta = skillRowIconSize;
+            iconRect.anchoredPosition = new Vector2(skillRowIconX, 0f);
+        }
+
+        if (skillRowHighlights.TryGetValue(upperKey, out Image highlight) && highlight != null)
+        {
+            RectTransform highlightRect = highlight.rectTransform;
+            highlightRect.anchorMin = Vector2.zero;
+            highlightRect.anchorMax = Vector2.one;
+            highlightRect.offsetMin = Vector2.zero;
+            highlightRect.offsetMax = Vector2.zero;
+            highlightRect.localScale = Vector3.one * 1.18f;
+        }
+
+        List<RectTransform> slotRects = new List<RectTransform>();
+        for (int i = 0; i < row.childCount; i++)
+        {
+            Transform child = row.GetChild(i);
+            if (child == null || !child.name.StartsWith($"{upperKey}Slot"))
+            {
+                continue;
+            }
+
+            if (child is RectTransform childRect)
+            {
+                slotRects.Add(childRect);
+            }
+        }
+
+        slotRects.Sort((a, b) => ExtractSlotIndex(a.name).CompareTo(ExtractSlotIndex(b.name)));
+        for (int i = 0; i < slotRects.Count; i++)
+        {
+            RectTransform slotRect = slotRects[i];
+            slotRect.anchorMin = new Vector2(0f, 0.5f);
+            slotRect.anchorMax = new Vector2(0f, 0.5f);
+            slotRect.pivot = new Vector2(0f, 0.5f);
+            slotRect.anchoredPosition = new Vector2(skillRowSlotsStartX + (skillRowSlotSpacing * i), 0f);
+        }
+    }
+
+    private static int ExtractSlotIndex(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return 0;
+        }
+
+        for (int i = name.Length - 1; i >= 0; i--)
+        {
+            if (!char.IsDigit(name[i]))
+            {
+                if (int.TryParse(name.Substring(i + 1), out int value))
+                {
+                    return value;
+                }
+
+                break;
+            }
+        }
+
+        return 0;
+    }
+
+    private void RefreshSkillRowIcon(string key, int playerIndex, PlayerSkillHUD skillHud)
+    {
+        if (!skillRowIcons.TryGetValue(key, out Image icon))
+        {
+            return;
+        }
+
+        Sprite sprite = skillHud != null ? skillHud.GetConfiguredSkillIcon(playerIndex, key) : null;
+        icon.sprite = sprite;
+        icon.enabled = sprite != null;
+
+        if (skillRowHighlights.TryGetValue(key, out Image highlight))
+        {
+            highlight.sprite = sprite;
+            highlight.color = skillHoverHighlightColor;
+            highlight.enabled = false;
+            highlight.gameObject.SetActive(false);
+        }
+
+        if (skillRowHoverTriggers.TryGetValue(key, out SkillHoverTrigger trigger))
+        {
+            trigger.playerIndex = playerIndex;
+        }
+    }
+
+    private void HandleRuneSkillHoverEnter(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        string key = (trigger.skillKey ?? string.Empty).Trim().ToUpperInvariant();
+        if (skillRowHighlights.TryGetValue(key, out Image highlight))
+        {
+            highlight.enabled = true;
+            highlight.gameObject.SetActive(true);
+        }
+
+        SkillUIDefinitionEntry entry = SkillUIDefinitionDatabase.Get(trigger.playerIndex, key);
+        if (entry == null || skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
+        {
+            return;
+        }
+
+        skillDescriptionTitleText.text = string.IsNullOrWhiteSpace(entry.displayName) ? key : entry.displayName;
+        skillDescriptionBodyText.text = SkillUIDefinitionDatabase.BuildDetailBodyText(entry);
+        RefreshSkillDescriptionPanelHeight();
+        skillDescriptionPanel.SetActive(true);
+    }
+
+    private void HandleRuneSkillHoverExit(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        string key = (trigger.skillKey ?? string.Empty).Trim().ToUpperInvariant();
+        if (skillRowHighlights.TryGetValue(key, out Image highlight))
+        {
+            highlight.enabled = false;
+            highlight.gameObject.SetActive(false);
+        }
+
+        if (skillDescriptionPanel != null)
+        {
+            skillDescriptionPanel.SetActive(false);
+        }
+
+        if (skillDescriptionTitleText != null)
+        {
+            skillDescriptionTitleText.text = string.Empty;
+        }
+
+        if (skillDescriptionBodyText != null)
+        {
+            skillDescriptionBodyText.text = string.Empty;
+        }
+
+        RefreshSkillDescriptionPanelHeight();
+    }
+
+    private int ResolveCurrentPlayerIndex()
+    {
+        if (currentPlayer != null)
+        {
+            if (currentPlayer.GetComponent<Player2PrototypeController>() != null)
+            {
+                return 2;
+            }
+
+            if (currentPlayer.GetComponent<Player01SkillController>() != null)
+            {
+                return 1;
+            }
+        }
+
+        PlayerSkillHUD skillHud = Object.FindObjectOfType<PlayerSkillHUD>(true);
+        return skillHud != null ? skillHud.CurrentPlayerIndex : 1;
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string name)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        if (parent.name == name)
+        {
+            return parent;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform found = FindChildRecursive(parent.GetChild(i), name);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 }
 

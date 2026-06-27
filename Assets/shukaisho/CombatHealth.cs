@@ -159,6 +159,44 @@ public class CombatHealth : MonoBehaviour
         }
     }
 
+    public void ApplyDirectDamage(float amount, GameObject source)
+    {
+        if (dead)
+        {
+            return;
+        }
+
+        if (ShouldIgnoreDamageFrom(source))
+        {
+            return;
+        }
+
+        float finalDamage = Mathf.Max(0f, amount);
+        finalDamage *= GetIncomingDamageMultiplier();
+        finalDamage = AbsorbShieldDamage(finalDamage);
+
+        if (resourceBank != null)
+        {
+            resourceBank.currentHealth = Mathf.Max(0f, resourceBank.currentHealth - finalDamage);
+            currentHealth = resourceBank.currentHealth;
+        }
+        else
+        {
+            currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
+        }
+
+        if (finalDamage > 0f)
+        {
+            Damaged?.Invoke(finalDamage, source);
+            TriggerAnimation(hitTrigger);
+        }
+
+        if (currentHealth <= 0f)
+        {
+            Die(source);
+        }
+    }
+
     private bool ShouldIgnoreDamageFrom(GameObject source)
     {
         if (source == null)

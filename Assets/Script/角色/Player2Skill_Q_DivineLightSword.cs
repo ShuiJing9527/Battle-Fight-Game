@@ -5,11 +5,28 @@ using UnityEngine.Serialization;
 
 public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 {
-    [Header("Q - 神圣星刃 / 基础")]
+    [Header("Q - 神圣星刃 / 核心参数")]
+    [SerializeField, Min(0f)] private float cooldown = 0.8f;
+    [SerializeField, Min(0f)] private float manaCost = 10f;
     [InspectorName("Q Delay")]
     [SerializeField] private float qDelay = 0.35f;
+    [Header("Q - 旧伤害参数（当前直伤公式未使用）")]
+    [FormerlySerializedAs("qStarFallDamage")]
+    [HideInInspector]
+    [SerializeField] private float baseDamage = 15f;
+    [HideInInspector]
+    [SerializeField] private float physicalScaling = 0.8f;
+    [HideInInspector]
+    [SerializeField] private float specialScaling = 1.0f;
+    [InspectorName("Q Star Fall Damage Radius")]
+    [SerializeField] private float qStarFallDamageRadius = 0.8f;
+    [InspectorName("Q Star Fall Enable Damage")]
+    [SerializeField] private bool qStarFallEnableDamage = false;
+    [InspectorName("Q Star Fall Damage Multiplier")]
+    [SerializeField] private float qStarFallDamageMultiplier = 1f;
+    [SerializeField] private bool qDamageDebugLog = false;
 
-    [Header("Q - 神圣星刃 / 基础")]
+    [Header("Q - 神圣星刃 / 预制体")]
     [InspectorName("Q Skill Effect Prefab")]
     [SerializeField] private GameObject qSkillEffectPrefab;
 
@@ -118,21 +135,6 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qRandomAreaYOffset = 0f;
 
     [Header("Q - 神圣星刃 / 伤害")]
-    [InspectorName("Q Star Fall Damage Radius")]
-    [SerializeField] private float qStarFallDamageRadius = 0.8f;
-    [InspectorName("Q Star Fall Enable Damage")]
-    [SerializeField] private bool qStarFallEnableDamage = false;
-    [FormerlySerializedAs("qStarFallDamage")]
-    [InspectorName("Q Base Damage")]
-    [SerializeField] private float baseDamage = 15f;
-    [InspectorName("Q Physical Scaling")]
-    [SerializeField] private float physicalScaling = 0.8f;
-    [InspectorName("Q Special Scaling")]
-    [SerializeField] private float specialScaling = 1.0f;
-    [InspectorName("Q Star Fall Damage Multiplier")]
-    [SerializeField] private float qStarFallDamageMultiplier = 1f;
-
-    [Header("Q - 神圣星刃 / 伤害")]
     [HideInInspector]
     [SerializeField] private bool qSpawnImpactSeal = false;
     [HideInInspector]
@@ -224,6 +226,9 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     private readonly List<GameObject> activeQBlades = new List<GameObject>();
     private int activeQWaveCount;
     private Coroutine qCastRoutine;
+
+    public override float CooldownSeconds => cooldown;
+    public override float ManaCost => manaCost;
 
     public override void Initialize(Player2PrototypeController owner)
     {
@@ -442,19 +447,17 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             return;
         }
 
-        float damageAmount = ResolveDamage() * Mathf.Max(0f, qStarFallDamageMultiplier);
-        if (damageAmount <= 0f)
-        {
-            return;
-        }
-
         float damageRadius = Mathf.Max(1.2f, qStarFallDamageRadius);
         Collider[] hits = Physics.OverlapSphere(center, damageRadius);
         HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
         bool hitAnyEnemy = false;
+        CombatStats attackerStats = Owner != null ? Owner.GetComponent<CombatStats>() : GetComponent<CombatStats>();
 
-        Debug.Log($"[Player02 Q] damage check center={center}, radius={damageRadius:F2}", this);
+        if (qDamageDebugLog)
+        {
+            Debug.Log($"[Player02 Q] damage check center={center}, radius={damageRadius:F2}", this);
+        }
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -473,8 +476,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Special, source));
-                Debug.Log($"[Player02 Q] hit enemy={combatHealth.name} damage={damageAmount:F2}", this);
+                float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source);
+                if (damageAmount <= 0f)
+                {
+                    continue;
+                }
+
+                combatHealth.ApplyDirectDamage(damageAmount, source);
                 hitAnyEnemy = true;
                 continue;
             }
@@ -482,28 +490,51 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
             if (enemyHealth != null && (Owner == null || enemyHealth.gameObject != Owner.gameObject))
             {
+                float damageAmount = ResolveQBladeDamage(attackerStats, null, null, source);
+                if (damageAmount <= 0f)
+                {
+                    continue;
+                }
+
                 int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
                 enemyHealth.TakeDamage(damageInt, source);
-                Debug.Log($"[Player02 Q] hit enemy={enemyHealth.name} damage={damageInt}", this);
+                if (qDamageDebugLog)
+                {
+                    Debug.Log($"[Player02 Q] legacy hit enemy={enemyHealth.name} damage={damageInt}", this);
+                }
                 hitAnyEnemy = true;
             }
         }
 
-        if (!hitAnyEnemy)
+        if (!hitAnyEnemy && qDamageDebugLog)
         {
             Debug.Log("[Player02 Q] no enemy hit", this);
         }
     }
 
-    private float ResolveDamage()
+    private float ResolveQBladeDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source)
     {
-        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
-            this,
-            Owner != null ? Owner.gameObject : gameObject,
-            baseDamage,
-            physicalScaling,
-            specialScaling,
-            "Player02 Q");
+        float attackerPhysicalAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.physicalAttack) : 0f;
+        float attackerSpecialAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.specialAttack) : 0f;
+        float targetPhysicalDefense = targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f;
+        float targetSpecialDefense = targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f;
+
+        float physicalRaw = 5f + attackerPhysicalAttack * 0.6f;
+        float specialRaw = 20f + attackerSpecialAttack * 0.3f;
+
+        float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
+        float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
+        float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, qStarFallDamageMultiplier);
+
+        if (qDamageDebugLog)
+        {
+            string targetName = targetHealth != null ? targetHealth.name : "LegacyEnemy";
+            Debug.Log(
+                $"[Player02 Q Damage] target={targetName}, PATK={attackerPhysicalAttack}, SATK={attackerSpecialAttack}, TargetPDEF={targetPhysicalDefense}, TargetSDEF={targetSpecialDefense}, PhysicalRaw={physicalRaw:F2}, SpecialRaw={specialRaw:F2}, PhysicalFinal={physicalFinal:F2}, SpecialFinal={specialFinal:F2}, FinalDamage={finalDamage:F2}",
+                this);
+        }
+
+        return finalDamage;
     }
 
     private void SpawnQImpactDust(Vector3 impactPosition)

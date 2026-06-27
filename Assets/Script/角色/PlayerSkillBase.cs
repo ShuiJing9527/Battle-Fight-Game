@@ -3,6 +3,8 @@ using UnityEngine;
 public abstract class PlayerSkillBase : MonoBehaviour
 {
     public Player2PrototypeController Owner { get; private set; }
+    public virtual float CooldownSeconds => 0f;
+    public virtual float ManaCost => 0f;
 
     public virtual void Initialize(Player2PrototypeController owner)
     {

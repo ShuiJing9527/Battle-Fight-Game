@@ -4,6 +4,11 @@ using UnityEngine;
 using Spine.Unity;
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
+    [Header("E - 星痕瞬移 / 核心参数")]
+    [SerializeField, Min(0f)] private float cooldown = 8f;
+    [SerializeField, Min(0f)] private float manaCost = 20f;
+    [SerializeField, Min(0f)] private float dashDistance = 4f;
+    [SerializeField, Min(0.05f)] private float dashDuration = 0.15f;
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private float eRailDuration = 0.6f;
 
@@ -72,6 +77,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
 
     private readonly List<GameObject> activeAfterimageGhosts = new List<GameObject>();
 
+    public override float CooldownSeconds => cooldown;
+    public override float ManaCost => manaCost;
+
     public override void Initialize(Player2PrototypeController owner)
     {
         base.Initialize(owner);
@@ -120,15 +128,15 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     {
         isDashing = true;
 
-        float dashDuration = Mathf.Max(0.05f, eRailDuration);
-        float dashDistance = Owner != null ? Owner.dashDistance : 4f;
+        float dashDurationSeconds = Mathf.Max(0.05f, dashDuration > 0f ? dashDuration : eRailDuration);
+        float dashDistanceValue = Mathf.Max(0f, dashDistance);
         Vector3 dir = Owner != null ? Owner.FacingDirection : Vector3.forward;
         if (dir.sqrMagnitude < 0.0001f)
         {
             dir = Vector3.forward;
         }
         Vector3 dashStartPos = Owner != null ? Owner.transform.position : transform.position;
-        Vector3 dashEndPos = dashStartPos + dir * dashDistance;
+        Vector3 dashEndPos = dashStartPos + dir * dashDistanceValue;
         bool afterimageFlipX = GetCurrentSpineFacingFlipX();
         if (eAfterimageInvertFlip)
         {
@@ -140,9 +148,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         float afterimageDistanceAccumulator = 0f;
         float elapsed = 0f;
 
-        while (elapsed < dashDuration)
+        while (elapsed < dashDurationSeconds)
         {
-            float p = Mathf.Clamp01(elapsed / dashDuration);
+            float p = Mathf.Clamp01(elapsed / dashDurationSeconds);
             if (Owner != null)
             {
                 Owner.transform.position = Vector3.Lerp(dashStartPos, dashEndPos, p);

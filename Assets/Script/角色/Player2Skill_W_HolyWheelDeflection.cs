@@ -4,7 +4,9 @@ using UnityEngine;
 
 public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 {
-    [Header("W - 星环剑轮 / 基础")]
+    [Header("W - 神圣护轮 / 核心参数")]
+    [SerializeField, Min(0f)] private float cooldown = 6f;
+    [SerializeField, Min(0f)] private float manaCost = 40f;
     [InspectorName("W 持续时间")]
     [SerializeField] private float wDuration = 1.5f;
     [InspectorName("W 基础减伤")]
@@ -102,6 +104,9 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
+
+    public override float CooldownSeconds => cooldown;
+    public override float ManaCost => manaCost;
 
     private sealed class WSkillEffectRuntime : MonoBehaviour
     {

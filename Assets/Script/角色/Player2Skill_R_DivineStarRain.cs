@@ -5,8 +5,28 @@ using UnityEngine.Serialization;
 
 public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 {
-    [Header("R - 神眷剑涡 / 基础")]
+    [Header("R - 神眷剑涌 / 核心参数")]
+    [SerializeField, Min(0f)] private float cooldown = 15f;
+    [SerializeField, Min(0f)] private float manaCost = 60f;
     [SerializeField] private int rBaseSwordCount = 1;
+    [SerializeField] private float rSwarmDuration = 2.0f;
+    [SerializeField] private float rSwarmDurationPerSword = 0.25f;
+    [SerializeField] private float rSwarmMaxDuration = 18f;
+    [SerializeField] private float rSwarmDamageRadius = 3.0f;
+    [SerializeField] private float rSwarmDamageInterval = 0.25f;
+    [SerializeField] private float rSwarmBaseRotationSpeed = 120f;
+    [SerializeField] private float rSwarmRotationSpeedPerSword = 8f;
+    [SerializeField] private float rSwarmMaxRotationSpeed = 360f;
+    [SerializeField] private bool rDamageDebugLog = false;
+    [SerializeField] private bool rSwarmDebugLog = false;
+    [Header("R - 旧伤害参数（当前直伤公式未使用）")]
+    [FormerlySerializedAs("rSwarmDamagePerTick")]
+    [HideInInspector]
+    [SerializeField] private float baseDamage = 12.0f;
+    [HideInInspector]
+    [SerializeField] private float physicalScaling = 0.5f;
+    [HideInInspector]
+    [SerializeField] private float specialScaling = 1.3f;
 
     [Header("R - 神眷剑涡 / 视觉")]
     [SerializeField] private Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
@@ -19,7 +39,6 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float rEffectVisualRoll = 0f;
 
     [Header("R - 神眷剑涡 / 万剑漩涡")]
-    [SerializeField] private float rSwarmDuration = 2.0f;
     [SerializeField] private float rSwarmRadiusMin = 0.8f;
     [SerializeField] private float rSwarmRadiusMax = 3.2f;
     [SerializeField] private bool rUseDivineMarkRadiusScaling = true;
@@ -68,12 +87,6 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private Vector3 rSwordLengthLocalAxis = Vector3.up;
 
     [Header("R - 神眷剑涡 / 漩涡伤害")]
-    [SerializeField] private float rSwarmDamageRadius = 3.0f;
-    [SerializeField] private float rSwarmDamageInterval = 0.25f;
-    [FormerlySerializedAs("rSwarmDamagePerTick")]
-    [SerializeField] private float baseDamage = 12.0f;
-    [SerializeField] private float physicalScaling = 0.5f;
-    [SerializeField] private float specialScaling = 1.3f;
     [SerializeField] private LayerMask rSwarmEnemyLayer = ~0;
 
     [Header("R - 神眷剑涡 / 备用星雨")]
@@ -207,6 +220,9 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private readonly List<RStarRainBladeData> activeRStarRainBlades = new List<RStarRainBladeData>();
     private Camera resolvedRRenderCamera;
 
+    public override float CooldownSeconds => cooldown;
+    public override float ManaCost => manaCost;
+
     public override void Initialize(Player2PrototypeController owner)
     {
         base.Initialize(owner);
@@ -278,6 +294,15 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         if (Owner != null)
         {
             Owner.currentSwordEnergy = 0;
+        }
+
+        float finalDuration = ResolveFinalSwarmDuration(count);
+        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(count);
+        if (rSwarmDebugLog)
+        {
+            Debug.Log(
+                $"[Player02 R Swarm] BaseCount={rBaseSwordCount}, CurrentSwordCount={count}, BaseDuration={rSwarmDuration:F2}, DurationPerSword={rSwarmDurationPerSword:F2}, FinalDuration={finalDuration:F2}, BaseRotationSpeed={rSwarmBaseRotationSpeed:F2}, RotationSpeedPerSword={rSwarmRotationSpeedPerSword:F2}, FinalRotationSpeed={finalRotationSpeed:F2}",
+                this);
         }
 
         rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
@@ -373,6 +398,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         SpawnRCenterAura(swarmRoot.transform);
 
         int swordCount = Mathf.Max(0, count);
+        float finalDuration = ResolveFinalSwarmDuration(swordCount);
+        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(swordCount);
         float finalRadiusMin = GetScaledRSwarmRadiusMin();
         float finalRadiusMax = GetScaledRSwarmRadiusMax();
         float finalHorizontalRange = GetScaledRSwarmHorizontalRange();
@@ -388,7 +415,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             float radius = Mathf.Max(finalRadiusMin, new Vector2(spawnX, spawnZ).magnitude);
             radius = Mathf.Min(radius, finalRadiusMax);
             float height = spawnY;
-            float orbitSpeed = Random.Range(Mathf.Min(rSwarmSpeedMin, rSwarmSpeedMax), Mathf.Max(rSwarmSpeedMin, rSwarmSpeedMax));
+            float orbitSpeed = finalRotationSpeed;
             float bobAmplitude = Random.Range(Mathf.Min(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax), Mathf.Max(rSwarmBobAmplitudeMin, rSwarmBobAmplitudeMax));
             float bobFrequency = Random.Range(Mathf.Min(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax), Mathf.Max(rSwarmBobFrequencyMin, rSwarmBobFrequencyMax));
             float phase = Random.Range(0f, Mathf.PI * 2f);
@@ -500,7 +527,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         float orbitElapsed = 0f;
         float damageTickTimer = 0f;
-        float orbitDuration = Mathf.Max(0.05f, rSwarmDuration);
+        float orbitDuration = Mathf.Max(0.05f, finalDuration);
         float safeDamageInterval = Mathf.Max(0.05f, rSwarmDamageInterval);
         bool orbitCleared = false;
 
@@ -578,6 +605,18 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         CleanupRSwarmVisuals();
         usedDivineMarkCount = 0;
         rSwarmRoutine = null;
+    }
+
+    private float ResolveFinalSwarmDuration(int currentSwordCount)
+    {
+        float finalDuration = rSwarmDuration + Mathf.Max(0, currentSwordCount) * Mathf.Max(0f, rSwarmDurationPerSword);
+        return Mathf.Max(0.05f, Mathf.Min(Mathf.Max(0.05f, rSwarmMaxDuration), finalDuration));
+    }
+
+    private float ResolveFinalSwarmRotationSpeed(int currentSwordCount)
+    {
+        float finalRotationSpeed = rSwarmBaseRotationSpeed + Mathf.Max(0, currentSwordCount) * Mathf.Max(0f, rSwarmRotationSpeedPerSword);
+        return Mathf.Max(0f, Mathf.Min(Mathf.Max(0f, rSwarmMaxRotationSpeed), finalRotationSpeed));
     }
 
     private bool HasAliveRStarRainBlades()
@@ -949,23 +988,25 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, ResolveDamage());
+        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, 1f);
     }
 
     private void ApplyRSwarmImpactDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), ResolveDamage() * Mathf.Max(0f, rStarRainDamageMultiplier));
+        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), Mathf.Max(0f, rStarRainDamageMultiplier));
     }
 
-    private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageAmount)
+    private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageMultiplier)
     {
-        if (damageAmount <= 0f || radius <= 0f)
+        if (damageMultiplier <= 0f || radius <= 0f)
         {
             return;
         }
 
         Collider[] hits = Physics.OverlapSphere(center, radius, rSwarmEnemyLayer);
         HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
+        CombatStats attackerStats = Owner != null ? Owner.GetComponent<CombatStats>() : GetComponent<CombatStats>();
+        GameObject source = Owner != null ? Owner.gameObject : gameObject;
         for (int i = 0; i < hits.Length; i++)
         {
             Collider hit = hits[i];
@@ -983,28 +1024,46 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Special, Owner != null ? Owner.gameObject : gameObject));
+                float damageAmount = ResolveRHitDamage(attackerStats, combatHealth.stats, combatHealth, source, damageMultiplier);
+                combatHealth.ApplyDirectDamage(damageAmount, source);
                 continue;
             }
 
             EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
             if (enemyHealth != null && (Owner == null || enemyHealth.gameObject != Owner.gameObject))
             {
+                CombatStats targetStats = targetRoot.GetComponentInParent<CombatStats>();
+                float damageAmount = ResolveRHitDamage(attackerStats, targetStats, null, source, damageMultiplier);
                 int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
-                enemyHealth.TakeDamage(damageInt, Owner != null ? Owner.gameObject : gameObject);
+                enemyHealth.TakeDamage(damageInt, source);
             }
         }
     }
 
-    private float ResolveDamage()
+    private float ResolveRHitDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source, float damageMultiplier)
     {
-        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
-            this,
-            Owner != null ? Owner.gameObject : gameObject,
-            baseDamage,
-            physicalScaling,
-            specialScaling,
-            "Player02 R");
+        float attackerPhysicalAttack = attackerStats != null ? attackerStats.physicalAttack : 0f;
+        float attackerSpecialAttack = attackerStats != null ? attackerStats.specialAttack : 0f;
+        float targetPhysicalDefense = targetStats != null ? targetStats.physicalDefense : 0f;
+        float targetSpecialDefense = targetStats != null ? targetStats.specialDefense : 0f;
+
+        float physicalRaw = 4f + attackerPhysicalAttack * 0.45f;
+        float specialRaw = 15f + attackerSpecialAttack * 0.20f;
+
+        float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
+        float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
+
+        float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier);
+
+        if (rDamageDebugLog)
+        {
+            string targetName = targetHealth != null ? targetHealth.name : (targetStats != null ? targetStats.name : "LegacyEnemy");
+            Debug.Log(
+                $"[Player02 R Damage] target={targetName}, PATK={attackerPhysicalAttack:F2}, SATK={attackerSpecialAttack:F2}, TargetPDEF={targetPhysicalDefense:F2}, TargetSDEF={targetSpecialDefense:F2}, PhysicalRaw={physicalRaw:F2}, SpecialRaw={specialRaw:F2}, PhysicalFinal={physicalFinal:F2}, SpecialFinal={specialFinal:F2}, FinalDamage={finalDamage:F2}",
+                this);
+        }
+
+        return Mathf.Max(1f, finalDamage);
     }
 
     private GameObject ResolveRSkillEffectPrefab()

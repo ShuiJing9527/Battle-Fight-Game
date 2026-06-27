@@ -1124,6 +1124,7 @@ MonoBehaviour:
   eStarFallSequentialDelay: 0.07
   currentSwordEnergy: 1
   rBaseSwordCount: 7
+  debugSkillCooldownFlow: 1
   sharedSkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
   qSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
   wSkillEffectPrefab: {fileID: 5092486940606590864, guid: 0c1c29a8c73a79a4b9476c4ad0751ea9, type: 3}
@@ -1290,7 +1291,16 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4173609bc00f48b4886a7c6914064982, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_Q_DivineLightSword
+  cooldown: 0.8
+  manaCost: 10
   qDelay: 0.35
+  baseDamage: 10
+  physicalScaling: 0.8
+  specialScaling: 1
+  qStarFallDamageRadius: 0.8
+  qStarFallEnableDamage: 1
+  qStarFallDamageMultiplier: 1
+  qDamageDebugLog: 0
   qSkillEffectPrefab: {fileID: 7616733904698143582, guid: ef6ee5d37eeb0a640959838d03b086af, type: 3}
   qSpawnFallTrail: 0
   qFallTrailPrefab: {fileID: 0}
@@ -1333,10 +1343,6 @@ MonoBehaviour:
   qRandomAreaSideRange: 4
   qRandomAreaUsePlayerCenter: 1
   qRandomAreaYOffset: 0
-  qStarFallDamageRadius: 0.8
-  qStarFallEnableDamage: 0
-  qStarFallDamage: 15
-  qStarFallDamageMultiplier: 1
   qSpawnImpactSeal: 0
   qImpactStarSealPrefab: {fileID: 0}
   qImpactStarSealLifetime: 0.45
@@ -1390,6 +1396,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a1994dff4cc9c84cbcf8969b78086bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
+  cooldown: 8
+  manaCost: 40
   wDuration: 5
   wDamageReduction: 0.4
   wShieldMaxHpMultiplier: 1
@@ -1436,6 +1444,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45276561a2769df41a45b9e9df485010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
+  cooldown: 3
+  manaCost: 20
+  dashDistance: 4
+  dashDuration: 0.15
   eRailDuration: 0.4
   eEnableAfterimageShader: 1
   eAfterimageSourceRenderer: {fileID: 7009046691658483294}
@@ -1480,7 +1492,18 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ba8d3ad4f1f7b34a8895b3745d62755, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_R_DivineStarRain
+  cooldown: 30
+  manaCost: 60
   rBaseSwordCount: 12
+  rSwarmDuration: 12
+  rSwarmDamageRadius: 10
+  rSwarmDamageInterval: 0.25
+  rSwarmBaseRotationSpeed: 90
+  rSwarmRotationSpeedPerSword: 4
+  rDamageDebugLog: 0
+  baseDamage: 12
+  physicalScaling: 0.5
+  specialScaling: 1.3
   rEffectScale: {x: 0.3, y: 0.3, z: 0.3}
   rEffectRotationZ: 0
   rEffectOffset: {x: 0, y: 0, z: 0}
@@ -1489,7 +1512,6 @@ MonoBehaviour:
   rEffectVisualPitch: 0
   rEffectVisualYaw: 0
   rEffectVisualRoll: 0
-  rSwarmDuration: 12
   rSwarmRadiusMin: 0.8
   rSwarmRadiusMax: 3.2
   rUseDivineMarkRadiusScaling: 1
@@ -1536,9 +1558,6 @@ MonoBehaviour:
   rSwordSelfSpinMin: 30
   rSwordSelfSpinMax: 120
   rSwordLengthLocalAxis: {x: 0, y: 1, z: 0}
-  rSwarmDamageRadius: 10
-  rSwarmDamageInterval: 0.25
-  rSwarmDamagePerTick: 12
   rSwarmEnemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295

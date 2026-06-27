@@ -2,7 +2,7 @@ using UnityEngine;
 
 public static class MonsterCombatAutoSetup
 {
-    public static bool enableStatVariance = true;
+    public static bool enableStatVariance = false;
     public static float minStatVariance = 0.10f;
     public static float maxStatVariance = 0.20f;
 
@@ -29,7 +29,7 @@ public static class MonsterCombatAutoSetup
 
         identity.attackStyle = ResolveAttackStyle(identity.rank);
 
-        ApplyStats(monster, identity);
+        SyncExistingStats(monster, identity);
         EnsureRuntimeComponents(monster);
         EnsureRankVisual(monster, identity);
     }
@@ -59,144 +59,42 @@ public static class MonsterCombatAutoSetup
         return rank == MonsterRank.Elite ? MonsterAttackStyle.Ranged : MonsterAttackStyle.Melee;
     }
 
-    private static void ApplyStats(GameObject monster, MonsterIdentity identity)
+    private static void SyncExistingStats(GameObject monster, MonsterIdentity identity)
     {
         CombatStats stats = monster.GetComponent<CombatStats>();
+        bool createdFallbackStats = false;
         if (stats == null)
         {
             stats = monster.AddComponent<CombatStats>();
+            createdFallbackStats = true;
         }
 
-        float maxHealth = 55f;
-        float physicalAttack = 8f;
-        float specialAttack = 8f;
-        float physicalDefense = 0f;
-        float specialDefense = 0f;
-        float speed = 4f;
-        float luck = 2f;
-        float moveSpeed = 2.5f;
+        if (createdFallbackStats)
+        {
+            ApplyFallbackStats(stats);
+            Debug.LogWarning($"[MonsterCombatAutoSetup] Missing CombatStats on '{monster.name}'. Added fallback CombatStats at runtime.", monster);
+        }
+
+        float maxHealth = Mathf.Max(1f, stats.maxHealth);
+        float physicalAttack = Mathf.Max(0f, stats.physicalAttack);
+        float specialAttack = Mathf.Max(0f, stats.specialAttack);
+        float physicalDefense = Mathf.Max(0f, stats.physicalDefense);
+        float specialDefense = Mathf.Max(0f, stats.specialDefense);
+        float speed = Mathf.Max(0.1f, stats.speed);
+        float luck = Mathf.Max(0f, stats.luck);
+        float moveSpeed = ResolveMoveSpeed(identity, speed);
         float range = 1.35f;
         float hitRange = 1.6f;
         float cooldown = 1.1f;
 
-        switch (identity.species)
-        {
-            case MonsterSpecies.BlueSlime:
-                maxHealth = 55f;
-                physicalAttack = 8f;
-                specialAttack = 4f;
-                speed = 4f;
-                luck = 2f;
-                moveSpeed = 2.5f;
-                cooldown = 1.1f;
-                break;
-            case MonsterSpecies.GreenSlime:
-                maxHealth = 60f;
-                physicalAttack = 9f;
-                specialAttack = 5f;
-                speed = 5f;
-                luck = 3f;
-                moveSpeed = 2.9f;
-                cooldown = 1f;
-                break;
-            case MonsterSpecies.LavaSlime:
-                maxHealth = 75f;
-                physicalAttack = 13f;
-                specialAttack = 7f;
-                physicalDefense = 2f;
-                specialDefense = 1f;
-                speed = 3f;
-                luck = 1f;
-                moveSpeed = 2.1f;
-                cooldown = 1.2f;
-                break;
-            case MonsterSpecies.PoisonSlime:
-                maxHealth = 50f;
-                physicalAttack = 7f;
-                specialAttack = 12f;
-                specialDefense = 1f;
-                speed = 5f;
-                luck = 4f;
-                moveSpeed = 2.7f;
-                cooldown = 1.15f;
-                break;
-            case MonsterSpecies.RainbowSlime:
-                maxHealth = 105f;
-                physicalAttack = 15f;
-                specialAttack = 18f;
-                physicalDefense = 2f;
-                specialDefense = 3f;
-                speed = 6f;
-                luck = 6f;
-                moveSpeed = 2.3f;
-                cooldown = 1.05f;
-                break;
-            case MonsterSpecies.Flying:
-                maxHealth = 28f;
-                physicalAttack = 5f;
-                specialAttack = 10f;
-                speed = 8f;
-                luck = 5f;
-                moveSpeed = 3.6f;
-                range = 5.5f;
-                hitRange = 5.5f;
-                cooldown = 1.3f;
-                break;
-            case MonsterSpecies.Ranged:
-                maxHealth = 32f;
-                physicalAttack = 4f;
-                specialAttack = 11f;
-                speed = 6f;
-                luck = 4f;
-                moveSpeed = 2f;
-                range = 7f;
-                hitRange = 7f;
-                cooldown = 1.7f;
-                break;
-            case MonsterSpecies.Tank:
-                maxHealth = 95f;
-                physicalAttack = 10f;
-                specialAttack = 5f;
-                physicalDefense = 4f;
-                specialDefense = 2f;
-                speed = 2f;
-                luck = 1f;
-                moveSpeed = 1.25f;
-                cooldown = 1.4f;
-                break;
-            case MonsterSpecies.Assassin:
-                maxHealth = 26f;
-                physicalAttack = 14f;
-                specialAttack = 8f;
-                speed = 10f;
-                luck = 6f;
-                moveSpeed = 4.4f;
-                cooldown = 0.75f;
-                break;
-        }
-
         if (identity.rank == MonsterRank.Elite)
         {
-            maxHealth *= 2.5f;
-            physicalAttack *= 2f;
-            specialAttack *= 2f;
-            physicalDefense += 2f;
-            specialDefense += 2f;
-            speed *= 1.05f;
-            luck += 2f;
             range = 5f;
             hitRange = 6f;
             cooldown = 1.6f;
         }
         else if (identity.rank == MonsterRank.Boss)
         {
-            maxHealth *= 9f;
-            physicalAttack *= 4f;
-            specialAttack *= 4f;
-            physicalDefense += 5f;
-            specialDefense += 5f;
-            speed *= 1.1f;
-            luck += 4f;
             range = 8f;
             hitRange = 8f;
             cooldown = 2.2f;
@@ -218,7 +116,14 @@ public static class MonsterCombatAutoSetup
             health = monster.AddComponent<CombatHealth>();
         }
 
+        BattleResourceBank resourceBank = monster.GetComponent<BattleResourceBank>();
+        if (resourceBank == null)
+        {
+            resourceBank = monster.AddComponent<BattleResourceBank>();
+        }
+
         health.stats = stats;
+        health.resourceBank = resourceBank;
         health.SyncHealthFromStats(refillCurrentHealth: true);
 
         DissolveOnDeath dissolveOnDeath = monster.GetComponent<DissolveOnDeath>();
@@ -233,6 +138,47 @@ public static class MonsterCombatAutoSetup
             BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
             float attackPower = damageType == BattleDamageType.Physical ? physicalAttack : specialAttack;
             controller.ConfigureRuntime(moveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
+        }
+    }
+
+    private static void ApplyFallbackStats(CombatStats stats)
+    {
+        if (stats == null)
+        {
+            return;
+        }
+
+        stats.maxHealth = 100f;
+        stats.physicalAttack = 8f;
+        stats.physicalDefense = 0f;
+        stats.specialAttack = 4f;
+        stats.specialDefense = 0f;
+        stats.speed = 4f;
+        stats.luck = 2f;
+    }
+
+    private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
+    {
+        switch (identity.species)
+        {
+            case MonsterSpecies.GreenSlime:
+                return 2.9f;
+            case MonsterSpecies.LavaSlime:
+                return 2.1f;
+            case MonsterSpecies.PoisonSlime:
+                return 2.7f;
+            case MonsterSpecies.RainbowSlime:
+                return 2.3f;
+            case MonsterSpecies.Flying:
+                return 3.6f;
+            case MonsterSpecies.Ranged:
+                return 2f;
+            case MonsterSpecies.Tank:
+                return 1.25f;
+            case MonsterSpecies.Assassin:
+                return 4.4f;
+            default:
+                return Mathf.Max(0.1f, statSpeed > 0f ? statSpeed : 2.5f);
         }
     }
 

@@ -7,6 +7,8 @@ using Spine.Unity;
 
 public class Player2PrototypeController : MonoBehaviour
 {
+    private const string LegacyRDisabledWarning = "[Player2PrototypeController] Legacy R fallback is disabled. Please use Player2Skill_R_DivineStarRain.";
+
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private PlayerSkillBase qSkill;
     [SerializeField] private PlayerSkillBase wSkill;
@@ -15,13 +17,6 @@ public class Player2PrototypeController : MonoBehaviour
 
     [Header("E - 星痕瞬移 / 残影特效")]
     public PlayerSkillCooldownManager cooldownManager;
-
-    private const float Player2QManaCost = 10f;
-    private const float Player2WManaCost = 40f;
-    private const float Player2EManaCost = 20f;
-    private const float Player2RManaCost = 60f;
-
-
 
     [Header("R - 神眷剑涡 / 基础")]
     [HideInInspector] public float moveSpeed = 5f;
@@ -223,11 +218,6 @@ public class Player2PrototypeController : MonoBehaviour
     [InspectorName("R Base Sword Count")]
     public int rBaseSwordCount = 1;
 
-    [Header("HUD Cooldowns")]
-    [SerializeField, Min(0f)] private float qCooldown = 3f;
-    [SerializeField, Min(0f)] private float wCooldown = 5f;
-    [SerializeField, Min(0f)] private float eCooldown = 8f;
-    [SerializeField, Min(0f)] private float rCooldown = 12f;
     [SerializeField] private bool debugSkillCooldownFlow = true;
 
     [Header("R - 神眷剑涡 / 收场")]
@@ -842,7 +832,7 @@ public class Player2PrototypeController : MonoBehaviour
                     Debug.Log("[SkillCD] Player02 Q start HUD cooldown", this);
                 }
 
-                skillHud.StartSkillCooldown("Q", qCooldown);
+                skillHud.StartSkillCooldown("Q", ResolveSkillCooldownSeconds(qSkill, "Q"));
             }
         }
 
@@ -904,7 +894,7 @@ public class Player2PrototypeController : MonoBehaviour
                     Debug.Log("[SkillCD] Player02 W start HUD cooldown", this);
                 }
 
-                skillHud.StartSkillCooldown("W", wCooldown);
+                skillHud.StartSkillCooldown("W", ResolveSkillCooldownSeconds(wSkill, "W"));
             }
         }
 
@@ -966,7 +956,7 @@ public class Player2PrototypeController : MonoBehaviour
                     Debug.Log("[SkillCD] Player02 E start HUD cooldown", this);
                 }
 
-                skillHud.StartSkillCooldown("E", eCooldown);
+                skillHud.StartSkillCooldown("E", ResolveSkillCooldownSeconds(eSkill, "E"));
             }
         }
 
@@ -1028,7 +1018,7 @@ public class Player2PrototypeController : MonoBehaviour
                     Debug.Log("[SkillCD] Player02 R start HUD cooldown", this);
                 }
 
-                skillHud.StartSkillCooldown("R", rCooldown);
+                skillHud.StartSkillCooldown("R", ResolveSkillCooldownSeconds(rSkill, "R"));
             }
         }
     }
@@ -1075,23 +1065,23 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         SkillCostCDData qCost = cooldownManager.skillDatas[0];
-        qCost.maxCooldown = qCooldown;
-        qCost.manaCost = Player2QManaCost;
+        qCost.maxCooldown = ResolveSkillCooldownSeconds(qSkill, "Q");
+        qCost.manaCost = ResolveSkillManaCost(qSkill, "Q");
         cooldownManager.skillDatas[0] = qCost;
 
         SkillCostCDData wCost = cooldownManager.skillDatas[1];
-        wCost.maxCooldown = wCooldown;
-        wCost.manaCost = Player2WManaCost;
+        wCost.maxCooldown = ResolveSkillCooldownSeconds(wSkill, "W");
+        wCost.manaCost = ResolveSkillManaCost(wSkill, "W");
         cooldownManager.skillDatas[1] = wCost;
 
         SkillCostCDData eCost = cooldownManager.skillDatas[2];
-        eCost.maxCooldown = eCooldown;
-        eCost.manaCost = Player2EManaCost;
+        eCost.maxCooldown = ResolveSkillCooldownSeconds(eSkill, "E");
+        eCost.manaCost = ResolveSkillManaCost(eSkill, "E");
         cooldownManager.skillDatas[2] = eCost;
 
         SkillCostCDData rCost = cooldownManager.skillDatas[3];
-        rCost.maxCooldown = rCooldown;
-        rCost.manaCost = Player2RManaCost;
+        rCost.maxCooldown = ResolveSkillCooldownSeconds(rSkill, "R");
+        rCost.manaCost = ResolveSkillManaCost(rSkill, "R");
         cooldownManager.skillDatas[3] = rCost;
     }
 
@@ -1103,20 +1093,64 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         SkillCostCDData qData = cooldownManager.skillDatas[0];
-        qData.maxCooldown = qCooldown;
+        qData.maxCooldown = ResolveSkillCooldownSeconds(qSkill, "Q");
         cooldownManager.skillDatas[0] = qData;
 
         SkillCostCDData wData = cooldownManager.skillDatas[1];
-        wData.maxCooldown = wCooldown;
+        wData.maxCooldown = ResolveSkillCooldownSeconds(wSkill, "W");
         cooldownManager.skillDatas[1] = wData;
 
         SkillCostCDData eData = cooldownManager.skillDatas[2];
-        eData.maxCooldown = eCooldown;
+        eData.maxCooldown = ResolveSkillCooldownSeconds(eSkill, "E");
         cooldownManager.skillDatas[2] = eData;
 
         SkillCostCDData rData = cooldownManager.skillDatas[3];
-        rData.maxCooldown = rCooldown;
+        rData.maxCooldown = ResolveSkillCooldownSeconds(rSkill, "R");
         cooldownManager.skillDatas[3] = rData;
+    }
+
+    private static float ResolveSkillCooldownSeconds(PlayerSkillBase skill, string keyLabel)
+    {
+        if (skill != null && skill.CooldownSeconds > 0f)
+        {
+            return skill.CooldownSeconds;
+        }
+
+        switch (keyLabel)
+        {
+            case "Q":
+                return 0.8f;
+            case "W":
+                return 6f;
+            case "E":
+                return 8f;
+            case "R":
+                return 15f;
+            default:
+                return 0f;
+        }
+    }
+
+    private static float ResolveSkillManaCost(PlayerSkillBase skill, string keyLabel)
+    {
+        if (skill != null && skill.ManaCost >= 0f)
+        {
+            return skill.ManaCost;
+        }
+
+        switch (keyLabel)
+        {
+            case "Q":
+                return 10f;
+            case "W":
+                return 40f;
+            case "E":
+                return 20f;
+            case "R":
+                return 60f;
+            default:
+                return 0f;
+        }
     }
 
     private void ResolveVisualFloatTargets()
@@ -1537,36 +1571,16 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        if (rSwarmRoutine != null)
-        {
-            StopCoroutine(rSwarmRoutine);
-            rSwarmRoutine = null;
-        }
-        CleanupRSwarmVisuals();
-
-        int energyForR = Mathf.Max(0, currentSwordEnergy);
-        int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
-        if (count <= 0) return;
-        Camera renderCamera = ResolveRRenderCamera();
-        Vector3 previewCenter = ResolveRSwarmCenter();
-        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
-        currentSwordEnergy = 0;
-        rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+        Debug.LogWarning(LegacyRDisabledWarning, this);
     }
 
     private bool TryCastRFallback()
     {
-        int energyForR = Mathf.Max(0, currentSwordEnergy);
-        int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
-        if (rSwarmRoutine == null && count <= 0)
-        {
-            return false;
-        }
-
-        CastR();
-        return true;
+        Debug.LogWarning(LegacyRDisabledWarning, this);
+        return false;
     }
 
+    // Legacy R fallback disabled. Current R is Player2Skill_R_DivineStarRain.
     private IEnumerator RSwarmRoutine(int count)
     {
         Vector3 center = ResolveRSwarmCenter();
@@ -2214,16 +2228,19 @@ public class Player2PrototypeController : MonoBehaviour
         }
     }
 
+    // Legacy R fallback disabled. Current R is Player2Skill_R_DivineStarRain.
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
         ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, rSwarmDamagePerTick);
     }
 
+    // Legacy R fallback disabled. Current R is Player2Skill_R_DivineStarRain.
     private void ApplyRSwarmImpactDamage(Vector3 center)
     {
         ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), rSwarmDamagePerTick * Mathf.Max(0f, rStarRainDamageMultiplier));
     }
 
+    // Legacy R fallback disabled. Current R is Player2Skill_R_DivineStarRain.
     private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageAmount)
     {
         if (damageAmount <= 0f || radius <= 0f)
