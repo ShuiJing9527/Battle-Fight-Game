@@ -28,6 +28,7 @@ public class PlayerStatusHUD : MonoBehaviour
 
     private void Awake()
     {
+        EnsureAttributePanelController();
         ApplyStaticTexts();
         RefreshPlayerCache(force: true);
         RefreshHud();
@@ -35,6 +36,7 @@ public class PlayerStatusHUD : MonoBehaviour
 
     private void OnEnable()
     {
+        EnsureAttributePanelController();
         ApplyStaticTexts();
         RefreshPlayerCache(force: true);
         RefreshHud();
@@ -204,5 +206,31 @@ public class PlayerStatusHUD : MonoBehaviour
         }
 
         label.text = value;
+    }
+
+    private void EnsureAttributePanelController()
+    {
+        Canvas canvas = GetComponentInParent<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        Transform existingController = canvas.transform.Find("PlayerAttributePanelController");
+        GameObject controllerObject;
+        if (existingController != null)
+        {
+            controllerObject = existingController.gameObject;
+        }
+        else
+        {
+            controllerObject = new GameObject("PlayerAttributePanelController", typeof(RectTransform));
+            controllerObject.transform.SetParent(canvas.transform, false);
+        }
+
+        if (controllerObject.GetComponent<PlayerAttributePanelUI>() == null)
+        {
+            controllerObject.AddComponent<PlayerAttributePanelUI>();
+        }
     }
 }

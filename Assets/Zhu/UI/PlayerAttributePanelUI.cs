@@ -1,15 +1,61 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using Spine.Unity;
+using CameraClearFlags = UnityEngine.CameraClearFlags;
 
 public class PlayerAttributePanelUI : MonoBehaviour
 {
+    private static PlayerAttributePanelUI primaryInstance;
+
     [Header("Root")]
     [SerializeField] private Canvas targetCanvas;
     [SerializeField] private RectTransform panelRoot;
+    [SerializeField] private GameObject panelPrefab;
     [SerializeField] private KeyCode toggleKey = KeyCode.I;
+    [SerializeField] private bool debugToggleLog = false;
 
-    [Header("Layout")]
+    [Header("Refresh")]
+    [SerializeField, Min(0.05f)] private float refreshInterval = 0.2f;
+
+    [Header("Layout Control")]
+    [SerializeField] private bool preserveManualLayout = true;
+
+    [Header("Preview")]
+    [SerializeField] private GameObject player01WorldPreviewPrefab;
+    [SerializeField] private GameObject player02WorldPreviewPrefab;
+    [SerializeField] private RawImage previewRawImage;
+    [SerializeField] private Camera previewCamera;
+    [SerializeField] private RenderTexture previewRenderTexture;
+    [SerializeField] private Transform worldPreviewRoot;
+    [SerializeField, Min(128)] private int previewRenderTextureSize = 512;
+    [SerializeField, Min(0.1f)] private float previewCameraOrthographicSize = 3f;
+    [SerializeField] private string previewLayerName = "UI";
+    [SerializeField] private Vector3 player01WorldPreviewPosition = Vector3.zero;
+    [SerializeField] private Vector3 player01WorldPreviewScale = Vector3.one;
+    [SerializeField] private Vector3 player01WorldPreviewEuler = Vector3.zero;
+    [SerializeField] private Vector3 player02WorldPreviewPosition = Vector3.zero;
+    [SerializeField] private Vector3 player02WorldPreviewScale = Vector3.one;
+    [SerializeField] private Vector3 player02WorldPreviewEuler = Vector3.zero;
+    [SerializeField] private string player01PreviewIdleAnimationName = "Idle";
+    [SerializeField] private string player02PreviewIdleAnimationName = "idle";
+    [Header("Legacy UI Preview Fallback")]
+    [SerializeField] private GameObject player01PreviewPrefab;
+    [SerializeField] private GameObject player02PreviewPrefab;
+    [SerializeField] private Vector2 previewUiAnchoredPosition = new Vector2(25f, 10f);
+    [SerializeField] private Vector2 previewUiSize = new Vector2(260f, 340f);
+    [SerializeField] private float previewUiScale = 0.12f;
+    [SerializeField] private Vector2 player01PreviewUiAnchoredPosition = new Vector2(25f, 10f);
+    [SerializeField] private Vector2 player01PreviewUiSize = new Vector2(260f, 340f);
+    [SerializeField] private float player01PreviewUiScale = 0.12f;
+    [SerializeField] private Vector2 player02PreviewUiAnchoredPosition = new Vector2(35f, 35f);
+    [SerializeField] private Vector2 player02PreviewUiSize = new Vector2(260f, 340f);
+    [SerializeField] private float player02PreviewUiScale = 0.07f;
+    [SerializeField] private Vector3 previewLocalPosition = Vector3.zero;
+    [SerializeField] private Vector3 previewLocalScale = new Vector3(80f, 80f, 80f);
+    [SerializeField] private Vector3 previewLocalEuler = Vector3.zero;
+
+    [Header("Fallback Layout")]
     [SerializeField] private Vector2 panelSize = new Vector2(760f, 360f);
     [SerializeField] private Vector2 panelAnchoredPosition = new Vector2(0f, 0f);
     [SerializeField] private Vector2 panelPadding = new Vector2(20f, 18f);
@@ -20,9 +66,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private float attributeRowSpacing = 12f;
     [SerializeField] private float footerHeight = 110f;
     [SerializeField] private float attributeLabelWidth = 48f;
-    [SerializeField] private float attributeValueWidth = 72f;
+    [SerializeField] private float attributeValueWidth = 88f;
 
-    [Header("Colors")]
+    [Header("Fallback Colors")]
     [SerializeField] private Color panelColor = new Color(0.08f, 0.1f, 0.14f, 0.96f);
     [SerializeField] private Color previewColor = new Color(0.12f, 0.14f, 0.2f, 0.95f);
     [SerializeField] private Color barBackgroundColor = new Color(0.16f, 0.18f, 0.24f, 1f);
@@ -30,47 +76,130 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private Color textColor = Color.white;
     [SerializeField] private Color subTextColor = new Color(0.84f, 0.88f, 0.95f, 1f);
 
+    [Header("Attribute Bar Colors")]
+    [SerializeField] private Color hpBaseColor = new Color32(0x6C, 0xCB, 0x5F, 0xFF);
+    [SerializeField] private Color atkBaseColor = new Color32(0xD9, 0x53, 0x4F, 0xFF);
+    [SerializeField] private Color defBaseColor = new Color32(0xE4, 0x9B, 0x3E, 0xFF);
+    [SerializeField] private Color magBaseColor = new Color32(0x8E, 0x63, 0xD9, 0xFF);
+    [SerializeField] private Color resBaseColor = new Color32(0x5B, 0x8C, 0xFF, 0xFF);
+    [SerializeField] private Color bonusBarColor = new Color32(0xF2, 0xC9, 0x4C, 0xFF);
+    [SerializeField] private Color compositeBarBackgroundColor = new Color32(0x2F, 0x35, 0x50, 0xFF);
+
     [Header("Bar Display Max")]
-    [SerializeField, Min(1f)] private float hpDisplayMax = 300f;
-    [SerializeField, Min(1f)] private float atkDisplayMax = 40f;
-    [SerializeField, Min(1f)] private float defDisplayMax = 30f;
-    [SerializeField, Min(1f)] private float magDisplayMax = 40f;
-    [SerializeField, Min(1f)] private float resDisplayMax = 30f;
+    [SerializeField, Min(1f)] private float hpChartDisplayMax = 50f;
+    [SerializeField, Min(1f)] private float atkDisplayMax = 100f;
+    [SerializeField, Min(1f)] private float defDisplayMax = 100f;
+    [SerializeField, Min(1f)] private float magDisplayMax = 100f;
+    [SerializeField, Min(1f)] private float resDisplayMax = 100f;
 
     private readonly string[] attributeKeys = { "HP", "ATK", "DEF", "MAG", "RES" };
-    private readonly Image[] attributeFills = new Image[5];
+    private readonly Image[] attributeBarBackgrounds = new Image[5];
+    private readonly Image[] attributeBaseFills = new Image[5];
+    private readonly Image[] attributeBonusFills = new Image[5];
     private readonly TextMeshProUGUI[] attributeValues = new TextMeshProUGUI[5];
 
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI previewText;
+    private TextMeshProUGUI playerNameText;
+    private TextMeshProUGUI characterPreviewText;
     private TextMeshProUGUI footerText;
+    private TextMeshProUGUI spdText;
+    private TextMeshProUGUI luckText;
+    private TextMeshProUGUI critRateText;
+    private TextMeshProUGUI extraSoulDropText;
+    private TextMeshProUGUI extraRuneDropText;
+    private TextMeshProUGUI reserveText;
     private RectTransform previewRect;
+    private RectTransform previewRootRect;
     private RectTransform statsRect;
+    private RectTransform subInfoRect;
+    private RectTransform reserveRect;
     private bool initialized;
+    private bool isVisible;
+    private bool usingFallbackLayout;
+    private bool usingPrefabLayout;
+    private bool panelRootWasCreatedAtRuntime;
+    private bool pausedByAttributePanel;
+    private bool warnedShowPanelFailed;
+    private float nextRefreshTime;
+    private float nextBootstrapLookupTime;
+    private float previousTimeScale = 1f;
+    private static bool warnedMissingPanelPrefab;
+
     private Player2Bootstrap cachedBootstrap;
     private GameObject cachedPlayer;
     private CombatStats cachedStats;
     private BattleResourceBank cachedResourceBank;
     private CombatHealth cachedCombatHealth;
     private RuntimeLootDropOnDeath cachedLootDropPreview;
-    private float nextBootstrapLookupTime;
+    private GameObject previewInstance;
+    private SkeletonAnimation previewSkeletonAnimation;
+    private GameObject currentPreviewPrefab;
+    private int currentPreviewPlayerIndex;
+    private string currentPreviewAnimationKey;
+    private bool warnedMissingPreviewIdleAnimation;
+    private int previewLayerIndex = -1;
 
     private void Awake()
     {
+        if (!AcquirePrimaryInstance())
+        {
+            return;
+        }
+
         Initialize();
-        SetVisible(false);
+        ForceHiddenInitializedState();
     }
 
     private void Start()
     {
+        if (primaryInstance != this)
+        {
+            return;
+        }
+
         Initialize();
-        SetVisible(false);
+        ForceHiddenInitializedState();
+    }
+
+    private void OnDisable()
+    {
+        if (primaryInstance != this)
+        {
+            return;
+        }
+
+        RestoreTimeScaleIfNeeded();
+    }
+
+    private void OnDestroy()
+    {
+        bool isPrimary = primaryInstance == this;
+        if (!isPrimary)
+        {
+            return;
+        }
+
+        RestoreTimeScaleIfNeeded();
+        if (previewRenderTexture != null)
+        {
+            previewRenderTexture.Release();
+            Destroy(previewRenderTexture);
+            previewRenderTexture = null;
+        }
+
+        primaryInstance = null;
     }
 
     private void Update()
     {
         if (!initialized)
         {
+            if (primaryInstance != null && primaryInstance != this)
+            {
+                return;
+            }
+
             Initialize();
             if (!initialized)
             {
@@ -83,11 +212,24 @@ public class PlayerAttributePanelUI : MonoBehaviour
             TogglePanel();
         }
 
-        if (panelRoot != null && panelRoot.gameObject.activeSelf)
+        if (isVisible && panelRoot != null && panelRoot.gameObject.activeSelf && Time.unscaledTime >= nextRefreshTime)
         {
             RefreshPlayerCache(force: false);
             RefreshPanel();
+            nextRefreshTime = Time.unscaledTime + refreshInterval;
         }
+
+        UpdatePreviewAnimationUnscaled(Time.unscaledDeltaTime);
+    }
+
+    private void LateUpdate()
+    {
+        if (primaryInstance != this)
+        {
+            return;
+        }
+
+        RenderPreviewCameraIfNeeded();
     }
 
     private void Initialize()
@@ -97,6 +239,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
+        panelRootWasCreatedAtRuntime = false;
+
         Canvas canvas = ResolveCanvas();
         if (canvas == null)
         {
@@ -105,24 +249,44 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (panelRoot == null)
         {
-            Transform existing = canvas.transform.Find("CharacterAttributePanel");
-            if (existing != null)
+            panelRoot = FindExistingPanel(canvas.transform);
+        }
+
+        if (panelRoot == null)
+        {
+            RectTransform prefabInstance = InstantiatePrefabPanel(canvas.transform);
+            if (prefabInstance != null)
             {
-                panelRoot = existing as RectTransform;
+                panelRoot = prefabInstance;
+                panelRootWasCreatedAtRuntime = true;
+                usingFallbackLayout = ShouldUseFallbackLayout(prefabInstance);
             }
         }
 
         if (panelRoot == null)
         {
-            panelRoot = CreateRectTransform("CharacterAttributePanel", canvas.transform);
-            panelRoot.gameObject.AddComponent<Image>().color = panelColor;
+            panelRoot = CreateRectTransform("PlayerAttributePanel", canvas.transform);
+            panelRootWasCreatedAtRuntime = true;
+            usingFallbackLayout = true;
         }
 
+        if (!usingFallbackLayout)
+        {
+            usingFallbackLayout = ShouldUseFallbackLayout(panelRoot);
+        }
+
+        usingPrefabLayout = !usingFallbackLayout;
+
         BuildPanelIfNeeded();
-        ApplyLayout();
+        if (ShouldApplyFallbackLayout())
+        {
+            ApplyFallbackLayout();
+        }
+
         RefreshPlayerCache(force: true);
         RefreshPanel();
         initialized = true;
+        ForceHiddenInitializedState();
     }
 
     private Canvas ResolveCanvas()
@@ -170,7 +334,13 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return targetCanvas;
         }
 
-        GameObject canvasObject = new GameObject("HUDCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
+        GameObject canvasObject = new GameObject(
+            "HUDCanvas",
+            typeof(RectTransform),
+            typeof(Canvas),
+            typeof(CanvasScaler),
+            typeof(GraphicRaycaster));
+
         Canvas createdCanvas = canvasObject.GetComponent<Canvas>();
         createdCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
 
@@ -184,6 +354,87 @@ public class PlayerAttributePanelUI : MonoBehaviour
         return targetCanvas;
     }
 
+    private RectTransform FindExistingPanel(Transform canvasTransform)
+    {
+        if (canvasTransform == null)
+        {
+            return null;
+        }
+
+        Transform existing = canvasTransform.Find("PlayerAttributePanel");
+        if (existing != null)
+        {
+            return existing as RectTransform;
+        }
+
+        existing = canvasTransform.Find("CharacterAttributePanel");
+        return existing as RectTransform;
+    }
+
+    private RectTransform InstantiatePrefabPanel(Transform parent)
+    {
+        GameObject resolvedPrefab = panelPrefab;
+        if (resolvedPrefab == null)
+        {
+            resolvedPrefab = Resources.Load<GameObject>("Prefabs/UI/PlayerAttributePanel");
+        }
+
+        if (resolvedPrefab == null)
+        {
+            if (!warnedMissingPanelPrefab)
+            {
+                Debug.LogWarning("[PlayerAttributePanelUI] Missing PlayerAttributePanel prefab. Falling back to runtime-built panel.");
+                warnedMissingPanelPrefab = true;
+            }
+
+            return null;
+        }
+
+        GameObject instance = Instantiate(resolvedPrefab, parent, false);
+        instance.name = resolvedPrefab.name;
+        return instance.GetComponent<RectTransform>();
+    }
+
+    private bool ShouldUseFallbackLayout(RectTransform root)
+    {
+        if (root == null)
+        {
+            return true;
+        }
+
+        RectTransform resolvedPreviewRect = FindNamedRect(root, "PreviewSection", "LeftPreviewArea");
+        RectTransform resolvedStatsRect = FindNamedRect(root, "StatsSection", "AttributeArea");
+        if (resolvedPreviewRect == null || resolvedStatsRect == null)
+        {
+            return true;
+        }
+
+        for (int i = 0; i < attributeKeys.Length; i++)
+        {
+            if ((resolvedStatsRect.Find(attributeKeys[i] + "Row") as RectTransform) == null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private bool ShouldApplyFallbackLayout()
+    {
+        if (!usingFallbackLayout)
+        {
+            return false;
+        }
+
+        if (!preserveManualLayout)
+        {
+            return true;
+        }
+
+        return panelRootWasCreatedAtRuntime;
+    }
+
     private void BuildPanelIfNeeded()
     {
         if (panelRoot == null)
@@ -191,79 +442,255 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
-        Image rootImage = panelRoot.GetComponent<Image>();
-        if (rootImage == null)
+        RectTransform backgroundRect = FindRect(panelRoot, "Background");
+        Image backgroundImage = backgroundRect != null
+            ? EnsureImage(backgroundRect, panelColor)
+            : EnsureImage(panelRoot, panelColor);
+        backgroundImage.raycastTarget = false;
+
+        previewRect = FindNamedRect(panelRoot, "PreviewSection", "LeftPreviewArea");
+        if (previewRect == null)
         {
-            rootImage = panelRoot.gameObject.AddComponent<Image>();
+            previewRect = CreateRectTransform("PreviewSection", panelRoot);
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
         }
 
-        rootImage.color = panelColor;
-        rootImage.raycastTarget = false;
-
-        previewRect = FindRect(panelRoot, "PreviewSection") ?? CreateRectTransform("PreviewSection", panelRoot);
-        Image previewImage = previewRect.GetComponent<Image>();
-        if (previewImage == null)
-        {
-            previewImage = previewRect.gameObject.AddComponent<Image>();
-        }
-
-        previewImage.color = previewColor;
+        Image previewImage = EnsureImage(previewRect, previewColor);
         previewImage.raycastTarget = false;
 
-        previewText = FindOrCreateText(previewRect, "PreviewLabel", 26f, TextAlignmentOptions.Center, textColor);
-        previewText.enableWordWrapping = true;
+        playerNameText = FindExistingText(previewRect, "PlayerNameText");
+        characterPreviewText = FindExistingText(previewRect, "CharacterPreviewText");
+        previewText = FindExistingText(previewRect, "PreviewLabel");
+        previewRootRect = FindNamedRect(previewRect, "PreviewRoot");
+        if (previewRootRect == null && !usingPrefabLayout)
+        {
+            previewRootRect = CreateRectTransform("PreviewRoot", previewRect);
+        }
 
-        statsRect = FindRect(panelRoot, "StatsSection") ?? CreateRectTransform("StatsSection", panelRoot);
+        if (previewRawImage == null)
+        {
+            previewRawImage = FindExistingRawImage(previewRootRect != null ? previewRootRect : previewRect, "PreviewRawImage");
+        }
 
-        titleText = FindOrCreateText(statsRect, "StatsTitle", 26f, TextAlignmentOptions.MidlineLeft, textColor);
-        titleText.enableWordWrapping = false;
+        if (previewRawImage == null)
+        {
+            previewRawImage = CreatePreviewRawImage(previewRootRect != null ? previewRootRect : previewRect);
+        }
+
+        if (previewRawImage != null)
+        {
+            previewRawImage.raycastTarget = false;
+        }
+
+        if (previewText == null && !usingPrefabLayout)
+        {
+            previewText = FindOrCreateText(previewRect, "PreviewLabel", 26f, TextAlignmentOptions.Center, textColor);
+        }
+
+        if (previewText != null)
+        {
+            previewText.enableWordWrapping = true;
+        }
+
+        statsRect = FindNamedRect(panelRoot, "StatsSection", "AttributeArea");
+        if (statsRect == null)
+        {
+            statsRect = CreateRectTransform("StatsSection", panelRoot);
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
+        }
+
+        titleText = FindExistingText(statsRect, "StatsTitle");
+        if (titleText == null)
+        {
+            titleText = FindExistingText(statsRect, "TitleText");
+        }
+
+        if (titleText == null && !usingPrefabLayout)
+        {
+            titleText = FindOrCreateText(statsRect, "StatsTitle", 26f, TextAlignmentOptions.MidlineLeft, textColor);
+        }
+
+        if (titleText != null)
+        {
+            titleText.enableWordWrapping = false;
+        }
 
         for (int i = 0; i < attributeKeys.Length; i++)
         {
             EnsureAttributeRow(i, attributeKeys[i]);
         }
 
-        footerText = FindOrCreateText(statsRect, "FooterText", 18f, TextAlignmentOptions.TopLeft, subTextColor);
-        footerText.enableWordWrapping = true;
-        footerText.overflowMode = TextOverflowModes.Overflow;
+        subInfoRect = FindNamedRect(panelRoot, "SubInfoArea");
+        if (subInfoRect != null)
+        {
+            spdText = FindExistingText(subInfoRect, "SPDText");
+            luckText = FindExistingText(subInfoRect, "LUCKText");
+            critRateText = FindExistingText(subInfoRect, "CritRateText");
+            extraSoulDropText = FindExistingText(subInfoRect, "ExtraSoulDropText");
+            extraRuneDropText = FindExistingText(subInfoRect, "ExtraRuneDropText");
+        }
+
+        reserveRect = FindNamedRect(panelRoot, "ReserveArea");
+        if (reserveRect != null)
+        {
+            reserveText = FindExistingText(reserveRect, "ReserveText");
+        }
+
+        footerText = FindExistingText(statsRect, "FooterText");
+        if (footerText == null && !usingPrefabLayout && subInfoRect == null && reserveRect == null)
+        {
+            footerText = FindOrCreateText(statsRect, "FooterText", 18f, TextAlignmentOptions.TopLeft, subTextColor);
+        }
+
+        if (footerText != null)
+        {
+            footerText.enableWordWrapping = true;
+            footerText.overflowMode = TextOverflowModes.Overflow;
+        }
     }
 
     private void EnsureAttributeRow(int index, string key)
     {
-        RectTransform row = FindRect(statsRect, $"{key}Row") ?? CreateRectTransform($"{key}Row", statsRect);
-
-        TextMeshProUGUI label = FindOrCreateText(row, "Label", 20f, TextAlignmentOptions.MidlineLeft, textColor);
-        label.text = key;
-        label.enableWordWrapping = false;
-
-        RectTransform backgroundRect = FindRect(row, "BarBackground") ?? CreateRectTransform("BarBackground", row);
-        Image backgroundImage = backgroundRect.GetComponent<Image>();
-        if (backgroundImage == null)
+        RectTransform row = FindRect(statsRect, key + "Row");
+        if (row == null)
         {
-            backgroundImage = backgroundRect.gameObject.AddComponent<Image>();
+            row = CreateRectTransform(key + "Row", statsRect);
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
         }
 
-        backgroundImage.color = barBackgroundColor;
+        TextMeshProUGUI label = FindExistingText(row, "Label");
+        if (label == null)
+        {
+            label = FindExistingText(row, "LabelText");
+        }
+
+        if (label == null && !usingPrefabLayout)
+        {
+            label = FindOrCreateText(row, "Label", 20f, TextAlignmentOptions.MidlineLeft, textColor);
+        }
+
+        if (label != null)
+        {
+            label.text = key + ":";
+            label.enableWordWrapping = false;
+        }
+
+        RectTransform barRootRect = FindRect(row, "BarRoot");
+        RectTransform legacyBackgroundRect = FindRect(row, "BarBackground");
+        if (barRootRect == null && legacyBackgroundRect != null)
+        {
+            barRootRect = legacyBackgroundRect;
+        }
+
+        bool createdBarRoot = false;
+        if (barRootRect == null)
+        {
+            barRootRect = CreateRectTransform("BarRoot", row);
+            createdBarRoot = true;
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
+        }
+
+        RectTransform backgroundRect = FindRect(barRootRect, "BarBg");
+        if (backgroundRect == null)
+        {
+            backgroundRect = FindRect(barRootRect, "BarBackground");
+        }
+
+        bool backgroundRectIsBarRoot = backgroundRect == null && barRootRect == legacyBackgroundRect;
+        bool createdBackgroundRect = false;
+        if (backgroundRect == null)
+        {
+            if (backgroundRectIsBarRoot)
+            {
+                backgroundRect = barRootRect;
+            }
+            else
+            {
+                backgroundRect = CreateRectTransform("BarBg", barRootRect);
+                createdBackgroundRect = true;
+                usingFallbackLayout = true;
+                usingPrefabLayout = false;
+            }
+        }
+
+        Image backgroundImage = EnsureImage(backgroundRect, compositeBarBackgroundColor);
+        backgroundImage.color = compositeBarBackgroundColor;
         backgroundImage.raycastTarget = false;
 
-        RectTransform fillRect = FindRect(backgroundRect, "BarFill") ?? CreateRectTransform("BarFill", backgroundRect);
-        Image fillImage = fillRect.GetComponent<Image>();
-        if (fillImage == null)
+        if (createdBarRoot)
         {
-            fillImage = fillRect.gameObject.AddComponent<Image>();
+            ConfigureBarContainerRect(barRootRect);
         }
 
-        fillImage.color = barFillColor;
-        fillImage.raycastTarget = false;
+        if (createdBackgroundRect)
+        {
+            ConfigureBarContainerRect(backgroundRect);
+        }
 
-        TextMeshProUGUI value = FindOrCreateText(row, "Value", 20f, TextAlignmentOptions.MidlineRight, textColor);
-        value.enableWordWrapping = false;
+        RectTransform fillParentRect = backgroundRect != null ? backgroundRect : barRootRect;
+        RectTransform baseFillRect = FindRect(fillParentRect, "BaseFill");
+        if (baseFillRect == null)
+        {
+            RectTransform legacyFillRect = FindRect(backgroundRect, "BarFill");
+            if (legacyFillRect != null)
+            {
+                baseFillRect = legacyFillRect;
+                baseFillRect.SetParent(fillParentRect, false);
+                baseFillRect.name = "BaseFill";
+            }
+        }
 
-        attributeFills[index] = fillImage;
+        if (baseFillRect == null)
+        {
+            baseFillRect = CreateRectTransform("BaseFill", fillParentRect);
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
+        }
+
+        Image baseFillImage = EnsureImage(baseFillRect, ResolveAttributeBaseColor(index));
+        baseFillImage.color = ResolveAttributeBaseColor(index);
+        baseFillImage.raycastTarget = false;
+
+        RectTransform bonusFillRect = FindRect(fillParentRect, "BonusFill");
+        if (bonusFillRect == null)
+        {
+            bonusFillRect = CreateRectTransform("BonusFill", fillParentRect);
+            usingFallbackLayout = true;
+            usingPrefabLayout = false;
+        }
+
+        Image bonusFillImage = EnsureImage(bonusFillRect, bonusBarColor);
+        bonusFillImage.color = bonusBarColor;
+        bonusFillImage.raycastTarget = false;
+
+        TextMeshProUGUI value = FindExistingText(row, "Value");
+        if (value == null)
+        {
+            value = FindExistingText(row, "ValueText");
+        }
+
+        if (value == null && !usingPrefabLayout)
+        {
+            value = FindOrCreateText(row, "Value", 20f, TextAlignmentOptions.MidlineRight, textColor);
+        }
+
+        if (value != null)
+        {
+            value.enableWordWrapping = false;
+            value.alignment = TextAlignmentOptions.MidlineRight;
+        }
+
+        attributeBarBackgrounds[index] = backgroundImage;
+        attributeBaseFills[index] = baseFillImage;
+        attributeBonusFills[index] = bonusFillImage;
         attributeValues[index] = value;
     }
 
-    private void ApplyLayout()
+    private void ApplyFallbackLayout()
     {
         if (panelRoot == null || previewRect == null || statsRect == null)
         {
@@ -313,7 +740,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         for (int i = 0; i < attributeKeys.Length; i++)
         {
-            RectTransform row = FindRect(statsRect, $"{attributeKeys[i]}Row");
+            RectTransform row = FindRect(statsRect, attributeKeys[i] + "Row");
             if (row == null)
             {
                 continue;
@@ -327,6 +754,10 @@ public class PlayerAttributePanelUI : MonoBehaviour
             row.offsetMax = new Vector2(0f, top);
 
             RectTransform labelRect = FindRect(row, "Label");
+            if (labelRect == null)
+            {
+                labelRect = FindRect(row, "LabelText");
+            }
             if (labelRect != null)
             {
                 labelRect.anchorMin = new Vector2(0f, 0f);
@@ -336,26 +767,47 @@ public class PlayerAttributePanelUI : MonoBehaviour
                 labelRect.sizeDelta = new Vector2(attributeLabelWidth, 0f);
             }
 
-            RectTransform backgroundRect = FindRect(row, "BarBackground");
-            if (backgroundRect != null)
+            RectTransform barRootRect = FindRect(row, "BarRoot");
+            if (barRootRect == null)
             {
-                backgroundRect.anchorMin = new Vector2(0f, 0.5f);
-                backgroundRect.anchorMax = new Vector2(0f, 0.5f);
-                backgroundRect.pivot = new Vector2(0f, 0.5f);
-                backgroundRect.anchoredPosition = new Vector2(barStartX, 0f);
-                backgroundRect.sizeDelta = new Vector2(barWidth, attributeRowHeight - 6f);
+                barRootRect = FindRect(row, "BarBackground");
             }
 
-            RectTransform fillRect = backgroundRect != null ? FindRect(backgroundRect, "BarFill") : null;
-            if (fillRect != null)
+            if (barRootRect != null)
             {
-                fillRect.anchorMin = new Vector2(0f, 0f);
-                fillRect.anchorMax = new Vector2(1f, 1f);
-                fillRect.offsetMin = Vector2.zero;
-                fillRect.offsetMax = Vector2.zero;
+                barRootRect.anchorMin = new Vector2(0f, 0.5f);
+                barRootRect.anchorMax = new Vector2(0f, 0.5f);
+                barRootRect.pivot = new Vector2(0f, 0.5f);
+                barRootRect.anchoredPosition = new Vector2(barStartX, 0f);
+                barRootRect.sizeDelta = new Vector2(barWidth, attributeRowHeight - 6f);
+
+                RectTransform backgroundRect = FindRect(barRootRect, "BarBg");
+                if (backgroundRect == null)
+                {
+                    backgroundRect = FindRect(barRootRect, "BarBackground");
+                }
+
+                if (backgroundRect != null)
+                {
+                    backgroundRect.anchorMin = new Vector2(0f, 0f);
+                    backgroundRect.anchorMax = new Vector2(1f, 1f);
+                    backgroundRect.pivot = new Vector2(0f, 0.5f);
+                    backgroundRect.offsetMin = Vector2.zero;
+                    backgroundRect.offsetMax = Vector2.zero;
+                }
+
+                RectTransform baseFillRect = FindRect(barRootRect, "BaseFill");
+                ConfigureCompositeFillRect(baseFillRect);
+
+                RectTransform bonusFillRect = FindRect(barRootRect, "BonusFill");
+                ConfigureCompositeFillRect(bonusFillRect);
             }
 
             RectTransform valueRect = FindRect(row, "Value");
+            if (valueRect == null)
+            {
+                valueRect = FindRect(row, "ValueText");
+            }
             if (valueRect != null)
             {
                 valueRect.anchorMin = new Vector2(1f, 0f);
@@ -379,32 +831,97 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void TogglePanel()
     {
-        bool nextVisible = panelRoot == null || !panelRoot.gameObject.activeSelf;
-        if (nextVisible)
+        LogToggleState("TogglePanel pressed");
+        if (isVisible)
         {
-            CloseRunePanelIfOpen();
-            RefreshPlayerCache(force: true);
-            RefreshPanel();
+            HidePanel();
+        }
+        else
+        {
+            ShowPanel();
+        }
+    }
+
+    private bool EnsurePanelReady()
+    {
+        if (!initialized || panelRoot == null)
+        {
+            Initialize();
         }
 
-        SetVisible(nextVisible);
+        if (panelRoot != null && panelRoot.gameObject.activeSelf != isVisible)
+        {
+            panelRoot.gameObject.SetActive(isVisible);
+        }
+
+        return initialized && panelRoot != null;
+    }
+
+    private void ShowPanel()
+    {
+        if (!EnsurePanelReady())
+        {
+            if (!warnedShowPanelFailed)
+            {
+                Debug.LogWarning("[PlayerAttributePanelUI] Failed to show panel because panel root could not be created or bound.");
+                warnedShowPanelFailed = true;
+            }
+            return;
+        }
+
+        warnedShowPanelFailed = false;
+
+        if (panelRoot == null)
+        {
+            return;
+        }
+
+        panelRoot.gameObject.SetActive(true);
+        isVisible = true;
+        LogToggleState("ShowPanel active");
+
+        RefreshPlayerCache(force: true);
+        RefreshPanel();
+        ForceRefreshPreview();
+        nextRefreshTime = Time.unscaledTime + refreshInterval;
+
+        PauseGameForPanel();
+        LogToggleState("ShowPanel success");
+    }
+
+    private void HidePanel()
+    {
+        if (panelRoot != null)
+        {
+            panelRoot.gameObject.SetActive(false);
+        }
+
+        SetPreviewVisible(false);
+        isVisible = false;
+        RestoreTimeScaleIfNeeded();
+        LogToggleState("HidePanel");
     }
 
     private void SetVisible(bool visible)
     {
+        isVisible = visible;
         if (panelRoot != null)
         {
             panelRoot.gameObject.SetActive(visible);
         }
     }
 
-    private void CloseRunePanelIfOpen()
+    private void ForceHiddenInitializedState()
     {
-        RuneUIController runeUi = FindObjectOfType<RuneUIController>(true);
-        if (runeUi != null && runeUi.mainPanel != null && runeUi.mainPanel.activeSelf)
+        isVisible = false;
+        pausedByAttributePanel = false;
+
+        if (panelRoot != null)
         {
-            runeUi.ClosePanel();
+            panelRoot.gameObject.SetActive(false);
         }
+
+        SetPreviewVisible(false);
     }
 
     private void RefreshPlayerCache(bool force)
@@ -443,10 +960,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
-        ApplyLayout();
-
         float hpCurrent = ResolveCurrentHealth();
-        float hpMax = cachedStats != null ? Mathf.Max(1f, cachedStats.maxHealth) : Mathf.Max(1f, hpCurrent);
+        float hpMax = ResolveMaxHealth();
         float atk = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalAttack) : 0f;
         float def = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalDefense) : 0f;
         float mag = cachedStats != null ? Mathf.Max(0f, cachedStats.specialAttack) : 0f;
@@ -459,31 +974,71 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (titleText != null)
         {
-            titleText.text = cachedPlayer != null ? $"{cachedPlayer.name} Attributes" : "Character Attributes";
+            titleText.text = cachedPlayer != null ? cachedPlayer.name + " Attributes" : "Character Attributes";
         }
 
         if (previewText != null)
         {
-            previewText.text = cachedPlayer != null
-                ? $"{cachedPlayer.name}\n\nCharacter Preview"
-                : "Character Preview";
+            previewText.text = "Character Preview";
         }
 
-        SetAttributeDisplay(0, $"HP {Mathf.CeilToInt(hpCurrent)}/{Mathf.CeilToInt(hpMax)}", hpMax, hpDisplayMax);
-        SetAttributeDisplay(1, $"ATK {Mathf.RoundToInt(atk)}", atk, atkDisplayMax);
-        SetAttributeDisplay(2, $"DEF {Mathf.RoundToInt(def)}", def, defDisplayMax);
-        SetAttributeDisplay(3, $"MAG {Mathf.RoundToInt(mag)}", mag, magDisplayMax);
-        SetAttributeDisplay(4, $"RES {Mathf.RoundToInt(res)}", res, resDisplayMax);
+        if (playerNameText != null)
+        {
+            playerNameText.text = cachedPlayer != null ? cachedPlayer.name : "Player";
+        }
 
-        if (footerText != null)
+        if (characterPreviewText != null)
+        {
+            characterPreviewText.text = "Character Preview";
+        }
+
+        RefreshPreview(force: false);
+
+        SetHealthDisplay(hpCurrent, hpMax);
+        SetAttributeDisplay(1, atk, 0f, atkDisplayMax);
+        SetAttributeDisplay(2, def, 0f, defDisplayMax);
+        SetAttributeDisplay(3, mag, 0f, magDisplayMax);
+        SetAttributeDisplay(4, res, 0f, resDisplayMax);
+
+        if (spdText != null)
+        {
+            spdText.text = "SPD " + speed.ToString("0.0");
+        }
+
+        if (luckText != null)
+        {
+            luckText.text = "LUCK " + luck.ToString("0");
+        }
+
+        if (critRateText != null)
+        {
+            critRateText.text = "Crit Rate " + critRate.ToString("0.#") + "%";
+        }
+
+        if (extraSoulDropText != null)
+        {
+            extraSoulDropText.text = "Extra Soul Drop " + extraSoulDrop.ToString("0.#") + "%";
+        }
+
+        if (extraRuneDropText != null)
+        {
+            extraRuneDropText.text = "Extra Rune Drop " + extraRuneDrop.ToString("0.#") + "%";
+        }
+
+        if (reserveText != null)
+        {
+            reserveText.text = "Buff / Rune / Skill Info Reserved";
+        }
+
+        if (footerText != null && spdText == null && luckText == null && critRateText == null && extraSoulDropText == null && extraRuneDropText == null)
         {
             footerText.text =
-                $"SPD  {speed:0.0}\n" +
-                $"LUCK {luck:0}\n" +
-                $"Crit Rate        {critRate:0.#}%\n" +
-                $"Extra Soul Drop  {extraSoulDrop:0.#}%\n" +
-                $"Extra Rune Drop  {extraRuneDrop:0.#}%\n" +
-                $"Buff / Rune / Skill Info Reserved";
+                "SPD  " + speed.ToString("0.0") + "\n" +
+                "LUCK " + luck.ToString("0") + "\n" +
+                "Crit Rate        " + critRate.ToString("0.#") + "%\n" +
+                "Extra Soul Drop  " + extraSoulDrop.ToString("0.#") + "%\n" +
+                "Extra Rune Drop  " + extraRuneDrop.ToString("0.#") + "%\n" +
+                "Buff / Rune / Skill Info Reserved";
         }
     }
 
@@ -502,7 +1057,44 @@ public class PlayerAttributePanelUI : MonoBehaviour
         return cachedStats != null ? Mathf.Max(0f, cachedStats.maxHealth) : 0f;
     }
 
-    private void SetAttributeDisplay(int index, string valueLabel, float value, float displayMax)
+    private float ResolveMaxHealth()
+    {
+        if (cachedResourceBank != null)
+        {
+            return Mathf.Max(1f, cachedResourceBank.maxHealth);
+        }
+
+        if (cachedStats != null)
+        {
+            return Mathf.Max(1f, cachedStats.maxHealth);
+        }
+
+        if (cachedCombatHealth != null)
+        {
+            return Mathf.Max(1f, cachedCombatHealth.currentHealth);
+        }
+
+        return 1f;
+    }
+
+    private void SetHealthDisplay(float current, float max)
+    {
+        float baseMax = Mathf.Max(0f, max);
+        float bonusMax = 0f;
+        float hpChartBaseValue = baseMax / 10f;
+        float hpChartBonusValue = bonusMax / 10f;
+        SetCompositeAttributeDisplay(0, baseMax, bonusMax, hpChartBaseValue, hpChartBonusValue, hpChartDisplayMax);
+    }
+
+    private void SetAttributeDisplay(int index, float finalValue, float bonusValue, float displayMax)
+    {
+        float safeFinalValue = Mathf.Max(0f, finalValue);
+        float safeBonusValue = Mathf.Max(0f, bonusValue);
+        float safeBaseValue = Mathf.Max(0f, safeFinalValue - safeBonusValue);
+        SetCompositeAttributeDisplay(index, safeBaseValue, safeBonusValue, safeBaseValue, safeBonusValue, displayMax);
+    }
+
+    private void SetCompositeAttributeDisplay(int index, float baseValue, float bonusValue, float barBaseValue, float barBonusValue, float displayMax)
     {
         if (index < 0 || index >= attributeValues.Length)
         {
@@ -511,20 +1103,106 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (attributeValues[index] != null)
         {
-            attributeValues[index].text = valueLabel;
+            attributeValues[index].text = Mathf.RoundToInt(baseValue) + " + " + Mathf.RoundToInt(bonusValue);
         }
 
-        if (attributeFills[index] == null)
+        float totalDisplayValue = Mathf.Max(0f, barBaseValue + barBonusValue);
+        if (displayMax <= 0f)
+        {
+            displayMax = totalDisplayValue;
+        }
+
+        if (displayMax <= 0f)
+        {
+            ApplyCompositeFillWidths(index, 0f, 0f);
+            return;
+        }
+
+        float safeBaseValue = Mathf.Max(0f, baseValue);
+        float safeBonusValue = Mathf.Max(0f, bonusValue);
+        float finalValue = Mathf.Max(0f, safeBaseValue + safeBonusValue);
+        float finalBarValue = Mathf.Clamp(Mathf.Max(0f, barBaseValue + barBonusValue), 0f, displayMax);
+
+        if (finalBarValue <= 0f || finalValue <= 0f)
+        {
+            ApplyCompositeFillWidths(index, 0f, 0f);
+            return;
+        }
+
+        float finalRatio = Mathf.Clamp01(finalBarValue / displayMax);
+        float baseRatio = finalRatio * (safeBaseValue / finalValue);
+        float bonusRatio = safeBonusValue > 0f
+            ? finalRatio * (safeBonusValue / finalValue)
+            : 0f;
+
+        ApplyCompositeFillWidths(index, baseRatio, bonusRatio);
+    }
+
+    private void ApplyCompositeFillWidths(int index, float baseRatio, float bonusRatio)
+    {
+        if (index < 0 || index >= attributeBaseFills.Length)
         {
             return;
         }
 
-        float ratio = displayMax > 0f ? Mathf.Clamp01(Mathf.Max(0f, value) / displayMax) : 0f;
-        RectTransform rect = attributeFills[index].rectTransform;
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(ratio, 1f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
+        RectTransform backgroundRect = attributeBarBackgrounds[index] != null
+            ? attributeBarBackgrounds[index].rectTransform
+            : null;
+        RectTransform baseRect = attributeBaseFills[index] != null
+            ? attributeBaseFills[index].rectTransform
+            : null;
+        RectTransform bonusRect = attributeBonusFills[index] != null
+            ? attributeBonusFills[index].rectTransform
+            : null;
+
+        if (backgroundRect == null || baseRect == null || bonusRect == null)
+        {
+            return;
+        }
+
+        baseRatio = Mathf.Clamp01(baseRatio);
+        bonusRatio = bonusRatio <= 0f ? 0f : Mathf.Clamp01(bonusRatio);
+
+        float maxCombined = Mathf.Clamp01(baseRatio + bonusRatio);
+        if (baseRatio > maxCombined)
+        {
+            baseRatio = maxCombined;
+        }
+
+        if (baseRatio + bonusRatio > 1f)
+        {
+            bonusRatio = Mathf.Max(0f, 1f - baseRatio);
+        }
+
+        float totalWidth = ResolveBarTotalWidth(backgroundRect);
+        if (totalWidth <= 0f)
+        {
+            SetCompositeFillRect(baseRect, 0f, 0f);
+            SetCompositeFillRect(bonusRect, 0f, 0f);
+            if (bonusRect != null)
+            {
+                bonusRect.gameObject.SetActive(false);
+            }
+
+            return;
+        }
+
+        float baseWidth = totalWidth * baseRatio;
+        float bonusWidth = totalWidth * bonusRatio;
+
+        SetCompositeFillRect(baseRect, 0f, baseWidth);
+        SetCompositeFillRect(bonusRect, baseWidth, bonusWidth);
+
+        if (baseRect != null)
+        {
+            baseRect.gameObject.SetActive(baseWidth > 0f);
+        }
+
+        if (bonusRect != null)
+        {
+            bool showBonus = bonusWidth > 0f && bonusRatio > 0f;
+            bonusRect.gameObject.SetActive(showBonus);
+        }
     }
 
     private float ResolveExtraSoulDropChance(float luck)
@@ -566,22 +1244,961 @@ public class PlayerAttributePanelUI : MonoBehaviour
         return child as RectTransform;
     }
 
+    private static RectTransform FindNamedRect(Transform parent, params string[] names)
+    {
+        if (parent == null || names == null)
+        {
+            return null;
+        }
+
+        for (int i = 0; i < names.Length; i++)
+        {
+            RectTransform found = FindRect(parent, names[i]);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    private static TextMeshProUGUI FindExistingText(Transform parent, string name)
+    {
+        RectTransform rect = FindRect(parent, name);
+        return rect != null ? rect.GetComponent<TextMeshProUGUI>() : null;
+    }
+
+    private static Image EnsureImage(RectTransform rect, Color fallbackColor)
+    {
+        Image image = rect.GetComponent<Image>();
+        if (image != null)
+        {
+            return image;
+        }
+
+        image = rect.gameObject.AddComponent<Image>();
+        image.color = fallbackColor;
+        return image;
+    }
+
+    private static RawImage FindExistingRawImage(Transform parent, string name)
+    {
+        RectTransform rect = FindRect(parent, name);
+        return rect != null ? rect.GetComponent<RawImage>() : null;
+    }
+
+    private Color ResolveAttributeBaseColor(int index)
+    {
+        switch (index)
+        {
+            case 0:
+                return hpBaseColor;
+            case 1:
+                return atkBaseColor;
+            case 2:
+                return defBaseColor;
+            case 3:
+                return magBaseColor;
+            case 4:
+                return resBaseColor;
+            default:
+                return barFillColor;
+        }
+    }
+
+    private static void ConfigureBarContainerRect(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
+    }
+
+    private static void ConfigureCompositeFillRect(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.offsetMin = new Vector2(0f, 0f);
+        rect.offsetMax = new Vector2(0f, 0f);
+        rect.sizeDelta = new Vector2(0f, 0f);
+        rect.localScale = Vector3.one;
+    }
+
+    private static void SetCompositeFillRect(RectTransform rect, float startX, float width)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(0f, 1f);
+        rect.pivot = new Vector2(0f, 0.5f);
+        rect.anchoredPosition = new Vector2(startX, 0f);
+        rect.offsetMin = new Vector2(0f, 0f);
+        rect.offsetMax = new Vector2(0f, 0f);
+        rect.sizeDelta = new Vector2(Mathf.Max(0f, width), 0f);
+        rect.localScale = Vector3.one;
+    }
+
+    private static float ResolveBarTotalWidth(RectTransform barRect)
+    {
+        if (barRect == null)
+        {
+            return 0f;
+        }
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(barRect);
+        Canvas.ForceUpdateCanvases();
+
+        float totalWidth = barRect.rect.width;
+        if (totalWidth > 0f)
+        {
+            return totalWidth;
+        }
+
+        totalWidth = barRect.sizeDelta.x;
+        return totalWidth > 0f ? totalWidth : 0f;
+    }
+
+    private RawImage CreatePreviewRawImage(Transform parent)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        GameObject rawImageObject = new GameObject("PreviewRawImage", typeof(RectTransform), typeof(RawImage));
+        rawImageObject.transform.SetParent(parent, false);
+
+        RectTransform rect = rawImageObject.GetComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0f, 0f);
+        rect.anchorMax = new Vector2(1f, 1f);
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = new Vector2(16f, 16f);
+        rect.offsetMax = new Vector2(-16f, -16f);
+        rect.localScale = Vector3.one;
+
+        RawImage rawImage = rawImageObject.GetComponent<RawImage>();
+        rawImage.color = Color.white;
+        rawImage.raycastTarget = false;
+        return rawImage;
+    }
+
     private static TextMeshProUGUI FindOrCreateText(Transform parent, string name, float fontSize, TextAlignmentOptions alignment, Color color)
     {
         RectTransform rect = FindRect(parent, name);
-        TextMeshProUGUI text = rect != null ? rect.GetComponent<TextMeshProUGUI>() : null;
-        if (text == null)
+        bool createdObject = false;
+        if (rect == null)
         {
             GameObject textObject = new GameObject(name, typeof(RectTransform), typeof(TextMeshProUGUI));
             textObject.transform.SetParent(parent, false);
-            text = textObject.GetComponent<TextMeshProUGUI>();
+            rect = textObject.GetComponent<RectTransform>();
+            createdObject = true;
         }
 
-        text.fontSize = fontSize;
-        text.alignment = alignment;
-        text.color = color;
+        TextMeshProUGUI text = rect.GetComponent<TextMeshProUGUI>();
+        bool createdComponent = false;
+        if (text == null)
+        {
+            text = rect.gameObject.AddComponent<TextMeshProUGUI>();
+            createdComponent = true;
+        }
+
+        if (createdObject || createdComponent)
+        {
+            text.fontSize = fontSize;
+            text.alignment = alignment;
+            text.color = color;
+            text.text = string.Empty;
+        }
+
         text.raycastTarget = false;
-        text.text = string.Empty;
         return text;
+    }
+
+    private void PauseGameForPanel()
+    {
+        if (pausedByAttributePanel)
+        {
+            return;
+        }
+
+        previousTimeScale = Time.timeScale;
+        Time.timeScale = 0f;
+        pausedByAttributePanel = true;
+    }
+
+    private void RestoreTimeScaleIfNeeded()
+    {
+        if (!pausedByAttributePanel)
+        {
+            return;
+        }
+
+        Time.timeScale = previousTimeScale;
+        pausedByAttributePanel = false;
+    }
+
+    private void ForceRefreshPreview()
+    {
+        if (previewRect == null)
+        {
+            return;
+        }
+
+        LogPreviewState("ForceRefreshPreview before");
+        RefreshPreview(force: true);
+        LogPreviewState("ForceRefreshPreview after");
+    }
+
+    private void RefreshPreview(bool force)
+    {
+        if (previewRect == null)
+        {
+            return;
+        }
+
+        int playerIndex = ResolveCurrentPreviewPlayerIndex();
+        bool useWorldPreview;
+        GameObject targetPreviewPrefab = ResolvePreviewPrefab(playerIndex, out useWorldPreview);
+
+        if (targetPreviewPrefab == null)
+        {
+            currentPreviewPlayerIndex = 0;
+            currentPreviewPrefab = null;
+            currentPreviewAnimationKey = null;
+            ClearPreviewInstance();
+
+            SetPreviewPlaceholderVisible(true);
+            return;
+        }
+
+        if (!force && previewInstance != null && currentPreviewPlayerIndex == playerIndex && currentPreviewPrefab == targetPreviewPrefab)
+        {
+            ApplyPreviewTransform(previewInstance.transform, useWorldPreview);
+            if (useWorldPreview)
+            {
+                PrepareWorldPreviewRenderChain(previewInstance);
+            }
+
+            SetPreviewVisible(true);
+            SetPreviewPlaceholderVisible(false);
+            return;
+        }
+
+        ClearPreviewInstance();
+
+        currentPreviewAnimationKey = null;
+        warnedMissingPreviewIdleAnimation = false;
+        currentPreviewPlayerIndex = playerIndex;
+        currentPreviewPrefab = targetPreviewPrefab;
+        Transform parent = useWorldPreview
+            ? EnsureWorldPreviewRoot()
+            : (previewRootRect != null ? previewRootRect : previewRect);
+
+        if (parent == null)
+        {
+            SetPreviewPlaceholderVisible(true);
+            return;
+        }
+
+        previewInstance = Instantiate(targetPreviewPrefab, parent, false);
+        previewInstance.name = targetPreviewPrefab.name + "_Preview";
+        previewSkeletonAnimation = previewInstance.GetComponentInChildren<SkeletonAnimation>(true);
+        ApplyPreviewTransform(previewInstance.transform, useWorldPreview);
+        if (useWorldPreview)
+        {
+            PrepareWorldPreviewRenderChain(previewInstance);
+        }
+
+        PlayPreviewIdleAnimation(previewInstance);
+        SetPreviewVisible(true);
+        SetPreviewPlaceholderVisible(false);
+    }
+
+    private int ResolveCurrentPreviewPlayerIndex()
+    {
+        if (cachedPlayer == null)
+        {
+            return 0;
+        }
+
+        if (cachedPlayer.GetComponent<Player2PrototypeController>() != null || cachedPlayer.name.Contains("Player02"))
+        {
+            return 2;
+        }
+
+        if (cachedPlayer.GetComponent<Player01SkillController>() != null || cachedPlayer.name.Contains("Player01"))
+        {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    private GameObject ResolvePreviewPrefab(int playerIndex, out bool useWorldPreview)
+    {
+        useWorldPreview = false;
+
+        if (player01WorldPreviewPrefab == null)
+        {
+            player01WorldPreviewPrefab = Resources.Load<GameObject>("Prefabs/UI/Preview/Player01AttributeWorldPreview");
+        }
+
+        if (player02WorldPreviewPrefab == null)
+        {
+            player02WorldPreviewPrefab = Resources.Load<GameObject>("Prefabs/UI/Preview/Player02AttributeWorldPreview");
+        }
+
+        GameObject worldPreviewPrefab = null;
+        switch (playerIndex)
+        {
+            case 1:
+                worldPreviewPrefab = player01WorldPreviewPrefab;
+                break;
+            case 2:
+                worldPreviewPrefab = player02WorldPreviewPrefab;
+                break;
+        }
+
+        if (worldPreviewPrefab != null)
+        {
+            useWorldPreview = true;
+            return worldPreviewPrefab;
+        }
+
+        switch (playerIndex)
+        {
+            case 1:
+                return player01PreviewPrefab;
+            case 2:
+                return player02PreviewPrefab;
+            default:
+                return null;
+        }
+    }
+
+    private void ApplyPreviewTransform(Transform previewTransform, bool useWorldPreview)
+    {
+        if (previewTransform == null)
+        {
+            return;
+        }
+
+        if (useWorldPreview)
+        {
+            previewTransform.localPosition = ResolveWorldPreviewPosition();
+            previewTransform.localEulerAngles = ResolveWorldPreviewEuler();
+            previewTransform.localScale = ResolveWorldPreviewScale();
+            return;
+        }
+
+        SkeletonGraphic skeletonGraphic = previewTransform.GetComponent<SkeletonGraphic>();
+        if (skeletonGraphic == null)
+        {
+            skeletonGraphic = previewTransform.GetComponentInChildren<SkeletonGraphic>(true);
+        }
+
+        if (skeletonGraphic != null)
+        {
+            RectTransform rect = skeletonGraphic.rectTransform;
+            if (rect != null)
+            {
+                Vector2 anchoredPosition = ResolvePreviewUiAnchoredPosition();
+                Vector2 size = ResolvePreviewUiSize();
+                float scale = ResolvePreviewUiScale();
+                rect.anchorMin = new Vector2(0.5f, 0.5f);
+                rect.anchorMax = new Vector2(0.5f, 0.5f);
+                rect.pivot = new Vector2(0.5f, 0.5f);
+                rect.anchoredPosition = anchoredPosition;
+                rect.sizeDelta = size;
+                rect.localScale = Vector3.one * scale;
+                rect.localEulerAngles = Vector3.zero;
+            }
+
+            return;
+        }
+
+        previewTransform.localPosition = previewLocalPosition;
+        previewTransform.localEulerAngles = previewLocalEuler;
+        previewTransform.localScale = previewLocalScale;
+    }
+
+    private Vector3 ResolveWorldPreviewPosition()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01WorldPreviewPosition;
+            case 2:
+                return player02WorldPreviewPosition;
+            default:
+                return Vector3.zero;
+        }
+    }
+
+    private Vector3 ResolveWorldPreviewScale()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01WorldPreviewScale;
+            case 2:
+                return player02WorldPreviewScale;
+            default:
+                return Vector3.one;
+        }
+    }
+
+    private Vector3 ResolveWorldPreviewEuler()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01WorldPreviewEuler;
+            case 2:
+                return player02WorldPreviewEuler;
+            default:
+                return Vector3.zero;
+        }
+    }
+
+    private void ClearPreviewInstance()
+    {
+        if (previewInstance != null)
+        {
+            Destroy(previewInstance);
+            previewInstance = null;
+        }
+
+        previewSkeletonAnimation = null;
+        currentPreviewAnimationKey = null;
+        SetPreviewVisible(false);
+    }
+
+    private Transform EnsureWorldPreviewRoot()
+    {
+        if (worldPreviewRoot != null)
+        {
+            return worldPreviewRoot;
+        }
+
+        GameObject root = new GameObject("AttributeWorldPreviewRoot");
+        root.transform.SetParent(transform, false);
+        root.transform.localPosition = new Vector3(0f, -1000f, 0f);
+        root.transform.localRotation = Quaternion.identity;
+        root.transform.localScale = Vector3.one;
+        worldPreviewRoot = root.transform;
+        return worldPreviewRoot;
+    }
+
+    private void PrepareWorldPreviewRenderChain(GameObject instance)
+    {
+        if (instance == null)
+        {
+            return;
+        }
+
+        EnsurePreviewRawImage();
+        EnsurePreviewRenderTexture();
+        EnsurePreviewCamera();
+        ApplyPreviewLayer(instance);
+        ConfigurePreviewCamera();
+
+        if (previewRawImage != null)
+        {
+            previewRawImage.texture = previewRenderTexture;
+            previewRawImage.gameObject.SetActive(true);
+        }
+    }
+
+    private void EnsurePreviewRawImage()
+    {
+        if (previewRawImage != null)
+        {
+            return;
+        }
+
+        Transform parent = previewRootRect != null ? previewRootRect : previewRect;
+        if (parent == null)
+        {
+            return;
+        }
+
+        previewRawImage = FindExistingRawImage(parent, "PreviewRawImage");
+        if (previewRawImage == null)
+        {
+            previewRawImage = CreatePreviewRawImage(parent);
+        }
+    }
+
+    private void EnsurePreviewRenderTexture()
+    {
+        int size = Mathf.Max(128, previewRenderTextureSize);
+        if (previewRenderTexture != null &&
+            previewRenderTexture.width == size &&
+            previewRenderTexture.height == size)
+        {
+            return;
+        }
+
+        if (previewRenderTexture != null)
+        {
+            previewRenderTexture.Release();
+            Destroy(previewRenderTexture);
+        }
+
+        previewRenderTexture = new RenderTexture(size, size, 16, RenderTextureFormat.ARGB32);
+        previewRenderTexture.name = "PlayerAttributePreviewRT";
+        previewRenderTexture.Create();
+    }
+
+    private void EnsurePreviewCamera()
+    {
+        if (previewCamera == null)
+        {
+            Transform existing = transform.Find("AttributePreviewCamera");
+            if (existing != null)
+            {
+                previewCamera = existing.GetComponent<Camera>();
+            }
+        }
+
+        if (previewCamera == null)
+        {
+            GameObject cameraObject = new GameObject("AttributePreviewCamera");
+            cameraObject.transform.SetParent(transform, false);
+            previewCamera = cameraObject.AddComponent<Camera>();
+        }
+
+        previewCamera.enabled = false;
+        previewCamera.orthographic = true;
+        previewCamera.orthographicSize = previewCameraOrthographicSize;
+        previewCamera.clearFlags = CameraClearFlags.SolidColor;
+        previewCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
+        previewCamera.nearClipPlane = 0.01f;
+        previewCamera.farClipPlane = 100f;
+        previewCamera.targetTexture = previewRenderTexture;
+        previewLayerIndex = ResolvePreviewLayerIndex();
+        previewCamera.cullingMask = 1 << previewLayerIndex;
+    }
+
+    private void ConfigurePreviewCamera()
+    {
+        if (previewCamera == null)
+        {
+            return;
+        }
+
+        Vector3 focusPoint = previewInstance != null ? previewInstance.transform.position : Vector3.zero;
+        previewCamera.transform.position = new Vector3(focusPoint.x, focusPoint.y, focusPoint.z - 10f);
+        previewCamera.transform.rotation = Quaternion.identity;
+    }
+
+    private int ResolvePreviewLayerIndex()
+    {
+        int layerIndex = LayerMask.NameToLayer(previewLayerName);
+        if (layerIndex < 0)
+        {
+            layerIndex = 0;
+        }
+
+        return layerIndex;
+    }
+
+    private void ApplyPreviewLayer(GameObject root)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        int layerIndex = ResolvePreviewLayerIndex();
+        SetLayerRecursively(root.transform, layerIndex);
+    }
+
+    private static void SetLayerRecursively(Transform root, int layerIndex)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        root.gameObject.layer = layerIndex;
+        for (int i = 0; i < root.childCount; i++)
+        {
+            SetLayerRecursively(root.GetChild(i), layerIndex);
+        }
+    }
+
+    private Vector2 ResolvePreviewUiAnchoredPosition()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01PreviewUiAnchoredPosition;
+            case 2:
+                return player02PreviewUiAnchoredPosition;
+            default:
+                return previewUiAnchoredPosition;
+        }
+    }
+
+    private Vector2 ResolvePreviewUiSize()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01PreviewUiSize;
+            case 2:
+                return player02PreviewUiSize;
+            default:
+                return previewUiSize;
+        }
+    }
+
+    private float ResolvePreviewUiScale()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01PreviewUiScale;
+            case 2:
+                return player02PreviewUiScale;
+            default:
+                return previewUiScale;
+        }
+    }
+
+    private void PlayPreviewIdleAnimation(GameObject previewObject)
+    {
+        if (previewObject == null)
+        {
+            return;
+        }
+
+        SkeletonGraphic skeletonGraphic = previewObject.GetComponentInChildren<SkeletonGraphic>(true);
+        if (skeletonGraphic != null)
+        {
+            skeletonGraphic.Initialize(true);
+            if (TrySetIdleAnimation(skeletonGraphic))
+            {
+                return;
+            }
+        }
+
+        SkeletonAnimation skeletonAnimation = previewObject.GetComponentInChildren<SkeletonAnimation>(true);
+        if (skeletonAnimation != null)
+        {
+            skeletonAnimation.Initialize(true);
+            TrySetIdleAnimation(skeletonAnimation);
+        }
+    }
+
+    private bool TrySetIdleAnimation(SkeletonGraphic skeletonGraphic)
+    {
+        if (skeletonGraphic == null || skeletonGraphic.Skeleton == null || skeletonGraphic.AnimationState == null)
+        {
+            return false;
+        }
+
+        string animationName = ResolvePreviewIdleAnimationName(skeletonGraphic.Skeleton.Data);
+        if (string.IsNullOrEmpty(animationName))
+        {
+            WarnMissingPreviewIdleAnimation(skeletonGraphic.name);
+            return false;
+        }
+
+        if (currentPreviewAnimationKey == animationName)
+        {
+            return true;
+        }
+
+        skeletonGraphic.AnimationState.SetAnimation(0, animationName, true);
+        skeletonGraphic.AnimationState.Apply(skeletonGraphic.Skeleton);
+        skeletonGraphic.Skeleton.UpdateWorldTransform();
+        skeletonGraphic.UpdateMesh();
+        currentPreviewAnimationKey = animationName;
+        return true;
+    }
+
+    private bool TrySetIdleAnimation(SkeletonAnimation skeletonAnimation)
+    {
+        if (skeletonAnimation == null || skeletonAnimation.Skeleton == null || skeletonAnimation.AnimationState == null)
+        {
+            return false;
+        }
+
+        string animationName = ResolvePreviewIdleAnimationName(skeletonAnimation.Skeleton.Data);
+        if (string.IsNullOrEmpty(animationName))
+        {
+            WarnMissingPreviewIdleAnimation(skeletonAnimation.name);
+            return false;
+        }
+
+        if (currentPreviewAnimationKey == animationName)
+        {
+            return true;
+        }
+
+        skeletonAnimation.AnimationState.SetAnimation(0, animationName, true);
+        currentPreviewAnimationKey = animationName;
+        return true;
+    }
+
+    private string ResolvePreviewIdleAnimationName(Spine.SkeletonData skeletonData)
+    {
+        if (skeletonData == null)
+        {
+            return null;
+        }
+
+        string preferredAnimation = ResolvePreferredPreviewIdleAnimationName();
+        if (!string.IsNullOrEmpty(preferredAnimation) && skeletonData.FindAnimation(preferredAnimation) != null)
+        {
+            return preferredAnimation;
+        }
+
+        string[] candidates =
+        {
+            "Idle",
+            "idle",
+            "stand",
+            "Stand",
+            "待机"
+        };
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            string candidate = candidates[i];
+            if (string.IsNullOrEmpty(candidate))
+            {
+                continue;
+            }
+
+            if (skeletonData.FindAnimation(candidate) != null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private string ResolvePreferredPreviewIdleAnimationName()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01PreviewIdleAnimationName;
+            case 2:
+                return player02PreviewIdleAnimationName;
+            default:
+                return null;
+        }
+    }
+
+    private void WarnMissingPreviewIdleAnimation(string sourceName)
+    {
+        if (warnedMissingPreviewIdleAnimation)
+        {
+            return;
+        }
+
+        Debug.LogWarning("[PlayerAttributePanelUI] Missing preview idle animation on " + sourceName +
+                         ". Preferred animation was '" + ResolvePreferredPreviewIdleAnimationName() + "'.");
+        warnedMissingPreviewIdleAnimation = true;
+    }
+
+    private void SetPreviewVisible(bool visible)
+    {
+        if (previewInstance != null)
+        {
+            previewInstance.SetActive(visible);
+        }
+
+        if (previewRawImage != null)
+        {
+            previewRawImage.texture = visible ? previewRenderTexture : null;
+            previewRawImage.gameObject.SetActive(visible);
+        }
+    }
+
+    private void UpdatePreviewAnimationUnscaled(float deltaTime)
+    {
+        if (deltaTime <= 0f || previewInstance == null || panelRoot == null || !panelRoot.gameObject.activeSelf)
+        {
+            return;
+        }
+
+        if (!Mathf.Approximately(Time.timeScale, 0f))
+        {
+            return;
+        }
+
+        if (previewSkeletonAnimation == null)
+        {
+            previewSkeletonAnimation = previewInstance.GetComponentInChildren<SkeletonAnimation>(true);
+        }
+
+        if (previewSkeletonAnimation == null ||
+            previewSkeletonAnimation.AnimationState == null ||
+            previewSkeletonAnimation.Skeleton == null)
+        {
+            return;
+        }
+
+        previewSkeletonAnimation.AnimationState.Update(deltaTime);
+        previewSkeletonAnimation.AnimationState.Apply(previewSkeletonAnimation.Skeleton);
+        previewSkeletonAnimation.Skeleton.UpdateWorldTransform();
+    }
+
+    private void RenderPreviewCameraIfNeeded()
+    {
+        if (!isVisible || panelRoot == null || !panelRoot.gameObject.activeSelf)
+        {
+            return;
+        }
+
+        if (previewCamera == null || previewRenderTexture == null || previewInstance == null)
+        {
+            return;
+        }
+
+        ConfigurePreviewCamera();
+        previewCamera.targetTexture = previewRenderTexture;
+        previewCamera.Render();
+    }
+
+    private void SetPreviewPlaceholderVisible(bool visible)
+    {
+        if (previewText != null)
+        {
+            previewText.gameObject.SetActive(visible);
+        }
+
+        if (characterPreviewText != null)
+        {
+            characterPreviewText.gameObject.SetActive(visible);
+        }
+
+        if (previewRect != null)
+        {
+            TextMeshProUGUI[] placeholders = previewRect.GetComponentsInChildren<TextMeshProUGUI>(true);
+            for (int i = 0; i < placeholders.Length; i++)
+            {
+                TextMeshProUGUI placeholder = placeholders[i];
+                if (placeholder == null)
+                {
+                    continue;
+                }
+
+                if (placeholder == previewText || placeholder == characterPreviewText)
+                {
+                    continue;
+                }
+
+                bool isPlaceholderByName =
+                    string.Equals(placeholder.gameObject.name, "PreviewLabel") ||
+                    string.Equals(placeholder.gameObject.name, "CharacterPreviewText");
+
+                bool isPlaceholderByText = !string.IsNullOrEmpty(placeholder.text) &&
+                                           placeholder.text.Contains("Character Preview");
+
+                if (isPlaceholderByName || isPlaceholderByText)
+                {
+                    placeholder.gameObject.SetActive(visible);
+                }
+            }
+        }
+    }
+
+    private void LogToggleState(string context)
+    {
+        if (!debugToggleLog)
+        {
+            return;
+        }
+
+        bool panelActive = panelRoot != null && panelRoot.gameObject.activeSelf;
+        Debug.Log("[PlayerAttributePanelUI] " + context +
+                  " | controller=" + GetTransformPath(transform) +
+                  " | isVisible=" + isVisible +
+                  " panelActive=" + panelActive +
+                  " pausedByPanel=" + pausedByAttributePanel +
+                  " timeScale=" + Time.timeScale.ToString("0.###"));
+    }
+
+    private void LogPreviewState(string context)
+    {
+        if (!debugToggleLog)
+        {
+            return;
+        }
+
+        int playerIndex = ResolveCurrentPreviewPlayerIndex();
+        bool useWorldPreview;
+        GameObject targetPreviewPrefab = ResolvePreviewPrefab(playerIndex, out useWorldPreview);
+        Debug.Log("[PlayerAttributePanelUI] " + context +
+                  " | controller=" + GetTransformPath(transform) +
+                  " | playerIndex=" + playerIndex +
+                  " | useWorldPreview=" + useWorldPreview +
+                  " previewPrefab=" + (targetPreviewPrefab != null ? targetPreviewPrefab.name : "null") +
+                  " previewInstance=" + (previewInstance != null ? previewInstance.name : "null"));
+    }
+
+    private bool AcquirePrimaryInstance()
+    {
+        if (primaryInstance == null)
+        {
+            primaryInstance = this;
+            return true;
+        }
+
+        if (primaryInstance == this)
+        {
+            return true;
+        }
+
+        if (debugToggleLog)
+        {
+            Debug.LogWarning("[PlayerAttributePanelUI] Duplicate controller disabled: " + GetTransformPath(transform), this);
+        }
+
+        enabled = false;
+        return false;
+    }
+
+    private static string GetTransformPath(Transform current)
+    {
+        if (current == null)
+        {
+            return "<null>";
+        }
+
+        string path = current.name;
+        while (current.parent != null)
+        {
+            current = current.parent;
+            path = current.name + "/" + path;
+        }
+
+        return path;
     }
 }
