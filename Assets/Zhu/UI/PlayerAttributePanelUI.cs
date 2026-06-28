@@ -1,4 +1,5 @@
 using TMPro;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using Spine.Unity;
@@ -8,12 +9,24 @@ public class PlayerAttributePanelUI : MonoBehaviour
 {
     private static PlayerAttributePanelUI primaryInstance;
 
+    private struct AttributeBaseSnapshot
+    {
+        public bool initialized;
+        public float maxHealth;
+        public float physicalAttack;
+        public float physicalDefense;
+        public float specialAttack;
+        public float specialDefense;
+    }
+
     [Header("Root")]
     [SerializeField] private Canvas targetCanvas;
     [SerializeField] private RectTransform panelRoot;
     [SerializeField] private GameObject panelPrefab;
     [SerializeField] private KeyCode toggleKey = KeyCode.I;
     [SerializeField] private bool debugToggleLog = false;
+    [SerializeField] private bool usePanelOverrideSorting = true;
+    [SerializeField] private int panelSortingOrder = 500;
 
     [Header("Refresh")]
     [SerializeField, Min(0.05f)] private float refreshInterval = 0.2f;
@@ -109,6 +122,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private TextMeshProUGUI extraSoulDropText;
     private TextMeshProUGUI extraRuneDropText;
     private TextMeshProUGUI reserveText;
+    private Canvas panelCanvas;
     private RectTransform previewRect;
     private RectTransform previewRootRect;
     private RectTransform statsRect;
@@ -123,6 +137,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private bool warnedShowPanelFailed;
     private float nextRefreshTime;
     private float nextBootstrapLookupTime;
+    private float nextBaseSnapshotWarmupTime;
     private float previousTimeScale = 1f;
     private static bool warnedMissingPanelPrefab;
 
@@ -139,6 +154,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private string currentPreviewAnimationKey;
     private bool warnedMissingPreviewIdleAnimation;
     private int previewLayerIndex = -1;
+    private readonly Dictionary<int, AttributeBaseSnapshot> attributeBaseSnapshots = new Dictionary<int, AttributeBaseSnapshot>();
 
     private void Awake()
     {
@@ -149,6 +165,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         Initialize();
         ForceHiddenInitializedState();
+        TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: true);
     }
 
     private void Start()
@@ -160,6 +177,18 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         Initialize();
         ForceHiddenInitializedState();
+        TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: true);
+    }
+
+    private void OnEnable()
+    {
+        if (primaryInstance != this)
+        {
+            return;
+        }
+
+        Initialize();
+        TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: true);
     }
 
     private void OnDisable()
@@ -205,6 +234,11 @@ public class PlayerAttributePanelUI : MonoBehaviour
             {
                 return;
             }
+        }
+
+        if (Time.unscaledTime >= nextBaseSnapshotWarmupTime)
+        {
+            TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: false);
         }
 
         if (Input.GetKeyDown(toggleKey))
@@ -278,12 +312,14 @@ public class PlayerAttributePanelUI : MonoBehaviour
         usingPrefabLayout = !usingFallbackLayout;
 
         BuildPanelIfNeeded();
+        EnsurePanelDisplayHierarchy();
         if (ShouldApplyFallbackLayout())
         {
             ApplyFallbackLayout();
         }
 
         RefreshPlayerCache(force: true);
+        TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: true);
         RefreshPanel();
         initialized = true;
         ForceHiddenInitializedState();
@@ -548,6 +584,31 @@ public class PlayerAttributePanelUI : MonoBehaviour
         {
             footerText.enableWordWrapping = true;
             footerText.overflowMode = TextOverflowModes.Overflow;
+        }
+    }
+
+    private void EnsurePanelDisplayHierarchy()
+    {
+        if (panelRoot == null)
+        {
+            return;
+        }
+
+        panelCanvas = panelRoot.GetComponent<Canvas>();
+        if (panelCanvas == null)
+        {
+            panelCanvas = panelRoot.gameObject.AddComponent<Canvas>();
+        }
+
+        panelCanvas.overrideSorting = usePanelOverrideSorting;
+        if (usePanelOverrideSorting)
+        {
+            panelCanvas.sortingOrder = panelSortingOrder;
+        }
+
+        if (panelRoot.GetComponent<GraphicRaycaster>() == null)
+        {
+            panelRoot.gameObject.AddComponent<GraphicRaycaster>();
         }
     }
 
@@ -876,7 +937,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
+        EnsurePanelDisplayHierarchy();
         panelRoot.gameObject.SetActive(true);
+        panelRoot.SetAsLastSibling();
         isVisible = true;
         LogToggleState("ShowPanel active");
 
@@ -916,6 +979,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
         isVisible = false;
         pausedByAttributePanel = false;
 
+        EnsurePanelDisplayHierarchy();
+
         if (panelRoot != null)
         {
             panelRoot.gameObject.SetActive(false);
@@ -951,6 +1016,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         cachedStats = cachedPlayer != null ? BattleStatUtility.GetCombatStats(cachedPlayer) : null;
         cachedResourceBank = cachedPlayer != null ? cachedPlayer.GetComponent<BattleResourceBank>() : null;
         cachedCombatHealth = cachedPlayer != null ? cachedPlayer.GetComponent<CombatHealth>() : null;
+        CacheAttributeBaseSnapshot(currentPlayer, cachedStats);
     }
 
     private void RefreshPanel()
@@ -961,11 +1027,22 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         float hpCurrent = ResolveCurrentHealth();
-        float hpMax = ResolveMaxHealth();
-        float atk = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalAttack) : 0f;
-        float def = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalDefense) : 0f;
-        float mag = cachedStats != null ? Mathf.Max(0f, cachedStats.specialAttack) : 0f;
-        float res = cachedStats != null ? Mathf.Max(0f, cachedStats.specialDefense) : 0f;
+        float hpTotal = ResolveMaxHealth();
+        AttributeBaseSnapshot baseSnapshot = ResolveAttributeBaseSnapshot();
+        float hpBase = Mathf.Max(0f, baseSnapshot.maxHealth);
+        float hpBonus = Mathf.Max(0f, hpTotal - hpBase);
+        float atkTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalAttack) : 0f;
+        float atkBase = Mathf.Max(0f, baseSnapshot.physicalAttack);
+        float atkBonus = Mathf.Max(0f, atkTotal - atkBase);
+        float defTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalDefense) : 0f;
+        float defBase = Mathf.Max(0f, baseSnapshot.physicalDefense);
+        float defBonus = Mathf.Max(0f, defTotal - defBase);
+        float magTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.specialAttack) : 0f;
+        float magBase = Mathf.Max(0f, baseSnapshot.specialAttack);
+        float magBonus = Mathf.Max(0f, magTotal - magBase);
+        float resTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.specialDefense) : 0f;
+        float resBase = Mathf.Max(0f, baseSnapshot.specialDefense);
+        float resBonus = Mathf.Max(0f, resTotal - resBase);
         float speed = cachedStats != null ? Mathf.Max(0f, cachedStats.speed) : 0f;
         float luck = cachedStats != null ? Mathf.Max(0f, cachedStats.luck) : 0f;
         float critRate = BattleStatUtility.GetCritRate(cachedStats) * 100f;
@@ -994,11 +1071,11 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         RefreshPreview(force: false);
 
-        SetHealthDisplay(hpCurrent, hpMax);
-        SetAttributeDisplay(1, atk, 0f, atkDisplayMax);
-        SetAttributeDisplay(2, def, 0f, defDisplayMax);
-        SetAttributeDisplay(3, mag, 0f, magDisplayMax);
-        SetAttributeDisplay(4, res, 0f, resDisplayMax);
+        SetHealthDisplay(hpCurrent, hpBase, hpTotal, hpBonus);
+        SetAttributeDisplay(1, atkBase, atkTotal, atkBonus, atkDisplayMax);
+        SetAttributeDisplay(2, defBase, defTotal, defBonus, defDisplayMax);
+        SetAttributeDisplay(3, magBase, magTotal, magBonus, magDisplayMax);
+        SetAttributeDisplay(4, resBase, resTotal, resBonus, resDisplayMax);
 
         if (spdText != null)
         {
@@ -1077,24 +1154,25 @@ public class PlayerAttributePanelUI : MonoBehaviour
         return 1f;
     }
 
-    private void SetHealthDisplay(float current, float max)
+    private void SetHealthDisplay(float current, float baseMax, float totalMax, float bonusMax)
     {
-        float baseMax = Mathf.Max(0f, max);
-        float bonusMax = 0f;
-        float hpChartBaseValue = baseMax / 10f;
-        float hpChartBonusValue = bonusMax / 10f;
-        SetCompositeAttributeDisplay(0, baseMax, bonusMax, hpChartBaseValue, hpChartBonusValue, hpChartDisplayMax);
+        float safeBaseMax = Mathf.Max(0f, baseMax);
+        float safeTotalMax = Mathf.Max(0f, totalMax);
+        float safeBonusMax = Mathf.Max(0f, bonusMax);
+        float hpChartBaseValue = safeBaseMax / 10f;
+        float hpChartBonusValue = safeBonusMax / 10f;
+        SetCompositeAttributeDisplay(0, safeBaseMax, safeTotalMax, safeBonusMax, hpChartBaseValue, hpChartBonusValue, hpChartDisplayMax);
     }
 
-    private void SetAttributeDisplay(int index, float finalValue, float bonusValue, float displayMax)
+    private void SetAttributeDisplay(int index, float baseValue, float totalValue, float bonusValue, float displayMax)
     {
-        float safeFinalValue = Mathf.Max(0f, finalValue);
+        float safeBaseValue = Mathf.Max(0f, baseValue);
+        float safeTotalValue = Mathf.Max(0f, totalValue);
         float safeBonusValue = Mathf.Max(0f, bonusValue);
-        float safeBaseValue = Mathf.Max(0f, safeFinalValue - safeBonusValue);
-        SetCompositeAttributeDisplay(index, safeBaseValue, safeBonusValue, safeBaseValue, safeBonusValue, displayMax);
+        SetCompositeAttributeDisplay(index, safeBaseValue, safeTotalValue, safeBonusValue, safeBaseValue, safeBonusValue, displayMax);
     }
 
-    private void SetCompositeAttributeDisplay(int index, float baseValue, float bonusValue, float barBaseValue, float barBonusValue, float displayMax)
+    private void SetCompositeAttributeDisplay(int index, float baseValue, float totalValue, float bonusValue, float barBaseValue, float barBonusValue, float displayMax)
     {
         if (index < 0 || index >= attributeValues.Length)
         {
@@ -1119,8 +1197,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         float safeBaseValue = Mathf.Max(0f, baseValue);
+        float safeTotalValue = Mathf.Max(0f, totalValue);
         float safeBonusValue = Mathf.Max(0f, bonusValue);
-        float finalValue = Mathf.Max(0f, safeBaseValue + safeBonusValue);
+        float finalValue = Mathf.Max(0f, safeTotalValue);
         float finalBarValue = Mathf.Clamp(Mathf.Max(0f, barBaseValue + barBonusValue), 0f, displayMax);
 
         if (finalBarValue <= 0f || finalValue <= 0f)
@@ -1136,6 +1215,120 @@ public class PlayerAttributePanelUI : MonoBehaviour
             : 0f;
 
         ApplyCompositeFillWidths(index, baseRatio, bonusRatio);
+    }
+
+    private void CacheAttributeBaseSnapshot(GameObject player, CombatStats stats)
+    {
+        if (player == null || stats == null)
+        {
+            return;
+        }
+
+        int key = player.GetInstanceID();
+        if (attributeBaseSnapshots.ContainsKey(key))
+        {
+            return;
+        }
+
+        AttributeBaseSnapshot snapshot = new AttributeBaseSnapshot
+        {
+            initialized = true,
+            maxHealth = Mathf.Max(0f, stats.maxHealth),
+            physicalAttack = Mathf.Max(0f, stats.physicalAttack),
+            physicalDefense = Mathf.Max(0f, stats.physicalDefense),
+            specialAttack = Mathf.Max(0f, stats.specialAttack),
+            specialDefense = Mathf.Max(0f, stats.specialDefense)
+        };
+
+        attributeBaseSnapshots[key] = snapshot;
+    }
+
+    private void TryWarmupAttributeBaseSnapshot(bool forceBootstrapRefresh)
+    {
+        if (!forceBootstrapRefresh && Time.unscaledTime < nextBaseSnapshotWarmupTime)
+        {
+            return;
+        }
+
+        GameObject player = ResolveCurrentPlayerForBaseSnapshot(forceBootstrapRefresh);
+        CombatStats stats = player != null ? BattleStatUtility.GetCombatStats(player) : null;
+
+        if (player != null && stats != null)
+        {
+            CacheAttributeBaseSnapshot(player, stats);
+            nextBaseSnapshotWarmupTime = HasAttributeBaseSnapshot(player)
+                ? Time.unscaledTime + 1f
+                : Time.unscaledTime + 0.25f;
+            return;
+        }
+
+        nextBaseSnapshotWarmupTime = Time.unscaledTime + 0.25f;
+    }
+
+    private GameObject ResolveCurrentPlayerForBaseSnapshot(bool forceBootstrapRefresh)
+    {
+        if ((forceBootstrapRefresh || cachedBootstrap == null) && Time.unscaledTime >= nextBootstrapLookupTime)
+        {
+            cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
+            nextBootstrapLookupTime = Time.unscaledTime + 1f;
+        }
+
+        GameObject player = cachedBootstrap != null ? cachedBootstrap.CurrentPlayer : null;
+        if (player != null && player.activeInHierarchy)
+        {
+            return player;
+        }
+
+        GameObject taggedPlayer = GameObject.FindWithTag("Player");
+        if (taggedPlayer != null && taggedPlayer.activeInHierarchy)
+        {
+            return taggedPlayer;
+        }
+
+        return null;
+    }
+
+    private bool HasAttributeBaseSnapshot(GameObject player)
+    {
+        if (player == null)
+        {
+            return false;
+        }
+
+        AttributeBaseSnapshot snapshot;
+        return attributeBaseSnapshots.TryGetValue(player.GetInstanceID(), out snapshot) && snapshot.initialized;
+    }
+
+    private AttributeBaseSnapshot ResolveAttributeBaseSnapshot()
+    {
+        if (cachedPlayer == null)
+        {
+            return default;
+        }
+
+        AttributeBaseSnapshot snapshot;
+        if (attributeBaseSnapshots.TryGetValue(cachedPlayer.GetInstanceID(), out snapshot) && snapshot.initialized)
+        {
+            return snapshot;
+        }
+
+        if (cachedStats == null)
+        {
+            return default;
+        }
+
+        snapshot = new AttributeBaseSnapshot
+        {
+            initialized = true,
+            maxHealth = Mathf.Max(0f, cachedStats.maxHealth),
+            physicalAttack = Mathf.Max(0f, cachedStats.physicalAttack),
+            physicalDefense = Mathf.Max(0f, cachedStats.physicalDefense),
+            specialAttack = Mathf.Max(0f, cachedStats.specialAttack),
+            specialDefense = Mathf.Max(0f, cachedStats.specialDefense)
+        };
+
+        attributeBaseSnapshots[cachedPlayer.GetInstanceID()] = snapshot;
+        return snapshot;
     }
 
     private void ApplyCompositeFillWidths(int index, float baseRatio, float bonusRatio)
@@ -1163,17 +1356,6 @@ public class PlayerAttributePanelUI : MonoBehaviour
         baseRatio = Mathf.Clamp01(baseRatio);
         bonusRatio = bonusRatio <= 0f ? 0f : Mathf.Clamp01(bonusRatio);
 
-        float maxCombined = Mathf.Clamp01(baseRatio + bonusRatio);
-        if (baseRatio > maxCombined)
-        {
-            baseRatio = maxCombined;
-        }
-
-        if (baseRatio + bonusRatio > 1f)
-        {
-            bonusRatio = Mathf.Max(0f, 1f - baseRatio);
-        }
-
         float totalWidth = ResolveBarTotalWidth(backgroundRect);
         if (totalWidth <= 0f)
         {
@@ -1187,20 +1369,24 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
-        float baseWidth = totalWidth * baseRatio;
-        float bonusWidth = totalWidth * bonusRatio;
+        float totalRatio = Mathf.Clamp01(baseRatio + bonusRatio);
+        baseRatio = Mathf.Clamp01(baseRatio);
+        if (totalRatio < baseRatio)
+        {
+            totalRatio = baseRatio;
+        }
 
-        SetCompositeFillRect(baseRect, 0f, baseWidth);
-        SetCompositeFillRect(bonusRect, baseWidth, bonusWidth);
+        SetCompositeFillRect(baseRect, 0f, baseRatio);
+        SetCompositeFillRect(bonusRect, baseRatio, totalRatio);
 
         if (baseRect != null)
         {
-            baseRect.gameObject.SetActive(baseWidth > 0f);
+            baseRect.gameObject.SetActive(baseRatio > 0f);
         }
 
         if (bonusRect != null)
         {
-            bool showBonus = bonusWidth > 0f && bonusRatio > 0f;
+            bool showBonus = bonusRatio > 0f && totalRatio > baseRatio;
             bonusRect.gameObject.SetActive(showBonus);
         }
     }
@@ -1335,25 +1521,34 @@ public class PlayerAttributePanelUI : MonoBehaviour
         rect.anchoredPosition = Vector2.zero;
         rect.offsetMin = new Vector2(0f, 0f);
         rect.offsetMax = new Vector2(0f, 0f);
-        rect.sizeDelta = new Vector2(0f, 0f);
+        rect.sizeDelta = Vector2.zero;
         rect.localScale = Vector3.one;
     }
 
-    private static void SetCompositeFillRect(RectTransform rect, float startX, float width)
+    private static void SetCompositeFillRect(RectTransform rect, float startRatio, float endRatio)
     {
         if (rect == null)
         {
             return;
         }
 
+        startRatio = Mathf.Clamp01(startRatio);
+        endRatio = Mathf.Clamp01(endRatio);
+        if (endRatio < startRatio)
+        {
+            endRatio = startRatio;
+        }
+
         rect.anchorMin = new Vector2(0f, 0f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0f, 0.5f);
-        rect.anchoredPosition = new Vector2(startX, 0f);
-        rect.offsetMin = new Vector2(0f, 0f);
-        rect.offsetMax = new Vector2(0f, 0f);
-        rect.sizeDelta = new Vector2(Mathf.Max(0f, width), 0f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
         rect.localScale = Vector3.one;
+        rect.anchorMin = new Vector2(startRatio, 0f);
+        rect.anchorMax = new Vector2(endRatio, 1f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
     }
 
     private static float ResolveBarTotalWidth(RectTransform barRect)

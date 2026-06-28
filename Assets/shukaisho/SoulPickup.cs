@@ -521,10 +521,10 @@ public class SoulPickup : MonoBehaviour
     {
         return type switch
         {
-            SoulType.Life => new Color(1f, 0.24f, 0.28f, 1f),
-            SoulType.Energy => new Color(0.2f, 0.62f, 1f, 1f),
-            SoulType.Growth => new Color(0.28f, 0.92f, 0.38f, 1f),
-            SoulType.Function => new Color(1f, 0.76f, 0.22f, 1f),
+            SoulType.Life => new Color(0.30f, 1.00f, 0.35f, 1.00f),
+            SoulType.Energy => new Color(0.30f, 0.66f, 1.00f, 1.00f),
+            SoulType.Growth => new Color(1.00f, 0.83f, 0.29f, 1.00f),
+            SoulType.Function => new Color(0.95f, 0.95f, 0.95f, 1.00f),
             _ => Color.white
         };
     }
