@@ -220,6 +220,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private readonly List<RSwarmSwordData> activeRSwarmSwords = new List<RSwarmSwordData>();
     private readonly List<RStarRainBladeData> activeRStarRainBlades = new List<RStarRainBladeData>();
     private Camera resolvedRRenderCamera;
+    private RuneRuntimeState runeRuntimeState;
+    private int activeRuneCastId = -1;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -299,6 +301,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         float finalDuration = ResolveFinalSwarmDuration(count);
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(count);
+        runeRuntimeState = ResolveRuneRuntimeState();
+        activeRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(3) : -1;
         if (rSwarmDebugLog)
         {
             Debug.Log(
@@ -1026,6 +1030,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
                 float damageAmount = ResolveRHitDamage(attackerStats, combatHealth.stats, combatHealth, source, damageMultiplier);
+                damageAmount += ConsumeRuneFirstHitBonusDamage();
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 if (debugCriticalLog)
                 {
@@ -1033,7 +1038,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                     Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
                 }
 
+                float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
+                float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+                runeRuntimeState?.NotifyMonsterDamagedBySkill(3, combatHealth, actualDamage);
                 continue;
             }
 
@@ -1042,6 +1050,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             {
                 CombatStats targetStats = targetRoot.GetComponentInParent<CombatStats>();
                 float damageAmount = ResolveRHitDamage(attackerStats, targetStats, null, source, damageMultiplier);
+                damageAmount += ConsumeRuneFirstHitBonusDamage();
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
                 enemyHealth.TakeDamage(damageInt, source);
@@ -1078,6 +1087,34 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         return Mathf.Max(1f, finalDamage);
+    }
+
+    private float ConsumeRuneFirstHitBonusDamage()
+    {
+        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
+        return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(3, activeRuneCastId) : 0f;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (Owner == null)
+        {
+            return GetComponent<RuneRuntimeState>() ?? GetComponentInParent<RuneRuntimeState>();
+        }
+
+        return Owner.GetComponent<RuneRuntimeState>() ?? Owner.GetComponentInParent<RuneRuntimeState>();
+    }
+
+    private float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
     }
 
     private GameObject ResolveRSkillEffectPrefab()

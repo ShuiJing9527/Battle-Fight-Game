@@ -1462,6 +1462,64 @@ public class Player2PrototypeController : MonoBehaviour
 
     public Vector3 FacingDirection => ResolveFacingDirection();
     public Vector3 GetFacingDirection() => FacingDirection;
+    public bool TryTriggerRuneCounterQ(CombatHealth attacker, bool suppressRuneCounterRecursion = true)
+    {
+        RuneRuntimeState runeRuntimeState = GetComponent<RuneRuntimeState>();
+        bool debugThornCounter = runeRuntimeState != null && runeRuntimeState.IsThornCounterDebugEnabled();
+
+        if (attacker == null)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player02 controller rejected Q counter: attacker is null.", this);
+            }
+
+            return false;
+        }
+
+        if (qSkill is not Player2Skill_Q_DivineLightSword qDivineLightSword)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player02 controller rejected Q counter: qSkill is null or not Player2Skill_Q_DivineLightSword.", this);
+            }
+
+            return false;
+        }
+
+        FaceTowardsTarget(attacker.transform);
+        bool started = qDivineLightSword.TryCastAsRuneCounter(attacker.transform, suppressRuneCounterRecursion);
+        if (debugThornCounter)
+        {
+            Debug.Log($"[Rune][ThornCounter] Player02 controller Q counter request result={started}.", this);
+        }
+
+        return started;
+    }
+
+    public void FaceTowardsTarget(Transform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        Vector3 dir = target.position - transform.position;
+        dir.y = 0f;
+        if (dir.sqrMagnitude < 0.0001f)
+        {
+            return;
+        }
+
+        lastMoveDir = dir.normalized;
+        cachedSpineFacingScaleX = lastMoveDir.x >= 0f ? -1 : 1;
+        if (!lockCharacterRotation)
+        {
+            transform.rotation = Quaternion.LookRotation(lastMoveDir, Vector3.up);
+        }
+
+        UpdateSpineFacingMirror();
+    }
     public int CurrentDivineMark => currentSwordEnergy;
     public Camera GetRenderCamera() => ResolveRRenderCamera();
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;

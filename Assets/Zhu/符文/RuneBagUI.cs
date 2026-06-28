@@ -330,6 +330,7 @@ public class RuneBagUI : MonoBehaviour
         int runeSlotIndex = Mathf.Clamp(skillIndex, 0, skill.equippedRunes.Length - 1);
         skill.equippedRunes[runeSlotIndex] = selectedRune;
         slot.equippedRune = selectedRune;
+        skillCaster.RefreshRuneState();
 
         Debug.Log($"[RuneBagUI] Equipped {GetRuneName(selectedRune)} to {slot.skillName} slot {runeSlotIndex}");
         RefreshSkillSlots();

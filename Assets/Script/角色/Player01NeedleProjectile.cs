@@ -14,6 +14,8 @@ public class Player01NeedleProjectile : MonoBehaviour
     private float healPercentOfDamage;
     private LayerMask targetLayers = ~0;
     private bool hasHit;
+    private int skillSlotIndex = -1;
+    private int runeCastId = -1;
 
     private void Awake()
     {
@@ -41,12 +43,19 @@ public class Player01NeedleProjectile : MonoBehaviour
 
     public void Launch(Vector3 direction, float speed, float damage, GameObject source, float healPercentOfDamage, LayerMask targetLayers)
     {
+        Launch(direction, speed, damage, source, healPercentOfDamage, targetLayers, -1, -1);
+    }
+
+    public void Launch(Vector3 direction, float speed, float damage, GameObject source, float healPercentOfDamage, LayerMask targetLayers, int skillSlotIndex, int runeCastId)
+    {
         moveDirection = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.right;
         moveSpeed = Mathf.Max(0f, speed);
         Damage = Mathf.Max(0f, damage);
         this.source = source;
         this.healPercentOfDamage = Mathf.Clamp01(healPercentOfDamage);
         this.targetLayers = targetLayers;
+        this.skillSlotIndex = skillSlotIndex;
+        this.runeCastId = runeCastId;
         spawnTime = Time.time;
         transform.rotation = Quaternion.FromToRotation(Vector3.right, moveDirection);
 
@@ -89,11 +98,16 @@ public class Player01NeedleProjectile : MonoBehaviour
             return;
         }
 
-        float dealtDamage = Damage;
+        float resolvedDamage = Damage + ConsumeRuneFirstHitBonusDamage();
+        float dealtDamage = resolvedDamage;
         CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(other, sourceTransform);
         if (combatHealth != null)
         {
-            combatHealth.TakeDamage(new BattleDamage(Damage, BattleDamageType.Special, source));
+            float beforeHealth = ResolveCurrentHealth(combatHealth);
+            combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Special, source));
+            float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+            ResolveRuneRuntimeState()?.NotifyMonsterDamagedBySkill(skillSlotIndex, combatHealth, actualDamage);
+            dealtDamage = actualDamage > 0f ? actualDamage : resolvedDamage;
         }
         else
         {
@@ -103,12 +117,46 @@ public class Player01NeedleProjectile : MonoBehaviour
                 return;
             }
 
-            enemyHealth.TakeDamage(Mathf.RoundToInt(Damage), source);
+            enemyHealth.TakeDamage(Mathf.RoundToInt(resolvedDamage), source);
         }
 
         hasHit = true;
         HealSource(dealtDamage * healPercentOfDamage);
         Destroy(gameObject);
+    }
+
+    private float ConsumeRuneFirstHitBonusDamage()
+    {
+        RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+        return runtimeState != null ? runtimeState.ConsumeFirstHitBonusDamage(skillSlotIndex, runeCastId) : 0f;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        RuneRuntimeState runtimeState = source.GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            return runtimeState;
+        }
+
+        return source.GetComponentInParent<RuneRuntimeState>();
+    }
+
+    private float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
     }
 
     private void HealSource(float amount)

@@ -71,6 +71,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private static readonly System.Collections.Generic.HashSet<string> MissingQuickShearStatsWarnings = new System.Collections.Generic.HashSet<string>();
     private float qLifestealTotalThisCast;
     private Coroutine activeScissorTimelineCoroutine;
+    private RuneRuntimeState runeRuntimeState;
+    private int currentRuneCastId = -1;
 
     private void Reset()
     {
@@ -140,6 +142,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             animationName = "AKT2";
         }
 
+        runeRuntimeState = ResolveRuneRuntimeState();
         SyncQuickShearSkillConfig();
     }
 
@@ -159,6 +162,48 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         SyncQuickShearSkillConfig();
     }
 
+    public bool TryCastAsRuneCounter(Transform attacker, bool suppressRuneCounterRecursion = true)
+    {
+        RuneRuntimeState runeRuntimeState = GetComponent<RuneRuntimeState>();
+        bool debugThornCounter = runeRuntimeState != null && runeRuntimeState.IsThornCounterDebugEnabled();
+
+        if (Controller == null || castRoutine != null)
+        {
+            if (debugThornCounter)
+            {
+                string reason = Controller == null ? "Controller is null" : "castRoutine already running";
+                Debug.Log($"[Rune][ThornCounter] Player01 Q rune counter rejected: {reason}.", this);
+            }
+
+            return false;
+        }
+
+        if (!Controller.TryBeginSkill(this))
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player01 Q rune counter rejected: Controller.TryBeginSkill returned false.", this);
+            }
+
+            return false;
+        }
+
+        if (attacker != null)
+        {
+            Controller.FaceTowardsTarget(attacker);
+        }
+
+        castFinished = false;
+        OnCastStarted();
+        StartManagedCast(CastRoutine());
+        if (debugThornCounter)
+        {
+            Debug.Log($"[Rune][ThornCounter] Player01 Q rune counter started successfully. attacker={(attacker != null ? attacker.name : "<null>")}", this);
+        }
+
+        return true;
+    }
+
     protected override void OnCastStarted()
     {
         castDamagedCombatTargets.Clear();
@@ -172,6 +217,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         SyncQuickShearSkillConfig();
+        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
 
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
@@ -324,10 +370,12 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
+                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
+                combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
                 float afterHealth = ResolveCurrentHealth(combatHealth);
                 float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+                runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 if (actualDamage > 0f)
                 {
                     TryPlayQuickShearCritFlash(hit, damageResult);
@@ -339,7 +387,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
             if (legacyHealth != null && castDamagedLegacyTargets.Add(legacyHealth))
             {
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
+                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
+                int damageInt = Mathf.Max(1, Mathf.RoundToInt(resolvedDamage));
                 int beforeHp = Mathf.Max(0, legacyHealth.hp);
                 legacyHealth.TakeDamage(damageInt, gameObject);
                 int actualDamage = Mathf.Clamp(beforeHp, 0, damageInt);
@@ -691,6 +740,32 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         return GetComponentInParent<BattleResourceBank>();
+    }
+
+    private float ConsumeRuneFirstHitBonusDamage()
+    {
+        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
+        return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(SkillIndex, currentRuneCastId) : 0f;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        RuneRuntimeState runtimeState = GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            return runtimeState;
+        }
+
+        if (Controller != null)
+        {
+            runtimeState = Controller.GetComponent<RuneRuntimeState>();
+            if (runtimeState != null)
+            {
+                return runtimeState;
+            }
+        }
+
+        return GetComponentInParent<RuneRuntimeState>();
     }
 
     private float ResolvePlayerMaxHealth(CombatHealth combatHealth)

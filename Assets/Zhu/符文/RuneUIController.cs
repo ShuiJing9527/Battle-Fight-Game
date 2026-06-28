@@ -442,6 +442,7 @@ public class RuneUIController : MonoBehaviour
         if (equippedRune != null)
         {
             skill.equippedRunes[slotIndex] = null;
+            currentSkillCaster.RefreshRuneState();
             RefreshRuneList();
             RefreshSkillSlots();
             Debug.Log($"[RuneUI] Unequipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}", this);
@@ -470,6 +471,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         skill.equippedRunes[slotIndex] = selectedRune;
+        currentSkillCaster.RefreshRuneState();
         SetSelectedRune(null);
         RefreshRuneList();
         RefreshSkillSlots();
@@ -709,9 +711,9 @@ public class RuneUIController : MonoBehaviour
             return "null";
         }
 
-        if (rune.id != 0)
+        if (rune.runeId != 0)
         {
-            return $"id:{rune.id}";
+            return $"id:{rune.runeId}";
         }
 
         if (!string.IsNullOrEmpty(rune.runeName))
@@ -734,7 +736,7 @@ public class RuneUIController : MonoBehaviour
             return false;
         }
 
-        if (a.id != 0 && a.id == b.id)
+        if (a.runeId != 0 && a.runeId == b.runeId)
         {
             return true;
         }
@@ -782,32 +784,22 @@ public class RuneUIController : MonoBehaviour
         if (runeTypeText != null)
         {
             string rarityText = rune.rarity.ToString();
-            string mechanicText = rune.mechanic.ToString();
-            string categoryText = string.IsNullOrEmpty(rune.category) ? "-" : rune.category;
-            runeTypeText.text = $"Type: {categoryText} / {rarityText} / {mechanicText}";
+            string typeText = rune.GetTypeDisplayName();
+            runeTypeText.text = $"Type: {typeText} / {rarityText}";
         }
 
         if (runeDescriptionText != null)
         {
-            string triggerText = string.IsNullOrEmpty(rune.triggerCondition) ? "-" : rune.triggerCondition;
-            string styleText = string.IsNullOrEmpty(rune.playStyle) ? "-" : rune.playStyle;
-            runeDescriptionText.text = $"Description: {triggerText}\nPlay: {styleText}";
+            string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : rune.description.Trim();
+            runeDescriptionText.text = $"Description: {description}";
         }
 
         if (runeEffectText != null)
         {
-            string limitText = string.IsNullOrEmpty(rune.limitOrSideEffect) ? "-" : rune.limitOrSideEffect;
-            string effectText = $"ID: {rune.id}\nLimit: {limitText}";
-            if (rune.extraHitCount != 0 || rune.extraCastCount != 1 || Mathf.Abs(rune.damageMultiplier - 1f) > 0.001f || Mathf.Abs(rune.cooldownMultiplier - 1f) > 0.001f)
-            {
-                effectText += $"\nHit+{rune.extraHitCount} Cast+{rune.extraCastCount} Dmgx{rune.damageMultiplier:0.##} CDx{rune.cooldownMultiplier:0.##}";
-            }
-            if (rune.healAmount > 0f || rune.healthCost > 0f || rune.range > 0f)
-            {
-                effectText += $"\nHeal:{rune.healAmount:0.##} Cost:{rune.healthCost:0.##} Range:{rune.range:0.##}";
-            }
-
-            runeEffectText.text = effectText;
+            string effectText = rune.GetFullEffectDescription();
+            runeEffectText.text = string.IsNullOrWhiteSpace(effectText)
+                ? $"ID: {rune.runeId}"
+                : $"ID: {rune.runeId}\n{effectText}";
         }
     }
 

@@ -76,6 +76,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [SerializeField] private float eDashEffectLifetime = 0.7f;
 
     private readonly List<GameObject> activeAfterimageGhosts = new List<GameObject>();
+    private RuneRuntimeState runeRuntimeState;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -92,6 +93,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             return false;
         }
 
+        runeRuntimeState = ResolveRuneRuntimeState();
+        runeRuntimeState?.NotifySkillCastStarted(2);
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -112,6 +115,16 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         activeAfterimageGhosts.Clear();
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (Owner == null)
+        {
+            return GetComponent<RuneRuntimeState>() ?? GetComponentInParent<RuneRuntimeState>();
+        }
+
+        return Owner.GetComponent<RuneRuntimeState>() ?? Owner.GetComponentInParent<RuneRuntimeState>();
     }
 
     private void OnDisable()

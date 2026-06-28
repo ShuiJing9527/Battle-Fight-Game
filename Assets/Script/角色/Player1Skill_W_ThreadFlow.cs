@@ -51,6 +51,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private Coroutine enemyDebuffRoutine;
     private string damageModifierKey;
     private const string VeilDebuffKey = "Player01_W_Veil";
+    private RuneRuntimeState runeRuntimeState;
 
     private void Reset()
     {
@@ -81,6 +82,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     {
         SyncSkillTiming();
         CacheReferences();
+        runeRuntimeState = ResolveRuneRuntimeState();
     }
 
     private void OnValidate()
@@ -101,6 +103,8 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
     protected override void OnCastStarted()
     {
+        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
+        runeRuntimeState?.NotifySkillCastStarted(SkillIndex);
         IsDefending = true;
         SyncSkillTiming();
         CacheReferences();
@@ -199,6 +203,26 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         {
             damageModifierKey = VeilDebuffKey;
         }
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        RuneRuntimeState runtimeState = GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            return runtimeState;
+        }
+
+        if (Controller != null)
+        {
+            runtimeState = Controller.GetComponent<RuneRuntimeState>();
+            if (runtimeState != null)
+            {
+                return runtimeState;
+            }
+        }
+
+        return GetComponentInParent<RuneRuntimeState>();
     }
 
     private void ApplyBarrierTransform()

@@ -807,6 +807,72 @@ public class Player01SkillController : MonoBehaviour
         return wSkill is Player1Skill_W_ThreadFlow w && w.IsDefending;
     }
 
+    public bool TryTriggerRuneCounterQ(CombatHealth attacker, bool suppressRuneCounterRecursion = true)
+    {
+        RuneRuntimeState runeRuntimeState = GetComponent<RuneRuntimeState>();
+        bool debugThornCounter = runeRuntimeState != null && runeRuntimeState.IsThornCounterDebugEnabled();
+
+        if (attacker == null)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player01 controller rejected Q counter: attacker is null.", this);
+            }
+
+            return false;
+        }
+
+        if (qSkill is not Player1Skill_Q_QuickShear quickShearSkill)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player01 controller rejected Q counter: qSkill is null or not Player1Skill_Q_QuickShear.", this);
+            }
+
+            return false;
+        }
+
+        if (currentSkill != null)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log($"[Rune][ThornCounter] Player01 controller rejected Q counter: currentSkill={currentSkill.GetType().Name}.", this);
+            }
+
+            return false;
+        }
+
+        FaceTowardsTarget(attacker.transform);
+        bool started = quickShearSkill.TryCastAsRuneCounter(attacker.transform, suppressRuneCounterRecursion);
+        if (debugThornCounter)
+        {
+            Debug.Log($"[Rune][ThornCounter] Player01 controller Q counter request result={started}.", this);
+        }
+
+        return started;
+    }
+
+    public void FaceTowardsTarget(Transform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        float deltaX = target.position.x - transform.position.x;
+        if (Mathf.Abs(deltaX) < 0.0001f)
+        {
+            return;
+        }
+
+        cachedFacingScaleX = deltaX > 0f ? -1 : 1;
+        SkeletonAnimation spine = ResolveSkeletonAnimation();
+        if (spine != null && spine.Skeleton != null)
+        {
+            spine.Skeleton.ScaleX = cachedFacingScaleX;
+        }
+    }
+
     private string DescribeSkeletonAnimation(SkeletonAnimation spine)
     {
         if (spine == null)

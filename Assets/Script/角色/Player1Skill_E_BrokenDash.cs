@@ -35,6 +35,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private readonly Dictionary<int, bool> cachedLayerCollisionStates = new Dictionary<int, bool>();
     private readonly HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
     private readonly HashSet<EnemyHealth> damagedLegacyTargets = new HashSet<EnemyHealth>();
+    private RuneRuntimeState runeRuntimeState;
+    private int currentRuneCastId = -1;
 
     private void Reset()
     {
@@ -71,6 +73,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private void Awake()
     {
         cachedMovement = GetComponent<PlayerMovement>();
+        runeRuntimeState = ResolveRuneRuntimeState();
         CacheGhostStateVisual();
         CacheGhostShadowFollower();
         CacheGhostParticleController();
@@ -102,6 +105,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostStateVisible(true);
         SetGhostShadowVisible(true);
         SetGhostParticlesVisible(true);
+        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
 
         if (debugLog)
         {
@@ -166,14 +170,19 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
             if (combatHealth != null && damagedCombatTargets.Add(combatHealth))
             {
-                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject));
+                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
+                float beforeHealth = ResolveCurrentHealth(combatHealth);
+                combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject));
+                float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+                runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 continue;
             }
 
             EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
             if (legacyHealth != null && damagedLegacyTargets.Add(legacyHealth))
             {
-                legacyHealth.TakeDamage(Mathf.RoundToInt(finalDamage), gameObject);
+                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
+                legacyHealth.TakeDamage(Mathf.RoundToInt(resolvedDamage), gameObject);
             }
         }
     }
@@ -270,6 +279,44 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 cachedLayerCollisionStates.Remove(layer);
             }
         }
+    }
+
+    private float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
+    }
+
+    private float ConsumeRuneFirstHitBonusDamage()
+    {
+        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
+        return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(SkillIndex, currentRuneCastId) : 0f;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        RuneRuntimeState runtimeState = GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            return runtimeState;
+        }
+
+        if (Controller != null)
+        {
+            runtimeState = Controller.GetComponent<RuneRuntimeState>();
+            if (runtimeState != null)
+            {
+                return runtimeState;
+            }
+        }
+
+        return GetComponentInParent<RuneRuntimeState>();
     }
 
     protected override void OnDisable()

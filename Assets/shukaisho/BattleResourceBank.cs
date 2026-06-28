@@ -29,6 +29,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private float skillDamageMultiplier = 1f;
     private float skillDamageBuffEndTime = -1f;
+    private RuneRuntimeState runeRuntimeState;
 
     public float ResolveConfiguredMaxHealth(float fallback = 100f)
     {
@@ -79,6 +80,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private void Awake()
     {
+        runeRuntimeState = GetComponent<RuneRuntimeState>();
         SyncHealthFromCombatStats(refillCurrentHealth: false);
         currentEnergy = Mathf.Clamp(currentEnergy, 0f, maxEnergy);
     }
@@ -114,6 +116,11 @@ public class BattleResourceBank : MonoBehaviour
 
     public string ApplySoulWithFeedback(SoulType type, int soulPoint)
     {
+        return ApplySoulWithFeedbackInternal(type, soulPoint, allowLuckyCopy: true);
+    }
+
+    private string ApplySoulWithFeedbackInternal(SoulType type, int soulPoint, bool allowLuckyCopy)
+    {
         soulPoint = Mathf.Clamp(soulPoint, 1, 5);
         float resolvedValue = ResolveSoulValue(type, soulPoint);
         string feedback;
@@ -141,6 +148,22 @@ public class BattleResourceBank : MonoBehaviour
         }
 
         SoulApplied?.Invoke(type, soulPoint);
+        runeRuntimeState?.NotifySoulApplied(type, soulPoint);
+
+        if (allowLuckyCopy)
+        {
+            RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+            int copyCount = runtimeState != null ? runtimeState.GetSoulPickupCopyCount() : 0;
+            if (copyCount > 0)
+            {
+                int copyPoint = runtimeState.GetSoulPickupCopyPoint();
+                for (int i = 0; i < copyCount; i++)
+                {
+                    ApplySoulWithFeedbackInternal(type, copyPoint, allowLuckyCopy: false);
+                }
+            }
+        }
+
         return feedback;
     }
 
@@ -196,7 +219,9 @@ public class BattleResourceBank : MonoBehaviour
             return;
         }
 
-        shield += amount;
+        RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+        float multiplier = runtimeState != null ? runtimeState.GetShieldGainMultiplier() : 1f;
+        shield += amount * Mathf.Max(0f, multiplier);
         maxShield = Mathf.Max(maxShield, shield);
         OnShieldChanged?.Invoke(shield, maxShield);
     }
@@ -208,7 +233,13 @@ public class BattleResourceBank : MonoBehaviour
 
     private void ApplyEnergySoul(float amount)
     {
+        float previousEnergy = currentEnergy;
         currentEnergy = Mathf.Min(maxEnergy, currentEnergy + amount);
+        float overflow = Mathf.Max(0f, amount - (currentEnergy - previousEnergy));
+        if (overflow > 0f)
+        {
+            ResolveRuneRuntimeState()?.AddManaOverflow(overflow);
+        }
     }
 
     private void ApplyFunctionSoul(float amount)
@@ -291,5 +322,15 @@ public class BattleResourceBank : MonoBehaviour
             OnShieldChanged?.Invoke(shield, maxShield);
         }
         return amount - shieldUsed;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (runeRuntimeState == null)
+        {
+            runeRuntimeState = GetComponent<RuneRuntimeState>();
+        }
+
+        return runeRuntimeState;
     }
 }

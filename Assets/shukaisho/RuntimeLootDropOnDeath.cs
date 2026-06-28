@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections.Generic;
 
 public class RuntimeLootDropOnDeath : MonoBehaviour
 {
@@ -88,12 +89,17 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
         float killerLuck = ResolveLuck(killer);
+        RuneRuntimeState runeRuntimeState = ResolveRuneRuntimeState(killer);
 
         int soulCount = rank == MonsterRank.Boss ? 4 : (rank == MonsterRank.Elite ? 2 : 1);
         for (int i = 0; i < soulCount; i++)
         {
             SoulType soulType = GetRandomSoulTypeByWeight();
             int soulPoint = soulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            if (soulType == SoulType.Growth && runeRuntimeState != null)
+            {
+                soulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(soulPoint);
+            }
             CreateSoul(soulType, soulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
 
@@ -101,7 +107,25 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         {
             SoulType extraSoulType = GetRandomSoulTypeByWeight();
             int extraSoulPoint = extraSoulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            if (extraSoulType == SoulType.Growth && runeRuntimeState != null)
+            {
+                extraSoulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(extraSoulPoint);
+            }
             CreateSoul(extraSoulType, extraSoulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
+        }
+
+        if (runeRuntimeState != null)
+        {
+            List<RuneRuntimeState.SoulDropRequest> bonusSoulDrops = new List<RuneRuntimeState.SoulDropRequest>();
+            runeRuntimeState.AppendKillBonusSoulDrops(rank, bonusSoulDrops);
+            for (int i = 0; i < bonusSoulDrops.Count; i++)
+            {
+                RuneRuntimeState.SoulDropRequest request = bonusSoulDrops[i];
+                int requestPoint = request.soulType == SoulType.Growth
+                    ? runeRuntimeState.ModifyGrowthSoulPointOnDrop(request.soulPoint)
+                    : Mathf.Clamp(request.soulPoint, 1, 5);
+                CreateSoul(request.soulType, requestPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
+            }
         }
 
         int runeCount = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
@@ -386,7 +410,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         RuneLibrary library = FindObjectOfType<RuneLibrary>();
-        RuneDefinition rune = library != null ? library.GetRandomRune() : RuneDefinition.CreateTableRune(RuneMechanic.Combo);
+        RuneDefinition rune = library != null ? library.GetRandomRune() : RuneDefinition.CreateDefaultRune(RuneType.Life);
         if (rune == null)
         {
             return;
@@ -479,6 +503,22 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
         warnedMissingRunePickupPrefab = true;
         Debug.LogWarning("[RuneDrop] runePickupPrefab missing, fallback simple rune created.", this);
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState(GameObject killer)
+    {
+        if (killer == null)
+        {
+            return null;
+        }
+
+        RuneRuntimeState runtimeState = killer.GetComponent<RuneRuntimeState>();
+        if (runtimeState == null)
+        {
+            runtimeState = killer.GetComponentInParent<RuneRuntimeState>();
+        }
+
+        return runtimeState;
     }
 
 }

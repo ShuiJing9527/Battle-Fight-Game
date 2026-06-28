@@ -15,6 +15,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField, Range(0f, 1f)] private float healPercentOfDamage = 0.25f;
     [SerializeField] private LayerMask enemyLayer = ~0;
     [SerializeField] private Vector3 spawnOffset = new Vector3(0.85f, 0.15f, 0f);
+    private RuneRuntimeState runeRuntimeState;
+    private int currentRuneCastId = -1;
 
     private void Reset()
     {
@@ -36,6 +38,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     protected override void OnCastStarted()
     {
+        runeRuntimeState = ResolveRuneRuntimeState();
+        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
         SpawnNeedles();
 
         if (debugLog)
@@ -80,7 +84,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             Player01NeedleProjectile projectile = instance.GetComponent<Player01NeedleProjectile>();
             if (projectile != null)
             {
-                projectile.Launch(shotDirection, needleSpeed, finalDamage, gameObject, healPercentOfDamage, enemyLayer);
+                projectile.Launch(shotDirection, needleSpeed, finalDamage, gameObject, healPercentOfDamage, enemyLayer, SkillIndex, currentRuneCastId);
             }
             else if (instance.TryGetComponent<Rigidbody>(out Rigidbody projectileRb))
             {
@@ -98,5 +102,25 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             physicalScaling,
             specialScaling,
             "Player01 R");
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        RuneRuntimeState runtimeState = GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            return runtimeState;
+        }
+
+        if (Controller != null)
+        {
+            runtimeState = Controller.GetComponent<RuneRuntimeState>();
+            if (runtimeState != null)
+            {
+                return runtimeState;
+            }
+        }
+
+        return GetComponentInParent<RuneRuntimeState>();
     }
 }

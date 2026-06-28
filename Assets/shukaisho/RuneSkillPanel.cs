@@ -96,6 +96,7 @@ public class RuneSkillPanel : MonoBehaviour
         }
 
         skill.equippedRunes[slotIndex] = rune;
+        skillCaster.RefreshRuneState();
         inventory.RemoveRune(rune);
         selectedRuneIndex = -1;
         return true;

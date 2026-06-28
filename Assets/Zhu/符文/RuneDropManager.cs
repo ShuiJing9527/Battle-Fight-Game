@@ -53,8 +53,6 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
-        // 掉落外观由符文定义驱动：先按符文 id 选一个起始 prefab，
-        // 再向后扫描到第一个可用 prefab，避免空引用影响掉落结果。
         RunePickup prefab = GetDropPrefabForRune(rune);
         if (prefab == null)
         {
@@ -95,8 +93,7 @@ public class RuneDropManager : MonoBehaviour
         int startIndex = 0;
         if (rune != null && runeDropPrefabs.Length > 1)
         {
-            // 用 rune.id 作为起点，只影响 prefab 轮询顺序，不改变掉落内容本身。
-            startIndex = Mathf.Abs(rune.id) % runeDropPrefabs.Length;
+            startIndex = Mathf.Abs(rune.runeId) % runeDropPrefabs.Length;
         }
 
         for (int offset = 0; offset < runeDropPrefabs.Length; offset++)

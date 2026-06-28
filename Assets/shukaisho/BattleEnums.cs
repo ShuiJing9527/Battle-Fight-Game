@@ -34,6 +34,7 @@ public enum RuneRarity
     Epic
 }
 
+[System.Obsolete("Legacy rune mechanic enum. New rune system uses RuneType/count-based effects instead.")]
 public enum RuneMechanic
 {
     Combo,
@@ -46,6 +47,16 @@ public enum RuneMechanic
     Regeneration,
     Exchange,
     SoulLink
+}
+
+public enum RuneType
+{
+    None = 0,
+    Life = 1,
+    Shield = 2,
+    Mana = 3,
+    Thorn = 4,
+    Luck = 5
 }
 
 [System.Serializable]

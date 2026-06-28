@@ -104,6 +104,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
+    private RuneRuntimeState runeRuntimeState;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -134,6 +135,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         Cleanup();
+        runeRuntimeState = ResolveRuneRuntimeState();
+        runeRuntimeState?.NotifySkillCastStarted(1);
         wSkillRoutine = StartCoroutine(ShieldRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -217,6 +220,16 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Counter={counterDamage:F2}", this);
         ApplyWCounterDamage(incomingDamage, counterDamage);
         return Mathf.Max(0f, damageAfterReduction);
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (Owner == null)
+        {
+            return GetComponent<RuneRuntimeState>() ?? GetComponentInParent<RuneRuntimeState>();
+        }
+
+        return Owner.GetComponent<RuneRuntimeState>() ?? Owner.GetComponentInParent<RuneRuntimeState>();
     }
 
     private IEnumerator ShieldRoutine()

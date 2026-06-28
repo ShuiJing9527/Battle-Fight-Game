@@ -227,6 +227,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     private readonly List<GameObject> activeQBlades = new List<GameObject>();
     private int activeQWaveCount;
     private Coroutine qCastRoutine;
+    private RuneRuntimeState runeRuntimeState;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -234,6 +235,61 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     public override void Initialize(Player2PrototypeController owner)
     {
         base.Initialize(owner);
+    }
+
+    public bool TryCastAsRuneCounter(Transform attacker, bool suppressRuneCounterRecursion = true)
+    {
+        RuneRuntimeState debugRuneState = ResolveRuneRuntimeState();
+        bool debugThornCounter = debugRuneState != null && debugRuneState.IsThornCounterDebugEnabled();
+
+        if (Owner == null)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player02 Q rune counter rejected: Owner is null.", this);
+            }
+
+            return false;
+        }
+
+        GameObject sourcePrefab = ResolveQVisualPrefab();
+        if (sourcePrefab == null)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log("[Rune][ThornCounter] Player02 Q rune counter rejected: Q visual prefab is null.", this);
+            }
+
+            return false;
+        }
+
+        int maxActiveWaves = Mathf.Max(1, qMaxActiveWaves);
+        if (activeQWaveCount >= maxActiveWaves)
+        {
+            if (debugThornCounter)
+            {
+                Debug.Log($"[Rune][ThornCounter] Player02 Q rune counter rejected: activeQWaveCount={activeQWaveCount}, maxActiveWaves={maxActiveWaves}.", this);
+            }
+
+            return false;
+        }
+
+        if (attacker != null)
+        {
+            Owner.FaceTowardsTarget(attacker);
+        }
+
+        Owner.currentSwordEnergy += 1;
+        runeRuntimeState = debugRuneState;
+        int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
+        Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
+        if (debugThornCounter)
+        {
+            Debug.Log($"[Rune][ThornCounter] Player02 Q rune counter started successfully. attacker={(attacker != null ? attacker.name : "<null>")}, runeCastId={runeCastId}", this);
+        }
+
+        return true;
     }
 
     public override bool Cast()
@@ -258,7 +314,9 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         Owner.currentSwordEnergy += 1;
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab));
+        runeRuntimeState = ResolveRuneRuntimeState();
+        int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
     }
@@ -290,7 +348,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #endif
     }
 
-    private IEnumerator QStarFallRoutine(GameObject sourcePrefab)
+    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId)
     {
         activeQWaveCount++;
         try
@@ -371,7 +429,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 {
                     waveBlades.Add(blade);
                     activeQBlades.Add(blade);
-                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos));
+                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId));
                 }
 
                 if (qStarFallSequentialDelay > 0f)
@@ -415,7 +473,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         return bladeRoot;
     }
 
-    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos)
+    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId)
     {
         while (bladeRoot != null && Vector3.Distance(bladeRoot.transform.position, targetPos) > 0.05f)
         {
@@ -429,7 +487,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            ApplyQStarFallDamage(targetPos);
+            ApplyQStarFallDamage(targetPos, runeCastId);
 
             SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
@@ -441,7 +499,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void ApplyQStarFallDamage(Vector3 center)
+    private void ApplyQStarFallDamage(Vector3 center, int runeCastId)
     {
         if (qStarFallDamageRadius <= 0f)
         {
@@ -483,6 +541,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     continue;
                 }
 
+                damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 if (debugCriticalLog)
                 {
@@ -490,7 +549,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
                 }
 
+                float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
+                float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+                runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
                 hitAnyEnemy = true;
                 continue;
             }
@@ -504,6 +566,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     continue;
                 }
 
+                damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
                 enemyHealth.TakeDamage(damageInt, source);
@@ -520,6 +583,34 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         {
             Debug.Log("[Player02 Q] no enemy hit", this);
         }
+    }
+
+    private float ConsumeRuneFirstHitBonusDamage(int runeCastId)
+    {
+        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
+        return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(0, runeCastId) : 0f;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (Owner == null)
+        {
+            return GetComponent<RuneRuntimeState>() ?? GetComponentInParent<RuneRuntimeState>();
+        }
+
+        return Owner.GetComponent<RuneRuntimeState>() ?? Owner.GetComponentInParent<RuneRuntimeState>();
+    }
+
+    private float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
     }
 
     private float ResolveQBladeDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source)

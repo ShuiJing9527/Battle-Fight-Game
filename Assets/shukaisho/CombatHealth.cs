@@ -34,6 +34,7 @@ public class CombatHealth : MonoBehaviour
     private float localShield;
     private float localMaxShield;
     private readonly Dictionary<string, float> incomingDamageMultipliers = new Dictionary<string, float>();
+    private RuneRuntimeState runeRuntimeState;
     private bool warnedMissingDamagePopupPrefab;
     private static DamagePopupFloatingText defaultDamagePopupPrefab;
     private static bool attemptedLoadDefaultDamagePopupPrefab;
@@ -91,6 +92,11 @@ public class CombatHealth : MonoBehaviour
         if (resourceBank == null)
         {
             resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (runeRuntimeState == null)
+        {
+            runeRuntimeState = GetComponent<RuneRuntimeState>();
         }
 
         if (animator == null)
@@ -162,6 +168,11 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
+            if (BattleTargetUtility.IsPlayer(gameObject) && damage.source != null && BattleTargetUtility.IsMonster(damage.source))
+            {
+                runeRuntimeState?.NotifyIncomingMonsterDamage(damage.source, finalDamage);
+            }
+
             Damaged?.Invoke(finalDamage, damage.source);
             ShowDamagePopup(finalDamage, ResolvePopupType(damage.damageType), damage.isCritical);
             TriggerAnimation(hitTrigger);
@@ -206,6 +217,11 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
+            if (BattleTargetUtility.IsPlayer(gameObject) && source != null && BattleTargetUtility.IsMonster(source))
+            {
+                runeRuntimeState?.NotifyIncomingMonsterDamage(source, finalDamage);
+            }
+
             Damaged?.Invoke(finalDamage, source);
             ShowDamagePopup(finalDamage, popupType, isCritical);
             TriggerAnimation(hitTrigger);
