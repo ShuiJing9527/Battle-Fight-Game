@@ -220,12 +220,18 @@ MonoBehaviour:
   stopDistance: 0.8
   faceMoveDirection: 0
   keepFlatRotation: 1
+  enableEnemySoftAvoidance: 1
+  enemySeparationRadius: 1.2
+  enemySeparationWeight: 0.6
+  enemySeparationMaxNeighbors: 8
   attackRange: 1.35
   attackHitRange: 1.6
   attackCooldown: 1.1
   attackDamage: 3
   attackStyle: 0
   projectileSpeed: 8
+  attackIntervalMultiplier: 1
+  outgoingDamageMultiplier: 1
   meleeHitAngle: 100
   meleeHitForwardOffset: 0
   closeHitRadius: 0
@@ -285,10 +291,27 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RuntimeLootDropOnDeath
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
   dropYOffset: 0.5
-  soulAmount: 15
   dropScatterRadius: 0.8
+  lifeSoulWeight: 25
+  energySoulWeight: 20
+  functionSoulWeight: 15
+  growthSoulWeight: 40
+  resourcePoint1Weight: 50
+  resourcePoint2Weight: 25
+  resourcePoint3Weight: 15
+  resourcePoint4Weight: 7
+  resourcePoint5Weight: 3
+  growthPoint1Weight: 70
+  growthPoint2Weight: 18
+  growthPoint3Weight: 8
+  growthPoint4Weight: 3
+  growthPoint5Weight: 1
+  extraSoulDropChancePerLuck: 0.01
+  maxExtraSoulDropChance: 0.5
   runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
   runeDropYOffset: 0.25
+  extraRuneDropChancePerLuck: 0.005
+  maxExtraRuneDropChance: 0.3
 --- !u!114 &5420526972999163506
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -316,13 +339,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 160
-  physicalAttack: 8
-  physicalDefense: 8
-  specialAttack: 4
-  specialDefense: 8
-  speed: 4
-  luck: 2
+  maxHealth: 260
+  physicalAttack: 14
+  physicalDefense: 16
+  specialAttack: 8
+  specialDefense: 16
+  speed: 8
+  luck: 4
 --- !u!114 &5915538337989477822
 MonoBehaviour:
   m_ObjectHideFlags: 0

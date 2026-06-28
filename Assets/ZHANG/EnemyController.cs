@@ -18,6 +18,10 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float stopDistance = 0.8f;
     [SerializeField] private bool faceMoveDirection = false;
     [SerializeField] private bool keepFlatRotation = true;
+    [SerializeField] private bool enableEnemySoftAvoidance = true;
+    [SerializeField] private float enemySeparationRadius = 1.2f;
+    [SerializeField] private float enemySeparationWeight = 0.6f;
+    [SerializeField] private int enemySeparationMaxNeighbors = 8;
 
     [Header("Attack")]
     [SerializeField] private float attackRange = 1.35f;
@@ -26,6 +30,8 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float attackDamage = 3f;
     [SerializeField] private MonsterAttackStyle attackStyle = MonsterAttackStyle.Melee;
     [SerializeField] private float projectileSpeed = 8f;
+    [SerializeField] private float attackIntervalMultiplier = 1f;
+    [SerializeField] private float outgoingDamageMultiplier = 1f;
     [SerializeField] private float meleeHitAngle = 100f;
     [SerializeField] private float meleeHitForwardOffset = 0f;
     [SerializeField] private float closeHitRadius = 0f;
@@ -48,6 +54,7 @@ public class EnemyController : MonoBehaviour
     private bool attackInProgress;
     private float lastLoggedMoveMultiplier = -1f;
     private float lastLoggedAttackMultiplier = -1f;
+    private Collider[] separationHits;
 
     private void Start()
     {
@@ -118,6 +125,17 @@ public class EnemyController : MonoBehaviour
         }
 
         Vector3 direction = toPlayer / distance;
+        if (enableEnemySoftAvoidance)
+        {
+            Vector3 separationDirection = ResolveEnemySeparationDirection();
+            Vector3 combinedDirection = direction + separationDirection * Mathf.Max(0f, enemySeparationWeight);
+            combinedDirection.y = 0f;
+            if (combinedDirection.sqrMagnitude > MovementZeroEpsilon * MovementZeroEpsilon)
+            {
+                direction = combinedDirection.normalized;
+            }
+        }
+
         float moveMultiplier = ResolveMoveSpeedMultiplier();
         float currentMoveSpeed = moveSpeed * moveMultiplier;
         if (debugLog && Mathf.Abs(moveMultiplier - lastLoggedMoveMultiplier) > 0.001f)
@@ -144,7 +162,7 @@ public class EnemyController : MonoBehaviour
         playerTarget = target;
     }
 
-    public void ConfigureRuntime(float moveSpeed, float stopDistance, float attackRange, float attackHitRange, float attackCooldown, float attackDamage, MonsterAttackStyle attackStyle)
+    public void ConfigureRuntime(float moveSpeed, float stopDistance, float attackRange, float attackHitRange, float attackCooldown, float attackDamage, MonsterAttackStyle attackStyle, float attackIntervalMultiplier = 1f, float outgoingDamageMultiplier = 1f)
     {
         this.moveSpeed = Mathf.Max(0f, moveSpeed);
         this.stopDistance = Mathf.Max(0f, stopDistance);
@@ -153,6 +171,83 @@ public class EnemyController : MonoBehaviour
         this.attackCooldown = Mathf.Max(0.1f, attackCooldown);
         this.attackDamage = Mathf.Max(0f, attackDamage);
         this.attackStyle = attackStyle;
+        this.attackIntervalMultiplier = Mathf.Max(0.1f, attackIntervalMultiplier);
+        this.outgoingDamageMultiplier = Mathf.Max(0.01f, outgoingDamageMultiplier);
+    }
+
+    private Vector3 ResolveEnemySeparationDirection()
+    {
+        float separationRadius = Mathf.Max(0f, enemySeparationRadius);
+        if (!enableEnemySoftAvoidance || separationRadius <= 0.01f || enemySeparationMaxNeighbors <= 0)
+        {
+            return Vector3.zero;
+        }
+
+        if (separationHits == null || separationHits.Length != Mathf.Max(1, enemySeparationMaxNeighbors))
+        {
+            separationHits = new Collider[Mathf.Max(1, enemySeparationMaxNeighbors)];
+        }
+
+        int enemyLayer = gameObject.layer;
+        int layerMask = enemyLayer >= 0 ? (1 << enemyLayer) : ~0;
+        int hitCount = Physics.OverlapSphereNonAlloc(
+            transform.position,
+            separationRadius,
+            separationHits,
+            layerMask,
+            QueryTriggerInteraction.Ignore);
+
+        if (hitCount <= 0)
+        {
+            return Vector3.zero;
+        }
+
+        Vector3 separation = Vector3.zero;
+        int neighborCount = 0;
+        Vector3 selfPosition = transform.position;
+        selfPosition.y = 0f;
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hit = separationHits[i];
+            if (hit == null)
+            {
+                continue;
+            }
+
+            Transform root = hit.transform.root;
+            if (root == null || root == transform.root)
+            {
+                continue;
+            }
+
+            Vector3 otherPosition = root.position;
+            otherPosition.y = 0f;
+            Vector3 away = selfPosition - otherPosition;
+            float distance = away.magnitude;
+            if (distance <= 0.001f || distance > separationRadius)
+            {
+                continue;
+            }
+
+            float weight = 1f - Mathf.Clamp01(distance / separationRadius);
+            separation += away.normalized * weight;
+            neighborCount++;
+        }
+
+        for (int i = 0; i < hitCount; i++)
+        {
+            separationHits[i] = null;
+        }
+
+        if (neighborCount <= 0 || separation.sqrMagnitude <= 0.0001f)
+        {
+            return Vector3.zero;
+        }
+
+        separation /= neighborCount;
+        separation.y = 0f;
+        return separation.normalized;
     }
 
     private void BeginAttack()
@@ -487,7 +582,7 @@ public class EnemyController : MonoBehaviour
 
     private float ResolveCurrentAttackCooldown()
     {
-        return Mathf.Max(0.1f, attackCooldown * BattleStatUtility.GetCooldownMultiplier(combatStats));
+        return Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier) * BattleStatUtility.GetCooldownMultiplier(combatStats));
     }
 
     private BattleDamageType ResolvePrimaryDamageType()
@@ -498,7 +593,7 @@ public class EnemyController : MonoBehaviour
     private float ResolveCurrentAttackDamage(BattleDamageType damageType)
     {
         float attackPower = BattleStatUtility.ResolveAttackPower(gameObject, damageType, attackDamage);
-        float damage = attackPower * ResolveAttackMultiplier();
+        float damage = attackPower * ResolveAttackMultiplier() * Mathf.Max(0.01f, outgoingDamageMultiplier);
         return BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
     }
 

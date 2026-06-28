@@ -13,7 +13,7 @@ public class EnemyDeathNotifier : MonoBehaviour
     {
         if (spawner != null)
         {
-            spawner.OnEnemyDestroyed();
+            spawner.OnEnemyDestroyed(gameObject);
         }
     }
 }

@@ -18,6 +18,7 @@ public class PlayerStatusHUD : MonoBehaviour
     [SerializeField] private TextMeshProUGUI shieldText;
     [SerializeField] private TextMeshProUGUI switchHintText;
     [SerializeField] private TextMeshProUGUI runeHintText;
+    [SerializeField] private TextMeshProUGUI characterPanelHintText;
 
     private Player2Bootstrap cachedBootstrap;
     private GameObject cachedPlayer;
@@ -58,6 +59,11 @@ public class PlayerStatusHUD : MonoBehaviour
         if (runeHintText != null)
         {
             runeHintText.text = "K: Rune Panel";
+        }
+
+        if (characterPanelHintText != null)
+        {
+            characterPanelHintText.text = "I: Character Panel";
         }
     }
 

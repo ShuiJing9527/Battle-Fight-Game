@@ -17,6 +17,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         public float physicalDefense;
         public float specialAttack;
         public float specialDefense;
+        public float speed;
     }
 
     [Header("Root")]
@@ -95,6 +96,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private Color defBaseColor = new Color32(0xE4, 0x9B, 0x3E, 0xFF);
     [SerializeField] private Color magBaseColor = new Color32(0x8E, 0x63, 0xD9, 0xFF);
     [SerializeField] private Color resBaseColor = new Color32(0x5B, 0x8C, 0xFF, 0xFF);
+    [SerializeField] private Color spdBaseColor = new Color(0.75f, 0.94f, 1.00f, 1.00f);
     [SerializeField] private Color bonusBarColor = new Color32(0xF2, 0xC9, 0x4C, 0xFF);
     [SerializeField] private Color compositeBarBackgroundColor = new Color32(0x2F, 0x35, 0x50, 0xFF);
 
@@ -104,12 +106,13 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField, Min(1f)] private float defDisplayMax = 100f;
     [SerializeField, Min(1f)] private float magDisplayMax = 100f;
     [SerializeField, Min(1f)] private float resDisplayMax = 100f;
+    [SerializeField, Min(1f)] private float spdDisplayMax = 100f;
 
-    private readonly string[] attributeKeys = { "HP", "ATK", "DEF", "MAG", "RES" };
-    private readonly Image[] attributeBarBackgrounds = new Image[5];
-    private readonly Image[] attributeBaseFills = new Image[5];
-    private readonly Image[] attributeBonusFills = new Image[5];
-    private readonly TextMeshProUGUI[] attributeValues = new TextMeshProUGUI[5];
+    private readonly string[] attributeKeys = { "HP", "ATK", "DEF", "MAG", "RES", "SPD" };
+    private readonly Image[] attributeBarBackgrounds = new Image[6];
+    private readonly Image[] attributeBaseFills = new Image[6];
+    private readonly Image[] attributeBonusFills = new Image[6];
+    private readonly TextMeshProUGUI[] attributeValues = new TextMeshProUGUI[6];
 
     private TextMeshProUGUI titleText;
     private TextMeshProUGUI previewText;
@@ -1043,7 +1046,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
         float resTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.specialDefense) : 0f;
         float resBase = Mathf.Max(0f, baseSnapshot.specialDefense);
         float resBonus = Mathf.Max(0f, resTotal - resBase);
-        float speed = cachedStats != null ? Mathf.Max(0f, cachedStats.speed) : 0f;
+        float speedTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.speed) : 0f;
+        float speedBase = Mathf.Max(0f, baseSnapshot.speed);
+        float speedBonus = Mathf.Max(0f, speedTotal - speedBase);
         float luck = cachedStats != null ? Mathf.Max(0f, cachedStats.luck) : 0f;
         float critRate = BattleStatUtility.GetCritRate(cachedStats) * 100f;
         float extraSoulDrop = ResolveExtraSoulDropChance(luck) * 100f;
@@ -1076,10 +1081,11 @@ public class PlayerAttributePanelUI : MonoBehaviour
         SetAttributeDisplay(2, defBase, defTotal, defBonus, defDisplayMax);
         SetAttributeDisplay(3, magBase, magTotal, magBonus, magDisplayMax);
         SetAttributeDisplay(4, resBase, resTotal, resBonus, resDisplayMax);
+        SetAttributeDisplay(5, speedBase, speedTotal, speedBonus, spdDisplayMax);
 
         if (spdText != null)
         {
-            spdText.text = "SPD " + speed.ToString("0.0");
+            spdText.gameObject.SetActive(false);
         }
 
         if (luckText != null)
@@ -1110,7 +1116,6 @@ public class PlayerAttributePanelUI : MonoBehaviour
         if (footerText != null && spdText == null && luckText == null && critRateText == null && extraSoulDropText == null && extraRuneDropText == null)
         {
             footerText.text =
-                "SPD  " + speed.ToString("0.0") + "\n" +
                 "LUCK " + luck.ToString("0") + "\n" +
                 "Crit Rate        " + critRate.ToString("0.#") + "%\n" +
                 "Extra Soul Drop  " + extraSoulDrop.ToString("0.#") + "%\n" +
@@ -1237,7 +1242,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
             physicalAttack = Mathf.Max(0f, stats.physicalAttack),
             physicalDefense = Mathf.Max(0f, stats.physicalDefense),
             specialAttack = Mathf.Max(0f, stats.specialAttack),
-            specialDefense = Mathf.Max(0f, stats.specialDefense)
+            specialDefense = Mathf.Max(0f, stats.specialDefense),
+            speed = Mathf.Max(0f, stats.speed)
         };
 
         attributeBaseSnapshots[key] = snapshot;
@@ -1324,7 +1330,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
             physicalAttack = Mathf.Max(0f, cachedStats.physicalAttack),
             physicalDefense = Mathf.Max(0f, cachedStats.physicalDefense),
             specialAttack = Mathf.Max(0f, cachedStats.specialAttack),
-            specialDefense = Mathf.Max(0f, cachedStats.specialDefense)
+            specialDefense = Mathf.Max(0f, cachedStats.specialDefense),
+            speed = Mathf.Max(0f, cachedStats.speed)
         };
 
         attributeBaseSnapshots[cachedPlayer.GetInstanceID()] = snapshot;
@@ -1488,6 +1495,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
                 return magBaseColor;
             case 4:
                 return resBaseColor;
+            case 5:
+                return spdBaseColor;
             default:
                 return barFillColor;
         }

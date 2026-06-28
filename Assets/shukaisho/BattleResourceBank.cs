@@ -226,7 +226,7 @@ public class BattleResourceBank : MonoBehaviour
     {
         CombatStats stats = GetComponent<CombatStats>();
         CombatHealth combatHealth = GetComponent<CombatHealth>();
-        int growthChoice = UnityEngine.Random.Range(0, 5);
+        int growthChoice = UnityEngine.Random.Range(0, 6);
         int growthAmount = Mathf.Clamp(soulPoint, 1, 5);
         float healthGrowth = growthAmount * 10f;
 
@@ -272,9 +272,12 @@ public class BattleResourceBank : MonoBehaviour
             case 3:
                 stats.specialAttack += growthAmount;
                 return $"MAG +{growthAmount}";
-            default:
+            case 4:
                 stats.specialDefense += growthAmount;
                 return $"RES +{growthAmount}";
+            default:
+                stats.speed += growthAmount;
+                return $"SPD +{growthAmount}";
         }
     }
 

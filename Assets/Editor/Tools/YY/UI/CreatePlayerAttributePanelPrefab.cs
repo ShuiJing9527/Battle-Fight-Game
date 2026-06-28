@@ -80,8 +80,8 @@ public static class CreatePlayerAttributePanelPrefab
         TextMeshProUGUI titleText = CreateText(attributeArea.transform, "TitleText", "Player Attributes", fontAsset, 20f, TextAlignmentOptions.MidlineLeft);
         Stretch(titleText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -30f), new Vector2(0f, 0f));
 
-        string[] rowKeys = { "HP", "ATK", "DEF", "MAG", "RES" };
-        string[] rowValues = { "100/100", "0", "0", "0", "0" };
+        string[] rowKeys = { "HP", "ATK", "DEF", "MAG", "RES", "SPD" };
+        string[] rowValues = { "100/100", "0", "0", "0", "0", "0" };
         float rowTop = 44f;
         float rowHeight = 28f;
         float rowGap = 10f;
@@ -94,16 +94,15 @@ public static class CreatePlayerAttributePanelPrefab
         }
 
         GameObject subInfoArea = CreateUIObject("SubInfoArea", root.transform);
-        Stretch(subInfoArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 64f), new Vector2(-20f, 146f));
+        Stretch(subInfoArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 52f), new Vector2(-20f, 142f));
 
-        CreateSubInfoText(subInfoArea.transform, "SPDText", "SPD 0", fontAsset, 0);
-        CreateSubInfoText(subInfoArea.transform, "LUCKText", "LUCK 0", fontAsset, 1);
-        CreateSubInfoText(subInfoArea.transform, "CritRateText", "Crit Rate 0%", fontAsset, 2);
-        CreateSubInfoText(subInfoArea.transform, "ExtraSoulDropText", "Extra Soul Drop 0%", fontAsset, 3);
-        CreateSubInfoText(subInfoArea.transform, "ExtraRuneDropText", "Extra Rune Drop 0%", fontAsset, 4);
+        CreateSubInfoText(subInfoArea.transform, "LUCKText", "LUCK 0", fontAsset, 0);
+        CreateSubInfoText(subInfoArea.transform, "CritRateText", "Crit Rate 0%", fontAsset, 1);
+        CreateSubInfoText(subInfoArea.transform, "ExtraSoulDropText", "Extra Soul Drop 0%", fontAsset, 2);
+        CreateSubInfoText(subInfoArea.transform, "ExtraRuneDropText", "Extra Rune Drop 0%", fontAsset, 3);
 
         GameObject reserveArea = CreateUIObject("ReserveArea", root.transform);
-        Stretch(reserveArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 20f), new Vector2(-20f, 20f));
+        Stretch(reserveArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 14f), new Vector2(-20f, 42f));
 
         TextMeshProUGUI reserveText = CreateText(reserveArea.transform, "ReserveText", "Buff / Rune / Skill Info Reserved", fontAsset, 13f, TextAlignmentOptions.MidlineLeft);
         reserveText.enableWordWrapping = true;
@@ -126,10 +125,34 @@ public static class CreatePlayerAttributePanelPrefab
         GameObject barBackground = CreatePanel(row.transform, "BarBackground", new Color(0.16f, 0.18f, 0.24f, 1f));
         Stretch(barBackground.GetComponent<RectTransform>(), new Vector2(0f, 0.5f), new Vector2(0f, 0.5f), new Vector2(70f, -6f), new Vector2(286f, 6f));
 
-        GameObject barFill = CreatePanel(barBackground.transform, "BarFill", new Color(0.92f, 0.76f, 0.30f, 1f));
-        Stretch(barFill.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
+        GameObject baseFill = CreatePanel(row.transform, "BaseFill", ResolveBaseFillColor(key));
+        Stretch(baseFill.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(70f, 0f), new Vector2(70f, 0f));
+
+        GameObject bonusFill = CreatePanel(row.transform, "BonusFill", new Color(1.00f, 0.83f, 0.29f, 1.00f));
+        Stretch(bonusFill.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(70f, 0f), new Vector2(70f, 0f));
 
         return row;
+    }
+
+    private static Color ResolveBaseFillColor(string key)
+    {
+        switch (key)
+        {
+            case "HP":
+                return new Color32(0x6C, 0xCB, 0x5F, 0xFF);
+            case "ATK":
+                return new Color32(0xD9, 0x53, 0x4F, 0xFF);
+            case "DEF":
+                return new Color32(0xE4, 0x9B, 0x3E, 0xFF);
+            case "MAG":
+                return new Color32(0x8E, 0x63, 0xD9, 0xFF);
+            case "RES":
+                return new Color32(0x5B, 0x8C, 0xFF, 0xFF);
+            case "SPD":
+                return new Color(0.75f, 0.94f, 1.00f, 1.00f);
+            default:
+                return new Color(0.92f, 0.76f, 0.30f, 1f);
+        }
     }
 
     private static void CreateSubInfoText(Transform parent, string name, string value, TMP_FontAsset fontAsset, int lineIndex)

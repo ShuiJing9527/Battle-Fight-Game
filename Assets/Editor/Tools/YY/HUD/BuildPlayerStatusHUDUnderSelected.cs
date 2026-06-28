@@ -56,6 +56,10 @@ public static class BuildPlayerStatusHUDUnderSelected
         GameObject hudRoot = CreateUIObject("HudRoot", selectedRect);
         SetupHudRoot(hudRoot.GetComponent<RectTransform>());
 
+        GameObject hpBar = CreateStatusBar(hudRoot.transform, "HpBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -8f), new Color(0.86f, 0.18f, 0.18f, 1f), "HP 100/100");
+        GameObject mpBar = CreateStatusBar(hudRoot.transform, "MpBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -56f), new Color(0.24f, 0.55f, 1f, 1f), "MP 100/100");
+        GameObject shieldBar = CreateStatusBar(hudRoot.transform, "ShieldBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -104f), new Color(0.84f, 0.96f, 1f, 1f), "Shield 0/0");
+
         GameObject hintPanel = CreateUIObject("HintPanel", hudRoot.transform);
         SetupHintPanel(hintPanel.GetComponent<RectTransform>());
 
@@ -65,9 +69,8 @@ public static class BuildPlayerStatusHUDUnderSelected
         TextMeshProUGUI runeHintText = CreateText(hintPanel.transform, "RuneHintText", "K: Rune Panel", 28f, TextAlignmentOptions.TopLeft);
         ConfigureHintText(runeHintText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -38f), new Vector2(0f, -42f), 34f);
 
-        GameObject hpBar = CreateStatusBar(hudRoot.transform, "HpBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -96f), new Color(0.86f, 0.18f, 0.18f, 1f), "HP 100/100");
-        GameObject mpBar = CreateStatusBar(hudRoot.transform, "MpBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -144f), new Color(0.24f, 0.55f, 1f, 1f), "MP 100/100");
-        GameObject shieldBar = CreateStatusBar(hudRoot.transform, "ShieldBar", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, -192f), new Color(0.84f, 0.96f, 1f, 1f), "Shield 0/0");
+        TextMeshProUGUI characterPanelHintText = CreateText(hintPanel.transform, "CharacterPanelHintText", "I: Character Panel", 28f, TextAlignmentOptions.TopLeft);
+        ConfigureHintText(characterPanelHintText.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -76f), new Vector2(0f, -80f), 34f);
 
         BindHud(
             hud,
@@ -79,7 +82,8 @@ public static class BuildPlayerStatusHUDUnderSelected
             mpBar.transform.Find("Label")?.GetComponent<TextMeshProUGUI>(),
             shieldBar.transform.Find("Label")?.GetComponent<TextMeshProUGUI>(),
             switchHintText,
-            runeHintText);
+            runeHintText,
+            characterPanelHintText);
 
         Selection.activeGameObject = hudRoot;
         Debug.Log("[HUD] Built test PlayerStatusHUD under selected object.", selected);
@@ -95,7 +99,8 @@ public static class BuildPlayerStatusHUDUnderSelected
         TextMeshProUGUI mpText,
         TextMeshProUGUI shieldText,
         TextMeshProUGUI switchHintText,
-        TextMeshProUGUI runeHintText)
+        TextMeshProUGUI runeHintText,
+        TextMeshProUGUI characterPanelHintText)
     {
         Undo.RecordObject(hud, "Bind Player Status HUD");
 
@@ -109,6 +114,7 @@ public static class BuildPlayerStatusHUDUnderSelected
         serializedObject.FindProperty("shieldText").objectReferenceValue = shieldText;
         serializedObject.FindProperty("switchHintText").objectReferenceValue = switchHintText;
         serializedObject.FindProperty("runeHintText").objectReferenceValue = runeHintText;
+        serializedObject.FindProperty("characterPanelHintText").objectReferenceValue = characterPanelHintText;
         serializedObject.ApplyModifiedProperties();
 
         EditorUtility.SetDirty(hud);
@@ -161,8 +167,8 @@ public static class BuildPlayerStatusHUDUnderSelected
         rect.anchorMin = new Vector2(0f, 1f);
         rect.anchorMax = new Vector2(0f, 1f);
         rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = Vector2.zero;
-        rect.sizeDelta = new Vector2(360f, 72f);
+        rect.anchoredPosition = new Vector2(0f, -152f);
+        rect.sizeDelta = new Vector2(360f, 108f);
     }
 
     private static void ConfigureHintText(

@@ -5,6 +5,18 @@ using AHD2TimeOfDay;
 
 public class EnemySpawner : MonoBehaviour
 {
+    private struct MonsterBaseSnapshot
+    {
+        public bool initialized;
+        public float maxHealth;
+        public float physicalAttack;
+        public float physicalDefense;
+        public float specialAttack;
+        public float specialDefense;
+        public float speed;
+        public float luck;
+    }
+
     [Header("Enemy")]
     public GameObject[] enemyPrefabs;
     public GameObject[] normalEnemyPrefabs;
@@ -12,15 +24,65 @@ public class EnemySpawner : MonoBehaviour
     public GameObject[] bossEnemyPrefabs;
     public bool useRuntimeRankOverride = true;
 
-    [Header("Quantity limit")]
-    [Tooltip("Maximum concurrent enemies allowed for this spawner in the scene")]
-    public int maxEnemyCount = 5;
-    private int currentEnemyCount = 0;
-
-    [Header("Spawn time")]
+    [Header("Legacy Spawn")]
+    [Tooltip("Base refill check interval used when alive normal monsters fall below the base amount.")]
     public float spawnInterval = 3f;
     public float startDelay = 2f;
-    public float eliteSpawnInterval = 30f;
+    [Tooltip("Legacy field kept for compatibility. Elite now uses the random interval range below.")]
+    [HideInInspector] public float eliteSpawnInterval = 30f;
+
+    [Header("Normal Monsters")]
+    public int baseNormalMonsterCount = 5;
+    public int maxNormalMonsterCount = 50;
+    public float normalReinforceIntervalMin = 5f;
+    public float normalReinforceIntervalMax = 10f;
+    public int normalReinforceCountMin = 1;
+    public int normalReinforceCountMax = 5;
+
+    [Header("Monster Stat Growth")]
+    public float monsterStatGrowthIntervalMin = 30f;
+    public float monsterStatGrowthIntervalMax = 60f;
+    [Range(0.01f, 0.5f)] public float monsterStatGrowthPercentMin = 0.01f;
+    [Range(0.01f, 0.5f)] public float monsterStatGrowthPercentMax = 0.05f;
+    [Min(1f)] public float currentMonsterStatMultiplier = 1f;
+
+    [Header("Rank Multipliers - Normal")]
+    public float normalHealthMultiplier = 1f;
+    public float normalAttackMultiplier = 1f;
+    public float normalDefenseMultiplier = 1f;
+    public float normalMagicMultiplier = 1f;
+    public float normalResistanceMultiplier = 1f;
+    public float normalSpeedMultiplier = 1f;
+
+    [Header("Rank Multipliers - Elite")]
+    public float eliteHealthMultiplier = 3f;
+    public float eliteAttackMultiplier = 2f;
+    public float eliteDefenseMultiplier = 1.5f;
+    public float eliteMagicMultiplier = 2f;
+    public float eliteResistanceMultiplier = 1.5f;
+    public float eliteSpeedMultiplier = 1.1f;
+    public float eliteAttackIntervalMultiplier = 1.1f;
+    public float eliteOutgoingDamageMultiplier = 1f;
+
+    [Header("Rank Multipliers - Boss")]
+    public float bossHealthMultiplier = 10f;
+    public float bossAttackMultiplier = 5f;
+    public float bossDefenseMultiplier = 3f;
+    public float bossMagicMultiplier = 5f;
+    public float bossResistanceMultiplier = 3f;
+    public float bossSpeedMultiplier = 1f;
+    public float bossAttackIntervalMultiplier = 1.8f;
+    public float bossOutgoingDamageMultiplier = 1.5f;
+
+    [Header("Elite")]
+    public float eliteSpawnIntervalMin = 20f;
+    public float eliteSpawnIntervalMax = 40f;
+    public int maxAliveEliteCount = 1;
+
+    [Header("Boss")]
+    public float bossCheckIntervalGameHours = 6f;
+    [Range(0f, 1f)] public float bossSpawnChancePerCheck = 0.25f;
+    public int maxAliveBossCount = 1;
 
     [Header("Spawn Around Player")]
     public bool spawnAroundPlayer = true;
@@ -33,60 +95,147 @@ public class EnemySpawner : MonoBehaviour
     public Transform playerTarget;
     public string playerTag = "Player";
 
+    [Header("Enemy Collision")]
+    [SerializeField] private string enemyLayerName = "Enemy";
+    [SerializeField] private bool ignoreEnemySelfCollision = true;
+    [SerializeField] private bool freezeEnemyVerticalPosition = false;
+
     private Player2Bootstrap playerBootstrap;
     private TODController todController;
     private float previousTodTime;
     private bool todTimeInitialized;
+    private float elapsedTrackedGameHours;
+    private float nextBossCheckElapsedGameHours;
+
     private readonly List<GameObject> fallbackNormalEnemyPrefabs = new List<GameObject>();
     private readonly List<GameObject> fallbackEliteEnemyPrefabs = new List<GameObject>();
     private readonly List<GameObject> fallbackBossEnemyPrefabs = new List<GameObject>();
+    private readonly List<GameObject> aliveEnemies = new List<GameObject>();
+    private readonly Dictionary<int, MonsterBaseSnapshot> monsterBaseSnapshots = new Dictionary<int, MonsterBaseSnapshot>();
+    private int resolvedEnemyLayer = -1;
+    private bool enemyLayerCollisionConfigured;
 
     private void Start()
     {
         CachePrefabPools();
+        ResolveEnemyLayer();
+        ConfigureEnemyLayerCollision();
         ResolvePlayerTarget();
         InitializeTodTracking();
-        StartCoroutine(NormalSpawnRoutine());
+        StartCoroutine(InitialNormalSpawnRoutine());
+        StartCoroutine(NormalBaseMaintenanceRoutine());
+        StartCoroutine(NormalReinforcementRoutine());
         StartCoroutine(EliteSpawnRoutine());
+        StartCoroutine(MonsterGrowthRoutine());
     }
 
     private void Update()
     {
         ResolvePlayerTarget();
-        CheckBossSpawnAtMidnight();
+        CheckBossSpawnByGameHours();
     }
 
-    private IEnumerator NormalSpawnRoutine()
+    private IEnumerator InitialNormalSpawnRoutine()
     {
-        yield return new WaitForSeconds(startDelay);
+        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
+        SpawnNormalEnemiesUpTo(baseNormalMonsterCount);
+    }
+
+    private IEnumerator NormalBaseMaintenanceRoutine()
+    {
+        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
 
         while (true)
         {
+            CleanupTrackedEnemies();
+            ResolvePlayerTarget();
+            SpawnNormalEnemiesUpTo(baseNormalMonsterCount);
+            yield return new WaitForSeconds(Mathf.Max(0.25f, spawnInterval));
+        }
+    }
+
+    private IEnumerator NormalReinforcementRoutine()
+    {
+        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
+
+        while (true)
+        {
+            float waitSeconds = Random.Range(
+                Mathf.Max(0.1f, Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax)),
+                Mathf.Max(Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax) + 0.1f, Mathf.Max(normalReinforceIntervalMin, normalReinforceIntervalMax)));
+
+            yield return new WaitForSeconds(waitSeconds);
+
+            CleanupTrackedEnemies();
             ResolvePlayerTarget();
 
-            if (currentEnemyCount < maxEnemyCount)
+            int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
+            int capacity = Mathf.Max(0, maxNormalMonsterCount - aliveNormal);
+            if (capacity <= 0)
             {
-                SpawnNormalEnemy();
+                continue;
             }
 
-            yield return new WaitForSeconds(spawnInterval);
+            int reinforceMin = Mathf.Max(1, Mathf.Min(normalReinforceCountMin, normalReinforceCountMax));
+            int reinforceMax = Mathf.Max(reinforceMin, Mathf.Max(normalReinforceCountMin, normalReinforceCountMax));
+            int reinforceCount = Mathf.Min(capacity, Random.Range(reinforceMin, reinforceMax + 1));
+            SpawnMultipleNormals(reinforceCount);
         }
     }
 
     private IEnumerator EliteSpawnRoutine()
     {
-        yield return new WaitForSeconds(Mathf.Max(0f, eliteSpawnInterval));
-
         while (true)
         {
+            float waitSeconds = Random.Range(
+                Mathf.Max(0.1f, Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax)),
+                Mathf.Max(Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax) + 0.1f, Mathf.Max(eliteSpawnIntervalMin, eliteSpawnIntervalMax)));
+
+            yield return new WaitForSeconds(waitSeconds);
+
+            CleanupTrackedEnemies();
             ResolvePlayerTarget();
 
-            if (currentEnemyCount < maxEnemyCount)
+            if (CountAliveEnemies(MonsterRank.Elite) < Mathf.Max(0, maxAliveEliteCount))
             {
                 SpawnEliteEnemy();
             }
+        }
+    }
 
-            yield return new WaitForSeconds(Mathf.Max(0.1f, eliteSpawnInterval));
+    private IEnumerator MonsterGrowthRoutine()
+    {
+        while (true)
+        {
+            float waitSeconds = Random.Range(
+                Mathf.Max(0.1f, Mathf.Min(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax)),
+                Mathf.Max(Mathf.Min(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax) + 0.1f, Mathf.Max(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax)));
+
+            yield return new WaitForSeconds(waitSeconds);
+            ApplyMonsterGrowthRoll();
+        }
+    }
+
+    private void SpawnNormalEnemiesUpTo(int targetCount)
+    {
+        CleanupTrackedEnemies();
+        int safeTarget = Mathf.Clamp(targetCount, 0, Mathf.Max(0, maxNormalMonsterCount));
+        int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
+        int missingCount = Mathf.Max(0, safeTarget - aliveNormal);
+        SpawnMultipleNormals(missingCount);
+    }
+
+    private void SpawnMultipleNormals(int count)
+    {
+        count = Mathf.Max(0, count);
+        for (int i = 0; i < count; i++)
+        {
+            if (CountAliveEnemies(MonsterRank.Normal) >= Mathf.Max(0, maxNormalMonsterCount))
+            {
+                break;
+            }
+
+            SpawnNormalEnemy();
         }
     }
 
@@ -140,7 +289,7 @@ public class EnemySpawner : MonoBehaviour
 
         MonsterCombatAutoSetup.Configure(spawnedEnemy, runtimeSpecies, runtimeRank);
 
-        currentEnemyCount++;
+        RegisterSpawnedEnemy(spawnedEnemy);
 
         EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
         if (notifier == null)
@@ -153,6 +302,313 @@ public class EnemySpawner : MonoBehaviour
         if (enemyController != null)
         {
             enemyController.SetTarget(ResolveActivePlayerTarget());
+        }
+    }
+
+    private void RegisterSpawnedEnemy(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        aliveEnemies.Add(enemy);
+        CacheMonsterBaseSnapshot(enemy);
+        ConfigureSpawnedEnemyPhysics(enemy);
+        ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
+    }
+
+    private void CacheMonsterBaseSnapshot(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        CombatStats stats = enemy.GetComponent<CombatStats>();
+        if (stats == null)
+        {
+            return;
+        }
+
+        monsterBaseSnapshots[enemy.GetInstanceID()] = new MonsterBaseSnapshot
+        {
+            initialized = true,
+            maxHealth = Mathf.Max(1f, stats.maxHealth),
+            physicalAttack = Mathf.Max(0f, stats.physicalAttack),
+            physicalDefense = Mathf.Max(0f, stats.physicalDefense),
+            specialAttack = Mathf.Max(0f, stats.specialAttack),
+            specialDefense = Mathf.Max(0f, stats.specialDefense),
+            speed = Mathf.Max(0.1f, stats.speed),
+            luck = Mathf.Max(0f, stats.luck)
+        };
+    }
+
+    private void ApplyMonsterGrowthRoll()
+    {
+        float growthPercent = Random.Range(
+            Mathf.Max(0f, Mathf.Min(monsterStatGrowthPercentMin, monsterStatGrowthPercentMax)),
+            Mathf.Max(Mathf.Min(monsterStatGrowthPercentMin, monsterStatGrowthPercentMax), Mathf.Max(monsterStatGrowthPercentMin, monsterStatGrowthPercentMax)));
+
+        currentMonsterStatMultiplier *= 1f + growthPercent;
+
+        CleanupTrackedEnemies();
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            ApplyCurrentMultiplierToMonster(aliveEnemies[i], refillCurrentHealth: false);
+        }
+    }
+
+    private void ApplyCurrentMultiplierToMonster(GameObject enemy, bool refillCurrentHealth)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        CombatStats stats = enemy.GetComponent<CombatStats>();
+        if (stats == null)
+        {
+            return;
+        }
+
+        MonsterBaseSnapshot snapshot;
+        if (!monsterBaseSnapshots.TryGetValue(enemy.GetInstanceID(), out snapshot) || !snapshot.initialized)
+        {
+            CacheMonsterBaseSnapshot(enemy);
+            if (!monsterBaseSnapshots.TryGetValue(enemy.GetInstanceID(), out snapshot) || !snapshot.initialized)
+            {
+                return;
+            }
+        }
+
+        BattleResourceBank resourceBank = enemy.GetComponent<BattleResourceBank>();
+        CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
+        float previousMaxHealth = resourceBank != null
+            ? Mathf.Max(1f, resourceBank.maxHealth)
+            : (combatHealth != null ? Mathf.Max(1f, combatHealth.MaxHealthValue) : Mathf.Max(1f, stats.maxHealth));
+        float previousCurrentHealth = resourceBank != null
+            ? Mathf.Max(0f, resourceBank.currentHealth)
+            : (combatHealth != null ? Mathf.Max(0f, combatHealth.currentHealth) : previousMaxHealth);
+        float healthRatio = refillCurrentHealth || previousMaxHealth <= 0f
+            ? 1f
+            : Mathf.Clamp01(previousCurrentHealth / previousMaxHealth);
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        float timeMultiplier = Mathf.Max(1f, currentMonsterStatMultiplier);
+        float healthMultiplier = timeMultiplier * ResolveRankHealthMultiplier(rank);
+        float attackMultiplier = timeMultiplier * ResolveRankAttackMultiplier(rank);
+        float defenseMultiplier = timeMultiplier * ResolveRankDefenseMultiplier(rank);
+        float magicMultiplier = timeMultiplier * ResolveRankMagicMultiplier(rank);
+        float resistanceMultiplier = timeMultiplier * ResolveRankResistanceMultiplier(rank);
+        float speedMultiplier = timeMultiplier * ResolveRankSpeedMultiplier(rank);
+
+        stats.maxHealth = Mathf.Max(1f, Mathf.Round(snapshot.maxHealth * healthMultiplier));
+        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(snapshot.physicalAttack * attackMultiplier));
+        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(snapshot.physicalDefense * defenseMultiplier));
+        stats.specialAttack = Mathf.Max(0f, Mathf.Round(snapshot.specialAttack * magicMultiplier));
+        stats.specialDefense = Mathf.Max(0f, Mathf.Round(snapshot.specialDefense * resistanceMultiplier));
+        stats.speed = Mathf.Max(0.1f, RoundToDecimals(snapshot.speed * speedMultiplier, 2));
+        stats.luck = Mathf.Max(0f, snapshot.luck);
+
+        float resolvedCurrentHealth = refillCurrentHealth
+            ? stats.maxHealth
+            : Mathf.Clamp(stats.maxHealth * healthRatio, 0f, stats.maxHealth);
+
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = stats.maxHealth;
+            resourceBank.currentHealth = resolvedCurrentHealth;
+        }
+
+        if (combatHealth != null)
+        {
+            combatHealth.stats = stats;
+            combatHealth.resourceBank = resourceBank;
+            combatHealth.currentHealth = resolvedCurrentHealth;
+        }
+
+        ConfigureEnemyController(enemy, stats);
+    }
+
+    private void ConfigureEnemyController(GameObject enemy, CombatStats stats)
+    {
+        if (enemy == null || stats == null)
+        {
+            return;
+        }
+
+        EnemyController controller = enemy.GetComponent<EnemyController>();
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (controller == null || identity == null)
+        {
+            return;
+        }
+
+        float range = 1.35f;
+        float hitRange = 1.6f;
+        float cooldown = 1.1f;
+        if (identity.rank == MonsterRank.Elite)
+        {
+            range = 5f;
+            hitRange = 6f;
+            cooldown = 1.6f;
+        }
+        else if (identity.rank == MonsterRank.Boss)
+        {
+            range = 8f;
+            hitRange = 8f;
+            cooldown = 2.2f;
+        }
+
+        float moveSpeed = ResolveMoveSpeed(identity, stats.speed);
+        BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
+        float attackPower = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
+        controller.ConfigureRuntime(
+            moveSpeed,
+            0.8f,
+            range,
+            hitRange,
+            cooldown,
+            attackPower,
+            identity.attackStyle,
+            ResolveRankAttackIntervalMultiplier(identity.rank),
+            ResolveRankOutgoingDamageMultiplier(identity.rank));
+        controller.SetTarget(ResolveActivePlayerTarget());
+    }
+
+    private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
+    {
+        if (identity == null)
+        {
+            return Mathf.Max(0.1f, statSpeed);
+        }
+
+        switch (identity.species)
+        {
+            case MonsterSpecies.GreenSlime:
+                return 2.9f;
+            case MonsterSpecies.LavaSlime:
+                return 2.1f;
+            case MonsterSpecies.PoisonSlime:
+                return 2.7f;
+            case MonsterSpecies.RainbowSlime:
+                return 2.3f;
+            case MonsterSpecies.Flying:
+                return 3.6f;
+            case MonsterSpecies.Ranged:
+                return 2f;
+            case MonsterSpecies.Tank:
+                return 1.25f;
+            case MonsterSpecies.Assassin:
+                return 4.4f;
+            default:
+                return Mathf.Max(0.1f, statSpeed > 0f ? statSpeed : 2.5f);
+        }
+    }
+
+    private float ResolveRankHealthMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossHealthMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteHealthMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalHealthMultiplier);
+        }
+    }
+
+    private float ResolveRankAttackMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossAttackMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteAttackMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalAttackMultiplier);
+        }
+    }
+
+    private float ResolveRankDefenseMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossDefenseMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteDefenseMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalDefenseMultiplier);
+        }
+    }
+
+    private float ResolveRankMagicMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossMagicMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteMagicMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalMagicMultiplier);
+        }
+    }
+
+    private float ResolveRankResistanceMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossResistanceMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteResistanceMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalResistanceMultiplier);
+        }
+    }
+
+    private float ResolveRankSpeedMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossSpeedMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteSpeedMultiplier);
+            default:
+                return Mathf.Max(0.01f, normalSpeedMultiplier);
+        }
+    }
+
+    private float ResolveRankAttackIntervalMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.1f, bossAttackIntervalMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.1f, eliteAttackIntervalMultiplier);
+            default:
+                return 1f;
+        }
+    }
+
+    private float ResolveRankOutgoingDamageMultiplier(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Boss:
+                return Mathf.Max(0.01f, bossOutgoingDamageMultiplier);
+            case MonsterRank.Elite:
+                return Mathf.Max(0.01f, eliteOutgoingDamageMultiplier);
+            default:
+                return 1f;
         }
     }
 
@@ -208,6 +664,119 @@ public class EnemySpawner : MonoBehaviour
             if (playerObject != null)
             {
                 playerTarget = playerObject.transform;
+            }
+        }
+    }
+
+    private void ResolveEnemyLayer()
+    {
+        resolvedEnemyLayer = LayerMask.NameToLayer(enemyLayerName);
+    }
+
+    private void ConfigureEnemyLayerCollision()
+    {
+        if (!ignoreEnemySelfCollision)
+        {
+            return;
+        }
+
+        if (resolvedEnemyLayer < 0)
+        {
+            return;
+        }
+
+        if (enemyLayerCollisionConfigured)
+        {
+            return;
+        }
+
+        Physics.IgnoreLayerCollision(resolvedEnemyLayer, resolvedEnemyLayer, true);
+        enemyLayerCollisionConfigured = true;
+    }
+
+    private void ConfigureSpawnedEnemyPhysics(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        if (resolvedEnemyLayer >= 0)
+        {
+            SetLayerRecursively(enemy, resolvedEnemyLayer);
+            ConfigureEnemyLayerCollision();
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        if (body != null)
+        {
+            RigidbodyConstraints constraints = body.constraints;
+            constraints |= RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
+            constraints &= ~RigidbodyConstraints.FreezePositionY;
+
+            body.constraints = constraints;
+        }
+
+        if (!ignoreEnemySelfCollision || resolvedEnemyLayer >= 0)
+        {
+            return;
+        }
+
+        Collider[] newEnemyColliders = enemy.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            GameObject otherEnemy = aliveEnemies[i];
+            if (otherEnemy == null || otherEnemy == enemy)
+            {
+                continue;
+            }
+
+            Collider[] otherColliders = otherEnemy.GetComponentsInChildren<Collider>(true);
+            IgnoreColliderPairs(newEnemyColliders, otherColliders);
+        }
+    }
+
+    private static void IgnoreColliderPairs(Collider[] first, Collider[] second)
+    {
+        if (first == null || second == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < first.Length; i++)
+        {
+            Collider left = first[i];
+            if (left == null)
+            {
+                continue;
+            }
+
+            for (int j = 0; j < second.Length; j++)
+            {
+                Collider right = second[j];
+                if (right == null || left == right)
+                {
+                    continue;
+                }
+
+                Physics.IgnoreCollision(left, right, true);
+            }
+        }
+    }
+
+    private static void SetLayerRecursively(GameObject root, int layer)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        root.layer = layer;
+        foreach (Transform child in root.transform)
+        {
+            if (child != null)
+            {
+                SetLayerRecursively(child.gameObject, layer);
             }
         }
     }
@@ -278,6 +847,9 @@ public class EnemySpawner : MonoBehaviour
     private void InitializeTodTracking()
     {
         todController = FindObjectOfType<TODController>();
+        elapsedTrackedGameHours = 0f;
+        nextBossCheckElapsedGameHours = Mathf.Max(0.1f, bossCheckIntervalGameHours);
+
         if (todController != null && todController.todGlobalParameters != null)
         {
             previousTodTime = todController.todGlobalParameters.CurrentTime;
@@ -285,7 +857,7 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private void CheckBossSpawnAtMidnight()
+    private void CheckBossSpawnByGameHours()
     {
         if (todController == null)
         {
@@ -302,27 +874,135 @@ public class EnemySpawner : MonoBehaviour
         {
             previousTodTime = currentTodTime;
             todTimeInitialized = true;
+            elapsedTrackedGameHours = 0f;
+            nextBossCheckElapsedGameHours = Mathf.Max(0.1f, bossCheckIntervalGameHours);
             return;
         }
 
-        bool crossedMidnight = currentTodTime < previousTodTime;
-        previousTodTime = currentTodTime;
+        float deltaHours = currentTodTime - previousTodTime;
+        if (deltaHours < 0f)
+        {
+            deltaHours += 24f;
+        }
 
-        if (!crossedMidnight || currentEnemyCount >= maxEnemyCount)
+        previousTodTime = currentTodTime;
+        elapsedTrackedGameHours += Mathf.Max(0f, deltaHours);
+
+        float intervalHours = Mathf.Max(0.1f, bossCheckIntervalGameHours);
+        while (elapsedTrackedGameHours >= nextBossCheckElapsedGameHours)
+        {
+            TrySpawnBossFromTimedCheck();
+            nextBossCheckElapsedGameHours += intervalHours;
+        }
+    }
+
+    private void TrySpawnBossFromTimedCheck()
+    {
+        CleanupTrackedEnemies();
+        if (CountAliveEnemies(MonsterRank.Boss) >= Mathf.Max(0, maxAliveBossCount))
         {
             return;
         }
 
-        SpawnBossEnemy();
+        if (Random.value <= Mathf.Clamp01(bossSpawnChancePerCheck))
+        {
+            SpawnBossEnemy();
+        }
+    }
+
+    private int CountAliveEnemies(MonsterRank rank)
+    {
+        CleanupTrackedEnemies();
+        int count = 0;
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            GameObject enemy = aliveEnemies[i];
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+            MonsterRank enemyRank = identity != null ? identity.rank : MonsterRank.Normal;
+            if (enemyRank == rank)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private void CleanupTrackedEnemies()
+    {
+        for (int i = aliveEnemies.Count - 1; i >= 0; i--)
+        {
+            GameObject enemy = aliveEnemies[i];
+            if (enemy != null)
+            {
+                continue;
+            }
+
+            aliveEnemies.RemoveAt(i);
+        }
+
+        List<int> staleKeys = null;
+        foreach (KeyValuePair<int, MonsterBaseSnapshot> pair in monsterBaseSnapshots)
+        {
+            bool exists = false;
+            for (int i = 0; i < aliveEnemies.Count; i++)
+            {
+                if (aliveEnemies[i] != null && aliveEnemies[i].GetInstanceID() == pair.Key)
+                {
+                    exists = true;
+                    break;
+                }
+            }
+
+            if (exists)
+            {
+                continue;
+            }
+
+            if (staleKeys == null)
+            {
+                staleKeys = new List<int>();
+            }
+
+            staleKeys.Add(pair.Key);
+        }
+
+        if (staleKeys == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < staleKeys.Count; i++)
+        {
+            monsterBaseSnapshots.Remove(staleKeys[i]);
+        }
+    }
+
+    public void OnEnemyDestroyed(GameObject destroyedEnemy)
+    {
+        if (destroyedEnemy != null)
+        {
+            aliveEnemies.Remove(destroyedEnemy);
+            monsterBaseSnapshots.Remove(destroyedEnemy.GetInstanceID());
+        }
+
+        CleanupTrackedEnemies();
     }
 
     public void OnEnemyDestroyed()
     {
-        currentEnemyCount--;
-        if (currentEnemyCount < 0)
-        {
-            currentEnemyCount = 0;
-        }
+        CleanupTrackedEnemies();
+    }
+
+    private static float RoundToDecimals(float value, int decimals)
+    {
+        float multiplier = Mathf.Pow(10f, Mathf.Max(0, decimals));
+        return Mathf.Round(value * multiplier) / multiplier;
     }
 
     private void OnDrawGizmosSelected()
