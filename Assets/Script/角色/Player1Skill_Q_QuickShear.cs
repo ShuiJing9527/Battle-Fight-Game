@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Reflection;
 using UnityEngine;
 using Spine;
 using Spine.Unity;
@@ -9,17 +10,67 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [Header("Q")]
     [SerializeField, Min(1)] private int slashCount = 3;
     [SerializeField, Min(0f)] private float slashInterval = 0.15f;
-    [FormerlySerializedAs("qDamage")]
-    [SerializeField, Min(0f)] private float baseDamage = 20f;
-    [SerializeField, Min(0f)] private float physicalScaling = 0.6f;
-    [SerializeField, Min(0f)] private float specialScaling = 0.8f;
+    [FormerlySerializedAs("baseDamage")]
+    [SerializeField, Min(0f)] private float physicalBaseDamage = 30f;
+    [SerializeField, Min(0f)] private float specialBaseDamage = 20f;
+    [SerializeField, Min(0f)] private float physicalScaling = 0.2f;
+    [SerializeField, Min(0f)] private float specialScaling = 0.6f;
     [SerializeField, Min(0f)] private float qRange = 2f;
     [SerializeField] private LayerMask enemyLayer = ~0;
     [SerializeField] private Transform hitPoint;
 
+    [Header("Cost")]
+    [InspectorName("Mana Cost")]
+    [SerializeField, Min(0f)] private float manaCost = 10f;
+    [SerializeField, Range(0f, 1f)] private float quickShearLifeStealRatio = 0.5f;
+
+    [Header("Q - Scissor Effects")]
+    [SerializeField] private GameObject scissorCutEffectPrefab;
+    [SerializeField] private GameObject scissorSlashWaveEffectPrefab;
+    [SerializeField] private GameObject scissorEndEffectPrefab;
+    [SerializeField] private Vector3 scissorCutEffectOffset = new Vector3(0.9f, 0.15f, 0f);
+    [SerializeField] private Vector3 scissorSlashWaveEffectOffset = new Vector3(1.35f, 0.15f, 0f);
+    [SerializeField] private Vector3 scissorEndEffectOffset = new Vector3(0.95f, 0.15f, 0f);
+    [SerializeField] private Vector3 scissorCutEffectScale = new Vector3(1.2f, 1.2f, 1f);
+    [SerializeField] private Vector3 scissorSlashWaveEffectScale = new Vector3(1.5f, 1.5f, 1f);
+    [SerializeField] private Vector3 scissorEndEffectScale = new Vector3(1.2f, 1.2f, 1f);
+    [SerializeField, Min(0.01f)] private float scissorCutEffectLifetime = 0.18f;
+    [SerializeField, Min(0.01f)] private float scissorSlashWaveEffectLifetime = 0.20f;
+    [SerializeField, Min(0.01f)] private float scissorEndEffectLifetime = 0.18f;
+    [SerializeField] private bool useScissorEffectTimeline = true;
+    [SerializeField] private bool playScissorEffectsPerSlash = false;
+    [SerializeField, Min(0f)] private float scissorCutEffectDelayFrames = 0f;
+    [SerializeField, Min(0f)] private float scissorSlashWaveEffectDelayFrames = 12f;
+    [SerializeField, Min(0f)] private float scissorEndEffectDelayFrames = 22f;
+    [SerializeField, Min(1f)] private float assumedEffectFrameRate = 60f;
+    [SerializeField] private int scissorCutEffectSortingOrder = 60;
+    [SerializeField] private int scissorSlashWaveEffectSortingOrder = 55;
+    [SerializeField] private int scissorEndEffectSortingOrder = 65;
+    [SerializeField] private bool playEndEffectPerSlash = false;
+    [SerializeField] private bool expandHitboxWithEffect = false;
+    [SerializeField, Min(1f)] private float visualAttackRangeMultiplier = 1f;
+
+    [Header("Q - Extra Crit")]
+    [SerializeField, Range(0f, 1f)] private float quickShearExtraCritChance = 0.30f;
+    [SerializeField, Min(1f)] private float quickShearExtraCritMultiplier = 2.0f;
+    [SerializeField, Range(0f, 1f)] private float quickShearSuperCritChance = 0.05f;
+    [SerializeField, Min(1f)] private float quickShearSuperCritMultiplier = 5.0f;
+    [SerializeField] private bool debugQuickShearCritLog = false;
+    [Header("Q - Crit Flash")]
+    [SerializeField] private GameObject quickShearCritFlashEffectPrefab;
+    [SerializeField] private GameObject quickShearSuperCritFlashEffectPrefab;
+    [SerializeField] private Vector3 quickShearCritFlashOffset = new Vector3(0.9f, 0.25f, 0f);
+    [SerializeField] private Vector3 quickShearCritFlashScale = Vector3.one;
+    [SerializeField, Min(0.01f)] private float quickShearCritFlashLifetime = 0.12f;
+    [SerializeField] private int quickShearCritFlashSortingOrder = 80;
+    [SerializeField] private Color quickShearCritFlashColor = Color.white;
+    [SerializeField] private Color quickShearSuperCritFlashColor = new Color(1f, 0.78f, 0.15f, 1f);
+
     private readonly System.Collections.Generic.HashSet<CombatHealth> castDamagedCombatTargets = new System.Collections.Generic.HashSet<CombatHealth>();
     private readonly System.Collections.Generic.HashSet<EnemyHealth> castDamagedLegacyTargets = new System.Collections.Generic.HashSet<EnemyHealth>();
+    private static readonly System.Collections.Generic.HashSet<string> MissingQuickShearStatsWarnings = new System.Collections.Generic.HashSet<string>();
     private float qLifestealTotalThisCast;
+    private Coroutine activeScissorTimelineCoroutine;
 
     private void Reset()
     {
@@ -30,11 +81,46 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         debugLog = false;
         slashCount = 3;
         slashInterval = 0.15f;
-        baseDamage = 20f;
-        physicalScaling = 0.6f;
-        specialScaling = 0.8f;
+        physicalBaseDamage = 30f;
+        specialBaseDamage = 20f;
+        physicalScaling = 0.2f;
+        specialScaling = 0.6f;
         qRange = 2f;
         enemyLayer = ~0;
+        manaCost = 10f;
+        quickShearLifeStealRatio = 0.5f;
+        scissorCutEffectOffset = new Vector3(0.9f, 0.15f, 0f);
+        scissorSlashWaveEffectOffset = new Vector3(1.35f, 0.15f, 0f);
+        scissorEndEffectOffset = new Vector3(0.95f, 0.15f, 0f);
+        scissorCutEffectScale = new Vector3(1.2f, 1.2f, 1f);
+        scissorSlashWaveEffectScale = new Vector3(1.5f, 1.5f, 1f);
+        scissorEndEffectScale = new Vector3(1.2f, 1.2f, 1f);
+        scissorCutEffectLifetime = 0.18f;
+        scissorSlashWaveEffectLifetime = 0.20f;
+        scissorEndEffectLifetime = 0.18f;
+        useScissorEffectTimeline = true;
+        playScissorEffectsPerSlash = false;
+        scissorCutEffectDelayFrames = 0f;
+        scissorSlashWaveEffectDelayFrames = 12f;
+        scissorEndEffectDelayFrames = 22f;
+        assumedEffectFrameRate = 60f;
+        scissorCutEffectSortingOrder = 60;
+        scissorSlashWaveEffectSortingOrder = 55;
+        scissorEndEffectSortingOrder = 65;
+        playEndEffectPerSlash = false;
+        expandHitboxWithEffect = false;
+        visualAttackRangeMultiplier = 1f;
+        quickShearExtraCritChance = 0.30f;
+        quickShearExtraCritMultiplier = 2f;
+        quickShearSuperCritChance = 0.05f;
+        quickShearSuperCritMultiplier = 5f;
+        debugQuickShearCritLog = false;
+        quickShearCritFlashOffset = new Vector3(0.9f, 0.25f, 0f);
+        quickShearCritFlashScale = Vector3.one;
+        quickShearCritFlashLifetime = 0.12f;
+        quickShearCritFlashSortingOrder = 80;
+        quickShearCritFlashColor = Color.white;
+        quickShearSuperCritFlashColor = new Color(1f, 0.78f, 0.15f, 1f);
     }
 
     private void OnValidate()
@@ -43,6 +129,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             animationName = "AKT2";
         }
+
+        SyncQuickShearSkillConfig();
     }
 
     private void Awake()
@@ -51,6 +139,24 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             animationName = "AKT2";
         }
+
+        SyncQuickShearSkillConfig();
+    }
+
+    private void OnDisable()
+    {
+        StopActiveScissorTimeline();
+    }
+
+    private void OnDestroy()
+    {
+        StopActiveScissorTimeline();
+    }
+
+    public override void Initialize(Player01SkillController controller)
+    {
+        base.Initialize(controller);
+        SyncQuickShearSkillConfig();
     }
 
     protected override void OnCastStarted()
@@ -58,15 +164,25 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         castDamagedCombatTargets.Clear();
         castDamagedLegacyTargets.Clear();
         qLifestealTotalThisCast = 0f;
+        StopActiveScissorTimeline();
 
         if (debugLog)
         {
             Debug.Log($"[Q - QuickShear] Start. animation={animationName}, slashes={slashCount}, interval={slashInterval:F2}", this);
         }
 
+        SyncQuickShearSkillConfig();
+
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
             Debug.Log("[Player01 Q] cast while W active", this);
+        }
+
+        if (debugQuickShearCritLog)
+        {
+            Debug.Log(
+                $"[QuickShear Config] manaCost={manaCost:F2}, inspectorCooldown={cooldown:F2}, runtimeCooldown={ResolveRuntimeCooldownSeconds():F2}",
+                this);
         }
     }
 
@@ -151,7 +267,14 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         if (debugLog)
         {
             Debug.Log($"[Q - QuickShear] Slash {slashIndex}/{slashTotal} requested '{animationName}' via shared controller entry.", this);
-            Debug.Log($"[Q - QuickShear] damage={baseDamage:F2}, range={qRange:F2}", this);
+            Debug.Log(
+                $"[Q - QuickShear] damageFormula=({physicalBaseDamage:F2} + SATK*{specialScaling:F2}) + ({specialBaseDamage:F2} + PATK*{physicalScaling:F2}), range={qRange:F2}",
+                this);
+        }
+
+        if (playScissorEffectsPerSlash || slashIndex == 1)
+        {
+            PlayScissorAttackEffects();
         }
 
         float dealtDamage = ApplySlashDamage();
@@ -181,7 +304,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
         facing.Normalize();
         Vector3 center = hitPoint != null ? hitPoint.position : origin + facing * (Mathf.Max(0.1f, qRange) * 0.5f);
-        float finalDamage = ResolveDamage();
+        QuickShearDamageResult damageResult = ResolveDamage();
+        float finalDamage = damageResult.finalDamage;
         Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
         float totalDamageDealt = 0f;
 
@@ -201,9 +325,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject));
+                combatHealth.TakeDamage(new BattleDamage(finalDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
                 float afterHealth = ResolveCurrentHealth(combatHealth);
                 float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+                if (actualDamage > 0f)
+                {
+                    TryPlayQuickShearCritFlash(hit, damageResult);
+                }
                 totalDamageDealt += actualDamage;
                 continue;
             }
@@ -215,6 +343,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 int beforeHp = Mathf.Max(0, legacyHealth.hp);
                 legacyHealth.TakeDamage(damageInt, gameObject);
                 int actualDamage = Mathf.Clamp(beforeHp, 0, damageInt);
+                if (actualDamage > 0)
+                {
+                    TryPlayQuickShearCritFlash(hit, damageResult);
+                }
                 totalDamageDealt += actualDamage;
             }
         }
@@ -222,9 +354,215 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         return totalDamageDealt;
     }
 
+    public void PlayScissorAttackEffects()
+    {
+        float facingSign = ResolveFacingSign();
+
+        if (useScissorEffectTimeline)
+        {
+            StopActiveScissorTimeline();
+            activeScissorTimelineCoroutine = StartCoroutine(PlayScissorEffectTimeline(facingSign));
+            return;
+        }
+
+        PlayScissorCutEffect(facingSign);
+        StartCoroutine(PlayScissorFollowupEffects(facingSign));
+    }
+
+    public void PlayScissorCutEffect()
+    {
+        PlayScissorCutEffect(ResolveFacingSign());
+    }
+
+    public void PlayScissorCutEffect(float facingSign)
+    {
+        SpawnScissorEffect(
+            scissorCutEffectPrefab,
+            scissorCutEffectOffset,
+            scissorCutEffectScale,
+            scissorCutEffectLifetime,
+            scissorCutEffectSortingOrder,
+            facingSign);
+    }
+
+    public void PlayScissorSlashWaveEffect()
+    {
+        PlayScissorSlashWaveEffect(ResolveFacingSign());
+    }
+
+    public void PlayScissorSlashWaveEffect(float facingSign)
+    {
+        SpawnScissorEffect(
+            scissorSlashWaveEffectPrefab,
+            scissorSlashWaveEffectOffset,
+            scissorSlashWaveEffectScale,
+            scissorSlashWaveEffectLifetime,
+            scissorSlashWaveEffectSortingOrder,
+            facingSign);
+    }
+
+    public void PlayScissorEndEffect()
+    {
+        PlayScissorEndEffect(ResolveFacingSign());
+    }
+
+    public void PlayScissorEndEffect(float facingSign)
+    {
+        SpawnScissorEffect(
+            scissorEndEffectPrefab,
+            scissorEndEffectOffset,
+            scissorEndEffectScale,
+            scissorEndEffectLifetime,
+            scissorEndEffectSortingOrder,
+            facingSign);
+    }
+
+    private IEnumerator PlayScissorFollowupEffects(float facingSign)
+    {
+        float secondDelaySeconds = Mathf.Max(0f, scissorSlashWaveEffectDelayFrames) / Mathf.Max(1f, assumedEffectFrameRate);
+        if (secondDelaySeconds > 0f)
+        {
+            yield return new WaitForSeconds(secondDelaySeconds);
+        }
+
+        if (this == null || gameObject == null || !isActiveAndEnabled)
+        {
+            yield break;
+        }
+
+        PlayScissorSlashWaveEffect(facingSign);
+
+        if (!playEndEffectPerSlash || scissorEndEffectPrefab == null)
+        {
+            yield break;
+        }
+
+        float endDelaySeconds = Mathf.Max(0f, scissorEndEffectDelayFrames) / Mathf.Max(1f, assumedEffectFrameRate);
+        float extraDelaySeconds = Mathf.Max(0f, endDelaySeconds - secondDelaySeconds);
+        if (extraDelaySeconds > 0f)
+        {
+            yield return new WaitForSeconds(extraDelaySeconds);
+        }
+
+        if (this == null || gameObject == null || !isActiveAndEnabled)
+        {
+            yield break;
+        }
+
+        PlayScissorEndEffect(facingSign);
+    }
+
+    private IEnumerator PlayScissorEffectTimeline(float facingSign)
+    {
+        float cutDelaySeconds = Mathf.Max(0f, scissorCutEffectDelayFrames) / Mathf.Max(1f, assumedEffectFrameRate);
+        float slashDelaySeconds = Mathf.Max(0f, scissorSlashWaveEffectDelayFrames) / Mathf.Max(1f, assumedEffectFrameRate);
+        float endDelaySeconds = Mathf.Max(0f, scissorEndEffectDelayFrames) / Mathf.Max(1f, assumedEffectFrameRate);
+
+        if (cutDelaySeconds > 0f)
+        {
+            yield return new WaitForSeconds(cutDelaySeconds);
+        }
+
+        if (!this || !gameObject || !isActiveAndEnabled)
+        {
+            activeScissorTimelineCoroutine = null;
+            yield break;
+        }
+
+        PlayScissorCutEffect(facingSign);
+
+        float cutToSlashDelay = Mathf.Max(0f, slashDelaySeconds - cutDelaySeconds);
+        if (cutToSlashDelay > 0f)
+        {
+            yield return new WaitForSeconds(cutToSlashDelay);
+        }
+
+        if (!this || !gameObject || !isActiveAndEnabled)
+        {
+            activeScissorTimelineCoroutine = null;
+            yield break;
+        }
+
+        PlayScissorSlashWaveEffect(facingSign);
+
+        if (scissorEndEffectPrefab != null)
+        {
+            float slashToEndDelay = Mathf.Max(0f, endDelaySeconds - slashDelaySeconds);
+            if (slashToEndDelay > 0f)
+            {
+                yield return new WaitForSeconds(slashToEndDelay);
+            }
+
+            if (!this || !gameObject || !isActiveAndEnabled)
+            {
+                activeScissorTimelineCoroutine = null;
+                yield break;
+            }
+
+            PlayScissorEndEffect(facingSign);
+        }
+
+        activeScissorTimelineCoroutine = null;
+    }
+
+    private void SpawnScissorEffect(
+        GameObject effectPrefab,
+        Vector3 localOffset,
+        Vector3 localScale,
+        float lifetime,
+        int sortingOrder,
+        float facingSign)
+    {
+        if (effectPrefab == null)
+        {
+            return;
+        }
+
+        Vector3 spawnOffset = new Vector3(localOffset.x * facingSign, localOffset.y, localOffset.z);
+        Vector3 spawnPosition = transform.position + spawnOffset;
+        GameObject instance = Instantiate(effectPrefab, spawnPosition, Quaternion.identity);
+
+        Vector3 finalScale = localScale;
+        finalScale.x = Mathf.Abs(finalScale.x) * facingSign;
+        instance.transform.localScale = finalScale;
+
+        ScissorFrameEffectPlayer effectPlayer = instance.GetComponent<ScissorFrameEffectPlayer>();
+        if (effectPlayer != null)
+        {
+            effectPlayer.SetLifetime(lifetime);
+            effectPlayer.SetSortingOrder(sortingOrder);
+            effectPlayer.Play();
+        }
+        else
+        {
+            SpriteRenderer[] renderers = instance.GetComponentsInChildren<SpriteRenderer>(true);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                renderers[i].sortingOrder = sortingOrder;
+            }
+        }
+    }
+
+    private float ResolveFacingSign()
+    {
+        if (Controller == null)
+        {
+            return transform.localScale.x < 0f ? -1f : 1f;
+        }
+
+        Vector3 facing = Controller.GetFacingWorldDirection();
+        if (Mathf.Abs(facing.x) > 0.001f)
+        {
+            return facing.x >= 0f ? 1f : -1f;
+        }
+
+        float mirrorScaleX = Controller.GetFacingMirrorScaleX();
+        return mirrorScaleX < 0f ? 1f : -1f;
+    }
+
     private void ApplyQLifeSteal(float damageDealt)
     {
-        float healAmount = Mathf.Max(0f, damageDealt);
+        float healAmount = Mathf.Max(0f, damageDealt) * Mathf.Max(0f, quickShearLifeStealRatio);
         if (healAmount <= 0f)
         {
             return;
@@ -244,7 +582,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         qLifestealTotalThisCast += actualHeal;
-        Debug.Log($"[Player01 Q Lifesteal] damage={damageDealt:F2} heal={actualHeal:F2}", this);
+        if (debugQuickShearCritLog)
+        {
+            Debug.Log($"[Player01 Q Lifesteal] damage={damageDealt:F2} heal={actualHeal:F2}", this);
+        }
     }
 
     private float ResolveCurrentHealth(CombatHealth combatHealth)
@@ -410,15 +751,233 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         return Vector3.Dot(toTarget.normalized, facing) >= 0.15f;
     }
 
-    private float ResolveDamage()
+    private QuickShearDamageResult ResolveDamage()
     {
-        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
-            this,
-            gameObject,
-            baseDamage,
-            physicalScaling,
-            specialScaling,
-            "Player01 Q");
+        float rawDamage = Mathf.Max(0f, physicalBaseDamage) + Mathf.Max(0f, specialBaseDamage);
+        CombatStats stats = gameObject.GetComponent<CombatStats>();
+        if (stats == null)
+        {
+            stats = gameObject.GetComponentInParent<CombatStats>();
+        }
+
+        float physicalAttackValue = 0f;
+        float specialAttackValue = 0f;
+        if (stats != null)
+        {
+            physicalAttackValue = Mathf.Max(0f, stats.physicalAttack);
+            specialAttackValue = Mathf.Max(0f, stats.specialAttack);
+            rawDamage += specialAttackValue * Mathf.Max(0f, specialScaling);
+            rawDamage += physicalAttackValue * Mathf.Max(0f, physicalScaling);
+        }
+        else
+        {
+            WarnMissingCombatStatsOnce();
+        }
+
+        BattleResourceBank bank = gameObject.GetComponent<BattleResourceBank>();
+        if (bank == null)
+        {
+            bank = gameObject.GetComponentInParent<BattleResourceBank>();
+        }
+
+        if (bank != null)
+        {
+            rawDamage *= bank.SkillDamageMultiplier;
+        }
+
+        float afterBaseCrit = BattleStatUtility.ApplyCriticalDamage(gameObject, rawDamage, out bool baseCritTriggered);
+        bool extraCritTriggered = Random.value < Mathf.Clamp01(quickShearExtraCritChance);
+        bool superCritTriggered = Random.value < Mathf.Clamp01(quickShearSuperCritChance);
+
+        float normalCritDamage = afterBaseCrit;
+        float finalDamage = normalCritDamage;
+        float qCritMultiplier = 1f;
+        string qCritMode = "None";
+
+        if (superCritTriggered)
+        {
+            qCritMultiplier = Mathf.Max(1f, quickShearSuperCritMultiplier);
+            finalDamage = normalCritDamage * qCritMultiplier;
+            qCritMode = $"QSuperCrit x{qCritMultiplier:F2}";
+        }
+        else if (extraCritTriggered)
+        {
+            qCritMultiplier = Mathf.Max(1f, quickShearExtraCritMultiplier);
+            finalDamage = normalCritDamage * qCritMultiplier;
+            qCritMode = $"QExtraCrit x{qCritMultiplier:F2}";
+        }
+
+        if (debugQuickShearCritLog)
+        {
+            float baseChainMultiplier = rawDamage > 0f ? normalCritDamage / rawDamage : 1f;
+            float totalMultiplier = rawDamage > 0f ? finalDamage / rawDamage : 1f;
+            Debug.Log(
+                $"[QuickShear Crit] manaCost={manaCost:F2}, cooldown={ResolveRuntimeCooldownSeconds():F2}, PATK={physicalAttackValue:F2}, SATK={specialAttackValue:F2}, " +
+                $"Formula=((30 + SATK*{specialScaling:F2}) + (20 + PATK*{physicalScaling:F2})) => Raw={rawDamage:F2}, NormalCritDamage={normalCritDamage:F2}, Final={finalDamage:F2}, " +
+                $"BaseCrit={baseCritTriggered}, ExtraCrit={extraCritTriggered}, SuperCrit={superCritTriggered}, " +
+                $"BaseChainMultiplier={baseChainMultiplier:F2}, QCritMode={qCritMode}, QuickShearMultiplier={qCritMultiplier:F2}, TotalMultiplier={totalMultiplier:F2}",
+                this);
+        }
+
+        return new QuickShearDamageResult(
+            finalDamage,
+            baseCritTriggered,
+            extraCritTriggered,
+            superCritTriggered);
+    }
+
+    private readonly struct QuickShearDamageResult
+    {
+        public readonly float finalDamage;
+        public readonly bool baseCritTriggered;
+        public readonly bool extraCritTriggered;
+        public readonly bool superCritTriggered;
+
+        public bool isAnyCritical => baseCritTriggered || extraCritTriggered || superCritTriggered;
+
+        public QuickShearDamageResult(
+            float finalDamage,
+            bool baseCritTriggered,
+            bool extraCritTriggered,
+            bool superCritTriggered)
+        {
+            this.finalDamage = finalDamage;
+            this.baseCritTriggered = baseCritTriggered;
+            this.extraCritTriggered = extraCritTriggered;
+            this.superCritTriggered = superCritTriggered;
+        }
+    }
+
+    private void WarnMissingCombatStatsOnce()
+    {
+        string ownerName = gameObject != null ? gameObject.name : "<null owner>";
+        if (!MissingQuickShearStatsWarnings.Add(ownerName))
+        {
+            return;
+        }
+
+        Debug.LogWarning($"[Player01 Q] CombatStats not found on '{ownerName}', using QuickShear base formula fallback.", this);
+    }
+
+    private void SyncQuickShearSkillConfig()
+    {
+        float resolvedCooldown = Mathf.Max(0f, cooldown);
+        float resolvedManaCost = Mathf.Max(0f, manaCost);
+
+        if (SkillResource != null && SkillIndex >= 0 && SkillResource.skillDatas != null && SkillResource.skillDatas.Length > SkillIndex)
+        {
+            SkillCostCDData qData = SkillResource.skillDatas[SkillIndex];
+            qData.maxCooldown = resolvedCooldown;
+            qData.manaCost = resolvedManaCost;
+            SkillResource.skillDatas[SkillIndex] = qData;
+        }
+
+        if (Controller != null)
+        {
+            FieldInfo qCooldownField = typeof(Player01SkillController).GetField("qCooldown", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (qCooldownField != null)
+            {
+                qCooldownField.SetValue(Controller, resolvedCooldown);
+            }
+        }
+    }
+
+    private float ResolveRuntimeCooldownSeconds()
+    {
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            return SkillResource.GetSkillMaxCD(SkillIndex);
+        }
+
+        return Mathf.Max(0f, cooldown);
+    }
+
+    private void TryPlayQuickShearCritFlash(Collider hit, QuickShearDamageResult damageResult)
+    {
+        if (!damageResult.extraCritTriggered && !damageResult.superCritTriggered)
+        {
+            return;
+        }
+
+        Vector3 spawnPosition = ResolveQuickShearCritFlashPosition(hit);
+        float facingSign = ResolveFacingSign();
+        bool useSuperCritPrefab = damageResult.superCritTriggered && quickShearSuperCritFlashEffectPrefab != null;
+        GameObject selectedPrefab = useSuperCritPrefab ? quickShearSuperCritFlashEffectPrefab : quickShearCritFlashEffectPrefab;
+        if (selectedPrefab == null)
+        {
+            return;
+        }
+
+        Color flashColor = damageResult.superCritTriggered
+            ? (useSuperCritPrefab ? Color.white : quickShearSuperCritFlashColor)
+            : quickShearCritFlashColor;
+
+        GameObject instance = Instantiate(selectedPrefab, spawnPosition, Quaternion.identity);
+        Vector3 finalScale = quickShearCritFlashScale;
+        finalScale.x = Mathf.Abs(finalScale.x) * facingSign;
+        instance.transform.localScale = finalScale;
+
+        if (instance.TryGetComponent(out ScissorFrameEffectPlayer effectPlayer))
+        {
+            effectPlayer.SetLifetime(quickShearCritFlashLifetime);
+            effectPlayer.SetSortingOrder(quickShearCritFlashSortingOrder);
+            effectPlayer.SetDestroyOnComplete(true);
+            effectPlayer.SetColor(flashColor);
+            effectPlayer.Play();
+        }
+        else
+        {
+            ApplyCritFlashVisuals(instance, flashColor);
+            Destroy(instance, Mathf.Max(0.01f, quickShearCritFlashLifetime));
+        }
+
+        if (debugQuickShearCritLog)
+        {
+            Debug.Log(
+                $"[QuickShear Crit Flash] played={(instance != null)} extra={damageResult.extraCritTriggered} super={damageResult.superCritTriggered} " +
+                $"prefab={(selectedPrefab != null ? selectedPrefab.name : "<null>")} " +
+                $"colorMode={(damageResult.superCritTriggered ? (useSuperCritPrefab ? "OriginalGoldPrefab" : "GoldTintFallback") : "Original")} " +
+                $"lifetime={quickShearCritFlashLifetime:F2} facingSign={facingSign:F0}",
+                this);
+        }
+    }
+
+    private Vector3 ResolveQuickShearCritFlashPosition(Collider hit)
+    {
+        if (hit != null)
+        {
+            return hit.bounds.center;
+        }
+
+        float facingSign = ResolveFacingSign();
+        Vector3 fallback = hitPoint != null ? hitPoint.position : transform.position;
+        return fallback + new Vector3(quickShearCritFlashOffset.x * facingSign, quickShearCritFlashOffset.y, quickShearCritFlashOffset.z);
+    }
+
+    private void ApplyCritFlashVisuals(GameObject effectInstance, Color color)
+    {
+        if (effectInstance == null)
+        {
+            return;
+        }
+
+        SpriteRenderer[] renderers = effectInstance.GetComponentsInChildren<SpriteRenderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            renderers[i].sortingOrder = quickShearCritFlashSortingOrder;
+            renderers[i].color = color;
+        }
+    }
+
+    private void StopActiveScissorTimeline()
+    {
+        if (activeScissorTimelineCoroutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(activeScissorTimelineCoroutine);
+        activeScissorTimelineCoroutine = null;
     }
 
     private IEnumerator LogTrackNextFrame(int slashIndex, int slashTotal)

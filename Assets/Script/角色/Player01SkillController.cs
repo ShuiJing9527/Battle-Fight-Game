@@ -46,6 +46,7 @@ public class Player01SkillController : MonoBehaviour
     private bool skillMovementFrozen;
     private float frozenMoveSpeed = -1f;
     private int lastFacingLockLogFrame = -1;
+    private bool manaRegenMatchedToPlayer02Standard;
 
     private void Reset()
     {
@@ -434,6 +435,8 @@ public class Player01SkillController : MonoBehaviour
             cooldownManager.resourceBank = bank;
         }
 
+        MatchPlayer01ManaRegenToPlayer02Standard();
+
         if (GetComponent<CombatSkillCaster>() == null)
         {
             gameObject.AddComponent<CombatSkillCaster>();
@@ -734,6 +737,23 @@ public class Player01SkillController : MonoBehaviour
         SkillCostCDData rData = cooldownManager.skillDatas[3];
         rData.maxCooldown = rCooldown;
         cooldownManager.skillDatas[3] = rData;
+    }
+
+    private void MatchPlayer01ManaRegenToPlayer02Standard()
+    {
+        if (manaRegenMatchedToPlayer02Standard)
+        {
+            return;
+        }
+
+        PlayerSkillCooldownManager cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        if (cooldownManager == null)
+        {
+            return;
+        }
+
+        cooldownManager.manaRecoverPerSecond = Mathf.Max(0f, cooldownManager.manaRecoverPerSecond) * 2f;
+        manaRegenMatchedToPlayer02Standard = true;
     }
 
     private System.Collections.IEnumerator LogTrackAfterOneFrame(SkeletonAnimation spine, string expectedAnimation)

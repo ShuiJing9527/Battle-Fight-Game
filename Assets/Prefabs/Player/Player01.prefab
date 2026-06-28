@@ -822,6 +822,14 @@ MonoBehaviour:
   hitTrigger: Hit
   deathTrigger: Die
   destroyDelayAfterDeath: 0.65
+  showDamageNumbers: 1
+  damagePopupPrefab: {fileID: 0}
+  normalDamageColor: {r: 1, g: 1, b: 1, a: 1}
+  physicalDamageColor: {r: 1, g: 0.25, b: 0.25, a: 1}
+  specialDamageColor: {r: 0.78, g: 0.35, b: 1, a: 1}
+  criticalDamageColor: {r: 1, g: 0.84, b: 0.2, a: 1}
+  damagePopupOffset: {x: 0, y: 1, z: 0}
+  damagePopupRandomOffset: {x: 0.3, y: 0.15}
 --- !u!114 &2746917147873669084
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1257,6 +1265,11 @@ MonoBehaviour:
   runSpeedThreshold: 6
   spineSortingOrder: 20
   debugLog: 0
+  debugSkillCooldownFlow: 1
+  qCooldown: 3
+  wCooldown: 5
+  eCooldown: 8
+  rCooldown: 12
 --- !u!114 &8259389470975152275
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1269,19 +1282,61 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1002, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_Q_QuickShear
-  cooldown: 1
+  cooldown: 1.2
   duration: 0.42
   effectPower: 1.2
   animationName: AKT2
   debugLog: 1
   slashCount: 3
-  slashInterval: 0.15
-  qDamage: 20
-  qRange: 1.5
+  slashInterval: 0.2
+  physicalBaseDamage: 20
+  specialBaseDamage: 20
+  physicalScaling: 0.6
+  specialScaling: 0.8
+  qRange: 2
   enemyLayer:
     serializedVersion: 2
     m_Bits: 4294967295
   hitPoint: {fileID: 0}
+  manaCost: 20
+  quickShearLifeStealRatio: 0.5
+  scissorCutEffectPrefab: {fileID: 8335468127871354634, guid: 88a5dee28dced174889662aa021b4ffb, type: 3}
+  scissorSlashWaveEffectPrefab: {fileID: 2713941305649311741, guid: bfd2612cc7cb93e4295108ef4b49e2b1, type: 3}
+  scissorEndEffectPrefab: {fileID: 8335468127871354634, guid: f435fa98bd0df254c89e80a745878d35, type: 3}
+  scissorCutEffectOffset: {x: 0.9, y: 0.15, z: 0}
+  scissorSlashWaveEffectOffset: {x: 1.35, y: 0.15, z: 0}
+  scissorEndEffectOffset: {x: 0.95, y: 0.15, z: 0}
+  scissorCutEffectScale: {x: 1.2, y: 1.2, z: 1}
+  scissorSlashWaveEffectScale: {x: 1.5, y: 1.5, z: 1}
+  scissorEndEffectScale: {x: 1.2, y: 1.2, z: 1}
+  scissorCutEffectLifetime: 0.26
+  scissorSlashWaveEffectLifetime: 0.24
+  scissorEndEffectLifetime: 0.16
+  useScissorEffectTimeline: 1
+  playScissorEffectsPerSlash: 1
+  scissorCutEffectDelayFrames: 0
+  scissorSlashWaveEffectDelayFrames: 8
+  scissorEndEffectDelayFrames: 18
+  assumedEffectFrameRate: 60
+  scissorCutEffectSortingOrder: 60
+  scissorSlashWaveEffectSortingOrder: 55
+  scissorEndEffectSortingOrder: 65
+  playEndEffectPerSlash: 1
+  expandHitboxWithEffect: 0
+  visualAttackRangeMultiplier: 1
+  quickShearExtraCritChance: 0.3
+  quickShearExtraCritMultiplier: 2
+  quickShearSuperCritChance: 0.05
+  quickShearSuperCritMultiplier: 5
+  debugQuickShearCritLog: 0
+  quickShearCritFlashEffectPrefab: {fileID: 513019668223324186, guid: fae36e373b46676489b32331049e0553, type: 3}
+  quickShearSuperCritFlashEffectPrefab: {fileID: 8762694852573534868, guid: 1036d377e6a0b9741b1e1e8cbfb759e0, type: 3}
+  quickShearCritFlashOffset: {x: 0.9, y: 0.25, z: 0}
+  quickShearCritFlashScale: {x: 1, y: 1, z: 1}
+  quickShearCritFlashLifetime: 0.12
+  quickShearCritFlashSortingOrder: 80
+  quickShearCritFlashColor: {r: 1, g: 1, b: 1, a: 1}
+  quickShearSuperCritFlashColor: {r: 1, g: 0.8789927, b: 0, a: 1}
 --- !u!114 &6262736825200089138
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1342,7 +1397,9 @@ MonoBehaviour:
   obstacleLayers:
     serializedVersion: 2
     m_Bits: 8
-  dashDamage: 16
+  baseDamage: 16
+  physicalScaling: 0.7
+  specialScaling: 0.6
   dashHitRadius: 1.2
   enemyLayer:
     serializedVersion: 2
@@ -1374,7 +1431,9 @@ MonoBehaviour:
   needleCount: 3
   needleSpreadAngle: 10
   needleSpeed: 14
-  needleDamage: 50
+  baseDamage: 50
+  physicalScaling: 0.25
+  specialScaling: 1.1
   healPercentOfDamage: 0.25
   enemyLayer:
     serializedVersion: 2
