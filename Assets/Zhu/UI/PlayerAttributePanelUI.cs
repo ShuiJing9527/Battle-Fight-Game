@@ -163,6 +163,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private int previewLayerIndex = -1;
     private readonly Dictionary<int, AttributeBaseSnapshot> attributeBaseSnapshots = new Dictionary<int, AttributeBaseSnapshot>();
 
+    public bool IsPanelOpen => isVisible;
+
     private void Awake()
     {
         if (!AcquirePrimaryInstance())
@@ -921,11 +923,11 @@ public class PlayerAttributePanelUI : MonoBehaviour
         LogToggleState("TogglePanel pressed");
         if (isVisible)
         {
-            HidePanel();
+            ClosePanel();
         }
         else
         {
-            ShowPanel();
+            OpenPanel();
         }
     }
 
@@ -944,7 +946,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         return initialized && panelRoot != null;
     }
 
-    private void ShowPanel()
+    public void OpenPanel()
     {
         if (!EnsurePanelReady())
         {
@@ -957,6 +959,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         warnedShowPanelFailed = false;
+        CloseRunePanelsForExclusiveDisplay();
 
         if (panelRoot == null)
         {
@@ -978,7 +981,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         LogToggleState("ShowPanel success");
     }
 
-    private void HidePanel()
+    public void ClosePanel()
     {
         if (panelRoot != null)
         {
@@ -1004,6 +1007,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     {
         isVisible = false;
         pausedByAttributePanel = false;
+        OverlayPanelStateCoordinator.SetCharacterPanelOpen(false);
 
         EnsurePanelDisplayHierarchy();
 
@@ -1661,9 +1665,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
-        previousTimeScale = Time.timeScale;
-        Time.timeScale = 0f;
         pausedByAttributePanel = true;
+        OverlayPanelStateCoordinator.SetCharacterPanelOpen(true);
     }
 
     private void RestoreTimeScaleIfNeeded()
@@ -1673,8 +1676,41 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
-        Time.timeScale = previousTimeScale;
         pausedByAttributePanel = false;
+        OverlayPanelStateCoordinator.SetCharacterPanelOpen(false);
+    }
+
+    public void RefreshCurrentPlayerView()
+    {
+        if (!isVisible)
+        {
+            return;
+        }
+
+        if (!EnsurePanelReady())
+        {
+            return;
+        }
+
+        RefreshPlayerCache(force: true);
+        RefreshPanel();
+        ForceRefreshPreview();
+        nextRefreshTime = Time.unscaledTime + refreshInterval;
+    }
+
+    private void CloseRunePanelsForExclusiveDisplay()
+    {
+        RuneUIController runeController = FindObjectOfType<RuneUIController>(true);
+        if (runeController != null && runeController.IsPanelOpen)
+        {
+            runeController.ClosePanel();
+        }
+
+        RuneBagUI runeBag = FindObjectOfType<RuneBagUI>(true);
+        if (runeBag != null && runeBag.IsPanelOpen)
+        {
+            runeBag.ClosePanel();
+        }
     }
 
     private void ForceRefreshPreview()

@@ -62,6 +62,8 @@ public class RuneBagUI : MonoBehaviour
     private Canvas panelCanvas;
     private RectTransform panelRectTransform;
 
+    public bool IsPanelOpen => panelRoot != null ? panelRoot.activeSelf : gameObject.activeSelf;
+
     private void Start()
     {
         AutoBindSceneReferences();
@@ -101,6 +103,7 @@ public class RuneBagUI : MonoBehaviour
     public void OpenPanel()
     {
         ResolveRuntimeReferences();
+        CloseCharacterPanelForExclusiveDisplay();
         EnsurePanelVisible(true);
         SetPauseState(true);
 
@@ -732,18 +735,37 @@ public class RuneBagUI : MonoBehaviour
                 return;
             }
 
-            Time.timeScale = 0f;
             pauseApplied = true;
+            OverlayPanelStateCoordinator.SetRunePanelOpen(true);
             return;
         }
 
-        if (!pauseApplied && Time.timeScale != 0f)
+        if (!pauseApplied)
         {
             return;
         }
 
-        Time.timeScale = 1f;
         pauseApplied = false;
+        OverlayPanelStateCoordinator.SetRunePanelOpen(false);
+    }
+
+    public void RefreshCurrentPlayerView()
+    {
+        if (!IsPanelOpen)
+        {
+            return;
+        }
+
+        RefreshAll();
+    }
+
+    private void CloseCharacterPanelForExclusiveDisplay()
+    {
+        PlayerAttributePanelUI attributePanel = FindObjectOfType<PlayerAttributePanelUI>(true);
+        if (attributePanel != null && attributePanel.IsPanelOpen)
+        {
+            attributePanel.ClosePanel();
+        }
     }
 
     private void AutoBindSceneReferences()

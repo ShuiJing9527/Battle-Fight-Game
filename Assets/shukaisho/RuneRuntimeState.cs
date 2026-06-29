@@ -39,6 +39,7 @@ public class RuneRuntimeState : MonoBehaviour
     private CombatStats combatStats;
     private CombatHealth combatHealth;
     private PlayerSkillCooldownManager cooldownManager;
+    private bool isRebuildingFromEquippedRunes;
 
     private readonly Dictionary<RuneType, int>[] skillRuneCounts = new Dictionary<RuneType, int>[SkillCount];
     private readonly Dictionary<RuneType, int> globalMaxCounts = new Dictionary<RuneType, int>();
@@ -127,13 +128,21 @@ public class RuneRuntimeState : MonoBehaviour
 
     public void RebuildFromEquippedRunes()
     {
+        if (isRebuildingFromEquippedRunes)
+        {
+            return;
+        }
+
+        isRebuildingFromEquippedRunes = true;
+        try
+        {
         ClearRuneCounts();
 
         if (skillCaster != null)
         {
             for (int skillIndex = 0; skillIndex < SkillCount; skillIndex++)
             {
-                BattleSkill skill = skillCaster.GetSkill(skillIndex);
+                BattleSkill skill = skillCaster.TryGetSkillRaw(skillIndex);
                 if (skill == null || skill.equippedRunes == null)
                 {
                     continue;
@@ -164,6 +173,11 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         ApplyGlobalPassiveBonuses();
+        }
+        finally
+        {
+            isRebuildingFromEquippedRunes = false;
+        }
     }
 
     public int GetSkillRuneCount(int skillIndex, RuneType runeType)

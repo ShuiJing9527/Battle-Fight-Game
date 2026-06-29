@@ -85,6 +85,8 @@ public class RuneUIController : MonoBehaviour
     private TextMeshProUGUI attributeFooterText;
     private RuntimeLootDropOnDeath lootDropPreview;
 
+    public bool IsPanelOpen => IsMainPanelVisible();
+
     [Header("Skill UI Info")]
     [SerializeField] private Color skillHoverHighlightColor = new Color(1f, 0.9f, 0.35f, 0.5f);
     [SerializeField] private Color skillDescriptionPanelColor = new Color(0.09f, 0.11f, 0.16f, 0.94f);
@@ -211,6 +213,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         CacheBootstrap();
+        CloseCharacterPanelForExclusiveDisplay();
         if (mainPanel != null)
         {
             mainPanel.SetActive(true);
@@ -812,9 +815,8 @@ public class RuneUIController : MonoBehaviour
                 return;
             }
 
-            previousTimeScale = Time.timeScale;
-            Time.timeScale = 0f;
             pauseApplied = true;
+            OverlayPanelStateCoordinator.SetRunePanelOpen(true);
             return;
         }
 
@@ -823,8 +825,8 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        Time.timeScale = previousTimeScale;
         pauseApplied = false;
+        OverlayPanelStateCoordinator.SetRunePanelOpen(false);
     }
 
     private void CacheBootstrap()
@@ -837,19 +839,7 @@ public class RuneUIController : MonoBehaviour
 
     private void SetOldHudVisible(bool visible)
     {
-        CacheBootstrap();
-        if (cachedBootstrap == null)
-        {
-            return;
-        }
-
-        if (!hasCachedBootstrapState)
-        {
-            cachedBootstrapEnabled = cachedBootstrap.enabled;
-            hasCachedBootstrapState = true;
-        }
-
-        cachedBootstrap.enabled = visible ? cachedBootstrapEnabled : false;
+        // Keep Player2Bootstrap enabled so T character switching remains available while the rune panel is open.
     }
 
     private bool IsMainPanelVisible()
@@ -861,6 +851,28 @@ public class RuneUIController : MonoBehaviour
     {
         SetOldHudVisible(true);
         SetPauseState(false);
+    }
+
+    public void RefreshCurrentPlayerView()
+    {
+        if (!Application.isPlaying || !IsMainPanelVisible())
+        {
+            return;
+        }
+
+        ResolveCurrentPlayerContext();
+        RefreshRuneList();
+        RefreshSkillSlots();
+        RefreshSkillInfoVisuals();
+    }
+
+    private void CloseCharacterPanelForExclusiveDisplay()
+    {
+        PlayerAttributePanelUI attributePanel = Object.FindObjectOfType<PlayerAttributePanelUI>(true);
+        if (attributePanel != null && attributePanel.IsPanelOpen)
+        {
+            attributePanel.ClosePanel();
+        }
     }
 
     private void WarnMissingSlotRefsOnce()

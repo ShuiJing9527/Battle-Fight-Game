@@ -60,7 +60,10 @@ public class Player2Bootstrap : MonoBehaviour
 
         if (Keyboard.current != null && Keyboard.current.kKey.wasPressedThisFrame)
         {
-            ToggleRunePanel();
+            if (!HasRuneUiControllerInputHandler())
+            {
+                ToggleRunePanel();
+            }
         }
     }
 
@@ -207,13 +210,27 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         GameObject next = CurrentPlayer == player01 ? player02 : player01;
-        SetActivePlayer(next);
+        try
+        {
+            SetActivePlayer(next);
+            RefreshOverlayPanelsForCurrentPlayer();
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[PLAYER SWITCH] T key switch failed: {ex}", this);
+        }
 
         Debug.Log($"[PARTY] Switched current player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
     }
 
     private void ToggleRunePanel()
     {
+        RuneUIController runeUiController = FindObjectOfType<RuneUIController>(true);
+        if (runeUiController != null && runeUiController.enabled)
+        {
+            return;
+        }
+
         if (runeBagUI != null)
         {
             runeBagUI.TogglePanel();
@@ -221,6 +238,12 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         Debug.LogWarning("[RuneUI] Missing scene references on Player2Bootstrap.", this);
+    }
+
+    private bool HasRuneUiControllerInputHandler()
+    {
+        RuneUIController runeUiController = FindObjectOfType<RuneUIController>(true);
+        return runeUiController != null && runeUiController.enabled;
     }
 
     private void EnsureRunePanelReferences()
@@ -261,7 +284,6 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         nextActive.SetActive(true);
-        nextInactive.SetActive(false);
         CurrentPlayer = nextActive;
 
         if (nextActive == player01)
@@ -276,21 +298,81 @@ public class Player2Bootstrap : MonoBehaviour
             nextRb.angularVelocity = Vector3.zero;
         }
 
-        if (cameraRig == null)
+        SafeAssignCameraTarget(nextActive);
+        SafeRefreshSkillHud(nextActive);
+        nextInactive.SetActive(false);
+    }
+
+    private void SafeAssignCameraTarget(GameObject nextActive)
+    {
+        if (nextActive == null)
         {
-            cameraRig = FindObjectOfType<PlayerCameraRig>();
+            return;
         }
 
-        if (cameraRig != null)
+        try
         {
-            cameraRig.playerSlot = nextActive.transform;
+            if (cameraRig == null)
+            {
+                cameraRig = FindObjectOfType<PlayerCameraRig>();
+            }
+
+            if (cameraRig != null)
+            {
+                cameraRig.playerSlot = nextActive.transform;
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[PLAYER SWITCH] Failed to assign camera target during T switch: {ex}", this);
+        }
+    }
+
+    private void SafeRefreshSkillHud(GameObject nextActive)
+    {
+        if (nextActive == null)
+        {
+            return;
         }
 
-        PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-        if (skillHud != null)
+        try
         {
+            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+            if (skillHud == null)
+            {
+                return;
+            }
+
             int playerIndex = nextActive == player01 ? 1 : (nextActive == player02 ? 2 : 0);
-            skillHud.SetSkillIconSet(playerIndex);
+            if (playerIndex > 0)
+            {
+                skillHud.SetSkillIconSet(playerIndex);
+            }
+        }
+        catch (System.Exception ex)
+        {
+            Debug.LogError($"[PLAYER SWITCH] Failed to refresh skill HUD during T switch: {ex}", this);
+        }
+    }
+
+    private void RefreshOverlayPanelsForCurrentPlayer()
+    {
+        PlayerAttributePanelUI attributePanel = FindObjectOfType<PlayerAttributePanelUI>(true);
+        if (attributePanel != null && attributePanel.IsPanelOpen)
+        {
+            attributePanel.RefreshCurrentPlayerView();
+        }
+
+        RuneUIController runeUiController = FindObjectOfType<RuneUIController>(true);
+        if (runeUiController != null && runeUiController.IsPanelOpen)
+        {
+            runeUiController.RefreshCurrentPlayerView();
+        }
+
+        RuneBagUI runeBag = FindObjectOfType<RuneBagUI>(true);
+        if (runeBag != null && runeBag.IsPanelOpen)
+        {
+            runeBag.RefreshCurrentPlayerView();
         }
     }
 
