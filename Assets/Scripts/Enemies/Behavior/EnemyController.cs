@@ -580,9 +580,15 @@ public class EnemyController : MonoBehaviour
         return receiver != null ? receiver.GetAttackMultiplier() : 1f;
     }
 
+    private float ResolveOutgoingDamageMultiplier()
+    {
+        EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
+        return receiver != null ? receiver.GetOutgoingDamageMultiplier() : 1f;
+    }
+
     private float ResolveCurrentAttackCooldown()
     {
-        return Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier) * BattleStatUtility.GetCooldownMultiplier(combatStats));
+        return Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier) * Mathf.Max(1f, ResolveAttackMultiplier()) * BattleStatUtility.GetCooldownMultiplier(combatStats));
     }
 
     private BattleDamageType ResolvePrimaryDamageType()
@@ -593,7 +599,7 @@ public class EnemyController : MonoBehaviour
     private float ResolveCurrentAttackDamage(BattleDamageType damageType)
     {
         float attackPower = BattleStatUtility.ResolveAttackPower(gameObject, damageType, attackDamage);
-        float damage = attackPower * ResolveAttackMultiplier() * Mathf.Max(0.01f, outgoingDamageMultiplier);
+        float damage = attackPower * Mathf.Max(0.01f, outgoingDamageMultiplier) * Mathf.Max(0f, ResolveOutgoingDamageMultiplier());
         return BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
     }
 

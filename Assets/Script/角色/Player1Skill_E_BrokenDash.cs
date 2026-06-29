@@ -1,20 +1,34 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.Serialization;
 
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
-    [Header("E - Run Boost")]
-    [SerializeField, Min(0.1f)] private float speedMultiplier = 2f;
-    [SerializeField] private bool ignoreObstacleCollision = true;
-    [SerializeField] private LayerMask obstacleLayers = 1 << 3;
-    [FormerlySerializedAs("dashDamage")]
-    [SerializeField, Min(0f)] private float baseDamage = 16f;
-    [SerializeField, Min(0f)] private float physicalScaling = 0.7f;
-    [SerializeField, Min(0f)] private float specialScaling = 0.6f;
-    [SerializeField, Min(0.1f)] private float dashHitRadius = 1.2f;
-    [SerializeField] private LayerMask enemyLayer = ~0;
+    [Header("E - 灵体疾行 / 核心参数")]
+    [FormerlySerializedAs("cooldown")]
+    [SerializeField, Min(0f)] private float eCooldown = 10f;
+    [FormerlySerializedAs("duration")]
+    [SerializeField, Min(0f)] private float eDuration = 4f;
+    [SerializeField, Min(0f)] private float eManaCost = 30f;
+
+    [Header("E - 灵体疾行 / 移动")]
+    [FormerlySerializedAs("speedMultiplier")]
+    [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 1.6f;
+
+    [Header("E - 灵体疾行 / 回复")]
+    [SerializeField, Min(0f)] private float eHealPerTick = 5f;
+    [SerializeField, Min(0.01f)] private float eHealTickInterval = 0.5f;
+
+    [Header("E - 灵体疾行 / 灵体状态")]
+    [FormerlySerializedAs("ignoreObstacleCollision")]
+    [SerializeField] private bool eIgnoreTerrainCollision = true;
+    [SerializeField] private bool eIgnoreEnemyCollision = true;
+    [SerializeField] private bool eImmuneToMonsterPhysicalDamage = true;
+    [FormerlySerializedAs("obstacleLayers")]
+    [SerializeField] private LayerMask terrainCollisionLayers = 1 << 3;
+    [SerializeField] private LayerMask enemyCollisionLayers = ~0;
 
     [Header("E - Ghost Visual")]
     [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
@@ -32,10 +46,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     private PlayerMovement cachedMovement;
     private float cachedOriginalMoveSpeed = -1f;
-    private readonly Dictionary<int, bool> cachedLayerCollisionStates = new Dictionary<int, bool>();
-    private readonly HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
-    private RuneRuntimeState runeRuntimeState;
-    private int currentRuneCastId = -1;
+    private readonly Dictionary<int, bool> cachedTerrainCollisionStates = new Dictionary<int, bool>();
+    private readonly Dictionary<int, bool> cachedEnemyCollisionStates = new Dictionary<int, bool>();
+    private CombatHealth cachedCombatHealth;
 
     private void Reset()
     {
@@ -44,14 +57,18 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         effectPower = 4f;
         animationName = "Run";
         debugLog = true;
-        speedMultiplier = 2f;
-        baseDamage = 16f;
-        physicalScaling = 0.7f;
-        specialScaling = 0.6f;
-        dashHitRadius = 1.2f;
-        enemyLayer = ~0;
-        ignoreObstacleCollision = true;
-        obstacleLayers = 1 << 3;
+        eCooldown = 10f;
+        eDuration = 4f;
+        eManaCost = 30f;
+        eMoveSpeedMultiplier = 1.6f;
+        eHealPerTick = 5f;
+        eHealTickInterval = 0.5f;
+        eIgnoreTerrainCollision = true;
+        eIgnoreEnemyCollision = true;
+        eImmuneToMonsterPhysicalDamage = true;
+        terrainCollisionLayers = 1 << 3;
+        enemyCollisionLayers = ~0;
+        SyncEStateConfig();
     }
 
     public override bool Cast()
@@ -71,8 +88,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     private void Awake()
     {
+        SyncEStateConfig();
         cachedMovement = GetComponent<PlayerMovement>();
-        runeRuntimeState = ResolveRuneRuntimeState();
+        cachedCombatHealth = GetComponent<CombatHealth>();
         CacheGhostStateVisual();
         CacheGhostShadowFollower();
         CacheGhostParticleController();
@@ -89,6 +107,17 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
+    public override void Initialize(Player01SkillController controller)
+    {
+        base.Initialize(controller);
+        SyncEStateConfig();
+    }
+
+    private void OnValidate()
+    {
+        SyncEStateConfig();
+    }
+
     protected override bool ShouldLoopAnimation()
     {
         return true;
@@ -97,18 +126,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     protected override void OnCastStarted()
     {
         IsRunningBoost = true;
-        damagedCombatTargets.Clear();
+        SyncEStateConfig();
         ApplySpeedBoost();
-        ApplyObstacleCollisionIgnore(true);
+        ApplyTerrainCollisionIgnore(true);
+        ApplyEnemyCollisionIgnore(true);
         SetGhostStateVisible(true);
         SetGhostShadowVisible(true);
         SetGhostParticlesVisible(true);
-        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
-
-        if (debugLog)
-        {
-            Debug.Log($"[Player01 E Run] start duration={duration:F2}, animation={animationName}, speedMultiplier={speedMultiplier:F2}, ignoreObstacleCollision={ignoreObstacleCollision}", this);
-        }
+        Debug.Log(
+            $"Player01 E 灵体疾行：持续={eDuration:F2}，移速倍率={eMoveSpeedMultiplier:F2}，回血={eHealPerTick:F2}/{eHealTickInterval:F2}秒，免疫怪物物理攻击={eImmuneToMonsterPhysicalDamage}，CD={eCooldown:F2}，蓝耗={eManaCost:F2}",
+            this);
 
         if (Controller != null)
         {
@@ -120,9 +147,14 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         float waitTime = Mathf.Max(0f, duration);
         float elapsed = 0f;
+        float nextHealTickTime = Mathf.Max(0.01f, eHealTickInterval);
         while (elapsed < waitTime)
         {
-            ApplyDashDamage();
+            if (elapsed >= nextHealTickTime)
+            {
+                ApplyHealTick();
+                nextHealTickTime += Mathf.Max(0.01f, eHealTickInterval);
+            }
             elapsed += Time.deltaTime;
             yield return null;
         }
@@ -135,15 +167,12 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         IsRunningBoost = false;
         RestoreSpeed();
-        ApplyObstacleCollisionIgnore(false);
+        ApplyTerrainCollisionIgnore(false);
+        ApplyEnemyCollisionIgnore(false);
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
-
-        if (debugLog)
-        {
-            Debug.Log("[Player01 E Run] end restore movement/collision", this);
-        }
+        Debug.Log("Player01 E 灵体疾行结束，已恢复移动速度/碰撞/受击状态", this);
     }
 
     protected override string GetSkillLabel()
@@ -153,40 +182,13 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     protected override int SkillIndex => 2;
 
-    private void ApplyDashDamage()
+    public bool IsImmuneToMonsterPhysicalDamage(BattleDamage damage)
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, dashHitRadius, enemyLayer, QueryTriggerInteraction.Collide);
-        float finalDamage = ResolveDamage();
-
-        foreach (Collider hit in hits)
-        {
-            if (!BattleTargetUtility.IsMonster(hit, transform))
-            {
-                continue;
-            }
-
-            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
-            if (combatHealth != null && damagedCombatTargets.Add(combatHealth))
-            {
-                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
-                float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject));
-                float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
-                runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
-                continue;
-            }
-        }
-    }
-
-    private float ResolveDamage()
-    {
-        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
-            this,
-            gameObject,
-            baseDamage,
-            physicalScaling,
-            specialScaling,
-            "Player01 E");
+        return IsRunningBoost &&
+               eImmuneToMonsterPhysicalDamage &&
+               damage.damageType == BattleDamageType.Physical &&
+               damage.source != null &&
+               BattleTargetUtility.IsMonster(damage.source);
     }
 
     private void ApplySpeedBoost()
@@ -206,7 +208,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             cachedOriginalMoveSpeed = cachedMovement.moveSpeed;
         }
 
-        cachedMovement.moveSpeed = cachedOriginalMoveSpeed * Mathf.Max(0.1f, speedMultiplier);
+        cachedMovement.moveSpeed = cachedOriginalMoveSpeed * Mathf.Max(0f, eMoveSpeedMultiplier);
     }
 
     private void RestoreSpeed()
@@ -228,20 +230,35 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
-    private void ApplyObstacleCollisionIgnore(bool enable)
+    private void ApplyTerrainCollisionIgnore(bool enable)
     {
-        if (!ignoreObstacleCollision)
+        if (!eIgnoreTerrainCollision)
         {
             return;
         }
 
+        ApplyLayerCollisionIgnore(enable, terrainCollisionLayers, cachedTerrainCollisionStates, "[E - BrokenDash] Terrain layer mask is empty, skipping collision ignore.");
+    }
+
+    private void ApplyEnemyCollisionIgnore(bool enable)
+    {
+        if (!eIgnoreEnemyCollision)
+        {
+            return;
+        }
+
+        ApplyLayerCollisionIgnore(enable, enemyCollisionLayers, cachedEnemyCollisionStates, "[E - BrokenDash] Enemy layer mask is empty, skipping enemy collision ignore.");
+    }
+
+    private void ApplyLayerCollisionIgnore(bool enable, LayerMask layerMask, Dictionary<int, bool> cache, string emptyMaskWarning)
+    {
         int playerLayer = gameObject.layer;
-        int mask = obstacleLayers.value;
+        int mask = layerMask.value;
         if (mask == 0)
         {
             if (debugLog && enable)
             {
-                Debug.LogWarning("[E - BrokenDash] Obstacle layer mask is empty, skipping collision ignore.", this);
+                Debug.LogWarning(emptyMaskWarning, this);
             }
 
             return;
@@ -257,62 +274,44 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
             if (enable)
             {
-                if (!cachedLayerCollisionStates.ContainsKey(layer))
+                if (!cache.ContainsKey(layer))
                 {
-                    cachedLayerCollisionStates[layer] = Physics.GetIgnoreLayerCollision(playerLayer, layer);
+                    cache[layer] = Physics.GetIgnoreLayerCollision(playerLayer, layer);
                 }
 
                 Physics.IgnoreLayerCollision(playerLayer, layer, true);
             }
-            else if (cachedLayerCollisionStates.TryGetValue(layer, out bool originalState))
+            else if (cache.TryGetValue(layer, out bool originalState))
             {
                 Physics.IgnoreLayerCollision(playerLayer, layer, originalState);
-                cachedLayerCollisionStates.Remove(layer);
+                cache.Remove(layer);
             }
         }
     }
 
-    private float ResolveCurrentHealth(CombatHealth health)
+    private void ApplyHealTick()
     {
-        if (health == null)
+        if (!IsRunningBoost || eHealPerTick <= 0f)
         {
-            return 0f;
+            return;
         }
 
-        return health.resourceBank != null
-            ? Mathf.Max(0f, health.resourceBank.currentHealth)
-            : Mathf.Max(0f, health.currentHealth);
-    }
-
-    private float ConsumeRuneFirstHitBonusDamage()
-    {
-        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
-        return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(SkillIndex, currentRuneCastId) : 0f;
-    }
-
-    private RuneRuntimeState ResolveRuneRuntimeState()
-    {
-        RuneRuntimeState runtimeState = GetComponent<RuneRuntimeState>();
-        if (runtimeState != null)
+        if (cachedCombatHealth == null)
         {
-            return runtimeState;
+            cachedCombatHealth = GetComponent<CombatHealth>();
         }
 
-        if (Controller != null)
-        {
-            runtimeState = Controller.GetComponent<RuneRuntimeState>();
-            if (runtimeState != null)
-            {
-                return runtimeState;
-            }
-        }
-
-        return GetComponentInParent<RuneRuntimeState>();
+        cachedCombatHealth?.Heal(eHealPerTick);
     }
+
 
     protected override void OnDisable()
     {
         base.OnDisable();
+        RestoreSpeed();
+        ApplyTerrainCollisionIgnore(false);
+        ApplyEnemyCollisionIgnore(false);
+        IsRunningBoost = false;
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
@@ -321,9 +320,37 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     protected override void OnDestroy()
     {
         base.OnDestroy();
+        RestoreSpeed();
+        ApplyTerrainCollisionIgnore(false);
+        ApplyEnemyCollisionIgnore(false);
+        IsRunningBoost = false;
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
+    }
+
+    private void SyncEStateConfig()
+    {
+        cooldown = Mathf.Max(0f, eCooldown);
+        duration = Mathf.Max(0f, eDuration);
+
+        float resolvedManaCost = Mathf.Max(0f, eManaCost);
+        if (SkillResource != null && SkillIndex >= 0 && SkillResource.skillDatas != null && SkillResource.skillDatas.Length > SkillIndex)
+        {
+            SkillCostCDData eData = SkillResource.skillDatas[SkillIndex];
+            eData.maxCooldown = cooldown;
+            eData.manaCost = resolvedManaCost;
+            SkillResource.skillDatas[SkillIndex] = eData;
+        }
+
+        if (Controller != null)
+        {
+            FieldInfo eCooldownField = typeof(Player01SkillController).GetField("eCooldown", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (eCooldownField != null)
+            {
+                eCooldownField.SetValue(Controller, cooldown);
+            }
+        }
     }
 
     private void CacheGhostStateVisual()

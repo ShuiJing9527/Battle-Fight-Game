@@ -11,6 +11,12 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [SerializeField, Min(0.05f)] private float dashDuration = 0.15f;
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private float eRailDuration = 0.6f;
+    [Header("E - 星痕瞬移 / 路径伤害")]
+    [SerializeField, Min(0f)] private float ePhysicalBaseDamage = 10f;
+    [SerializeField, Min(0f)] private float ePhysicalAttackMultiplier = 0.6f;
+    [SerializeField, Min(0f)] private float eMagicBaseDamage = 30f;
+    [SerializeField, Min(0f)] private float eMagicAttackMultiplier = 0.3f;
+    [SerializeField, Min(0f)] private float ePathHitRadius = 0.6f;
 
     [Header("E - 星痕瞬移 / 残影特效")]
     [InspectorName("E 启用残影")]
@@ -76,7 +82,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [SerializeField] private float eDashEffectLifetime = 0.7f;
 
     private readonly List<GameObject> activeAfterimageGhosts = new List<GameObject>();
+    private readonly HashSet<int> hitEnemiesThisDash = new HashSet<int>();
     private RuneRuntimeState runeRuntimeState;
+    private int currentDashHitCount;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -104,6 +112,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     {
         StopAllCoroutines();
         isDashing = false;
+        currentDashHitCount = 0;
+        hitEnemiesThisDash.Clear();
 
         for (int i = 0; i < activeAfterimageGhosts.Count; i++)
         {
@@ -140,6 +150,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     private IEnumerator DashRoutine()
     {
         isDashing = true;
+        currentDashHitCount = 0;
+        hitEnemiesThisDash.Clear();
 
         float dashDurationSeconds = Mathf.Max(0.05f, dashDuration > 0f ? dashDuration : eRailDuration);
         float dashDistanceValue = Mathf.Max(0f, dashDistance);
@@ -150,11 +162,16 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
         Vector3 dashStartPos = Owner != null ? Owner.transform.position : transform.position;
         Vector3 dashEndPos = dashStartPos + dir * dashDistanceValue;
+        Vector3 previousPos = dashStartPos;
         bool afterimageFlipX = GetCurrentSpineFacingFlipX();
         if (eAfterimageInvertFlip)
         {
             afterimageFlipX = !afterimageFlipX;
         }
+
+        Debug.Log(
+            $"Player02 E 星痕瞬移：距离={dashDistanceValue:F2}，持续={dashDurationSeconds:F2}，路径伤害半径={Mathf.Max(0f, ePathHitRadius):F2}，物理伤害={ePhysicalBaseDamage:F0}+{ePhysicalAttackMultiplier * 100f:F0}%物攻，法术伤害={eMagicBaseDamage:F0}+{eMagicAttackMultiplier * 100f:F0}%特攻，CD={cooldown:F2}，蓝耗={manaCost:F2}",
+            this);
 
         int spawnedAfterimages = 0;
         Vector3 lastAfterimagePos = dashStartPos;
@@ -172,6 +189,10 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             {
                 transform.position = Vector3.Lerp(dashStartPos, dashEndPos, p);
             }
+
+            Vector3 currentPosForDamage = Owner != null ? Owner.transform.position : transform.position;
+            TryApplyDashPathDamage(previousPos, currentPosForDamage);
+            previousPos = currentPosForDamage;
 
             if (eEnableAfterimageShader && eAfterimageUseDistanceSampling)
             {
@@ -227,12 +248,15 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             transform.position = dashEndPos;
         }
 
+        TryApplyDashPathDamage(previousPos, dashEndPos);
+
         if (eSpawnDashEffect)
         {
             SpawnDashEffect(dashStartPos, dashEndPos);
         }
 
         isDashing = false;
+        Debug.Log($"Player02 E 星痕瞬移结束：命中敌人数量={currentDashHitCount}", this);
     }
 
     private bool TrySpawnEAfterimage(Vector3 position, Vector3 dashStartPos, Vector3 dashEndPos, bool afterimageFlipX, ref int spawnedCount)
@@ -267,6 +291,94 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
 
         spawnedCount += 1;
         return true;
+    }
+
+    private void TryApplyDashPathDamage(Vector3 from, Vector3 to)
+    {
+        float hitRadius = Mathf.Max(0f, ePathHitRadius);
+        if (hitRadius <= 0f)
+        {
+            return;
+        }
+
+        Collider[] hits = Physics.OverlapCapsule(from, to, hitRadius);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+            if (hit == null || !BattleTargetUtility.IsMonster(hit, transform))
+            {
+                continue;
+            }
+
+            Transform targetRoot = hit.transform.root;
+            if (targetRoot == null || !hitEnemiesThisDash.Add(targetRoot.gameObject.GetInstanceID()))
+            {
+                continue;
+            }
+
+            ApplyDashPathDamage(targetRoot.gameObject);
+        }
+    }
+
+    private void ApplyDashPathDamage(GameObject targetRoot)
+    {
+        if (targetRoot == null)
+        {
+            return;
+        }
+
+        CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
+        EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
+        CombatStats targetStats = targetRoot.GetComponentInParent<CombatStats>();
+        if (combatHealth == null && enemyHealth == null)
+        {
+            return;
+        }
+
+        CombatStats attackerStats = Owner != null ? Owner.GetComponent<CombatStats>() : GetComponent<CombatStats>();
+        float attackerPhysicalAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.physicalAttack) : 0f;
+        float attackerSpecialAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.specialAttack) : 0f;
+        float targetPhysicalDefense = targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f;
+        float targetSpecialDefense = targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f;
+
+        float physicalRaw = Mathf.Max(0f, ePhysicalBaseDamage) + attackerPhysicalAttack * Mathf.Max(0f, ePhysicalAttackMultiplier);
+        float magicRaw = Mathf.Max(0f, eMagicBaseDamage) + attackerSpecialAttack * Mathf.Max(0f, eMagicAttackMultiplier);
+        float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
+        float magicFinal = Mathf.Max(1f, magicRaw - targetSpecialDefense);
+
+        GameObject source = Owner != null ? Owner.gameObject : gameObject;
+        float beforeHealth = ResolveCurrentHealth(combatHealth);
+
+        if (combatHealth != null && combatHealth.gameObject != source)
+        {
+            combatHealth.ApplyDirectDamage(physicalFinal, source, DamagePopupType.Physical);
+            combatHealth.ApplyDirectDamage(magicFinal, source, DamagePopupType.Special);
+        }
+        else if (enemyHealth != null && enemyHealth.gameObject != source)
+        {
+            int totalDamage = Mathf.Max(2, Mathf.RoundToInt(physicalFinal) + Mathf.RoundToInt(magicFinal));
+            enemyHealth.TakeDamage(totalDamage, source);
+        }
+
+        if (combatHealth != null)
+        {
+            float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+            runeRuntimeState?.NotifyMonsterDamagedBySkill(2, combatHealth, actualDamage);
+        }
+
+        currentDashHitCount++;
+    }
+
+    private float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
     }
 
     private SpriteRenderer ResolveEAfterimageSourceRenderer()

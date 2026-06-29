@@ -807,6 +807,11 @@ public class Player01SkillController : MonoBehaviour
         return wSkill is Player1Skill_W_ThreadFlow w && w.IsDefending;
     }
 
+    public bool ShouldIgnoreIncomingDamage(BattleDamage damage)
+    {
+        return eSkill is Player1Skill_E_BrokenDash e && e.IsImmuneToMonsterPhysicalDamage(damage);
+    }
+
     public bool TryTriggerRuneCounterQ(CombatHealth attacker, bool suppressRuneCounterRecursion = true)
     {
         RuneRuntimeState runeRuntimeState = GetComponent<RuneRuntimeState>();

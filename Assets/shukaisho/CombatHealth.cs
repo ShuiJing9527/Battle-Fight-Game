@@ -147,6 +147,12 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        Player01SkillController player1 = GetComponent<Player01SkillController>();
+        if (player1 != null && player1.ShouldIgnoreIncomingDamage(damage))
+        {
+            return;
+        }
+
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : Mathf.Max(0f, damage.amount);
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
