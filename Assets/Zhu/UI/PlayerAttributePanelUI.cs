@@ -42,7 +42,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private Camera previewCamera;
     [SerializeField] private RenderTexture previewRenderTexture;
     [SerializeField] private Transform worldPreviewRoot;
-    [SerializeField, Min(128)] private int previewRenderTextureSize = 512;
+    [SerializeField] private Vector2 previewPanelSize = new Vector2(520f, 420f);
+    [SerializeField] private Vector2 previewPanelOffset = Vector2.zero;
+    [SerializeField] private Vector2Int previewTextureSize = new Vector2Int(1024, 1024);
     [SerializeField, Min(0.1f)] private float previewCameraOrthographicSize = 3f;
     [SerializeField] private string previewLayerName = "UI";
     [SerializeField] private Vector3 player01WorldPreviewPosition = Vector3.zero;
@@ -73,7 +75,6 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private Vector2 panelSize = new Vector2(760f, 360f);
     [SerializeField] private Vector2 panelAnchoredPosition = new Vector2(0f, 0f);
     [SerializeField] private Vector2 panelPadding = new Vector2(20f, 18f);
-    [SerializeField] private float previewWidth = 220f;
     [SerializeField] private float sectionSpacing = 20f;
     [SerializeField] private float statsTitleHeight = 32f;
     [SerializeField] private float attributeRowHeight = 28f;
@@ -136,6 +137,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private bool usingFallbackLayout;
     private bool usingPrefabLayout;
     private bool panelRootWasCreatedAtRuntime;
+    private bool previewRectWasCreatedAtRuntime;
+    private bool previewRootRectWasCreatedAtRuntime;
+    private bool previewCameraWasCreatedAtRuntime;
     private bool pausedByAttributePanel;
     private bool warnedShowPanelFailed;
     private float nextRefreshTime;
@@ -277,6 +281,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         panelRootWasCreatedAtRuntime = false;
+        previewRectWasCreatedAtRuntime = false;
+        previewRootRectWasCreatedAtRuntime = false;
+        previewCameraWasCreatedAtRuntime = false;
 
         Canvas canvas = ResolveCanvas();
         if (canvas == null)
@@ -493,6 +500,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             previewRect = CreateRectTransform("PreviewSection", panelRoot);
             usingFallbackLayout = true;
             usingPrefabLayout = false;
+            previewRectWasCreatedAtRuntime = true;
         }
 
         Image previewImage = EnsureImage(previewRect, previewColor);
@@ -505,6 +513,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         if (previewRootRect == null && !usingPrefabLayout)
         {
             previewRootRect = CreateRectTransform("PreviewRoot", previewRect);
+            previewRootRectWasCreatedAtRuntime = true;
         }
 
         if (previewRawImage == null)
@@ -520,6 +529,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         if (previewRawImage != null)
         {
             previewRawImage.raycastTarget = false;
+            StretchPreviewGraphic(previewRawImage.rectTransform);
         }
 
         if (previewText == null && !usingPrefabLayout)
@@ -768,11 +778,24 @@ public class PlayerAttributePanelUI : MonoBehaviour
         panelRoot.sizeDelta = panelSize;
         panelRoot.localScale = Vector3.one;
 
-        previewRect.anchorMin = new Vector2(0f, 0f);
-        previewRect.anchorMax = new Vector2(0f, 1f);
-        previewRect.pivot = new Vector2(0f, 0.5f);
-        previewRect.offsetMin = new Vector2(panelPadding.x, panelPadding.y);
-        previewRect.offsetMax = new Vector2(panelPadding.x + previewWidth, -panelPadding.y);
+        float resolvedPreviewWidth = ResolvePreviewPanelSize().x;
+        float resolvedPreviewHeight = ResolvePreviewPanelSize().y;
+        float previewLeft = panelPadding.x + previewPanelOffset.x;
+        float previewRight = previewLeft + resolvedPreviewWidth;
+
+        if (previewRectWasCreatedAtRuntime || !preserveManualLayout)
+        {
+            previewRect.anchorMin = new Vector2(0f, 0.5f);
+            previewRect.anchorMax = new Vector2(0f, 0.5f);
+            previewRect.pivot = new Vector2(0f, 0.5f);
+            previewRect.anchoredPosition = new Vector2(previewLeft, previewPanelOffset.y);
+            previewRect.sizeDelta = new Vector2(resolvedPreviewWidth, resolvedPreviewHeight);
+        }
+
+        if (previewRootRect != null && (previewRootRectWasCreatedAtRuntime || !preserveManualLayout))
+        {
+            StretchPreviewGraphic(previewRootRect);
+        }
 
         if (previewText != null)
         {
@@ -785,7 +808,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         statsRect.anchorMin = new Vector2(0f, 0f);
         statsRect.anchorMax = new Vector2(1f, 1f);
-        statsRect.offsetMin = new Vector2(panelPadding.x + previewWidth + sectionSpacing, panelPadding.y);
+        statsRect.offsetMin = new Vector2(previewRight + sectionSpacing, panelPadding.y);
         statsRect.offsetMax = new Vector2(-panelPadding.x, -panelPadding.y);
 
         if (titleText != null)
@@ -797,7 +820,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             titleRect.offsetMax = new Vector2(0f, 0f);
         }
 
-        float statsWidth = Mathf.Max(240f, panelSize.x - (panelPadding.x * 2f) - previewWidth - sectionSpacing);
+        float statsWidth = Mathf.Max(240f, panelSize.x - panelPadding.x - previewRight - sectionSpacing - panelPadding.x);
         float barStartX = attributeLabelWidth + 12f;
         float barWidth = Mathf.Max(100f, statsWidth - barStartX - attributeValueWidth - 12f);
         float firstRowTop = -statsTitleHeight - 14f;
@@ -1591,12 +1614,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         rawImageObject.transform.SetParent(parent, false);
 
         RectTransform rect = rawImageObject.GetComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(1f, 1f);
-        rect.pivot = new Vector2(0.5f, 0.5f);
-        rect.offsetMin = new Vector2(16f, 16f);
-        rect.offsetMax = new Vector2(-16f, -16f);
-        rect.localScale = Vector3.one;
+        StretchPreviewGraphic(rect);
 
         RawImage rawImage = rawImageObject.GetComponent<RawImage>();
         rawImage.color = Color.white;
@@ -1936,6 +1954,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     {
         if (previewRawImage != null)
         {
+            StretchPreviewGraphic(previewRawImage.rectTransform);
             return;
         }
 
@@ -1950,14 +1969,19 @@ public class PlayerAttributePanelUI : MonoBehaviour
         {
             previewRawImage = CreatePreviewRawImage(parent);
         }
+
+        if (previewRawImage != null)
+        {
+            StretchPreviewGraphic(previewRawImage.rectTransform);
+        }
     }
 
     private void EnsurePreviewRenderTexture()
     {
-        int size = Mathf.Max(128, previewRenderTextureSize);
+        Vector2Int resolvedSize = ResolvePreviewTextureSize();
         if (previewRenderTexture != null &&
-            previewRenderTexture.width == size &&
-            previewRenderTexture.height == size)
+            previewRenderTexture.width == resolvedSize.x &&
+            previewRenderTexture.height == resolvedSize.y)
         {
             return;
         }
@@ -1968,7 +1992,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             Destroy(previewRenderTexture);
         }
 
-        previewRenderTexture = new RenderTexture(size, size, 16, RenderTextureFormat.ARGB32);
+        previewRenderTexture = new RenderTexture(resolvedSize.x, resolvedSize.y, 16, RenderTextureFormat.ARGB32);
         previewRenderTexture.name = "PlayerAttributePreviewRT";
         previewRenderTexture.Create();
     }
@@ -1989,18 +2013,56 @@ public class PlayerAttributePanelUI : MonoBehaviour
             GameObject cameraObject = new GameObject("AttributePreviewCamera");
             cameraObject.transform.SetParent(transform, false);
             previewCamera = cameraObject.AddComponent<Camera>();
+            previewCameraWasCreatedAtRuntime = true;
         }
 
         previewCamera.enabled = false;
-        previewCamera.orthographic = true;
-        previewCamera.orthographicSize = previewCameraOrthographicSize;
         previewCamera.clearFlags = CameraClearFlags.SolidColor;
         previewCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
         previewCamera.nearClipPlane = 0.01f;
         previewCamera.farClipPlane = 100f;
         previewCamera.targetTexture = previewRenderTexture;
+        if (previewCameraWasCreatedAtRuntime)
+        {
+            previewCamera.orthographic = true;
+        }
+
+        if (previewCamera.orthographic)
+        {
+            previewCamera.orthographicSize = previewCameraOrthographicSize;
+        }
+
         previewLayerIndex = ResolvePreviewLayerIndex();
         previewCamera.cullingMask = 1 << previewLayerIndex;
+    }
+
+    private Vector2 ResolvePreviewPanelSize()
+    {
+        float width = Mathf.Max(1f, previewPanelSize.x);
+        float height = Mathf.Max(1f, previewPanelSize.y);
+        return new Vector2(width, height);
+    }
+
+    private Vector2Int ResolvePreviewTextureSize()
+    {
+        int width = Mathf.Max(128, previewTextureSize.x);
+        int height = Mathf.Max(128, previewTextureSize.y);
+        return new Vector2Int(width, height);
+    }
+
+    private static void StretchPreviewGraphic(RectTransform rect)
+    {
+        if (rect == null)
+        {
+            return;
+        }
+
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+        rect.localScale = Vector3.one;
     }
 
     private void ConfigurePreviewCamera()

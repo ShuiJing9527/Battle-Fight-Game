@@ -89,6 +89,9 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [HideInInspector]
     [InspectorName("Q Star Fall Blade Count")]
     [SerializeField] private int qStarFallBladeCount = 7;
+    [Header("Q - 神圣星刃 / 神印积攒")]
+    [InspectorName("Divine Seal Required Star Blade Count")]
+    [SerializeField, Min(1)] private int divineSealRequiredStarBladeCount = 36;
     [Header("Q - 神圣星刃 / 星刃数量成长")]
     [InspectorName("Q Star Fall Min Blade Count")]
     [SerializeField] private int qStarFallMinBladeCount = 1;
@@ -235,6 +238,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     public override void Initialize(Player2PrototypeController owner)
     {
         base.Initialize(owner);
+        SyncDivineSealRequirementToOwner();
     }
 
     public bool TryCastAsRuneCounter(Transform attacker, bool suppressRuneCounterRecursion = true)
@@ -279,7 +283,6 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             Owner.FaceTowardsTarget(attacker);
         }
 
-        Owner.currentSwordEnergy += 1;
         runeRuntimeState = debugRuneState;
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
         qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
@@ -313,7 +316,6 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             return false;
         }
 
-        Owner.currentSwordEnergy += 1;
         runeRuntimeState = ResolveRuneRuntimeState();
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
         qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
@@ -340,6 +342,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
     private void OnValidate()
     {
+        divineSealRequiredStarBladeCount = Mathf.Max(1, divineSealRequiredStarBladeCount);
+        SyncDivineSealRequirementToOwner();
 #if UNITY_EDITOR
         if (qImpactDustPrefab == null)
         {
@@ -429,6 +433,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 {
                     waveBlades.Add(blade);
                     activeQBlades.Add(blade);
+                    AccumulateDivineSealFromQBladeSpawn(1);
                     StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId));
                 }
 
@@ -836,6 +841,26 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         return Owner != null ? Mathf.Max(0, Owner.CurrentDivineMark) : 0;
     }
 
+    private void AccumulateDivineSealFromQBladeSpawn(int spawnedBladeCount)
+    {
+        if (Owner == null)
+        {
+            return;
+        }
+
+        Owner.AddQStarBladesToDivineSeal(spawnedBladeCount);
+    }
+
+    private void SyncDivineSealRequirementToOwner()
+    {
+        if (Owner == null)
+        {
+            return;
+        }
+
+        Owner.SetDivineSealRequiredStarBladeCount(divineSealRequiredStarBladeCount);
+    }
+
     private int GetQStarFallCurrentMaxBladeCount(int divineMark)
     {
         int minCount = Mathf.Max(1, qStarFallMinBladeCount);
@@ -950,5 +975,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
         return value < 0f ? -minAbs : minAbs;
     }
+
+    public int DivineSealRequiredStarBladeCount => Mathf.Max(1, divineSealRequiredStarBladeCount);
 }
 

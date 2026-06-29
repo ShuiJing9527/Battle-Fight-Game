@@ -213,6 +213,11 @@ public class Player2PrototypeController : MonoBehaviour
     public int currentSwordEnergy = 0;
 
     [HideInInspector]
+    [SerializeField, Min(1)] private int divineSealRequiredStarBladeCount = 36;
+    [HideInInspector]
+    [SerializeField, Min(0)] private int accumulatedQStarBladeCountForDivineSeal = 0;
+
+    [HideInInspector]
     [Header("R - 神眷剑涡 / 预制体")]
     [FormerlySerializedAs("swordEnergy")]
     [InspectorName("R Base Sword Count")]
@@ -1521,6 +1526,8 @@ public class Player2PrototypeController : MonoBehaviour
         UpdateSpineFacingMirror();
     }
     public int CurrentDivineMark => currentSwordEnergy;
+    public int DivineSealRequiredStarBladeCount => Mathf.Max(1, divineSealRequiredStarBladeCount);
+    public int CurrentDivineSealStarBladeProgress => Mathf.Max(0, accumulatedQStarBladeCountForDivineSeal);
     public Camera GetRenderCamera() => ResolveRRenderCamera();
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
     public Transform GroundAnchor => groundAnchor != null ? groundAnchor : transform;
@@ -1563,7 +1570,40 @@ public class Player2PrototypeController : MonoBehaviour
             qEffectVisualRoll + ResolveRotation(qEffectRotationZ),
             ResolveVisualScale(qEffectScale, qEffectPlaneScale));
         StartCoroutine(FireAfterDelay(sword, dir, qDelay, qSwordSpeed));
-        currentSwordEnergy += 1;
+        AddQStarBladesToDivineSeal(1);
+    }
+
+    public void AddQStarBladesToDivineSeal(int starBladeCount)
+    {
+        int validStarBladeCount = Mathf.Max(0, starBladeCount);
+        if (validStarBladeCount <= 0)
+        {
+            return;
+        }
+
+        accumulatedQStarBladeCountForDivineSeal += validStarBladeCount;
+        int requiredCount = DivineSealRequiredStarBladeCount;
+        if (requiredCount <= 0)
+        {
+            requiredCount = 1;
+        }
+
+        int gainedDivineSealCount = accumulatedQStarBladeCountForDivineSeal / requiredCount;
+        if (gainedDivineSealCount <= 0)
+        {
+            return;
+        }
+
+        currentSwordEnergy += gainedDivineSealCount;
+        accumulatedQStarBladeCountForDivineSeal -= gainedDivineSealCount * requiredCount;
+        Debug.Log(
+            $"[Player02 DivineSeal] gained={gainedDivineSealCount}, currentDivineMark={currentSwordEnergy}, requiredStarBlades={requiredCount}, remainder={accumulatedQStarBladeCountForDivineSeal}",
+            this);
+    }
+
+    public void SetDivineSealRequiredStarBladeCount(int requiredStarBladeCount)
+    {
+        divineSealRequiredStarBladeCount = Mathf.Max(1, requiredStarBladeCount);
     }
 
     private bool TryCastQFallback()
