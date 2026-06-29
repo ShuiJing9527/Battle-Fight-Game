@@ -7,6 +7,7 @@ public class RuneDropManager : MonoBehaviour
     public static RuneDropManager Instance { get; private set; }
 
     [Header("Rune Source")]
+    [SerializeField] private RuneDropSettings dropSettings;
     [SerializeField] private RuneLibrary runeLibrary;
 
     [Header("Rune Drop Prefabs")]
@@ -53,18 +54,25 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
-        RunePickup prefab = GetDropPrefabForRune(rune);
+        GameObject prefab = GetDropPrefabObjectForRune(rune);
         if (prefab == null)
         {
             WarnMissingPrefabsOnce();
             return null;
         }
 
-        Vector3 spawnPosition = position + Vector3.up * dropYOffset;
-        RunePickup pickup = Instantiate(prefab, spawnPosition, Quaternion.identity);
+        Vector3 spawnPosition = position + Vector3.up * GetDropYOffset();
+        GameObject pickupObject = Instantiate(prefab, spawnPosition, Quaternion.identity);
+        pickupObject.name = rune.runeType == RuneType.None ? "RuneDrop" : $"RuneDrop_{rune.runeType}";
+        RunePickup pickup = pickupObject.GetComponent<RunePickup>();
+        if (pickup == null)
+        {
+            pickup = pickupObject.AddComponent<RunePickup>();
+        }
+
         pickup.SetRune(rune);
         pickup.destroyAfterPickup = true;
-        pickup.gameObject.SetActive(true);
+        pickupObject.SetActive(true);
         return pickup;
     }
 
@@ -80,10 +88,42 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
-        return runeLibrary.GetRandomRune();
+        return dropSettings != null ? dropSettings.GetRandomRune(runeLibrary) : runeLibrary.GetRandomRune();
     }
 
-    private RunePickup GetDropPrefabForRune(RuneDefinition rune)
+    public int RollRuneDropCount(MonsterRank rank, float luck)
+    {
+        if (dropSettings != null)
+        {
+            return dropSettings.RollRuneDropCount(rank, luck);
+        }
+
+        int count = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
+        float extraChance = Mathf.Clamp(Mathf.Max(0f, luck) * 0.005f, 0f, 0.3f);
+        if (extraChance > 0f && Random.value < extraChance)
+        {
+            count++;
+        }
+
+        return count;
+    }
+
+    private GameObject GetDropPrefabObjectForRune(RuneDefinition rune)
+    {
+        if (dropSettings != null)
+        {
+            GameObject settingsPrefab = dropSettings.GetDropPrefabForRune(rune);
+            if (settingsPrefab != null)
+            {
+                return settingsPrefab;
+            }
+        }
+
+        RunePickup legacyPrefab = GetLegacyDropPrefabForRune(rune);
+        return legacyPrefab != null ? legacyPrefab.gameObject : null;
+    }
+
+    private RunePickup GetLegacyDropPrefabForRune(RuneDefinition rune)
     {
         if (runeDropPrefabs == null || runeDropPrefabs.Length == 0)
         {
@@ -107,6 +147,11 @@ public class RuneDropManager : MonoBehaviour
         }
 
         return null;
+    }
+
+    private float GetDropYOffset()
+    {
+        return dropSettings != null ? dropSettings.DropYOffset : Mathf.Max(0f, dropYOffset);
     }
 
     private void WarnMissingLibraryOnce()

@@ -6,6 +6,9 @@ public class RuneLibrary : MonoBehaviour
     [Header("Rune Library")]
     public RuneDefinition[] runes;
 
+    [Header("Default Text")]
+    [SerializeField] private bool keepCustomText = false;
+
     private static readonly RuneType[] DefaultRuneTypes =
     {
         RuneType.Life,
@@ -82,12 +85,44 @@ public class RuneLibrary : MonoBehaviour
 
     private void EnsureDefaults()
     {
-        if (!NeedsDefaultRefresh())
+        if (NeedsDefaultRefresh())
+        {
+            LoadTableDefaults();
+        }
+
+        if (!keepCustomText)
+        {
+            SyncDefaultText();
+        }
+    }
+
+    [ContextMenu("Sync English Rune Text")]
+    public void SyncDefaultText()
+    {
+        if (runes == null)
         {
             return;
         }
 
-        LoadTableDefaults();
+        for (int i = 0; i < runes.Length; i++)
+        {
+            RuneDefinition rune = runes[i];
+            if (rune == null || rune.runeType == RuneType.None)
+            {
+                continue;
+            }
+
+            RuneDefinition defaultRune = RuneDefinition.CreateDefaultRune(rune.runeType);
+            rune.runeId = defaultRune.runeId;
+            rune.runeName = defaultRune.runeName;
+            rune.description = defaultRune.description;
+            rune.tier1Effect = defaultRune.tier1Effect;
+            rune.tier2Effect = defaultRune.tier2Effect;
+            rune.tier3Effect = defaultRune.tier3Effect;
+            rune.tier4Effect = defaultRune.tier4Effect;
+            rune.tier5Effect = defaultRune.tier5Effect;
+            rune.setBonusEffect = defaultRune.setBonusEffect;
+        }
     }
 
     private bool NeedsDefaultRefresh()

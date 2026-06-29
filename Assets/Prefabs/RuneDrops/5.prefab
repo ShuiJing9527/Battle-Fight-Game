@@ -154,21 +154,17 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RunePickup
   rune:
-    id: 0
+    runeId: 0
     runeName: 
-    category: 
+    runeType: 0
     rarity: 0
-    mechanic: 0
-    triggerCondition: 
-    limitOrSideEffect: 
-    playStyle: 
-    extraHitCount: 0
-    extraCastCount: 1
-    damageMultiplier: 1
-    delaySeconds: 0
-    cooldownMultiplier: 1
-    range: 0
-    healthCost: 0
-    healAmount: 0
-    lifeSoulPrefab: {fileID: 0}
+    description: 
+    icon: {fileID: 0}
+    displayPrefab: {fileID: 0}
+    tier1Effect: 
+    tier2Effect: 
+    tier3Effect: 
+    tier4Effect: 
+    tier5Effect: 
+    setBonusEffect: 
   destroyAfterPickup: 1

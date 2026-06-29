@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class RuntimeLootDropOnDeath : MonoBehaviour
 {
@@ -122,15 +125,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             }
         }
 
-        int runeCount = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
+        int runeCount = ResolveRuneDropCount(rank, killerLuck);
         for (int i = 0; i < runeCount; i++)
         {
             CreateRune(transform.position + Vector3.up * runeDropYOffset);
-        }
-
-        if (ShouldDropExtraRune(killerLuck))
-        {
-            CreateRune(transform.position + Vector3.up * runeDropYOffset + RandomOffset());
         }
     }
 
@@ -402,39 +400,19 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         if (runePickupPrefab != null)
         {
             RunePickup pickup = Instantiate(runePickupPrefab, position, Quaternion.identity);
+            pickup.name = rune.runeType == RuneType.None ? "RuneDrop" : $"RuneDrop_{rune.runeType}";
             pickup.rune = rune;
             pickup.destroyAfterPickup = true;
             pickup.gameObject.SetActive(true);
             return;
         }
 
+        if (TrySpawnRuneFromRuneDropsFolder(rune, position))
+        {
+            return;
+        }
+
         WarnMissingRunePickupPrefabOnce();
-        GameObject runeObject = GameObject.CreatePrimitive(PrimitiveType.Cube);
-        runeObject.name = $"Rune - {rune.runeName}";
-        runeObject.transform.position = position;
-        runeObject.transform.localScale = new Vector3(0.35f, 0.12f, 0.35f);
-
-        Collider collider = runeObject.GetComponent<Collider>();
-        if (collider != null)
-        {
-            collider.isTrigger = true;
-        }
-
-        Rigidbody rb = runeObject.GetComponent<Rigidbody>();
-        if (rb == null)
-        {
-            rb = runeObject.AddComponent<Rigidbody>();
-        }
-        rb.isKinematic = true;
-        rb.useGravity = false;
-
-        RunePickup fallbackPickup = runeObject.GetComponent<RunePickup>();
-        if (fallbackPickup == null)
-        {
-            fallbackPickup = runeObject.AddComponent<RunePickup>();
-        }
-        fallbackPickup.rune = rune;
-        fallbackPickup.destroyAfterPickup = true;
     }
 
     private bool TrySpawnRuneFromManager(Vector3 position)
@@ -449,6 +427,37 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return pickup != null;
     }
 
+    private bool TrySpawnRuneFromRuneDropsFolder(RuneDefinition rune, Vector3 position)
+    {
+#if UNITY_EDITOR
+        string[] prefabGuids = AssetDatabase.FindAssets("t:Prefab", new[] { "Assets/Prefabs/RuneDrops" });
+        for (int i = 0; i < prefabGuids.Length; i++)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(prefabGuids[i]);
+            GameObject prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null)
+            {
+                continue;
+            }
+
+            GameObject pickupObject = Instantiate(prefab, position, Quaternion.identity);
+            pickupObject.name = rune.runeType == RuneType.None ? "RuneDrop" : $"RuneDrop_{rune.runeType}";
+            RunePickup pickup = pickupObject.GetComponent<RunePickup>();
+            if (pickup == null)
+            {
+                pickup = pickupObject.AddComponent<RunePickup>();
+            }
+
+            pickup.SetRune(rune);
+            pickup.destroyAfterPickup = true;
+            pickupObject.SetActive(true);
+            return true;
+        }
+#endif
+
+        return false;
+    }
+
     private RuneDropManager ResolveRuneDropManager()
     {
         if (runeDropManager != null)
@@ -460,10 +469,27 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         if (runeDropManager == null && !triedMissingRuneDropManager)
         {
             triedMissingRuneDropManager = true;
-            Debug.LogWarning($"[RuntimeLootDropOnDeath] RuneDropManager not found in scene. Falling back to local runePrefab on {name}.", this);
+            Debug.LogWarning($"[RuntimeLootDropOnDeath] RuneDropManager not found in scene. Trying RuneDrops prefab folder fallback on {name}.", this);
         }
 
         return runeDropManager;
+    }
+
+    private int ResolveRuneDropCount(MonsterRank rank, float luck)
+    {
+        RuneDropManager manager = ResolveRuneDropManager();
+        if (manager != null)
+        {
+            return manager.RollRuneDropCount(rank, luck);
+        }
+
+        int count = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
+        if (ShouldDropExtraRune(luck))
+        {
+            count++;
+        }
+
+        return count;
     }
 
     private void WarnMissingSoulPrefabOnce()
@@ -485,7 +511,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         warnedMissingRunePickupPrefab = true;
-        Debug.LogWarning("[RuneDrop] runePickupPrefab missing, fallback simple rune created.", this);
+        Debug.LogWarning("[RuneDrop] RuneDropManager and RuneDrops prefab fallback are missing. Rune was not spawned to avoid cube placeholder.", this);
     }
 
     private RuneRuntimeState ResolveRuneRuntimeState(GameObject killer)

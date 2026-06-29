@@ -103834,6 +103834,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 26cfb2b2b2ac07b44a4646f4fbb009f4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RuneDropManager
+  dropSettings: {fileID: 11400000, guid: d8b5af2784e34d6ab4b20ef1cc9df8ef, type: 2}
   runeLibrary: {fileID: 1781365618}
   runeDropPrefabs:
   - {fileID: 421617024454299227, guid: f49ac055fb7c12d4a97d628b127435c8, type: 3}
