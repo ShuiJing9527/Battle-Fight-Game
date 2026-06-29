@@ -51045,6 +51045,43 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!84 &811536650
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &885241560
 GameObject:
   m_ObjectHideFlags: 0
@@ -51281,7 +51318,7 @@ MonoBehaviour:
   previewPanelSize: {x: 620, y: 430}
   previewPanelOffset: {x: 0, y: 0}
   previewTextureSize: {x: 1024, y: 1024}
-  previewCameraOrthographicSize: 3.5
+  previewCameraOrthographicSize: 6
   previewLayerName: UI
   player01WorldPreviewPosition: {x: 0, y: -2, z: 0}
   player01WorldPreviewScale: {x: 0.6, y: 0.6, z: 0.6}
@@ -81617,7 +81654,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1281013636}
+  m_CustomBakedTexture: {fileID: 811536650}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -102492,43 +102529,6 @@ MonoBehaviour:
   tooltipWidth: 360
   tooltipPadding: {x: 12, y: 10}
   tooltipOffset: {x: 0, y: 25}
---- !u!84 &1281013636
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1297219327
 GameObject:
   m_ObjectHideFlags: 0
@@ -102672,7 +102672,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.9944632, g: 0.761674, b: 0.3571959, a: 1}
+  m_Color: {r: 0.9795215, g: 0.69404435, b: 0.3051811, a: 1}
   m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
@@ -102735,7 +102735,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.3898491, y: 0.104459755, z: 0.23680258, w: 0.88375926}
+  m_LocalRotation: {x: 0.7128472, y: 0.19100685, z: 0.17465304, w: 0.65181404}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
