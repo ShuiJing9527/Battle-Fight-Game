@@ -1,26 +1,39 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 {
     [Header("W - 神圣护轮 / 核心参数")]
-    [SerializeField, Min(0f)] private float cooldown = 6f;
+    [FormerlySerializedAs("cooldown")]
+    [SerializeField, Min(0f)] private float wCooldown = 8f;
     [SerializeField, Min(0f)] private float manaCost = 40f;
-    [InspectorName("W 持续时间")]
-    [SerializeField] private float wDuration = 1.5f;
+    [FormerlySerializedAs("wDuration")]
+    [InspectorName("W 护盾持续时间")]
+    [SerializeField, Min(0f)] private float wShieldDuration = 5f;
     [InspectorName("W 基础减伤")]
     [SerializeField] private float wDamageReduction = 0.4f;
 
-    [Header("W - 星环剑轮 / 护盾")]
+    [Header("W - 星刃护盾 / 护盾")]
     [InspectorName("W 护盾倍率")]
-    [SerializeField, Min(0f)] private float wShieldMaxHpMultiplier = 2f;
-    [InspectorName("W 每个额外星刃的护盾加成")]
+    [SerializeField, Min(0f)] private float wShieldMaxHpMultiplier = 1f;
+    [InspectorName("W 旧额外星刃护盾加成(仅兼容旧数据)")]
     [SerializeField, Min(0f)] private float wShieldBonusPerExtraSword = 0.1f;
     [InspectorName("W 结束时清空护盾")]
     [SerializeField] private bool wClearShieldOnEnd = true;
 
-    [Header("W - 星环剑轮 / 神印加成")]
+    [Header("W - 星刃护盾 / 接触伤害")]
+    [InspectorName("W 星刃伤害占护盾比例")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeDamageShieldRatio = 0.5f;
+    [InspectorName("W 星刃碰撞半径")]
+    [SerializeField, Min(0.05f)] private float wOrbitStarBladeHitRadius = 0.45f;
+    [InspectorName("W 星刃击退力度")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeKnockbackForce = 4f;
+    [InspectorName("W 星刃命中间隔")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeHitInterval = 0.35f;
+
+    [Header("W - 星刃护盾 / 兼容旧减伤逻辑")]
     [InspectorName("W 每把剑减伤加成")]
     [SerializeField] private float wDamageReductionPerSword = 0.03f;
     [InspectorName("W 最大减伤")]
@@ -34,13 +47,13 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 尺寸倍率")]
     [SerializeField] private float wEffectScaleMultiplier = 1f;
 
-    [Header("W - 星环剑轮 / 剑轮")]
-    [InspectorName("W 初始剑数量")]
-    [SerializeField] private int baseWSwordCount = 3;
-    [InspectorName("W 使用剑气值")]
-    [SerializeField] private bool useSwordEnergyForW = true;
-    [InspectorName("W 最大剑数量")]
-    [SerializeField] private int maxWSwordCount = 15;
+    [Header("W - 星刃护盾 / 剑轮")]
+    [FormerlySerializedAs("baseWSwordCount")]
+    [InspectorName("W 基础星刃数量")]
+    [SerializeField, Min(1)] private int wBaseOrbitStarBladeCount = 1;
+    [FormerlySerializedAs("maxWSwordCount")]
+    [InspectorName("W 最大星刃数量")]
+    [SerializeField, Min(1)] private int wMaxOrbitStarBladeCount = 12;
     [InspectorName("W 环绕半径")]
     [SerializeField] private float wEffectOrbitRadius = 1.2f;
     [InspectorName("W 高度")]
@@ -95,6 +108,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private float wOrbitAngle;
     private Coroutine wSkillRoutine;
     private float wAppliedShieldValue;
+    private float currentWOrbitBladeDamage;
+    private float currentWOrbitRadius;
     private GameObject activeWOrbitVisualRoot;
     private GameObject activeWShieldBubble;
     private readonly List<SpriteRenderer> activeWShieldBubbleSpriteRenderers = new List<SpriteRenderer>();
@@ -102,11 +117,14 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private readonly List<Renderer> activeWShieldBubbleMeshRenderers = new List<Renderer>();
     private readonly List<Color> activeWShieldBubbleMeshBaseColors = new List<Color>();
     private readonly List<GameObject> activeWSwords = new List<GameObject>();
+    private readonly Collider[] orbitBladeHitBuffer = new Collider[32];
+    private readonly Dictionary<int, float> orbitBladeNextHitTimeByTarget = new Dictionary<int, float>();
+    private readonly HashSet<int> orbitBladeProcessedTargetIds = new HashSet<int>();
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
     private RuneRuntimeState runeRuntimeState;
 
-    public override float CooldownSeconds => cooldown;
+    public override float CooldownSeconds => wCooldown;
     public override float ManaCost => manaCost;
 
     private sealed class WSkillEffectRuntime : MonoBehaviour
@@ -192,6 +210,10 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         isWGuardActive = false;
         currentWSwordCount = 0;
         currentWFinalDamageReduction = 0f;
+        currentWOrbitBladeDamage = 0f;
+        currentWOrbitRadius = 0f;
+        orbitBladeNextHitTimeByTarget.Clear();
+        orbitBladeProcessedTargetIds.Clear();
         ClearWShield();
     }
 
@@ -242,17 +264,16 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         activeWOrbitVisualRoot = orbitRoot;
         GameObject shieldBubble = SpawnWShieldBubble(orbitRoot.transform);
 
-        int energyForW = useSwordEnergyForW ? Mathf.Max(0, Owner != null ? Owner.currentSwordEnergy : 0) : 0;
-        int swordCount = baseWSwordCount;
-        if (useSwordEnergyForW)
-        {
-            swordCount += energyForW;
-        }
-        swordCount = Mathf.Clamp(swordCount, baseWSwordCount, maxWSwordCount);
+        int sealCount = ResolveCurrentDivineSealCount();
+        int swordCount = Mathf.Clamp(
+            Mathf.Max(1, wBaseOrbitStarBladeCount) + sealCount,
+            1,
+            Mathf.Max(1, wMaxOrbitStarBladeCount));
 
-        float finalDuration = wDuration + Mathf.Min(energyForW * wDurationPerSwordEnergy, wMaxDurationBonus);
-        float finalOrbitSpeed = wEffectOrbitSpeed + Mathf.Min(energyForW * wOrbitSpeedPerSwordEnergy, wMaxOrbitSpeedBonus);
-        float finalRadius = wEffectOrbitRadius + Mathf.Min(energyForW * wRadiusPerSwordEnergy, wMaxRadiusBonus);
+        float finalDuration = Mathf.Max(0f, wShieldDuration);
+        float finalOrbitSpeed = wEffectOrbitSpeed + Mathf.Min(sealCount * wOrbitSpeedPerSwordEnergy, wMaxOrbitSpeedBonus);
+        float finalRadius = wEffectOrbitRadius + Mathf.Min(sealCount * wRadiusPerSwordEnergy, wMaxRadiusBonus);
+        currentWOrbitRadius = Mathf.Max(0.1f, finalRadius);
 
         activeWSwords.Clear();
         for (int i = 0; i < swordCount; i++)
@@ -307,11 +328,12 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         currentWSwordCount = activeWSwords.Count;
-        currentWFinalDamageReduction = ComputeWFinalDamageReduction(currentWSwordCount);
-        isWGuardActive = true;
+        currentWFinalDamageReduction = 0f;
+        isWGuardActive = false;
         ApplyWShield(currentWSwordCount);
+        currentWOrbitBladeDamage = Mathf.Max(0f, wAppliedShieldValue * wOrbitStarBladeDamageShieldRatio);
 
-        Debug.Log($"[W Skill] Base={baseWSwordCount}, CurrentSwordEnergy={energyForW}, Spawned={activeWSwords.Count}, Duration={finalDuration:F2}, OrbitSpeed={finalOrbitSpeed:F2}, Radius={finalRadius:F2}, DamageReduction={currentWFinalDamageReduction:F2}", this);
+        Debug.Log($"W技能统计：护盾值={wAppliedShieldValue:F2}，神印={sealCount}，星刃数量={currentWSwordCount}，星刃伤害={currentWOrbitBladeDamage:F2}，CD={wCooldown:F2}", this);
         if (activeWSwords.Count > swordCount)
         {
             Debug.LogWarning($"[W Skill] Spawned sword count exceeded expected {swordCount}: {activeWSwords.Count}", this);
@@ -359,9 +381,16 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
                 }
             }
 
+            UpdateOrbitBladeContacts();
+
             if (shieldBubble != null)
             {
                 UpdateWShieldBubble(shieldBubble.transform, t);
+            }
+
+            if (ShouldEndWBecauseShieldExpired())
+            {
+                break;
             }
 
             t += Time.deltaTime;
@@ -376,6 +405,158 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         Cleanup();
         isShielding = false;
         wSkillRoutine = null;
+    }
+
+    private int ResolveCurrentDivineSealCount()
+    {
+        return Owner != null ? Mathf.Max(0, Owner.CurrentDivineMark) : 0;
+    }
+
+    private bool ShouldEndWBecauseShieldExpired()
+    {
+        if (Owner == null || wAppliedShieldValue <= 0f)
+        {
+            return false;
+        }
+
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        return combatHealth != null && combatHealth.GetShield() <= 0f;
+    }
+
+    private void UpdateOrbitBladeContacts()
+    {
+        if (Owner == null || currentWOrbitBladeDamage <= 0f || activeWSwords.Count == 0)
+        {
+            return;
+        }
+
+        orbitBladeProcessedTargetIds.Clear();
+        float hitRadius = Mathf.Max(0.05f, wOrbitStarBladeHitRadius);
+        Transform ownerTransform = Owner.transform;
+
+        for (int i = 0; i < activeWSwords.Count; i++)
+        {
+            GameObject sword = activeWSwords[i];
+            if (sword == null)
+            {
+                continue;
+            }
+
+            int hitCount = Physics.OverlapSphereNonAlloc(
+                sword.transform.position,
+                hitRadius,
+                orbitBladeHitBuffer,
+                ~0,
+                QueryTriggerInteraction.Collide);
+
+            for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+            {
+                Collider hit = orbitBladeHitBuffer[hitIndex];
+                if (hit == null || !BattleTargetUtility.IsMonster(hit, ownerTransform))
+                {
+                    continue;
+                }
+
+                Transform targetRoot = hit.transform.root;
+                if (targetRoot == null)
+                {
+                    continue;
+                }
+
+                int targetId = targetRoot.gameObject.GetInstanceID();
+                if (!orbitBladeProcessedTargetIds.Add(targetId))
+                {
+                    continue;
+                }
+
+                if (orbitBladeNextHitTimeByTarget.TryGetValue(targetId, out float nextHitTime) && Time.time < nextHitTime)
+                {
+                    continue;
+                }
+
+                orbitBladeNextHitTimeByTarget[targetId] = Time.time + Mathf.Max(0.01f, wOrbitStarBladeHitInterval);
+                ApplyOrbitBladeHit(targetRoot.gameObject);
+            }
+
+            for (int hitIndex = 0; hitIndex < hitCount; hitIndex++)
+            {
+                orbitBladeHitBuffer[hitIndex] = null;
+            }
+        }
+    }
+
+    private void ApplyOrbitBladeHit(GameObject target)
+    {
+        if (target == null || Owner == null)
+        {
+            return;
+        }
+
+        CombatHealth combatHealth = target.GetComponentInParent<CombatHealth>();
+        EnemyHealth enemyHealth = target.GetComponentInParent<EnemyHealth>();
+        CombatStats targetStats = target.GetComponentInParent<CombatStats>();
+        if (combatHealth == null && enemyHealth == null)
+        {
+            return;
+        }
+
+        // W 星刃护盾命中时按“护盾值 50% 混合伤害”拆成物理/法术两段结算。
+        float mixedDamage = Mathf.Max(0f, currentWOrbitBladeDamage);
+        float splitRawDamage = mixedDamage * 0.5f;
+        float physicalFinalDamage = Mathf.Max(1f, splitRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f));
+        float specialFinalDamage = Mathf.Max(1f, splitRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f));
+
+        if (combatHealth != null && combatHealth.gameObject != Owner.gameObject)
+        {
+            combatHealth.ApplyDirectDamage(physicalFinalDamage, Owner.gameObject, DamagePopupType.Physical);
+            combatHealth.ApplyDirectDamage(specialFinalDamage, Owner.gameObject, DamagePopupType.Special);
+        }
+        else if (enemyHealth != null && enemyHealth.gameObject != Owner.gameObject)
+        {
+            int totalDamage = Mathf.Max(2, Mathf.RoundToInt(physicalFinalDamage) + Mathf.RoundToInt(specialFinalDamage));
+            enemyHealth.TakeDamage(totalDamage, Owner.gameObject);
+        }
+
+        ApplyOrbitBladeKnockback(target.transform.root != null ? target.transform.root : target.transform);
+    }
+
+    private void ApplyOrbitBladeKnockback(Transform targetRoot)
+    {
+        if (targetRoot == null || Owner == null)
+        {
+            return;
+        }
+
+        Vector3 away = targetRoot.position - Owner.transform.position;
+        away.y = 0f;
+        if (away.sqrMagnitude <= 0.0001f)
+        {
+            away = Owner.transform.forward;
+            away.y = 0f;
+        }
+
+        away = away.normalized;
+        float desiredDistance = Mathf.Max(0.1f, currentWOrbitRadius + wOrbitStarBladeHitRadius * 0.5f);
+        Vector3 ownerFlatPosition = Owner.transform.position;
+        ownerFlatPosition.y = 0f;
+        Vector3 targetFlatPosition = targetRoot.position;
+        targetFlatPosition.y = 0f;
+        float currentDistance = Vector3.Distance(ownerFlatPosition, targetFlatPosition);
+        if (currentDistance < desiredDistance)
+        {
+            Vector3 correctedFlatPosition = ownerFlatPosition + away * desiredDistance;
+            targetRoot.position = new Vector3(correctedFlatPosition.x, targetRoot.position.y, correctedFlatPosition.z);
+        }
+
+        Rigidbody targetRigidbody = targetRoot.GetComponentInParent<Rigidbody>();
+        if (targetRigidbody != null && !targetRigidbody.isKinematic)
+        {
+            Vector3 currentVelocity = targetRigidbody.linearVelocity;
+            targetRigidbody.linearVelocity = new Vector3(
+                away.x * Mathf.Max(0f, wOrbitStarBladeKnockbackForce),
+                currentVelocity.y,
+                away.z * Mathf.Max(0f, wOrbitStarBladeKnockbackForce));
+        }
     }
 
     private GameObject SpawnWShieldBubble(Transform parent)
@@ -1048,16 +1229,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             return;
         }
 
-        if (Approximately(wDuration, 1.5f)) wDuration = Owner.wDuration;
-        if (Approximately(wDamageReduction, 0.4f)) wDamageReduction = Owner.wDamageReduction;
-        if (Approximately(wDamageReductionPerSword, 0.03f)) wDamageReductionPerSword = Owner.wDamageReductionPerSword;
-        if (Approximately(wMaxDamageReduction, 0.8f)) wMaxDamageReduction = Owner.wMaxDamageReduction;
-        if (Approximately(wCounterDamageRatio, 0.5f)) wCounterDamageRatio = Owner.wCounterDamageRatio;
         if (Approximately(wEffectScale, new Vector3(0.3f, 0.3f, 0.3f))) wEffectScale = Owner.wEffectScale;
         if (Approximately(wEffectScaleMultiplier, 1f)) wEffectScaleMultiplier = Owner.wEffectScaleMultiplier;
-        if (baseWSwordCount == 3) baseWSwordCount = Owner.baseWSwordCount;
-        if (useSwordEnergyForW) useSwordEnergyForW = Owner.useSwordEnergyForW;
-        if (maxWSwordCount == 15) maxWSwordCount = Owner.maxWSwordCount;
         if (Approximately(wEffectOrbitRadius, 1.2f)) wEffectOrbitRadius = Owner.wEffectOrbitRadius;
         if (Approximately(wEffectHeight, 1.1f)) wEffectHeight = Owner.wEffectHeight;
         if (Approximately(wEffectOrbitSpeed, 80f)) wEffectOrbitSpeed = Owner.wEffectOrbitSpeed;
@@ -1291,11 +1464,10 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         float maxHp = ResolveOwnerMaxHp();
-        int extraSwordCount = Mathf.Max(0, currentSwordCount - baseWSwordCount);
         float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier);
-        wAppliedShieldValue = Mathf.Max(0f, baseShield * (1f + extraSwordCount * wShieldBonusPerExtraSword));
+        wAppliedShieldValue = baseShield;
         combatHealth.SetShield(wAppliedShieldValue);
-        Debug.Log($"[W Shield] Applied shield={wAppliedShieldValue:F2}, baseShield={baseShield:F2}, maxHp={maxHp:F2}, extraSwordCount={extraSwordCount}, bonusPerSword={wShieldBonusPerExtraSword:F2}", this);
+        Debug.Log($"[W Shield] Applied shield={wAppliedShieldValue:F2}, maxHp={maxHp:F2}, multiplier={wShieldMaxHpMultiplier:F2}, swordCount={currentSwordCount}", this);
     }
 
     private void ClearWShield()
