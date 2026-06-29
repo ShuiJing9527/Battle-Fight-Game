@@ -1044,22 +1044,6 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(3, combatHealth, actualDamage);
                 continue;
             }
-
-            EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
-            if (enemyHealth != null && (Owner == null || enemyHealth.gameObject != Owner.gameObject))
-            {
-                CombatStats targetStats = targetRoot.GetComponentInParent<CombatStats>();
-                float damageAmount = ResolveRHitDamage(attackerStats, targetStats, null, source, damageMultiplier);
-                damageAmount += ConsumeRuneFirstHitBonusDamage();
-                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
-                enemyHealth.TakeDamage(damageInt, source);
-                if (debugCriticalLog)
-                {
-                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
-                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={damageInt} Type=Special Target={enemyHealth.name}", this);
-                }
-            }
         }
     }
 

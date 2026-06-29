@@ -28,8 +28,7 @@ public static class BattleTargetUtility
         }
 
         return target.GetComponentInParent<MonsterIdentity>() != null ||
-               target.GetComponentInParent<EnemyController>() != null ||
-               target.GetComponentInParent<EnemyHealth>() != null;
+               target.GetComponentInParent<EnemyController>() != null;
     }
 
     public static bool IsMonster(Collider collider, Transform attacker)
@@ -55,10 +54,5 @@ public static class BattleTargetUtility
     public static CombatHealth GetMonsterCombatHealth(Collider collider, Transform attacker)
     {
         return IsMonster(collider, attacker) ? collider.GetComponentInParent<CombatHealth>() : null;
-    }
-
-    public static EnemyHealth GetMonsterLegacyHealth(Collider collider, Transform attacker)
-    {
-        return IsMonster(collider, attacker) ? collider.GetComponentInParent<EnemyHealth>() : null;
     }
 }

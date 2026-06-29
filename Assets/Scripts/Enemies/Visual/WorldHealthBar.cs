@@ -17,9 +17,7 @@ public class WorldHealthBar : MonoBehaviour
     private static Sprite whiteSprite;
 
     private CombatHealth combatHealth;
-    private EnemyHealth legacyHealth;
     private Transform cameraTransform;
-    private int legacyMaxHp;
     private bool initialized;
     private bool usingFallbackBar;
     private float backgroundLocalZ;
@@ -80,22 +78,7 @@ public class WorldHealthBar : MonoBehaviour
 
     private float ResolveHealthRatio()
     {
-        bool hasValue = false;
-        float ratio = 1f;
-
-        if (TryGetCombatHealthRatio(out float combatRatio))
-        {
-            ratio = combatRatio;
-            hasValue = true;
-        }
-
-        if (TryGetLegacyHealthRatio(out float legacyRatio))
-        {
-            ratio = hasValue ? Mathf.Min(ratio, legacyRatio) : legacyRatio;
-            hasValue = true;
-        }
-
-        return hasValue ? Mathf.Clamp01(ratio) : -1f;
+        return TryGetCombatHealthRatio(out float ratio) ? Mathf.Clamp01(ratio) : -1f;
     }
 
     private bool TryGetCombatHealthRatio(out float ratio)
@@ -122,18 +105,6 @@ public class WorldHealthBar : MonoBehaviour
         }
 
         ratio = Mathf.Clamp01(currentHealth / maxHealth);
-        return true;
-    }
-
-    private bool TryGetLegacyHealthRatio(out float ratio)
-    {
-        ratio = 1f;
-        if (legacyHealth == null)
-        {
-            return false;
-        }
-
-        ratio = Mathf.Clamp01((float)legacyHealth.hp / Mathf.Max(1, legacyMaxHp));
         return true;
     }
 
@@ -291,23 +262,6 @@ public class WorldHealthBar : MonoBehaviour
             if (combatHealth == null)
             {
                 combatHealth = GetComponentInChildren<CombatHealth>(true);
-            }
-        }
-
-        if (legacyHealth == null)
-        {
-            legacyHealth = GetComponent<EnemyHealth>();
-            if (legacyHealth == null)
-            {
-                legacyHealth = GetComponentInParent<EnemyHealth>();
-            }
-            if (legacyHealth == null)
-            {
-                legacyHealth = GetComponentInChildren<EnemyHealth>(true);
-            }
-            if (legacyHealth != null)
-            {
-                legacyMaxHp = Mathf.Max(1, legacyHealth.hp);
             }
         }
     }

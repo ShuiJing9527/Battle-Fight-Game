@@ -1273,15 +1273,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             return;
         }
 
-        EnemyHealth attackerEnemyHealth = attacker.GetComponentInParent<EnemyHealth>();
-        if (attackerEnemyHealth != null && attackerEnemyHealth.gameObject != gameObject)
-        {
-            int roundedDamage = Mathf.Max(1, Mathf.RoundToInt(counterDamage));
-            attackerEnemyHealth.TakeDamage(roundedDamage, gameObject);
-            return;
-        }
-
-        Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth/EnemyHealth for counter damage.", this);
+        Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth for counter damage.", this);
     }
 
     private void ApplyWShield(int currentSwordCount)

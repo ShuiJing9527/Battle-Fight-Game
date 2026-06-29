@@ -111,13 +111,7 @@ public class Player01NeedleProjectile : MonoBehaviour
         }
         else
         {
-            EnemyHealth enemyHealth = BattleTargetUtility.GetMonsterLegacyHealth(other, sourceTransform);
-            if (enemyHealth == null)
-            {
-                return;
-            }
-
-            enemyHealth.TakeDamage(Mathf.RoundToInt(resolvedDamage), source);
+            return;
         }
 
         hasHit = true;

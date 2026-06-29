@@ -67,7 +67,6 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [SerializeField] private Color quickShearSuperCritFlashColor = new Color(1f, 0.78f, 0.15f, 1f);
 
     private readonly System.Collections.Generic.HashSet<CombatHealth> castDamagedCombatTargets = new System.Collections.Generic.HashSet<CombatHealth>();
-    private readonly System.Collections.Generic.HashSet<EnemyHealth> castDamagedLegacyTargets = new System.Collections.Generic.HashSet<EnemyHealth>();
     private static readonly System.Collections.Generic.HashSet<string> MissingQuickShearStatsWarnings = new System.Collections.Generic.HashSet<string>();
     private float qLifestealTotalThisCast;
     private Coroutine activeScissorTimelineCoroutine;
@@ -207,7 +206,6 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     protected override void OnCastStarted()
     {
         castDamagedCombatTargets.Clear();
-        castDamagedLegacyTargets.Clear();
         qLifestealTotalThisCast = 0f;
         StopActiveScissorTimeline();
 
@@ -382,21 +380,6 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 }
                 totalDamageDealt += actualDamage;
                 continue;
-            }
-
-            EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
-            if (legacyHealth != null && castDamagedLegacyTargets.Add(legacyHealth))
-            {
-                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(resolvedDamage));
-                int beforeHp = Mathf.Max(0, legacyHealth.hp);
-                legacyHealth.TakeDamage(damageInt, gameObject);
-                int actualDamage = Mathf.Clamp(beforeHp, 0, damageInt);
-                if (actualDamage > 0)
-                {
-                    TryPlayQuickShearCritFlash(hit, damageResult);
-                }
-                totalDamageDealt += actualDamage;
             }
         }
 

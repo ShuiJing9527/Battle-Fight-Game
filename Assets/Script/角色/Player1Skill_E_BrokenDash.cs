@@ -34,7 +34,6 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private float cachedOriginalMoveSpeed = -1f;
     private readonly Dictionary<int, bool> cachedLayerCollisionStates = new Dictionary<int, bool>();
     private readonly HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
-    private readonly HashSet<EnemyHealth> damagedLegacyTargets = new HashSet<EnemyHealth>();
     private RuneRuntimeState runeRuntimeState;
     private int currentRuneCastId = -1;
 
@@ -99,7 +98,6 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         IsRunningBoost = true;
         damagedCombatTargets.Clear();
-        damagedLegacyTargets.Clear();
         ApplySpeedBoost();
         ApplyObstacleCollisionIgnore(true);
         SetGhostStateVisible(true);
@@ -176,13 +174,6 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 continue;
-            }
-
-            EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
-            if (legacyHealth != null && damagedLegacyTargets.Add(legacyHealth))
-            {
-                float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
-                legacyHealth.TakeDamage(Mathf.RoundToInt(resolvedDamage), gameObject);
             }
         }
     }

@@ -170,8 +170,6 @@ public class CombatSkillCaster : MonoBehaviour
                 }
 
                 CombatHealth health = BattleTargetUtility.GetMonsterCombatHealth(collider, transform);
-                EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(collider, transform);
-
                 if (health != null && hitTargets.Add(health))
                 {
                     float resolvedDamage = baseDamage;
@@ -181,10 +179,6 @@ public class CombatSkillCaster : MonoBehaviour
                     health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
                     float actualDamage = Mathf.Max(0f, beforeHealth - ResolveTargetCurrentHealth(health));
                     runeRuntimeState?.NotifyMonsterDamagedBySkill(skillIndex, health, actualDamage);
-                }
-                else if (legacyHealth != null)
-                {
-                    legacyHealth.TakeDamage(Mathf.RoundToInt(baseDamage), gameObject);
                 }
             }
         }

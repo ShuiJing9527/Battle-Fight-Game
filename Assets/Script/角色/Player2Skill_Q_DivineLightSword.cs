@@ -556,27 +556,6 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 hitAnyEnemy = true;
                 continue;
             }
-
-            EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
-            if (enemyHealth != null && (Owner == null || enemyHealth.gameObject != Owner.gameObject))
-            {
-                float damageAmount = ResolveQBladeDamage(attackerStats, null, null, source);
-                if (damageAmount <= 0f)
-                {
-                    continue;
-                }
-
-                damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
-                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(finalDamage));
-                enemyHealth.TakeDamage(damageInt, source);
-                if (qDamageDebugLog || debugCriticalLog)
-                {
-                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
-                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={damageInt} Type=Special Target={enemyHealth.name}", this);
-                }
-                hitAnyEnemy = true;
-            }
         }
 
         if (!hitAnyEnemy && qDamageDebugLog)

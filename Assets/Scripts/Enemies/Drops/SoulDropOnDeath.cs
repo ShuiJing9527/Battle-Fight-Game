@@ -14,23 +14,16 @@ public class SoulDropOnDeath : MonoBehaviour
     public SoulDropEntry[] drops;
 
     private CombatHealth combatHealth;
-    private EnemyHealth enemyHealth;
     private bool dropped;
 
     private void OnEnable()
     {
         dropped = false;
         combatHealth = GetComponent<CombatHealth>();
-        enemyHealth = GetComponent<EnemyHealth>();
 
         if (combatHealth != null)
         {
             combatHealth.Died += DropSouls;
-        }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.Died += DropSouls;
         }
     }
 
@@ -39,11 +32,6 @@ public class SoulDropOnDeath : MonoBehaviour
         if (combatHealth != null)
         {
             combatHealth.Died -= DropSouls;
-        }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.Died -= DropSouls;
         }
     }
 

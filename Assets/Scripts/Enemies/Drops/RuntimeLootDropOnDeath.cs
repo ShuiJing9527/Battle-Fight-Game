@@ -31,7 +31,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     [SerializeField, Min(0f)] private float maxExtraRuneDropChance = 0.3f;
 
     private CombatHealth combatHealth;
-    private EnemyHealth enemyHealth;
     private RuneDropManager runeDropManager;
     private bool dropped;
     private bool triedMissingHealthLog;
@@ -68,11 +67,6 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         if (deathEventsBound && combatHealth != null)
         {
             combatHealth.Died -= DropLoot;
-        }
-
-        if (deathEventsBound && enemyHealth != null)
-        {
-            enemyHealth.Died -= DropLoot;
         }
 
         deathEventsBound = false;
@@ -329,20 +323,9 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             combatHealth = GetComponent<CombatHealth>();
         }
 
-        if (enemyHealth == null)
-        {
-            enemyHealth = GetComponent<EnemyHealth>();
-        }
-
         if (combatHealth != null)
         {
             combatHealth.Died += DropLoot;
-            deathEventsBound = true;
-        }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.Died += DropLoot;
             deathEventsBound = true;
         }
 

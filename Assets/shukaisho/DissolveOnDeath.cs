@@ -40,9 +40,7 @@ public class DissolveOnDeath : MonoBehaviour
     private readonly HashSet<int> warnedMessages = new HashSet<int>();
 
     private CombatHealth combatHealth;
-    private EnemyHealth enemyHealth;
     private CombatHealth hookedCombatHealth;
-    private EnemyHealth hookedEnemyHealth;
     private RuntimeLootDropOnDeath lootDrop;
     private bool deathSequenceStarted;
     private bool healthHooked;
@@ -139,7 +137,7 @@ public class DissolveOnDeath : MonoBehaviour
     {
         HookHealthEvents();
 
-        if ((combatHealth == null && enemyHealth == null) && isActiveAndEnabled && healthBindingRoutine == null)
+        if (combatHealth == null && isActiveAndEnabled && healthBindingRoutine == null)
         {
             healthBindingRoutine = StartCoroutine(EnsureHealthBindingsRoutine());
         }
@@ -153,15 +151,6 @@ public class DissolveOnDeath : MonoBehaviour
             if (combatHealth == null)
             {
                 combatHealth = GetComponentInParent<CombatHealth>();
-            }
-        }
-
-        if (enemyHealth == null)
-        {
-            enemyHealth = GetComponent<EnemyHealth>();
-            if (enemyHealth == null)
-            {
-                enemyHealth = GetComponentInParent<EnemyHealth>();
             }
         }
 
@@ -575,7 +564,7 @@ public class DissolveOnDeath : MonoBehaviour
             return true;
         }
 
-        if (behaviour is CombatHealth || behaviour is EnemyHealth || behaviour is RuntimeLootDropOnDeath || behaviour is WorldHealthBar)
+        if (behaviour is CombatHealth || behaviour is RuntimeLootDropOnDeath || behaviour is WorldHealthBar)
         {
             return true;
         }
@@ -612,27 +601,8 @@ public class DissolveOnDeath : MonoBehaviour
             hookedCombatHealth = null;
         }
 
-        if (hookedEnemyHealth != null && hookedEnemyHealth != enemyHealth)
-        {
-            hookedEnemyHealth.Died -= HandleDied;
-            hookedEnemyHealth = null;
-        }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.Died -= HandleDied;
-            enemyHealth.Died += HandleDied;
-            hookedEnemyHealth = enemyHealth;
-            hasAnyBinding = true;
-        }
-        else if (hookedEnemyHealth != null)
-        {
-            hookedEnemyHealth.Died -= HandleDied;
-            hookedEnemyHealth = null;
-        }
-
         healthHooked = hasAnyBinding;
-        DebugLog($"[DissolveOnDeath] Bind owner={name} combatHealth={(combatHealth != null)} enemyHealth={(enemyHealth != null)}");
+        DebugLog($"[DissolveOnDeath] Bind owner={name} combatHealth={(combatHealth != null)}");
     }
 
     private void UnhookHealthEvents()
@@ -641,12 +611,6 @@ public class DissolveOnDeath : MonoBehaviour
         {
             hookedCombatHealth.Died -= HandleDied;
             hookedCombatHealth = null;
-        }
-
-        if (hookedEnemyHealth != null)
-        {
-            hookedEnemyHealth.Died -= HandleDied;
-            hookedEnemyHealth = null;
         }
 
         healthHooked = false;
@@ -664,11 +628,6 @@ public class DissolveOnDeath : MonoBehaviour
         {
             combatHealth.destroyOnDeath = value;
         }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.destroyOnDeath = value;
-        }
     }
 
     private void TryStartIfAlreadyDead()
@@ -681,8 +640,7 @@ public class DissolveOnDeath : MonoBehaviour
         }
 
         bool combatDead = combatHealth != null && combatHealth.IsDead;
-        bool enemyDead = enemyHealth != null && enemyHealth.hp <= 0;
-        if (combatDead || enemyDead)
+        if (combatDead)
         {
             BeginDeathSequence();
         }
@@ -728,7 +686,7 @@ public class DissolveOnDeath : MonoBehaviour
         keepDissolvedOnDestroy = false;
         loggedRendererDiagnostics = false;
         nextDissolveLogTime = 0f;
-        DebugLog($"[DissolveOnDeath] Begin owner={name} hasCombatHealth={(combatHealth != null)} hasEnemyHealth={(enemyHealth != null)}");
+        DebugLog($"[DissolveOnDeath] Begin owner={name} hasCombatHealth={(combatHealth != null)}");
         SyncDestroyOnDeathState(false);
         PrepareRuntimeMaterials();
         LogRendererDiagnostics();

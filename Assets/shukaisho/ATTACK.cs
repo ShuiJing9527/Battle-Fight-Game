@@ -112,15 +112,9 @@ public class ATTACK : MonoBehaviour
             }
 
             CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(enemy, transform);
-            EnemyHealth hp = BattleTargetUtility.GetMonsterLegacyHealth(enemy, transform);
-
             if (combatHealth != null)
             {
                 combatHealth.TakeDamage(new BattleDamage(attackDamage, BattleDamageType.Physical, gameObject));
-            }
-            else if (hp != null)
-            {
-                hp.TakeDamage(attackDamage, gameObject);
             }
         }
     }

@@ -2328,13 +2328,6 @@ public class Player2PrototypeController : MonoBehaviour
                 combatHealth.TakeDamage(new BattleDamage(damageAmount, BattleDamageType.Physical, gameObject));
                 continue;
             }
-
-            EnemyHealth enemyHealth = targetRoot.GetComponentInParent<EnemyHealth>();
-            if (enemyHealth != null && enemyHealth.gameObject != gameObject)
-            {
-                int damageInt = Mathf.Max(1, Mathf.RoundToInt(damageAmount));
-                enemyHealth.TakeDamage(damageInt, gameObject);
-            }
         }
     }
 
@@ -2407,15 +2400,7 @@ public class Player2PrototypeController : MonoBehaviour
             return;
         }
 
-        EnemyHealth attackerEnemyHealth = attacker.GetComponentInParent<EnemyHealth>();
-        if (attackerEnemyHealth != null && attackerEnemyHealth.gameObject != gameObject)
-        {
-            int roundedDamage = Mathf.Max(1, Mathf.RoundToInt(counterDamage));
-            attackerEnemyHealth.TakeDamage(roundedDamage, gameObject);
-            return;
-        }
-
-        Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth/EnemyHealth for counter damage.", this);
+        Debug.LogWarning($"[W Guard] Attacker '{attacker.name}' has no CombatHealth for counter damage.", this);
     }
 
     private IEnumerator DashRoutine()

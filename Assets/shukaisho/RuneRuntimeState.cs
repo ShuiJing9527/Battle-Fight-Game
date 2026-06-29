@@ -640,7 +640,6 @@ public class RuneRuntimeState : MonoBehaviour
             QueryTriggerInteraction.Collide);
 
         HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
-        HashSet<EnemyHealth> damagedLegacyTargets = new HashSet<EnemyHealth>();
         int hitCount = 0;
 
         for (int i = 0; i < hits.Length; i++)
@@ -662,13 +661,6 @@ public class RuneRuntimeState : MonoBehaviour
                 targetHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
                 hitCount++;
                 continue;
-            }
-
-            EnemyHealth legacyHealth = BattleTargetUtility.GetMonsterLegacyHealth(hit, transform);
-            if (legacyHealth != null && damagedLegacyTargets.Add(legacyHealth))
-            {
-                legacyHealth.TakeDamage(Mathf.RoundToInt(burstDamage), gameObject);
-                hitCount++;
             }
         }
 

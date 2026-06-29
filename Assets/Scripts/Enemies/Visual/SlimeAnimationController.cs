@@ -48,9 +48,7 @@ public class SlimeAnimationController : MonoBehaviour
     public event Action<Transform> OnAttackHit;
     public AttackHitEvent onAttackHit = new AttackHitEvent();
 
-    private EnemyHealth enemyHealth;
     private CombatHealth combatHealth;
-    private bool previousEnemyDestroyOnDeath = true;
     private bool previousCombatDestroyOnDeath = true;
     private bool hookedHealth;
 
@@ -547,14 +545,6 @@ public class SlimeAnimationController : MonoBehaviour
             return;
         }
 
-        enemyHealth = GetComponent<EnemyHealth>();
-        if (enemyHealth != null)
-        {
-            previousEnemyDestroyOnDeath = enemyHealth.destroyOnDeath;
-            enemyHealth.destroyOnDeath = false;
-            enemyHealth.Died += OnHealthDied;
-        }
-
         combatHealth = GetComponent<CombatHealth>();
         if (combatHealth != null)
         {
@@ -571,15 +561,6 @@ public class SlimeAnimationController : MonoBehaviour
         if (!hookedHealth)
         {
             return;
-        }
-
-        if (enemyHealth != null)
-        {
-            enemyHealth.Died -= OnHealthDied;
-            if (!isDying)
-            {
-                enemyHealth.destroyOnDeath = previousEnemyDestroyOnDeath;
-            }
         }
 
         if (combatHealth != null)
