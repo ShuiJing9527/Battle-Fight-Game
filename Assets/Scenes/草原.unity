@@ -51045,43 +51045,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!84 &811536650
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &885241560
 GameObject:
   m_ObjectHideFlags: 0
@@ -51328,6 +51291,48 @@ MonoBehaviour:
   player02WorldPreviewEuler: {x: 0, y: 0, z: 0}
   player01PreviewIdleAnimationName: Idle
   player02PreviewIdleAnimationName: idle
+  player01ExtraPreviewVisuals:
+  - source: {fileID: 4219715072139928434, guid: ab70a64e8b493a14e81dff2b12ba2ebc, type: 3}
+    previewName: EyeFire
+    transformMode: 1
+    followPosition: 0
+    followRotation: 0
+    followScale: 0
+    localPositionOffset: {x: 2.5, y: 7, z: 0}
+    localEulerOffset: {x: 0, y: 0, z: 90}
+    localScaleMultiplier: {x: 1, y: 1, z: 1}
+    sortMode: 2
+    sortingOrderOffset: 100
+    previewAlphaMultiplier: 1.2
+    previewColorIntensityMultiplier: 1.6
+    overridePreviewColor: 1
+    previewColorTint: {r: 0.34133857, g: 0.84738594, b: 0.94716984, a: 0.8627451}
+    previewEmissionMultiplier: 1.8
+    keepMonoBehaviours: 0
+    keepMonoBehaviourTypeNames: []
+    usePreviewRotationDriver: 0
+    previewRotationSpeedEuler: {x: 0, y: 0, z: 0}
+  player02ExtraPreviewVisuals:
+  - source: {fileID: 2634110848904970607, guid: 44da2b72404ada34991b711009a06deb, type: 3}
+    previewName: Halo
+    transformMode: 1
+    followPosition: 0
+    followRotation: 0
+    followScale: 0
+    localPositionOffset: {x: 0.5, y: 5.5, z: 0}
+    localEulerOffset: {x: 0, y: 0, z: 0}
+    localScaleMultiplier: {x: 1, y: 1, z: 1}
+    sortMode: 1
+    sortingOrderOffset: -50
+    previewAlphaMultiplier: 1
+    previewColorIntensityMultiplier: 1
+    overridePreviewColor: 0
+    previewColorTint: {r: 1, g: 1, b: 1, a: 1}
+    previewEmissionMultiplier: 1
+    keepMonoBehaviours: 0
+    keepMonoBehaviourTypeNames: []
+    usePreviewRotationDriver: 1
+    previewRotationSpeedEuler: {x: 0, y: 0, z: -30}
   player01PreviewPrefab: {fileID: 8462296807659335023, guid: ad45c11ef86568f4495c3a9e8352e09c, type: 3}
   player02PreviewPrefab: {fileID: 1391062824609752475, guid: 24d5fe62c6520404f9d15fed2d027453, type: 3}
   previewUiAnchoredPosition: {x: 30, y: -160}
@@ -81654,7 +81659,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 811536650}
+  m_CustomBakedTexture: {fileID: 1807021660}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -102672,7 +102677,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.9795215, g: 0.69404435, b: 0.3051811, a: 1}
+  m_Color: {r: 0.96422017, g: 0.6247865, b: 0.251914, a: 1}
   m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
@@ -102735,7 +102740,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7128472, y: 0.19100685, z: 0.17465304, w: 0.65181404}
+  m_LocalRotation: {x: 0.91807544, y: 0.2459976, z: 0.08045182, w: 0.3002503}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -103868,113 +103873,105 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RuneLibrary
   runes:
   - runeId: 101
-    runeName: "\u751F\u547D\u7B26\u6587"
+    runeName: Life Rune
     runeType: 1
     rarity: 0
-    description: "\u4EE5\u751F\u547D\u4E3A\u6E90\u6CC9\u7684\u7B26\u6587\uFF0C\u5F3A\u5316\u4F53\u9B44\uFF0C\u5E76\u5C06\u751F\u547D\u529B\u8F6C\u5316\u4E3A\u56DE\u590D\u3001\u4F24\u5BB3\u4E0E\u6210\u957F\u3002"
+    description: A rune born from vitality. It strengthens the body and turns life
+      force into healing, damage, and growth.
     icon: {fileID: 0}
     displayPrefab: {fileID: 0}
-    tier1Effect: "\u6700\u5927\u751F\u547D\u503C\u63D0\u9AD8 10%\u3002"
-    tier2Effect: "\u4F7F\u7528\u8BE5\u6280\u80FD\u65F6\uFF0C\u56DE\u590D\u81EA\u8EAB\u6700\u5927\u751F\u547D\u503C
-      1% \u7684 HP\u3002"
-    tier3Effect: "\u82E5\u8BE5\u56DE\u590D\u4EA7\u751F\u6EA2\u51FA\u6CBB\u7597\uFF0C\u5219\u5C06\u6EA2\u51FA\u90E8\u5206\u8F6C\u5316\u4E3A\u6C38\u4E45\u62A4\u76FE\uFF0C\u4E0A\u9650\u4E3A\u81EA\u8EAB\u6700\u5927\u751F\u547D\u503C\u7684
-      50%\u3002"
-    tier4Effect: "\u8BE5\u6280\u80FD\u9996\u6B21\u547D\u4E2D\u654C\u4EBA\u65F6\uFF0C\u989D\u5916\u9020\u6210\u81EA\u8EAB\u6700\u5927\u751F\u547D\u503C
-      1% \u7684\u4F24\u5BB3\uFF0C\u6BCF\u6B21\u91CA\u653E\u6700\u591A\u89E6\u53D1
-      1 \u6B21\u3002"
-    tier5Effect: "\u51FB\u6740\u602A\u7269\u65F6\uFF0C\u989D\u5916\u83B7\u5F97 1
-      \u4E2A\u751F\u547D\u5C5E\u6027\u9B42\u548C 1 \u4E2A\u56DE\u590D\u751F\u547D\u9B42\u3002"
-    setBonusEffect: "1 \u4EF6\u751F\u547D\u63D0\u9AD8\u6539\u4E3A 50%\uFF1B2 \u4EF6\u56DE\u590D\u6539\u4E3A
-      5%\uFF1B3 \u4EF6\u6C38\u4E45\u62A4\u76FE\u4E0A\u9650\u6539\u4E3A\u6700\u5927\u751F\u547D\u503C
-      100%\uFF1B4 \u4EF6\u9996\u6B21\u547D\u4E2D\u989D\u5916\u4F24\u5BB3\u6539\u4E3A\u6700\u5927\u751F\u547D\u503C
-      5%\uFF1B5 \u4EF6\u989D\u5916\u6839\u636E\u6700\u5927\u751F\u547D\u503C\u4E3A
-      HP \u4EE5\u5916\u5C5E\u6027\u63D0\u4F9B\u52A0\u6210\u3002"
+    tier1Effect: Max HP +10%.
+    tier2Effect: When using the socketed skill, restore HP equal to 1% of max HP.
+    tier3Effect: Overflow healing from this effect becomes permanent shield, up to
+      50% of max HP.
+    tier4Effect: The first enemy hit by the socketed skill takes bonus damage equal
+      to 1% of max HP. Triggers once per cast.
+    tier5Effect: When killing a monster, gain 1 Life Attribute Soul and 1 Life Recovery
+      Soul.
+    setBonusEffect: 1-piece max HP bonus becomes 50%; 2-piece healing becomes 5%;
+      3-piece permanent shield cap becomes 100% of max HP; 4-piece bonus damage becomes
+      5% of max HP; 5-piece also grants all-stat bonuses based on max HP.
   - runeId: 102
-    runeName: "\u62A4\u76FE\u7B26\u6587"
+    runeName: Shield Rune
     runeType: 2
     rarity: 0
-    description: "\u5B88\u62A4\u610F\u5FD7\u51DD\u7ED3\u800C\u6210\u7684\u7B26\u6587\uFF0C\u79EF\u84C4\u62A4\u76FE\u5E76\u5C06\u62A4\u76FE\u8F6C\u5316\u4E3A\u66F4\u5F3A\u7684\u9632\u5FA1\u4E0E\u653B\u51FB\u3002"
+    description: A rune shaped by protective will. It stores shield power and converts
+      shield strength into defense and offense.
     icon: {fileID: 0}
     displayPrefab: {fileID: 0}
-    tier1Effect: "\u6CA1\u6709\u53D7\u5230\u602A\u7269\u4F24\u5BB3 3 \u79D2\u540E\uFF0C\u83B7\u5F97\u81EA\u8EAB\u6700\u5927\u751F\u547D\u503C
-      15% \u7684\u62A4\u76FE\u3002"
-    tier2Effect: "\u62E5\u6709\u62A4\u76FE\u65F6\uFF0C\u9020\u6210\u7684\u4F24\u5BB3\u63D0\u9AD8
-      25%\u3002"
-    tier3Effect: "\u83B7\u5F97\u7684\u62A4\u76FE\u503C\u63D0\u9AD8 100%\u3002"
-    tier4Effect: "\u8BE5\u6280\u80FD\u9996\u6B21\u547D\u4E2D\u654C\u4EBA\u65F6\uFF0C\u989D\u5916\u9020\u6210\u5F53\u524D\u62A4\u76FE\u503C
-      10% \u7684\u4F24\u5BB3\uFF0C\u6BCF\u6B21\u91CA\u653E\u6700\u591A\u89E6\u53D1
-      1 \u6B21\u3002"
-    tier5Effect: "\u51FB\u6740\u602A\u7269\u65F6\uFF0C\u989D\u5916\u83B7\u5F97 1
-      \u4E2A\u62A4\u76FE\u9B42\u3002"
-    setBonusEffect: "1 \u4EF6\u62A4\u76FE\u503C\u6539\u4E3A\u6700\u5927\u751F\u547D\u503C
-      50%\uFF1B2 \u4EF6\u4F24\u5BB3\u63D0\u9AD8\u6539\u4E3A 50%\uFF1B3 \u4EF6\u62A4\u76FE\u83B7\u5F97\u63D0\u9AD8\u6539\u4E3A
-      200%\uFF1B4 \u4EF6\u9996\u6B21\u547D\u4E2D\u989D\u5916\u4F24\u5BB3\u6539\u4E3A\u5F53\u524D\u62A4\u76FE\u503C
-      25%\uFF1B5 \u4EF6\u6BCF\u6B21\u51FB\u6740 Boss \u4F7F\u62A4\u76FE\u6548\u80FD\u6C38\u4E45\u63D0\u9AD8
-      10%\u3002"
+    tier1Effect: After taking no monster damage for 3 seconds, gain shield equal
+      to 15% of max HP.
+    tier2Effect: While shielded, damage dealt +25%.
+    tier3Effect: Shield gained +100%.
+    tier4Effect: The first enemy hit by the socketed skill takes bonus damage equal
+      to 10% of current shield. Triggers once per cast.
+    tier5Effect: When killing a monster, gain 1 Shield Soul.
+    setBonusEffect: 1-piece shield becomes 50% of max HP; 2-piece damage bonus becomes
+      50%; 3-piece shield gained becomes +200%; 4-piece bonus damage becomes 25%
+      of current shield; 5-piece permanently increases shield efficiency by 10% whenever
+      a Boss is killed.
   - runeId: 103
-    runeName: "\u9B54\u529B\u7B26\u6587"
+    runeName: Mana Rune
     runeType: 3
     rarity: 0
-    description: "\u7531\u7EAF\u7CB9\u9B54\u529B\u51DD\u7ED3\u800C\u6210\u7684\u7B26\u6587\uFF0C\u6269\u5F20\u6CD5\u529B\u5BB9\u91CF\uFF0C\u5F3A\u5316\u9B54\u529B\u9B42\u6062\u590D\uFF0C\u5E76\u5C06\u6EA2\u51FA\u7684\u9B54\u529B\u8F6C\u5316\u4E3A\u7206\u53D1\u3002"
+    description: A rune condensed from pure mana. It expands mana capacity, improves
+      mana recovery, and turns overflow mana into burst damage.
     icon: {fileID: 0}
     displayPrefab: {fileID: 0}
-    tier1Effect: "\u6700\u5927\u6CD5\u529B\u503C\u589E\u52A0 150\u3002"
-    tier2Effect: "\u6CD5\u529B\u6062\u590D\u901F\u5EA6\u63D0\u9AD8 150%\u3002"
-    tier3Effect: "\u51FB\u6740\u602A\u7269\u65F6\uFF0C\u989D\u5916\u6389\u843D 1
-      \u4E2A\u9B54\u529B\u9B42\uFF1B\u9B54\u529B\u9B42\u6EA2\u51FA\u6062\u590D\u4F1A\u8F6C\u5316\u4E3A\u9B54\u529B\u5145\u76C8\uFF0C\u4E0A\u9650\u4E3A\u6700\u5927\u6CD5\u529B\u503C\u7684
-      100%\u3002"
-    tier4Effect: "\u8BE5\u6280\u80FD\u9996\u6B21\u547D\u4E2D\u654C\u4EBA\u65F6\uFF0C\u989D\u5916\u6D88\u8017\u6700\u591A
-      100 \u70B9\u6CD5\u529B\u6216\u9B54\u529B\u5145\u76C8\uFF0C\u9020\u6210\u989D\u5916\u6D88\u8017\u503C
-      \xD73 \u7684\u4F24\u5BB3\u3002"
-    tier5Effect: "\u6700\u5927\u6CD5\u529B\u8F6C\u5316\u4E3A\u5168\u5C5E\u6027\u52A0\u6210
-      20%\u3002"
-    setBonusEffect: "1 \u4EF6\u6700\u5927\u6CD5\u529B\u6539\u4E3A 400\uFF1B2 \u4EF6\u6CD5\u529B\u6062\u590D\u6539\u4E3A
-      300%\uFF1B3 \u4EF6\u9B54\u529B\u9B42\u6062\u590D\u63D0\u9AD8\u5230 300%\uFF0C\u9B54\u529B\u5145\u76C8\u4E0A\u9650\u6539\u4E3A\u6700\u5927\u6CD5\u529B\u503C
-      200%\uFF1B4 \u4EF6\u989D\u5916\u6D88\u8017\u4E0A\u9650\u6539\u4E3A 200 \u4E14\u500D\u7387\u6539\u4E3A
-      \xD74\uFF1B5 \u4EF6\u6BCF\u6B21\u51FB\u6740 Boss \u4F7F\u6CD5\u529B\u8F6C\u6362\u6548\u80FD\u6C38\u4E45\u63D0\u9AD8
-      10%\u3002"
+    tier1Effect: Max Mana +150.
+    tier2Effect: Mana recovery speed +150%.
+    tier3Effect: When killing a monster, drop 1 extra Mana Soul. Overflow recovery
+      from Mana Souls becomes Mana Overflow, up to 100% of max Mana.
+    tier4Effect: On the first enemy hit by the socketed skill, consume up to 100
+      Mana or Mana Overflow to deal bonus damage equal to consumed value x3.
+    tier5Effect: Convert max Mana into all-stat bonuses at 20% efficiency.
+    setBonusEffect: 1-piece max Mana bonus becomes 400; 2-piece mana recovery becomes
+      +300%; 3-piece Mana Soul recovery becomes 300% and Mana Overflow cap becomes
+      200% of max Mana; 4-piece consume cap becomes 200 and damage multiplier becomes
+      x4; 5-piece permanently increases mana conversion efficiency by 10% whenever
+      a Boss is killed.
   - runeId: 104
-    runeName: "\u8346\u68D8\u7B26\u6587"
+    runeName: Thorn Rune
     runeType: 4
     rarity: 0
-    description: "\u7531\u75DB\u82E6\u4E0E\u53CD\u51FB\u610F\u5FD7\u51DD\u7ED3\u800C\u6210\u7684\u7B26\u6587\uFF0C\u964D\u4F4E\u627F\u4F24\u5E76\u628A\u627F\u53D7\u7684\u653B\u51FB\u8F6C\u5316\u4E3A\u53CD\u51FB\u529B\u91CF\u3002"
+    description: A rune formed from pain and retaliation. It reduces incoming damage
+      and converts attacks taken into counter damage.
     icon: {fileID: 0}
     displayPrefab: {fileID: 0}
-    tier1Effect: "\u53D7\u5230\u7684\u4F24\u5BB3\u964D\u4F4E 15%\u3002"
-    tier2Effect: "\u53D7\u5230\u602A\u7269\u653B\u51FB\u65F6\uFF0C\u5BF9\u653B\u51FB\u8005\u9020\u6210\u81EA\u8EAB\u5168\u5C5E\u6027\u603B\u548C
-      15% \u7684\u8346\u68D8\u4F24\u5BB3\u3002"
-    tier3Effect: "\u8BE5\u6280\u80FD\u9996\u6B21\u9020\u6210\u4F24\u5BB3\u65F6\uFF0C\u989D\u5916\u9644\u52A0\u8346\u68D8\u4F24\u5BB3
-      150% \u7684\u4F24\u5BB3\uFF0C\u6BCF\u6B21\u91CA\u653E\u6700\u591A\u89E6\u53D1
-      1 \u6B21\u3002"
-    tier4Effect: "\u53D7\u5230\u602A\u7269\u653B\u51FB\u65F6\uFF0C\u81EA\u52A8\u89E6\u53D1\u4E00\u6B21\u9576\u5D4C\u6280\u80FD\u7684\u8346\u68D8\u53CD\u51FB\uFF0C\u65E0\u89C6\u51B7\u5374\u548C\u6D88\u8017\uFF0C\u4F46\u6709
-      4 \u79D2\u89E6\u53D1\u95F4\u9694\u3002"
-    tier5Effect: "\u8346\u68D8\u4F24\u5BB3\u63D0\u9AD8 100%\u3002"
-    setBonusEffect: "1 \u4EF6\u51CF\u4F24\u6539\u4E3A 35%\uFF1B2 \u4EF6\u8346\u68D8\u4F24\u5BB3\u6539\u4E3A\u5168\u5C5E\u6027\u603B\u548C
-      40%\uFF1B3 \u4EF6\u9644\u52A0\u4F24\u5BB3\u6539\u4E3A\u8346\u68D8\u4F24\u5BB3
-      300%\uFF1B4 \u4EF6\u89E6\u53D1\u95F4\u9694\u7F29\u77ED\u5230 2 \u79D2\uFF1B5
-      \u4EF6\u6BCF\u6B21\u51FB\u6740 Boss \u4F7F\u8346\u68D8\u6548\u80FD\u6C38\u4E45\u63D0\u9AD8
-      15%\u3002"
+    tier1Effect: Damage taken -15%.
+    tier2Effect: When hit by a monster, deal thorn damage to the attacker equal to
+      15% of total attributes.
+    tier3Effect: The first damage dealt by the socketed skill adds bonus damage equal
+      to 150% of thorn damage. Triggers once per cast.
+    tier4Effect: 'When hit by a monster, automatically trigger Thorn Counter from
+      the socketed skill without cooldown or resource cost. Base trigger cooldown:
+      4 seconds.'
+    tier5Effect: Thorn damage +100%.
+    setBonusEffect: 1-piece damage reduction becomes 35%; 2-piece thorn damage becomes
+      40% of total attributes; 3-piece added damage becomes 300% of thorn damage;
+      4-piece trigger cooldown becomes 2 seconds; 5-piece permanently increases thorn
+      efficiency by 15% whenever a Boss is killed.
   - runeId: 105
-    runeName: "\u5E78\u8FD0\u7B26\u6587"
+    runeName: Luck Rune
     runeType: 5
     rarity: 0
-    description: "\u7531\u547D\u8FD0\u6C14\u606F\u51DD\u7ED3\u800C\u6210\u7684\u7B26\u6587\uFF0C\u63D0\u9AD8\u9B42\u7684\u83B7\u53D6\u6548\u7387\uFF0C\u5E76\u628A\u5076\u7136\u6536\u76CA\u8F6C\u5316\u4E3A\u957F\u671F\u6210\u957F\u3002"
+    description: A rune condensed from the breath of fate. It improves Soul gains
+      and turns lucky combat rewards into long-term growth.
     icon: {fileID: 0}
     displayPrefab: {fileID: 0}
-    tier1Effect: "\u5E78\u8FD0\u503C\u63D0\u9AD8 1\u3002"
-    tier2Effect: "\u602A\u7269\u6389\u843D\u5C5E\u6027\u9B42\u65F6\uFF0C\u6709 20%
-      \u6982\u7387\u4F7F\u8BE5\u5C5E\u6027\u9B42\u70B9\u6570\u63D0\u9AD8 1\uFF0C\u6700\u9AD8\u4E0D\u8D85\u8FC7
-      5\u3002"
-    tier3Effect: "\u51FB\u6740\u602A\u7269\u65F6\uFF0C\u6709 15% \u6982\u7387\u989D\u5916\u6389\u843D
-      1 \u4E2A\u968F\u673A\u5C5E\u6027\u9B42\u3002"
-    tier4Effect: "\u62FE\u53D6\u4EFB\u610F\u9B42\u65F6\uFF0C\u6709 10% \u6982\u7387\u989D\u5916\u590D\u5236
-      1 \u4E2A\u540C\u7C7B\u578B\u9B42\uFF0C\u590D\u5236\u9B42\u9ED8\u8BA4 1 \u70B9\u3002"
-    tier5Effect: "\u51FB\u6740 Boss \u65F6\uFF0C\u989D\u5916\u6389\u843D 2 \u4E2A\u968F\u673A\u5C5E\u6027\u9B42\u3002"
-    setBonusEffect: "1 \u4EF6\u5E78\u8FD0\u63D0\u9AD8\u6539\u4E3A 3\uFF1B2 \u4EF6\u5C5E\u6027\u9B42\u63D0\u70B9\u6982\u7387\u6539\u4E3A
-      35%\uFF1B3 \u4EF6\u989D\u5916\u5C5E\u6027\u9B42\u6982\u7387\u6539\u4E3A 25%\uFF1B4
-      \u4EF6\u590D\u5236\u6982\u7387\u6539\u4E3A 25% \u4E14\u590D\u5236\u9B42\u70B9\u6570\u6539\u4E3A
-      3\uFF1B5 \u4EF6\u6BCF\u6B21\u51FB\u6740 Boss \u4F7F\u5E78\u8FD0\u6548\u80FD\u6C38\u4E45\u63D0\u9AD8
-      5%\u3002"
+    tier1Effect: Luck +1.
+    tier2Effect: When a monster drops an Attribute Soul, it has a 20% chance to increase
+      that Soul's point value by 1, up to 5.
+    tier3Effect: When killing a monster, there is a 15% chance to drop 1 extra random
+      Attribute Soul.
+    tier4Effect: When picking up any Soul, there is a 10% chance to copy 1 Soul of
+      the same type. Copied Soul point value is 1.
+    tier5Effect: When killing a Boss, drop 2 extra random Attribute Souls.
+    setBonusEffect: 1-piece Luck bonus becomes +3; 2-piece point increase chance
+      becomes 35%; 3-piece extra Attribute Soul chance becomes 25%; 4-piece copy
+      chance becomes 25% and copied Soul point value becomes 3; 5-piece permanently
+      increases luck efficiency by 5% whenever a Boss is killed.
+  keepCustomText: 0
 --- !u!114 &1781365619
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -103988,6 +103985,43 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::RuneInventory
   runes: []
+--- !u!84 &1807021660
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1829361578
 GameObject:
   m_ObjectHideFlags: 0
