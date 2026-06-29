@@ -50,6 +50,7 @@ public class CombatSkillCaster : MonoBehaviour
 
     private BattleResourceBank resourceBank;
     private RuneRuntimeState runeRuntimeState;
+    private bool isEnsuringDefaultSkills;
 
     private void Reset()
     {
@@ -97,6 +98,16 @@ public class CombatSkillCaster : MonoBehaviour
     {
         EnsureDefaultSkills();
         return index >= 0 && index < skills.Length ? skills[index] : null;
+    }
+
+    public BattleSkill TryGetSkillRaw(int index)
+    {
+        if (skills == null || index < 0 || index >= skills.Length)
+        {
+            return null;
+        }
+
+        return skills[index];
     }
 
     public bool CastSkill(BattleSkill skill, int skillIndex)
@@ -216,6 +227,19 @@ public class CombatSkillCaster : MonoBehaviour
 
     private void EnsureDefaultSkills()
     {
+        EnsureDefaultSkills(true);
+    }
+
+    private void EnsureDefaultSkills(bool rebuildRuneState)
+    {
+        if (isEnsuringDefaultSkills)
+        {
+            return;
+        }
+
+        isEnsuringDefaultSkills = true;
+        try
+        {
         if (skills == null || skills.Length != SkillCount)
         {
             LoadDefaultSkills();
@@ -252,9 +276,14 @@ public class CombatSkillCaster : MonoBehaviour
             }
         }
 
-        if (runeRuntimeState != null)
+        if (rebuildRuneState && runeRuntimeState != null)
         {
             runeRuntimeState.RebuildFromEquippedRunes();
+        }
+        }
+        finally
+        {
+            isEnsuringDefaultSkills = false;
         }
     }
 

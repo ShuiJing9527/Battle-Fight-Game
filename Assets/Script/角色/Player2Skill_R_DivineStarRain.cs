@@ -17,6 +17,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float rSwarmBaseRotationSpeed = 120f;
     [SerializeField] private float rSwarmRotationSpeedPerSword = 8f;
     [SerializeField] private float rSwarmMaxRotationSpeed = 360f;
+    [SerializeField, Min(1)] private int rVisibleStarBladeLimit = 64;
+    [SerializeField] private int rExtraDamagePerOverflowStarBlade = 10;
     [SerializeField] private bool rDamageDebugLog = false;
     [SerializeField] private bool rSwarmDebugLog = false;
     [SerializeField] private bool debugCriticalLog = false;
@@ -222,6 +224,11 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private Camera resolvedRRenderCamera;
     private RuneRuntimeState runeRuntimeState;
     private int activeRuneCastId = -1;
+    private int currentRTotalStarBladeCount;
+    private int currentRVisibleStarBladeCount;
+    private int currentROverflowStarBladeCount;
+    private int currentROverflowBonusDamage;
+    private int remainingRVisibleStarBladeSpawnBudget;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -260,6 +267,12 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         usedDivineMarkCount = 0;
+        currentRTotalStarBladeCount = 0;
+        currentRVisibleStarBladeCount = 0;
+        currentROverflowStarBladeCount = 0;
+        currentROverflowBonusDamage = 0;
+        remainingRVisibleStarBladeSpawnBudget = 0;
+        activeRuneCastId = -1;
         CleanupRSwarmVisuals();
         CleanupRStarRainVisuals();
         if (activeRSwarmRoot != null)
@@ -284,33 +297,40 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private bool CastInternal()
     {
         int energyForR = Mathf.Max(0, Owner != null ? Owner.currentSwordEnergy : 0);
-        int count = Mathf.Max(0, rBaseSwordCount) + energyForR;
-        if (count <= 0)
+        int totalStarBladeCount = Mathf.Max(0, rBaseSwordCount) + energyForR;
+        if (totalStarBladeCount <= 0)
         {
             return false;
         }
 
+        currentRTotalStarBladeCount = totalStarBladeCount;
+        currentRVisibleStarBladeCount = Mathf.Min(currentRTotalStarBladeCount, Mathf.Max(1, rVisibleStarBladeLimit));
+        currentROverflowStarBladeCount = Mathf.Max(0, currentRTotalStarBladeCount - currentRVisibleStarBladeCount);
+        currentROverflowBonusDamage = currentROverflowStarBladeCount * rExtraDamagePerOverflowStarBlade;
+        remainingRVisibleStarBladeSpawnBudget = currentRVisibleStarBladeCount;
+
         Camera renderCamera = ResolveRRenderCamera();
         Vector3 previewCenter = ResolveRSwarmCenter();
-        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={count}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
+        Debug.Log($"[R Skill] BaseSwordCount={rBaseSwordCount}, CurrentSwordEnergy={energyForR}, Spawned={totalStarBladeCount}, RenderCamera={(renderCamera != null ? renderCamera.name : "null")}, Center={previewCenter}", this);
+        Debug.Log($"R技能星刃统计：总数={currentRTotalStarBladeCount}，显示={currentRVisibleStarBladeCount}，溢出={currentROverflowStarBladeCount}，追加伤害={currentROverflowBonusDamage}", this);
         usedDivineMarkCount = energyForR;
         if (Owner != null)
         {
             Owner.currentSwordEnergy = 0;
         }
 
-        float finalDuration = ResolveFinalSwarmDuration(count);
-        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(count);
+        float finalDuration = ResolveFinalSwarmDuration(totalStarBladeCount);
+        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
         activeRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(3) : -1;
         if (rSwarmDebugLog)
         {
             Debug.Log(
-                $"[Player02 R Swarm] BaseCount={rBaseSwordCount}, CurrentSwordCount={count}, BaseDuration={rSwarmDuration:F2}, DurationPerSword={rSwarmDurationPerSword:F2}, FinalDuration={finalDuration:F2}, BaseRotationSpeed={rSwarmBaseRotationSpeed:F2}, RotationSpeedPerSword={rSwarmRotationSpeedPerSword:F2}, FinalRotationSpeed={finalRotationSpeed:F2}",
+                $"[Player02 R Swarm] BaseCount={rBaseSwordCount}, CurrentSwordCount={totalStarBladeCount}, VisibleSwordCount={currentRVisibleStarBladeCount}, OverflowSwordCount={currentROverflowStarBladeCount}, OverflowBonusDamage={currentROverflowBonusDamage}, BaseDuration={rSwarmDuration:F2}, DurationPerSword={rSwarmDurationPerSword:F2}, FinalDuration={finalDuration:F2}, BaseRotationSpeed={rSwarmBaseRotationSpeed:F2}, RotationSpeedPerSword={rSwarmRotationSpeedPerSword:F2}, FinalRotationSpeed={finalRotationSpeed:F2}",
                 this);
         }
 
-        rSwarmRoutine = StartCoroutine(RSwarmRoutine(count));
+        rSwarmRoutine = StartCoroutine(RSwarmRoutine(totalStarBladeCount));
         StartRAuraHealRoutine();
         return true;
     }
@@ -402,17 +422,23 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         activeRSwarmSwords.Clear();
         SpawnRCenterAura(swarmRoot.transform);
 
-        int swordCount = Mathf.Max(0, count);
-        float finalDuration = ResolveFinalSwarmDuration(swordCount);
-        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(swordCount);
+        int totalSwordCount = Mathf.Max(0, count);
+        int visibleSwordCount = Mathf.Min(totalSwordCount, Mathf.Max(0, currentRVisibleStarBladeCount));
+        float finalDuration = ResolveFinalSwarmDuration(totalSwordCount);
+        float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalSwordCount);
         float finalRadiusMin = GetScaledRSwarmRadiusMin();
         float finalRadiusMax = GetScaledRSwarmRadiusMax();
         float finalHorizontalRange = GetScaledRSwarmHorizontalRange();
         float finalDepthRange = GetScaledRSwarmVerticalRange();
         float finalHeightRange = GetScaledRSwarmHeightRange();
-        Debug.Log($"[R Vortex Range] marks={GetDivineMarkCount()}, horizontal={finalHorizontalRange:F2}, height={finalHeightRange:F2}, depth={finalDepthRange:F2}, count={swordCount}", this);
-        for (int i = 0; i < swordCount; i++)
+        Debug.Log($"[R Vortex Range] marks={GetDivineMarkCount()}, horizontal={finalHorizontalRange:F2}, height={finalHeightRange:F2}, depth={finalDepthRange:F2}, count={totalSwordCount}, visible={visibleSwordCount}", this);
+        for (int i = 0; i < visibleSwordCount; i++)
         {
+            if (!TryConsumeRVisibleStarBladeSpawnBudget())
+            {
+                break;
+            }
+
             float spawnX = Random.Range(-finalHorizontalRange, finalHorizontalRange);
             float spawnY = Random.Range(Mathf.Max(0.1f, finalHeightRange * 0.2f), finalHeightRange);
             float spawnZ = Random.Range(-finalDepthRange, finalDepthRange);
@@ -650,6 +676,11 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
         for (int i = 0; i < waveCount; i++)
         {
+            if (!TryConsumeRVisibleStarBladeSpawnBudget())
+            {
+                return;
+            }
+
             float targetX = Random.Range(-rainRadius, rainRadius);
             float targetZ = Random.Range(-Mathf.Max(0.01f, rainRadius * 0.3f), Mathf.Max(0.01f, rainRadius * 0.3f));
             Vector3 target = center + new Vector3(targetX, 0f, targetZ);
@@ -1061,16 +1092,33 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
 
         float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier);
+        finalDamage += GetCurrentROverflowBonusDamage();
 
         if (rDamageDebugLog)
         {
             string targetName = targetHealth != null ? targetHealth.name : (targetStats != null ? targetStats.name : "LegacyEnemy");
             Debug.Log(
-                $"[Player02 R Damage] target={targetName}, PATK={attackerPhysicalAttack:F2}, SATK={attackerSpecialAttack:F2}, TargetPDEF={targetPhysicalDefense:F2}, TargetSDEF={targetSpecialDefense:F2}, PhysicalRaw={physicalRaw:F2}, SpecialRaw={specialRaw:F2}, PhysicalFinal={physicalFinal:F2}, SpecialFinal={specialFinal:F2}, FinalDamage={finalDamage:F2}",
+                $"[Player02 R Damage] target={targetName}, PATK={attackerPhysicalAttack:F2}, SATK={attackerSpecialAttack:F2}, TargetPDEF={targetPhysicalDefense:F2}, TargetSDEF={targetSpecialDefense:F2}, PhysicalRaw={physicalRaw:F2}, SpecialRaw={specialRaw:F2}, PhysicalFinal={physicalFinal:F2}, SpecialFinal={specialFinal:F2}, OverflowBonus={currentROverflowBonusDamage:F2}, FinalDamage={finalDamage:F2}",
                 this);
         }
 
         return Mathf.Max(1f, finalDamage);
+    }
+
+    private bool TryConsumeRVisibleStarBladeSpawnBudget()
+    {
+        if (remainingRVisibleStarBladeSpawnBudget <= 0)
+        {
+            return false;
+        }
+
+        remainingRVisibleStarBladeSpawnBudget--;
+        return true;
+    }
+
+    private int GetCurrentROverflowBonusDamage()
+    {
+        return Mathf.Max(0, currentROverflowBonusDamage);
     }
 
     private float ConsumeRuneFirstHitBonusDamage()
