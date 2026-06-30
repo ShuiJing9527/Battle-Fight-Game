@@ -305,6 +305,121 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    public void SpawnSplitNormalsFromElite(GameObject eliteSource, int count, float scatterRadius)
+    {
+        if (eliteSource == null || count <= 0)
+        {
+            return;
+        }
+
+        MonsterIdentity sourceIdentity = eliteSource.GetComponent<MonsterIdentity>();
+        if (sourceIdentity == null || sourceIdentity.rank != MonsterRank.Elite || !IsSlimeSpecies(sourceIdentity.species))
+        {
+            return;
+        }
+
+        List<GameObject> sourcePool = ResolvePool(normalEnemyPrefabs, fallbackNormalEnemyPrefabs);
+        if (sourcePool == null || sourcePool.Count == 0)
+        {
+            Debug.LogWarning("[EnemySpawner] Elite slime split failed: normal enemy prefab pool is empty.", this);
+            return;
+        }
+
+        for (int i = 0; i < count; i++)
+        {
+            GameObject selectedEnemy = ResolveNormalSplitPrefab(sourcePool, sourceIdentity.species);
+            if (selectedEnemy == null)
+            {
+                continue;
+            }
+
+            Vector3 spawnPosition = eliteSource.transform.position + ResolveSplitOffset(scatterRadius, i, count);
+            spawnPosition.y = selectedEnemy.transform.position.y;
+            GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
+
+            MonsterIdentity cloneIdentity = spawnedEnemy.GetComponent<MonsterIdentity>();
+            if (cloneIdentity == null)
+            {
+                cloneIdentity = spawnedEnemy.AddComponent<MonsterIdentity>();
+            }
+
+            cloneIdentity.species = sourceIdentity.species;
+            cloneIdentity.rank = MonsterRank.Normal;
+
+            MonsterCombatAutoSetup.Configure(spawnedEnemy, sourceIdentity.species, MonsterRank.Normal);
+            RegisterSpawnedEnemy(spawnedEnemy);
+
+            EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
+            if (notifier == null)
+            {
+                notifier = spawnedEnemy.AddComponent<EnemyDeathNotifier>();
+            }
+            notifier.Initialize(this);
+
+            EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
+            if (enemyController != null)
+            {
+                enemyController.SetTarget(ResolveActivePlayerTarget());
+            }
+        }
+    }
+
+    private GameObject ResolveNormalSplitPrefab(List<GameObject> sourcePool, MonsterSpecies preferredSpecies)
+    {
+        if (sourcePool == null || sourcePool.Count == 0)
+        {
+            return null;
+        }
+
+        List<GameObject> matchingSpecies = new List<GameObject>();
+        for (int i = 0; i < sourcePool.Count; i++)
+        {
+            GameObject prefab = sourcePool[i];
+            if (prefab == null)
+            {
+                continue;
+            }
+
+            MonsterIdentity identity = prefab.GetComponent<MonsterIdentity>();
+            MonsterSpecies species = identity != null ? identity.species : MonsterSpecies.BlueSlime;
+            if (species == preferredSpecies)
+            {
+                matchingSpecies.Add(prefab);
+            }
+        }
+
+        if (matchingSpecies.Count > 0)
+        {
+            return matchingSpecies[Random.Range(0, matchingSpecies.Count)];
+        }
+
+        return sourcePool[Random.Range(0, sourcePool.Count)];
+    }
+
+    private static Vector3 ResolveSplitOffset(float scatterRadius, int index, int count)
+    {
+        float radius = Mathf.Max(0f, scatterRadius);
+        if (radius <= 0f)
+        {
+            return Vector3.zero;
+        }
+
+        float angle = count > 0 ? (Mathf.PI * 2f * index / count) : Random.Range(0f, Mathf.PI * 2f);
+        Vector2 ringOffset = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * radius;
+        Vector2 randomOffset = Random.insideUnitCircle * (radius * 0.25f);
+        Vector2 finalOffset = ringOffset + randomOffset;
+        return new Vector3(finalOffset.x, 0f, finalOffset.y);
+    }
+
+    private static bool IsSlimeSpecies(MonsterSpecies species)
+    {
+        return species == MonsterSpecies.BlueSlime ||
+               species == MonsterSpecies.GreenSlime ||
+               species == MonsterSpecies.LavaSlime ||
+               species == MonsterSpecies.PoisonSlime ||
+               species == MonsterSpecies.RainbowSlime;
+    }
+
     private void RegisterSpawnedEnemy(GameObject enemy)
     {
         if (enemy == null)
