@@ -841,7 +841,7 @@ public class RuneRuntimeState : MonoBehaviour
             int luckCount = GetGlobalRuneCount(RuneType.Luck);
             if (luckCount >= 1)
             {
-                appliedLuckRuneBonus += luckCount >= 5 ? 3f : 1f;
+                appliedLuckRuneBonus += luckCount >= 5 ? 5f : 1f;
             }
         }
 

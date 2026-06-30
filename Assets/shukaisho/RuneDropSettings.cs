@@ -3,6 +3,8 @@ using UnityEngine;
 [CreateAssetMenu(fileName = "RuneDropSettings", menuName = "Battle-Fight-Game/Rune Drop Settings")]
 public class RuneDropSettings : ScriptableObject
 {
+    private const float LuckRuneDropChancePerPoint = 0.03f;
+
     [System.Serializable]
     public struct RuneWeight
     {
@@ -22,6 +24,10 @@ public class RuneDropSettings : ScriptableObject
     [SerializeField, Min(0f)] private float extraRuneDropChancePerLuck = 0.005f;
     [SerializeField, Range(0f, 1f)] private float maxExtraRuneDropChanceFromLuck = 0.3f;
 
+    [Header("Drop Mode")]
+    [SerializeField] private bool highRuneDropTestMode = true;
+    [SerializeField, Min(0f)] private float normalRuneDropRateMultiplier = 0.25f;
+
     [Header("Drop Shape")]
     [SerializeField, Min(0f)] private float dropYOffset = 0.3f;
     [SerializeField] private GameObject[] runeDropPrefabs;
@@ -37,17 +43,46 @@ public class RuneDropSettings : ScriptableObject
     };
 
     public float DropYOffset => Mathf.Max(0f, dropYOffset);
+    public bool IsHighRuneDropTestMode => highRuneDropTestMode;
 
     public int RollRuneDropCount(MonsterRank rank, float luck)
     {
-        int count = GetBaseRuneDropCount(rank);
-        float extraChance = Mathf.Clamp01(GetRankExtraChance(rank) + GetExtraRuneDropChanceForLuck(luck));
-        if (extraChance > 0f && Random.value < extraChance)
+        return RollRuneDropCount(rank, luck, out _);
+    }
+
+    public int RollRuneDropCount(MonsterRank rank, float luck, out float? eliteRoll)
+    {
+        eliteRoll = null;
+        if (rank == MonsterRank.Normal)
         {
-            count++;
+            return 0;
         }
 
-        return Mathf.Max(0, count);
+        if (rank == MonsterRank.Elite)
+        {
+            return RollEliteRuneDropCount(out eliteRoll);
+        }
+
+        int baseCount = GetBaseRuneDropCount(rank);
+        int maxCount = GetMaxRuneDropCount(rank);
+        float extraChance = GetEffectiveExtraRuneDropChance(rank, luck);
+        int count = baseCount;
+        int extraRollCount = GetExtraRollCount(rank);
+        for (int i = 0; i < extraRollCount && count < maxCount; i++)
+        {
+            float rollChance = extraChance;
+            if (highRuneDropTestMode && rank == MonsterRank.Boss && i >= 2)
+            {
+                rollChance *= 0.25f;
+            }
+
+            if (rollChance > 0f && Random.value < rollChance)
+            {
+                count++;
+            }
+        }
+
+        return ClampRuneDropCountByRank(rank, count);
     }
 
     public RuneDefinition GetRandomRune(RuneLibrary library)
@@ -98,7 +133,19 @@ public class RuneDropSettings : ScriptableObject
 
     public float GetExtraRuneDropChanceForLuck(float luck)
     {
-        return Mathf.Clamp(Mathf.Max(0f, luck) * extraRuneDropChancePerLuck, 0f, maxExtraRuneDropChanceFromLuck);
+        return Mathf.Max(0f, luck - 1f) * LuckRuneDropChancePerPoint;
+    }
+
+    public float GetRuneDropRateMultiplier()
+    {
+        return highRuneDropTestMode ? 1f : Mathf.Max(0f, normalRuneDropRateMultiplier);
+    }
+
+    private float GetEffectiveExtraRuneDropChance(MonsterRank rank, float luck)
+    {
+        float rankChance = GetRankExtraChance(rank);
+        float luckChance = Mathf.Min(GetExtraRuneDropChanceForLuck(luck), Mathf.Max(0f, maxExtraRuneDropChanceFromLuck));
+        return Mathf.Clamp01((rankChance + luckChance) * GetRuneDropRateMultiplier());
     }
 
     private int GetBaseRuneDropCount(MonsterRank rank)
@@ -111,6 +158,36 @@ public class RuneDropSettings : ScriptableObject
         };
     }
 
+    private int GetMaxRuneDropCount(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => 6,
+            MonsterRank.Elite => 3,
+            _ => 0
+        };
+    }
+
+    private int GetExtraRollCount(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => 4,
+            MonsterRank.Elite => 2,
+            _ => 0
+        };
+    }
+
+    private static int ClampRuneDropCountByRank(MonsterRank rank, int count)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => Mathf.Clamp(count, 2, 6),
+            MonsterRank.Elite => Mathf.Clamp(count, 1, 3),
+            _ => 0
+        };
+    }
+
     private float GetRankExtraChance(MonsterRank rank)
     {
         return rank switch
@@ -119,6 +196,23 @@ public class RuneDropSettings : ScriptableObject
             MonsterRank.Elite => eliteExtraRuneChance,
             _ => normalExtraRuneChance
         };
+    }
+
+    private int RollEliteRuneDropCount(out float? eliteRoll)
+    {
+        float roll = Random.value;
+        eliteRoll = roll;
+        if (roll < 0.05f)
+        {
+            return 3;
+        }
+
+        if (roll < 0.35f)
+        {
+            return 2;
+        }
+
+        return 1;
     }
 
     private RuneType RollRuneType()

@@ -5,6 +5,7 @@ public class PlayerMovement : MonoBehaviour
 {
     [InspectorName("baseMoveSpeed")]
     public float moveSpeed = 5f;
+    [SerializeField, Min(0f)] private float playerBaseMoveSpeedScale = 1.0f;
     public Rigidbody rb;
     [Header("Debug")]
     [SerializeField] private bool debugSpeedDiagnostics = false;
@@ -43,7 +44,8 @@ public class PlayerMovement : MonoBehaviour
         float evasionMultiplier = BattleStatUtility.GetEvasionMultiplier(combatStats);
         float finalEvasionChance = BattleStatUtility.GetEvasionChance(combatStats);
         float externalMoveMultiplier = 1f;
-        float finalMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, moveSpeed, externalMoveMultiplier);
+        float scaledBaseMoveSpeed = moveSpeed * Mathf.Max(0f, playerBaseMoveSpeedScale);
+        float finalMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, scaledBaseMoveSpeed, externalMoveMultiplier);
         bool isLockedByController = player01SkillController != null && player01SkillController.IsMovementInputLocked();
         bool shouldBlockInputMovement = movementInputLocked || isLockedByController;
         if (shouldBlockInputMovement)
@@ -71,7 +73,7 @@ public class PlayerMovement : MonoBehaviour
         {
             nextSpeedDiagnosticTime = Time.time + Mathf.Max(0.1f, debugSpeedLogInterval);
             Debug.Log(
-                $"[SpeedDiag] name={name} stats.speed={statsSpeed:F2} stats.luck={(combatStats != null ? Mathf.Max(0f, combatStats.luck) : 0f):F2} baseMoveSpeed={moveSpeed:F2} moveMultiplierFromSpeed={moveMultiplierFromSpeed:F2} externalMoveMultiplier={externalMoveMultiplier:F2} finalMoveSpeed={finalMoveSpeed:F2} evasionMultiplier={evasionMultiplier:F2} finalEvasionChance={finalEvasionChance:P2}",
+                $"[SpeedDiag] name={name} stats.speed={statsSpeed:F2} stats.luck={(combatStats != null ? Mathf.Max(0f, combatStats.luck) : 0f):F2} baseMoveSpeed={moveSpeed:F2} playerBaseMoveSpeedScale={playerBaseMoveSpeedScale:F2} scaledBaseMoveSpeed={scaledBaseMoveSpeed:F2} moveMultiplierFromSpeed={moveMultiplierFromSpeed:F2} externalMoveMultiplier={externalMoveMultiplier:F2} finalMoveSpeed={finalMoveSpeed:F2} evasionMultiplier={evasionMultiplier:F2} finalEvasionChance={finalEvasionChance:P2}",
                 this);
         }
     }

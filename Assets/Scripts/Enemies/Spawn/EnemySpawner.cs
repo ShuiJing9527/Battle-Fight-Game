@@ -100,6 +100,10 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private bool ignoreEnemySelfCollision = true;
     [SerializeField] private bool freezeEnemyVerticalPosition = false;
 
+    [Header("Timed Difficulty")]
+    [SerializeField] private EnemyDifficultyDirector difficultyDirector;
+    [SerializeField] private bool debugDifficultySpawnLogs = false;
+
     private Player2Bootstrap playerBootstrap;
     private TODController todController;
     private float previousTodTime;
@@ -117,6 +121,7 @@ public class EnemySpawner : MonoBehaviour
 
     private void Start()
     {
+        ResolveDifficultyDirector();
         CachePrefabPools();
         ResolveEnemyLayer();
         ConfigureEnemyLayerCollision();
@@ -149,8 +154,8 @@ public class EnemySpawner : MonoBehaviour
         {
             CleanupTrackedEnemies();
             ResolvePlayerTarget();
-            SpawnNormalEnemiesUpTo(baseNormalMonsterCount);
-            yield return new WaitForSeconds(Mathf.Max(0.25f, spawnInterval));
+            SpawnNormalEnemiesUpTo(ResolveDifficultyTargetNormalCount());
+            yield return new WaitForSeconds(ResolveDifficultyAdjustedInterval(spawnInterval, 0.25f));
         }
     }
 
@@ -160,9 +165,10 @@ public class EnemySpawner : MonoBehaviour
 
         while (true)
         {
-            float waitSeconds = Random.Range(
+            float baseWaitSeconds = Random.Range(
                 Mathf.Max(0.1f, Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax)),
                 Mathf.Max(Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax) + 0.1f, Mathf.Max(normalReinforceIntervalMin, normalReinforceIntervalMax)));
+            float waitSeconds = ResolveDifficultyAdjustedInterval(baseWaitSeconds, 0.1f);
 
             yield return new WaitForSeconds(waitSeconds);
 
@@ -170,7 +176,7 @@ public class EnemySpawner : MonoBehaviour
             ResolvePlayerTarget();
 
             int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
-            int capacity = Mathf.Max(0, maxNormalMonsterCount - aliveNormal);
+            int capacity = Mathf.Max(0, ResolveDifficultyAdjustedMaxNormalMonsterCount() - aliveNormal);
             if (capacity <= 0)
             {
                 continue;
@@ -178,7 +184,7 @@ public class EnemySpawner : MonoBehaviour
 
             int reinforceMin = Mathf.Max(1, Mathf.Min(normalReinforceCountMin, normalReinforceCountMax));
             int reinforceMax = Mathf.Max(reinforceMin, Mathf.Max(normalReinforceCountMin, normalReinforceCountMax));
-            int reinforceCount = Mathf.Min(capacity, Random.Range(reinforceMin, reinforceMax + 1));
+            int reinforceCount = Mathf.Min(capacity, Mathf.Max(Random.Range(reinforceMin, reinforceMax + 1), ResolveDifficultySpawnBatchCount()));
             SpawnMultipleNormals(reinforceCount);
         }
     }
@@ -187,9 +193,10 @@ public class EnemySpawner : MonoBehaviour
     {
         while (true)
         {
-            float waitSeconds = Random.Range(
+            float baseWaitSeconds = Random.Range(
                 Mathf.Max(0.1f, Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax)),
                 Mathf.Max(Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax) + 0.1f, Mathf.Max(eliteSpawnIntervalMin, eliteSpawnIntervalMax)));
+            float waitSeconds = ResolveDifficultyAdjustedInterval(baseWaitSeconds, 0.1f);
 
             yield return new WaitForSeconds(waitSeconds);
 
@@ -218,11 +225,16 @@ public class EnemySpawner : MonoBehaviour
 
     private void SpawnNormalEnemiesUpTo(int targetCount)
     {
+        if (!CanSpawnByDifficulty("NormalBase"))
+        {
+            return;
+        }
+
         CleanupTrackedEnemies();
-        int safeTarget = Mathf.Clamp(targetCount, 0, Mathf.Max(0, maxNormalMonsterCount));
+        int safeTarget = Mathf.Clamp(targetCount, 0, ResolveDifficultyAdjustedMaxNormalMonsterCount());
         int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
         int missingCount = Mathf.Max(0, safeTarget - aliveNormal);
-        SpawnMultipleNormals(missingCount);
+        SpawnMultipleNormals(Mathf.Min(missingCount, ResolveDifficultySpawnBatchCount()));
     }
 
     private void SpawnMultipleNormals(int count)
@@ -230,7 +242,12 @@ public class EnemySpawner : MonoBehaviour
         count = Mathf.Max(0, count);
         for (int i = 0; i < count; i++)
         {
-            if (CountAliveEnemies(MonsterRank.Normal) >= Mathf.Max(0, maxNormalMonsterCount))
+            if (!CanSpawnByDifficulty("NormalReinforcement"))
+            {
+                break;
+            }
+
+            if (CountAliveEnemies(MonsterRank.Normal) >= ResolveDifficultyAdjustedMaxNormalMonsterCount())
             {
                 break;
             }
@@ -256,6 +273,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void SpawnFromPool(List<GameObject> sourcePool, MonsterRank forcedRank)
     {
+        if (!CanSpawnByDifficulty(forcedRank.ToString()))
+        {
+            return;
+        }
+
         if (sourcePool == null || sourcePool.Count == 0)
         {
             return;
@@ -288,6 +310,7 @@ public class EnemySpawner : MonoBehaviour
         cloneIdentity.rank = runtimeRank;
 
         MonsterCombatAutoSetup.Configure(spawnedEnemy, runtimeSpecies, runtimeRank);
+        ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
 
         RegisterSpawnedEnemy(spawnedEnemy);
 
@@ -301,13 +324,13 @@ public class EnemySpawner : MonoBehaviour
         EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
         if (enemyController != null)
         {
-            enemyController.SetTarget(ResolveActivePlayerTarget());
+            enemyController.SetTarget(ResolveActivePlayerTarget(), "Spawner");
         }
     }
 
     public void SpawnSplitNormalsFromElite(GameObject eliteSource, int count, float scatterRadius)
     {
-        if (eliteSource == null || count <= 0)
+        if (eliteSource == null || count <= 0 || !CanSpawnByDifficulty("EliteSplit"))
         {
             return;
         }
@@ -345,8 +368,10 @@ public class EnemySpawner : MonoBehaviour
 
             cloneIdentity.species = sourceIdentity.species;
             cloneIdentity.rank = MonsterRank.Normal;
+            cloneIdentity.suppressRuneDrop = true;
 
             MonsterCombatAutoSetup.Configure(spawnedEnemy, sourceIdentity.species, MonsterRank.Normal);
+            ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
             RegisterSpawnedEnemy(spawnedEnemy);
 
             EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
@@ -359,7 +384,7 @@ public class EnemySpawner : MonoBehaviour
             EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
             if (enemyController != null)
             {
-                enemyController.SetTarget(ResolveActivePlayerTarget());
+                enemyController.SetTarget(ResolveActivePlayerTarget(), "Spawner");
             }
         }
     }
@@ -596,7 +621,7 @@ public class EnemySpawner : MonoBehaviour
             identity.attackStyle,
             ResolveRankAttackIntervalMultiplier(identity.rank),
             ResolveRankOutgoingDamageMultiplier(identity.rank));
-        controller.SetTarget(ResolveActivePlayerTarget());
+        controller.SetTarget(ResolveActivePlayerTarget(), "Spawner");
     }
 
     private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
@@ -1026,6 +1051,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void TrySpawnBossFromTimedCheck()
     {
+        if (!CanSpawnByDifficulty("BossTimed"))
+        {
+            return;
+        }
+
         CleanupTrackedEnemies();
         if (CountAliveEnemies(MonsterRank.Boss) >= Mathf.Max(0, maxAliveBossCount))
         {
@@ -1061,12 +1091,27 @@ public class EnemySpawner : MonoBehaviour
         return count;
     }
 
+    public int CountAliveEnemiesForVictory()
+    {
+        CleanupTrackedEnemies();
+        int count = 0;
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            if (IsEnemyAliveForTracking(aliveEnemies[i]))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
     private void CleanupTrackedEnemies()
     {
         for (int i = aliveEnemies.Count - 1; i >= 0; i--)
         {
             GameObject enemy = aliveEnemies[i];
-            if (enemy != null)
+            if (IsEnemyAliveForTracking(enemy))
             {
                 continue;
             }
@@ -1113,6 +1158,8 @@ public class EnemySpawner : MonoBehaviour
 
     public void OnEnemyDestroyed(GameObject destroyedEnemy)
     {
+        NotifyDifficultyDirectorOfEnemyDeath(destroyedEnemy);
+
         if (destroyedEnemy != null)
         {
             aliveEnemies.Remove(destroyedEnemy);
@@ -1125,6 +1172,162 @@ public class EnemySpawner : MonoBehaviour
     public void OnEnemyDestroyed()
     {
         CleanupTrackedEnemies();
+    }
+
+    private EnemyDifficultyDirector ResolveDifficultyDirector()
+    {
+        if (difficultyDirector == null)
+        {
+            difficultyDirector = EnemyDifficultyDirector.GetOrCreateInstance();
+        }
+
+        return difficultyDirector;
+    }
+
+    private bool CanSpawnByDifficulty(string source)
+    {
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        bool canSpawn = director == null || director.ShouldAllowSpawning;
+        if (!canSpawn && debugDifficultySpawnLogs)
+        {
+            Debug.Log(
+                "[SpawnBlocked] " +
+                $"reason={(director != null ? director.CurrentPhase.ToString() : "DirectorMissing")} source={source}",
+                this);
+        }
+
+        return canSpawn;
+    }
+
+    private float ResolveDifficultyAdjustedInterval(float baseInterval, float minimumInterval)
+    {
+        float resolvedInterval = Mathf.Max(minimumInterval, baseInterval);
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        if (director == null)
+        {
+            return resolvedInterval;
+        }
+
+        return Mathf.Max(minimumInterval, resolvedInterval * director.CurrentSpawnIntervalMultiplier);
+    }
+
+    private int ResolveDifficultyAdjustedMaxNormalMonsterCount()
+    {
+        int resolvedCount = Mathf.Max(0, maxNormalMonsterCount);
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        if (director == null)
+        {
+            return resolvedCount;
+        }
+
+        return Mathf.Max(0, resolvedCount + director.CurrentExtraMaxAlive);
+    }
+
+    private int ResolveDifficultyTargetNormalCount()
+    {
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        if (director == null)
+        {
+            return Mathf.Max(0, baseNormalMonsterCount);
+        }
+
+        int desiredCount = Mathf.Max(0, baseNormalMonsterCount) + director.CurrentDifficultyLevel + director.CurrentSpawnBatchCount;
+        return Mathf.Clamp(desiredCount, 0, ResolveDifficultyAdjustedMaxNormalMonsterCount());
+    }
+
+    private int ResolveDifficultySpawnBatchCount()
+    {
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        return director != null ? Mathf.Max(1, director.CurrentSpawnBatchCount) : 1;
+    }
+
+    private static bool IsEnemyAliveForTracking(GameObject enemy)
+    {
+        if (enemy == null || !enemy.activeInHierarchy)
+        {
+            return false;
+        }
+
+        CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
+        return combatHealth == null || !combatHealth.IsDead;
+    }
+
+    private void NotifyDifficultyDirectorOfEnemyDeath(GameObject destroyedEnemy)
+    {
+        if (destroyedEnemy == null)
+        {
+            return;
+        }
+
+        CombatHealth combatHealth = destroyedEnemy.GetComponent<CombatHealth>();
+        if (combatHealth == null || !combatHealth.IsDead)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = destroyedEnemy.GetComponent<MonsterIdentity>();
+        bool wasBoss = identity != null && identity.rank == MonsterRank.Boss;
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        if (director == null)
+        {
+            return;
+        }
+
+        bool shouldSpawnBoss = director.NotifyEnemyKilled(wasBoss);
+        if (!shouldSpawnBoss)
+        {
+            return;
+        }
+
+        TrySpawnBossFromKillCount();
+    }
+
+    private void TrySpawnBossFromKillCount()
+    {
+        if (!CanSpawnByDifficulty("BossByKills"))
+        {
+            return;
+        }
+
+        CleanupTrackedEnemies();
+        if (CountAliveEnemies(MonsterRank.Boss) >= Mathf.Max(0, maxAliveBossCount))
+        {
+            return;
+        }
+
+        if (debugDifficultySpawnLogs)
+        {
+            string bossPrefabName = ResolveBossPrefabName();
+            Debug.Log(
+                "[BossSpawnByKills] " +
+                $"bossPrefab={bossPrefabName} position={ResolveSpawnPositionPreview()}",
+                this);
+        }
+
+        SpawnBossEnemy();
+    }
+
+    private string ResolveBossPrefabName()
+    {
+        List<GameObject> bossPool = ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs);
+        if (bossPool == null || bossPool.Count == 0 || bossPool[0] == null)
+        {
+            return "None";
+        }
+
+        return bossPool[0].name;
+    }
+
+    private string ResolveSpawnPositionPreview()
+    {
+        List<GameObject> bossPool = ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs);
+        if (bossPool == null || bossPool.Count == 0 || bossPool[0] == null)
+        {
+            return "Unavailable";
+        }
+
+        Vector3 previewPosition = ResolveSpawnPosition(bossPool[0]);
+        return previewPosition.ToString("F2");
     }
 
     private static float RoundToDecimals(float value, int decimals)

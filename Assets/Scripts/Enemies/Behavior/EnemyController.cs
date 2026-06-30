@@ -49,8 +49,10 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugMeleeHitCheck = false;
     [SerializeField] private bool debugAttackDiagnostics = false;
     [SerializeField] private bool debugSpeedDiagnostics = false;
+    [SerializeField] private bool debugChaseDiagnostics = true;
     [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
+    [SerializeField, Min(0.05f)] private float targetResolveRetryInterval = 0.25f;
 
     private Rigidbody rb;
     private Player2Bootstrap playerBootstrap;
@@ -67,6 +69,8 @@ public class EnemyController : MonoBehaviour
     private float lastLoggedAttackMultiplier = -1f;
     private float nextAttackDiagnosticTime;
     private float nextSpeedDiagnosticTime;
+    private float nextChaseDiagnosticTime;
+    private float nextTargetResolveTime;
     private Collider[] separationHits;
     private float lastAttackTime = -1f;
 
@@ -107,6 +111,18 @@ public class EnemyController : MonoBehaviour
             {
                 Debug.Log($"[EnemyAttackDiag] name={name} target=null failReason=NoTarget", this);
             }
+
+            LogChaseDiagnostics(
+                -1f,
+                false,
+                false,
+                false,
+                false,
+                false,
+                rb == null ? "NoRigidbody" : "NoTarget",
+                0f,
+                playerTarget != null ? playerTarget.name : "null",
+                rb == null ? "NoRigidbody" : "NoTarget");
             return;
         }
 
@@ -131,6 +147,7 @@ public class EnemyController : MonoBehaviour
         // 进入攻击范围后，优先切到攻击流程，避免追击和出手同时发生。
         if (canAttack)
         {
+            LogChaseDiagnostics(horizontalDistance, false, true, false, false, false, "Attack", 0f, playerTarget != null ? playerTarget.name : "null", "InAttackRange");
             BeginAttack();
             return;
         }
@@ -139,6 +156,7 @@ public class EnemyController : MonoBehaviour
         if (attackInProgress)
         {
             rb.linearVelocity = Vector3.zero;
+            LogChaseDiagnostics(horizontalDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", "AttackInProgress");
             if (keepFlatRotation)
             {
                 transform.rotation = initialRotation;
@@ -151,6 +169,7 @@ public class EnemyController : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
+            LogChaseDiagnostics(horizontalDistance, false, false, false, false, false, "HoldPosition", 0f, playerTarget != null ? playerTarget.name : "null", "StopDistance");
             if (keepFlatRotation)
             {
                 transform.rotation = initialRotation;
@@ -185,6 +204,17 @@ public class EnemyController : MonoBehaviour
         }
 
         LogSpeedDiagnostics(statsSpeed, distance, canAttack);
+        LogChaseDiagnostics(
+            horizontalDistance,
+            currentMoveSpeed > MovementZeroEpsilon,
+            false,
+            false,
+            false,
+            externalMoveMultiplier <= 0f,
+            "Chase",
+            currentMoveSpeed,
+            playerTarget != null ? playerTarget.name : "null",
+            string.IsNullOrEmpty(attackFailReason) ? "Chase" : attackFailReason);
 
         float verticalVelocity = rb.linearVelocity.y;
         if (maxVerticalVelocity > 0f)
@@ -207,7 +237,12 @@ public class EnemyController : MonoBehaviour
 
     public void SetTarget(Transform target)
     {
-        playerTarget = target;
+        AssignTarget(target, "Manual");
+    }
+
+    public void SetTarget(Transform target, string source)
+    {
+        AssignTarget(target, source);
     }
 
     public void ConfigureRuntime(float moveSpeed, float stopDistance, float attackRange, float attackHitRange, float attackCooldown, float attackDamage, MonsterAttackStyle attackStyle, float attackIntervalMultiplier = 1f, float outgoingDamageMultiplier = 1f)
@@ -625,30 +660,80 @@ public class EnemyController : MonoBehaviour
 
     private void ResolvePlayerTarget()
     {
+        if (HasUsableTarget(playerTarget))
+        {
+            return;
+        }
+
+        if (Time.time < nextTargetResolveTime)
+        {
+            return;
+        }
+
+        nextTargetResolveTime = Time.time + Mathf.Max(0.05f, targetResolveRetryInterval);
+        TryResolveTarget("AutoReacquire");
+    }
+
+    private bool TryResolveTarget(string source)
+    {
+        if (HasUsableTarget(playerTarget))
+        {
+            return true;
+        }
+
+        string oldTargetName = playerTarget != null ? playerTarget.name : "null";
+        Transform resolvedTarget = null;
+
         if (playerBootstrap == null)
         {
             playerBootstrap = FindObjectOfType<Player2Bootstrap>();
         }
 
-        if (playerBootstrap != null && playerBootstrap.CurrentPlayerTransform != null)
+        if (playerBootstrap != null)
         {
-            playerTarget = playerBootstrap.CurrentPlayerTransform;
-            return;
-        }
-
-        if (playerTarget != null)
-        {
-            return;
-        }
-
-        if (!string.IsNullOrEmpty(playerTag))
-        {
-            GameObject playerObject = GameObject.FindWithTag(playerTag);
-            if (playerObject != null)
+            playerBootstrap.EnsureInitializedForSpawn();
+            Transform currentPlayer = playerBootstrap.CurrentPlayerTransform;
+            if (HasUsableTarget(currentPlayer))
             {
-                playerTarget = playerObject.transform;
+                resolvedTarget = currentPlayer;
             }
         }
+
+        if (resolvedTarget == null && !string.IsNullOrEmpty(playerTag))
+        {
+            GameObject playerObject = GameObject.FindWithTag(playerTag);
+            if (playerObject != null && playerObject.activeInHierarchy)
+            {
+                resolvedTarget = playerObject.transform;
+            }
+        }
+
+        playerTarget = null;
+        if (!HasUsableTarget(resolvedTarget))
+        {
+            Debug.Log(
+                $"[EnemyTargetResolve] enemy={name} oldTarget={oldTargetName} newTarget=null success=False source={source} reason=NoActivePlayerFound",
+                this);
+            return false;
+        }
+
+        AssignTarget(resolvedTarget, source, oldTargetName);
+        return true;
+    }
+
+    private bool HasUsableTarget(Transform target)
+    {
+        return target != null && target.gameObject != null && target.gameObject.activeInHierarchy;
+    }
+
+    private void AssignTarget(Transform target, string source, string oldTargetNameOverride = null)
+    {
+        string oldTargetName = oldTargetNameOverride ?? (playerTarget != null ? playerTarget.name : "null");
+        playerTarget = HasUsableTarget(target) ? target : null;
+
+        Debug.Log(
+            $"[EnemyTargetResolve] enemy={name} oldTarget={oldTargetName} newTarget={(playerTarget != null ? playerTarget.name : "null")} success={(playerTarget != null)} source={source}{(playerTarget == null ? " reason=NoActivePlayerFound" : string.Empty)}",
+            this);
     }
 
     private EnemyDebuffReceiver ResolveDebuffReceiver()
@@ -744,6 +829,29 @@ public class EnemyController : MonoBehaviour
 
         Debug.Log(
             $"[EnemyAttackDiag] name={name} speed={statsSpeed:F2} speedBonus={speedBonus:F2} baseEnemyAttackSpeedMultiplier={baseEnemyAttackSpeedMultiplier:F2} extraEnemyAttackSpeedMax={extraEnemyAttackSpeedMax:F2} enemyAttackSpeedSoftCap={enemyAttackSpeedSoftCap:F2} enemyAttackSpeedMultiplier={attackSpeedMultiplier:F2} attackCooldown={attackCooldown:F2} attackIntervalMultiplier={attackIntervalMultiplier:F2} baseAttackCooldown={baseAttackCooldown:F2} externalAttackCooldownMultiplier={externalAttackCooldownMultiplier:F2} finalAttackCooldown={finalAttackCooldown:F2} timeSinceLastAttack={timeSinceLastAttack:F2} timeUntilNextAttack={timeUntilNextAttack:F2} canAttack={canAttack} distanceToTarget={distanceToTarget:F2} attackRange={attackRange:F2}",
+            this);
+    }
+
+    private void LogChaseDiagnostics(
+        float distanceToTarget,
+        bool canMove,
+        bool canAttack,
+        bool isKnockback,
+        bool isStunned,
+        bool isBlocked,
+        string currentState,
+        float moveSpeed,
+        string targetName,
+        string reason)
+    {
+        if (!debugChaseDiagnostics || Time.time < nextChaseDiagnosticTime)
+        {
+            return;
+        }
+
+        nextChaseDiagnosticTime = Time.time + Mathf.Max(0.1f, debugSpeedLogInterval);
+        Debug.Log(
+            $"[EnemyChaseDiag] enemy={name} distanceToTarget={distanceToTarget:F2} canMove={canMove} canAttack={canAttack} isKnockback={isKnockback} isStunned={isStunned} isBlocked={isBlocked} currentState={currentState} moveSpeed={moveSpeed:F2} target={targetName} reason={reason}",
             this);
     }
 

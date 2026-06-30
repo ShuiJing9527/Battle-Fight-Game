@@ -58,7 +58,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private Coroutine barrierDissolveRoutine;
     private Coroutine enemyDebuffRoutine;
     private string damageModifierKey;
-    private const string VeilDebuffKey = "Player01_W_Veil";
+    private const string VeilDebuffKey = "Player01_W_ThreadFlow";
     private RuneRuntimeState runeRuntimeState;
     private bool playerDamageModifierApplied;
     private Vector3 barrierCenterWorld;
@@ -756,9 +756,9 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private void RefreshEnemyDebuffs()
     {
         currentDebuffedEnemies.Clear();
-
+        float barrierRadius = Mathf.Max(0.1f, wFieldRadius);
         Vector3 barrierCenter = ResolveBarrierCenterWorld();
-        Collider[] hits = Physics.OverlapSphere(barrierCenter, Mathf.Max(0.1f, wFieldRadius), ~0, QueryTriggerInteraction.Collide);
+        Collider[] hits = Physics.OverlapSphere(barrierCenter, barrierRadius, ~0, QueryTriggerInteraction.Collide);
         if (debugLog)
         {
             Debug.Log($"[Player01 W Veil] overlap count = {hits.Length}", this);
@@ -786,6 +786,16 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             if (debugLog)
             {
                 Debug.Log($"[Player01 W Veil] found enemy = {enemyController.name}", enemyController);
+            }
+
+            if (!IsEnemyWithinBarrierRange(enemyController.transform, barrierCenter, barrierRadius))
+            {
+                if (debugLog)
+                {
+                    Debug.Log($"[Player01 W Veil] skip out-of-range enemy = {enemyController.name}", enemyController);
+                }
+
+                continue;
             }
 
             EnemyDebuffReceiver receiver = enemyController.GetComponentInParent<EnemyDebuffReceiver>();
@@ -861,6 +871,20 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         activeDebuffedEnemies.Clear();
         currentDebuffedEnemies.Clear();
         return restoredCount;
+    }
+
+    private static bool IsEnemyWithinBarrierRange(Transform enemyTransform, Vector3 barrierCenter, float barrierRadius)
+    {
+        if (enemyTransform == null)
+        {
+            return false;
+        }
+
+        Vector3 enemyPosition = enemyTransform.position;
+        enemyPosition.y = barrierCenter.y;
+        Vector3 centeredBarrier = barrierCenter;
+        centeredBarrier.y = enemyPosition.y;
+        return Vector3.Distance(enemyPosition, centeredBarrier) <= barrierRadius;
     }
 
     private GameObject ResolveBarrierPrefab()

@@ -20,6 +20,8 @@ MonoBehaviour:
   bossExtraRuneChance: 0
   extraRuneDropChancePerLuck: 0.005
   maxExtraRuneDropChanceFromLuck: 0.3
+  highRuneDropTestMode: 0
+  normalRuneDropRateMultiplier: 0.25
   dropYOffset: 0.3
   runeDropPrefabs:
   - {fileID: 2995015994627158919, guid: f49ac055fb7c12d4a97d628b127435c8, type: 3}

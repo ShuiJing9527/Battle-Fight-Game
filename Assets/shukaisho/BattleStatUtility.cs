@@ -3,9 +3,9 @@ using UnityEngine;
 public static class BattleStatUtility
 {
     private const float BaseEvasionChance = 0.05f;
-    private const float SpeedMoveBonusPerPoint = 0.03f;
+    private const float SpeedMoveBonusPerPoint = 0.0075f;
     private const float SpeedCooldownBonusPerPoint = 0.015f;
-    private const float EvasionSpeedBonusPerPoint = 0.01f;
+    private const float EvasionSpeedBonusPerPoint = 0.005f;
     private const float EvasionLuckBonusPerPoint = 0.04f;
     public const float EnemyAttackSpeedBaseMultiplier = 1.0f;
     public const float EnemyAttackSpeedExtraMax = 1.0f;

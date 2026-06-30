@@ -95,17 +95,74 @@ public class RuneDropManager : MonoBehaviour
     {
         if (dropSettings != null)
         {
-            return dropSettings.RollRuneDropCount(rank, luck);
+            float? eliteRoll;
+            int settingsCount = NormalizeDropCount(rank, dropSettings.RollRuneDropCount(rank, luck, out eliteRoll));
+            Debug.Log(
+                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={settingsCount} eliteRoll={(eliteRoll.HasValue ? eliteRoll.Value.ToString("F4") : "n/a")} settings={(dropSettings != null ? dropSettings.name : "null")} highRuneDropTestMode={(dropSettings != null ? dropSettings.IsHighRuneDropTestMode : false)}",
+                this);
+            return settingsCount;
         }
 
-        int count = rank == MonsterRank.Boss ? 2 : (rank == MonsterRank.Elite ? 1 : 0);
-        float extraChance = Mathf.Clamp(Mathf.Max(0f, luck) * 0.005f, 0f, 0.3f);
-        if (extraChance > 0f && Random.value < extraChance)
+        if (rank == MonsterRank.Normal)
         {
-            count++;
+            Debug.Log("[RuneDropManagerDiag] rank=Normal luck=0.00 finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true", this);
+            return 0;
         }
 
-        return count;
+        if (rank == MonsterRank.Elite)
+        {
+            float eliteRoll = Random.value;
+            int eliteCount = NormalizeDropCount(rank, eliteRoll < 0.05f ? 3 : (eliteRoll < 0.35f ? 2 : 1));
+            Debug.Log(
+                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={eliteCount} eliteRoll={eliteRoll:F4} settings=null highRuneDropTestMode=true",
+                this);
+            return eliteCount;
+        }
+
+        int baseCount = 2;
+        int maxCount = 6;
+        int extraRollCount = 4;
+        float extraChance = Mathf.Clamp01(Mathf.Max(0f, luck - 1f) * 0.03f);
+        int count = baseCount;
+        for (int i = 0; i < extraRollCount && count < maxCount; i++)
+        {
+            float rollChance = extraChance;
+            if (i >= 2)
+            {
+                rollChance *= 0.25f;
+            }
+
+            if (rollChance > 0f && Random.value < rollChance)
+            {
+                count++;
+            }
+        }
+
+        int finalCount = NormalizeDropCount(rank, ClampRuneDropCountByRank(rank, count));
+        Debug.Log(
+            $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={finalCount} eliteRoll=n/a settings=null highRuneDropTestMode=true",
+            this);
+        return finalCount;
+    }
+
+    private static int NormalizeDropCount(MonsterRank rank, int count)
+    {
+        if (rank == MonsterRank.Normal)
+        {
+            return 0;
+        }
+
+        return Mathf.Clamp(count, 1, 3);
+    }
+
+    private static int ClampRuneDropCountByRank(MonsterRank rank, int count)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => Mathf.Clamp(count, 2, 6),
+            MonsterRank.Elite => Mathf.Clamp(count, 1, 3),
+            _ => 0
+        };
     }
 
     private GameObject GetDropPrefabObjectForRune(RuneDefinition rune)

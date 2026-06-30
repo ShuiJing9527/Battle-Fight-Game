@@ -47,9 +47,6 @@ public class RuneBagUI : MonoBehaviour
     [Header("Selected Rune Text")]
     public TextMeshProUGUI selectedRuneText;
 
-    [Header("Debug Runes")]
-    public RuneDefinition[] testRunes;
-
     [Header("UI Scale")]
     [SerializeField, Min(1f)] private float panelScaleMultiplier = 1.25f;
     [SerializeField] private Vector2 runeButtonMinSize = new Vector2(72f, 72f);
@@ -86,14 +83,6 @@ public class RuneBagUI : MonoBehaviour
         BindSkillSlotButtons();
         RefreshAll();
         ClearSelectedRune();
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            AddTestRune();
-        }
     }
 
     private void OnDisable()
@@ -355,33 +344,6 @@ public class RuneBagUI : MonoBehaviour
             selectedRuneText.text = "Select a rune";
             selectedRuneText.fontSize = Mathf.Max(selectedRuneText.fontSize, selectedRuneFontSize);
         }
-    }
-
-    public void AddTestRune()
-    {
-        ResolveRuntimeReferences();
-
-        if (runeInventory == null)
-        {
-            Debug.LogWarning("[RuneBagUI] Missing RuneInventory.");
-            return;
-        }
-
-        if (testRunes == null || testRunes.Length == 0)
-        {
-            Debug.LogWarning("[RuneBagUI] Missing test runes.");
-            return;
-        }
-
-        RuneDefinition rune = testRunes[Random.Range(0, testRunes.Length)];
-        if (rune == null)
-        {
-            return;
-        }
-
-        runeInventory.AddRune(rune);
-        Debug.Log("[RuneBagUI] Added test rune: " + GetRuneName(rune));
-        RefreshRuneList();
     }
 
     public RuneDefinition GetEquippedRune(int skillIndex)

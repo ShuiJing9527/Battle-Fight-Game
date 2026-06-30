@@ -167,7 +167,7 @@ public class RuneDefinition
                 rune.tier3Effect = "When killing a monster, there is a 15% chance to drop 1 extra random Attribute Soul.";
                 rune.tier4Effect = "When picking up any Soul, there is a 10% chance to copy 1 Soul of the same type. Copied Soul point value is 1.";
                 rune.tier5Effect = "When killing a Boss, drop 2 extra random Attribute Souls.";
-                rune.setBonusEffect = "1-piece Luck bonus becomes +3; 2-piece point increase chance becomes 35%; 3-piece extra Attribute Soul chance becomes 25%; 4-piece copy chance becomes 25% and copied Soul point value becomes 3; 5-piece permanently increases luck efficiency by 5% whenever a Boss is killed.";
+                rune.setBonusEffect = "1-piece Luck bonus becomes +5; 2-piece point increase chance becomes 35%; 3-piece extra Attribute Soul chance becomes 25%; 4-piece copy chance becomes 25% and copied Soul point value becomes 3; 5-piece permanently increases luck efficiency by 5% whenever a Boss is killed.";
                 break;
         }
 

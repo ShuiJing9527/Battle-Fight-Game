@@ -2022,7 +2022,7 @@ public class RuneUIController : MonoBehaviour
         RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
         return preview != null
             ? preview.GetExtraSoulDropChanceForLuck(luck)
-            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.01f, 0f, 0.5f);
+            : Mathf.Max(0f, luck - 1f) * 0.025f;
     }
 
     private float ResolveExtraRuneDropChance(float luck)
@@ -2030,7 +2030,7 @@ public class RuneUIController : MonoBehaviour
         RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
         return preview != null
             ? preview.GetExtraRuneDropChanceForLuck(luck)
-            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.005f, 0f, 0.3f);
+            : Mathf.Max(0f, luck - 1f) * 0.03f;
     }
 
     private RuntimeLootDropOnDeath ResolveLootDropPreview()
