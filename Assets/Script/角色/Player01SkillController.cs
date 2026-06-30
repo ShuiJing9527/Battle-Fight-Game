@@ -540,12 +540,12 @@ public class Player01SkillController : MonoBehaviour
         }
 
         float horizontal = 0f;
-        if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
+        if (Keyboard.current.leftArrowKey.isPressed)
         {
             horizontal -= 1f;
         }
 
-        if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
+        if (Keyboard.current.rightArrowKey.isPressed)
         {
             horizontal += 1f;
         }
