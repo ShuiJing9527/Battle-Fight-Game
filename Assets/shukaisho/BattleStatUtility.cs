@@ -2,7 +2,6 @@ using UnityEngine;
 
 public static class BattleStatUtility
 {
-    private const float MoveSpeedPerPoint = 0.02f;
     private const float CooldownScalePerPoint = 0.035f;
     private const float MinimumCooldownMultiplier = 0.45f;
     private const float BaseCritRate = 0.10f;
@@ -28,10 +27,24 @@ public static class BattleStatUtility
         return stats;
     }
 
+    public static float ResolveBaseMoveSpeed(CombatStats stats, float fallbackBaseMoveSpeed)
+    {
+        if (stats == null)
+        {
+            return Mathf.Max(0f, fallbackBaseMoveSpeed);
+        }
+
+        return stats.speed > 0f ? stats.speed : Mathf.Max(0f, fallbackBaseMoveSpeed);
+    }
+
+    public static float GetSpeedMoveMultiplier(CombatStats stats)
+    {
+        return 1f;
+    }
+
     public static float GetMoveSpeedMultiplier(CombatStats stats)
     {
-        float speed = stats != null ? Mathf.Max(0f, stats.speed) : 0f;
-        return 1f + speed * MoveSpeedPerPoint;
+        return GetSpeedMoveMultiplier(stats);
     }
 
     public static float GetCooldownMultiplier(CombatStats stats)
