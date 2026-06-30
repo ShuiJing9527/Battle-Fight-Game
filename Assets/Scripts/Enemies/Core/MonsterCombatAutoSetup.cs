@@ -188,6 +188,11 @@ public static class MonsterCombatAutoSetup
         {
             monster.AddComponent<WorldHealthBar>();
         }
+
+        if (monster.GetComponent<EliteSlimeSplitOnDeath>() == null)
+        {
+            monster.AddComponent<EliteSlimeSplitOnDeath>();
+        }
     }
 
     private static void EnsureRankVisual(GameObject monster, MonsterIdentity identity)
