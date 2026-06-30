@@ -21,7 +21,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 旧额外星刃护盾加成(仅兼容旧数据)")]
     [SerializeField, Min(0f)] private float wShieldBonusPerExtraSword = 0.1f;
     [InspectorName("W 结束时清空护盾")]
-    [SerializeField] private bool wClearShieldOnEnd = true;
+    [SerializeField] private bool wClearShieldOnEnd = false;
 
     [Header("W - 星刃护盾 / 接触伤害")]
     [InspectorName("W 星刃伤害占护盾比例")]
@@ -39,7 +39,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 最大减伤")]
     [SerializeField] private float wMaxDamageReduction = 0.8f;
     [InspectorName("W 反击伤害比例")]
-    [SerializeField] private float wCounterDamageRatio = 0.5f;
+    [SerializeField] private float wCounterDamageRatio = 0.1f;
 
     [Header("W - 星环剑轮 / 视觉")]
     [InspectorName("W 特效尺寸")]
@@ -237,9 +237,10 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         float blockedDamage = clampedRaw * currentWFinalDamageReduction;
         float damageAfterReduction = clampedRaw - blockedDamage;
-        float counterDamage = blockedDamage * wCounterDamageRatio;
+        float currentShieldValue = ResolveCurrentShieldValue();
+        float counterDamage = currentShieldValue * Mathf.Max(0f, wCounterDamageRatio);
 
-        Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Counter={counterDamage:F2}", this);
+        Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Shield={currentShieldValue:F2}, Counter={counterDamage:F2}", this);
         ApplyWCounterDamage(incomingDamage, counterDamage);
         return Mathf.Max(0f, damageAfterReduction);
     }
@@ -1472,25 +1473,34 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
     private void ClearWShield()
     {
-        if (!wClearShieldOnEnd)
+        if (wClearShieldOnEnd)
         {
-            return;
+            Debug.Log($"[W Shield] Clear shield request ignored to preserve remaining shield. previousApplied={wAppliedShieldValue:F2}", this);
         }
 
+        wAppliedShieldValue = 0f;
+    }
+
+    private float ResolveCurrentShieldValue()
+    {
         if (Owner == null)
         {
-            wAppliedShieldValue = 0f;
-            return;
+            return 0f;
         }
 
         CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
         if (combatHealth != null)
         {
-            combatHealth.ClearShield();
-            Debug.Log($"[W Shield] Cleared shield, previousApplied={wAppliedShieldValue:F2}", this);
+            return Mathf.Max(0f, combatHealth.GetShield());
         }
 
-        wAppliedShieldValue = 0f;
+        BattleResourceBank resourceBank = Owner.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return Mathf.Max(0f, resourceBank.CurrentShield);
+        }
+
+        return 0f;
     }
 
     private float ResolveOwnerMaxHp()
