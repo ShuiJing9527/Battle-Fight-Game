@@ -9,12 +9,17 @@ public class PlayerMovement : MonoBehaviour
     [SerializeField] private bool debugSpeedDiagnostics = false;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
     private CombatStats combatStats;
+    private Player01SkillController player01SkillController;
     private float nextSpeedDiagnosticTime;
+    private bool movementInputLocked;
+    private bool loggedMovementBlocked;
 
     private void Awake()
     {
         if (rb == null) rb = GetComponent<Rigidbody>();
         combatStats = GetComponent<CombatStats>();
+        player01SkillController = GetComponent<Player01SkillController>();
+        Debug.Log($"[PlayerMovement] active on {name}, controller={player01SkillController}", this);
     }
 
     private void FixedUpdate()
@@ -37,8 +42,28 @@ public class PlayerMovement : MonoBehaviour
         float speedMoveMultiplier = BattleStatUtility.GetSpeedMoveMultiplier(combatStats);
         float externalMoveMultiplier = 1f;
         float finalMoveSpeed = baseMoveSpeed * speedMoveMultiplier * externalMoveMultiplier;
+        bool isLockedByController = player01SkillController != null && player01SkillController.IsMovementInputLocked();
+        bool shouldBlockInputMovement = movementInputLocked || isLockedByController;
+        if (shouldBlockInputMovement)
+        {
+            if (!loggedMovementBlocked)
+            {
+                Debug.Log($"[PlayerMovement] movement input blocked on {name}", this);
+                loggedMovementBlocked = true;
+            }
+        }
+        else
+        {
+            loggedMovementBlocked = false;
+        }
 
-        rb.linearVelocity = moveDirection * finalMoveSpeed;
+        if (!shouldBlockInputMovement)
+        {
+            rb.linearVelocity = new Vector3(
+                moveDirection.x * finalMoveSpeed,
+                rb.linearVelocity.y,
+                moveDirection.z * finalMoveSpeed);
+        }
 
         if (debugSpeedDiagnostics && Time.time >= nextSpeedDiagnosticTime)
         {
@@ -47,5 +72,29 @@ public class PlayerMovement : MonoBehaviour
                 $"[SpeedDiag] name={name} stats.speed={statsSpeed:F2} baseMoveSpeed={baseMoveSpeed:F2} speedMoveMultiplier={speedMoveMultiplier:F2} externalMoveMultiplier={externalMoveMultiplier:F2} finalMoveSpeed={finalMoveSpeed:F2} baseAttackCooldown=n/a speedCooldownMultiplier=n/a finalAttackCooldown=n/a",
                 this);
         }
+    }
+
+    public void SetMovementInputLocked(bool locked)
+    {
+        movementInputLocked = locked;
+        if (locked && rb != null)
+        {
+            rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+            loggedMovementBlocked = false;
+        }
+        else if (!locked)
+        {
+            loggedMovementBlocked = false;
+        }
+    }
+
+    public bool IsMovementInputLocked()
+    {
+        return movementInputLocked;
+    }
+
+    private void OnDisable()
+    {
+        movementInputLocked = false;
     }
 }

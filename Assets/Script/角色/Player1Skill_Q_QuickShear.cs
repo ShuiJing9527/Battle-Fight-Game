@@ -56,6 +56,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [SerializeField, Range(0f, 1f)] private float quickShearSuperCritChance = 0.05f;
     [SerializeField, Min(1f)] private float quickShearSuperCritMultiplier = 5.0f;
     [SerializeField] private bool debugQuickShearCritLog = false;
+    [Header("Q - Movement Lock")]
+    [SerializeField] private float qMovementLockDuration = -1f;
+    [SerializeField, Min(0f)] private float qMovementLockFallbackBuffer = 0.05f;
     [Header("Q - Crit Flash")]
     [SerializeField] private GameObject quickShearCritFlashEffectPrefab;
     [SerializeField] private GameObject quickShearSuperCritFlashEffectPrefab;
@@ -70,8 +73,11 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private static readonly System.Collections.Generic.HashSet<string> MissingQuickShearStatsWarnings = new System.Collections.Generic.HashSet<string>();
     private float qLifestealTotalThisCast;
     private Coroutine activeScissorTimelineCoroutine;
+    private Coroutine qMovementLockRoutine;
     private RuneRuntimeState runeRuntimeState;
     private int currentRuneCastId = -1;
+    private int qMovementLockToken;
+    private float qMovementLockEndTime;
 
     private void Reset()
     {
@@ -116,6 +122,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         quickShearSuperCritChance = 0.05f;
         quickShearSuperCritMultiplier = 5f;
         debugQuickShearCritLog = false;
+        qMovementLockDuration = -1f;
+        qMovementLockFallbackBuffer = 0.05f;
         quickShearCritFlashOffset = new Vector3(0.9f, 0.25f, 0f);
         quickShearCritFlashScale = Vector3.one;
         quickShearCritFlashLifetime = 0.12f;
@@ -148,11 +156,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private void OnDisable()
     {
         StopActiveScissorTimeline();
+        StopQMovementLockRoutine();
     }
 
     private void OnDestroy()
     {
         StopActiveScissorTimeline();
+        StopQMovementLockRoutine();
     }
 
     public override void Initialize(Player01SkillController controller)
@@ -208,6 +218,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         castDamagedCombatTargets.Clear();
         qLifestealTotalThisCast = 0f;
         StopActiveScissorTimeline();
+        BeginMovementLock(ResolveInitialMovementLockDuration(), ResolveInitialMovementLockSource());
+        Debug.Log($"[Player01 Q Lock] Q Start, controller={Controller}, movementInputLocked={(Controller != null && Controller.IsMovementInputLocked())}", this);
 
         if (debugLog)
         {
@@ -297,8 +309,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             Debug.Log($"[Q - QuickShear] TryPlayLockedSkillAnimation -> {animationName}.", this);
         }
 
-        bool played = Controller.TryPlayLockedSkillAnimation(animationName, false, lockDuration, true, "Q");
-        if (!played)
+        TrackEntry entry = Controller.PlayLockedSkillAnimationEntry(animationName, false, lockDuration, true, "Q");
+        if (entry == null)
         {
             if (debugLog)
             {
@@ -315,6 +327,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 $"[Q - QuickShear] damageFormula=({physicalBaseDamage:F2} + SATK*{specialScaling:F2}) + ({specialBaseDamage:F2} + PATK*{physicalScaling:F2}), range={qRange:F2}",
                 this);
         }
+
+        ExtendMovementLock(ResolveMovementLockDuration(entry, slashIndex, slashTotal), ResolveMovementLockSource(entry));
 
         if (playScissorEffectsPerSlash || slashIndex == 1)
         {
@@ -1073,6 +1087,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     protected override void OnCastFinished()
     {
+        Debug.Log("[Player01 Q Lock] OnCastFinished requested unlock", this);
+
         if (qLifestealTotalThisCast > 0f)
         {
             Debug.Log($"[Player01 Q Lifesteal] totalHeal={qLifestealTotalThisCast:F2}", this);
@@ -1080,4 +1096,107 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     }
 
     protected override int SkillIndex => 0;
+
+    private void BeginMovementLock(float duration, string source)
+    {
+        duration = Mathf.Max(0.01f, duration);
+        qMovementLockToken++;
+        qMovementLockEndTime = Time.time + duration;
+        StopQMovementLockRoutine();
+        Controller?.SetMovementInputLocked(true, "Player01 Q");
+        Debug.Log($"[Player01 Q Lock] Start movement lock, duration={duration:F3}, source={source}", this);
+        qMovementLockRoutine = StartCoroutine(QMovementLockRoutine(qMovementLockToken));
+    }
+
+    private void ExtendMovementLock(float duration, string source)
+    {
+        duration = Mathf.Max(0.01f, duration);
+        float proposedEndTime = Time.time + duration;
+        if (qMovementLockRoutine == null || Controller == null || !Controller.IsMovementInputLocked())
+        {
+            BeginMovementLock(duration, source);
+            return;
+        }
+
+        if (proposedEndTime > qMovementLockEndTime)
+        {
+            qMovementLockEndTime = proposedEndTime;
+            Debug.Log($"[Player01 Q Lock] Start movement lock, duration={duration:F3}, source={source}", this);
+        }
+    }
+
+    private IEnumerator QMovementLockRoutine(int token)
+    {
+        while (token == qMovementLockToken && Time.time < qMovementLockEndTime)
+        {
+            yield return null;
+        }
+
+        if (token != qMovementLockToken)
+        {
+            yield break;
+        }
+
+        qMovementLockRoutine = null;
+        Controller?.SetMovementInputLocked(false, "Player01 Q");
+        Debug.Log($"[Player01 Q Lock] End movement lock, token={token}", this);
+        Debug.Log($"[Player01 Q Lock] Q End, movementInputLocked={(Controller != null && Controller.IsMovementInputLocked())}", this);
+    }
+
+    private void StopQMovementLockRoutine()
+    {
+        if (qMovementLockRoutine == null)
+        {
+            return;
+        }
+
+        StopCoroutine(qMovementLockRoutine);
+        qMovementLockRoutine = null;
+    }
+
+    private float ResolveInitialMovementLockDuration()
+    {
+        if (qMovementLockDuration > 0f)
+        {
+            return qMovementLockDuration;
+        }
+
+        int count = Mathf.Max(1, slashCount);
+        float interval = Mathf.Max(0f, slashInterval);
+        float fallbackDuration = Mathf.Max(0f, duration);
+        return Mathf.Max(0.01f, fallbackDuration + interval * Mathf.Max(0, count - 1) + qMovementLockFallbackBuffer);
+    }
+
+    private string ResolveInitialMovementLockSource()
+    {
+        return qMovementLockDuration > 0f ? "Inspector" : "Fallback";
+    }
+
+    private float ResolveMovementLockDuration(TrackEntry entry, int slashIndex, int slashTotal)
+    {
+        if (qMovementLockDuration > 0f)
+        {
+            return qMovementLockDuration;
+        }
+
+        float remainingIntervals = Mathf.Max(0f, slashInterval) * Mathf.Max(0, slashTotal - slashIndex);
+        float fallbackDuration = Mathf.Max(0f, duration);
+
+        if (entry != null && entry.Animation != null)
+        {
+            return Mathf.Max(0.01f, entry.Animation.Duration + remainingIntervals + qMovementLockFallbackBuffer);
+        }
+
+        return Mathf.Max(0.01f, fallbackDuration + remainingIntervals + qMovementLockFallbackBuffer);
+    }
+
+    private string ResolveMovementLockSource(TrackEntry entry)
+    {
+        if (qMovementLockDuration > 0f)
+        {
+            return "Inspector";
+        }
+
+        return entry != null && entry.Animation != null ? "Animation" : "Fallback";
+    }
 }
