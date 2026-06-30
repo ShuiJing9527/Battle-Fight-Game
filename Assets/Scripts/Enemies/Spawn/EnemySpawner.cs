@@ -583,7 +583,7 @@ public class EnemySpawner : MonoBehaviour
             cooldown = 2.2f;
         }
 
-        float moveSpeed = ResolveMoveSpeed(identity, stats.speed);
+        float moveSpeed = controller.BaseMoveSpeed > 0f ? controller.BaseMoveSpeed : ResolveMoveSpeed(identity, stats.speed);
         BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
         float attackPower = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
         controller.ConfigureRuntime(

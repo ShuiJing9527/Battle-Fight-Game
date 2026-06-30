@@ -50,6 +50,8 @@ public class SlimeAnimationController : MonoBehaviour
 
     public event Action<Transform> OnAttackHit;
     public AttackHitEvent onAttackHit = new AttackHitEvent();
+    public bool IsAttacking => isAttacking;
+    public bool IsDying => isDying;
 
     private CombatHealth combatHealth;
     private bool previousCombatDestroyOnDeath = true;

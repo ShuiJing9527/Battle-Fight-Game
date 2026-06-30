@@ -176,6 +176,8 @@ MonoBehaviour:
   maxHorizontalAttackDistance: 1.35
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugSpeedDiagnostics: 0
+  debugSpeedLogInterval: 1
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -354,7 +356,7 @@ MonoBehaviour:
   physicalDefense: 20
   specialAttack: 28
   specialDefense: 36
-  speed: 8
+  speed: 10
   luck: 8
 --- !u!114 &8793765161300815962
 MonoBehaviour:

@@ -23,6 +23,7 @@ public class CombatHealth : MonoBehaviour
     [SerializeField] private Color physicalDamageColor = new Color(1f, 0.25f, 0.25f, 1f);
     [SerializeField] private Color specialDamageColor = new Color(0.78f, 0.35f, 1f, 1f);
     [SerializeField] private Color criticalDamageColor = new Color(1f, 0.84f, 0.2f, 1f);
+    [SerializeField] private Color missDamageColor = new Color(0.75f, 0.95f, 1f, 1f);
     [SerializeField] private Vector3 damagePopupOffset = new Vector3(0f, 1f, 0f);
     [SerializeField] private Vector2 damagePopupRandomOffset = new Vector2(0.3f, 0.15f);
 
@@ -147,6 +148,12 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        if (TryEvadeDamage(damage.source, out _))
+        {
+            ShowMissPopup();
+            return;
+        }
+
         Player01SkillController player1 = GetComponent<Player01SkillController>();
         if (player1 != null && player1.ShouldIgnoreIncomingDamage(damage))
         {
@@ -204,6 +211,12 @@ public class CombatHealth : MonoBehaviour
 
         if (ShouldIgnoreDamageFrom(source))
         {
+            return;
+        }
+
+        if (TryEvadeDamage(source, out _))
+        {
+            ShowMissPopup();
             return;
         }
 
@@ -419,6 +432,30 @@ public class CombatHealth : MonoBehaviour
         return damageType == BattleDamageType.Special ? DamagePopupType.Special : DamagePopupType.Physical;
     }
 
+    private bool TryEvadeDamage(GameObject source, out float finalEvasionChance)
+    {
+        finalEvasionChance = 0f;
+        CombatStats defenderStats = stats;
+        CombatStats attackerStats = BattleStatUtility.GetCombatStats(source);
+        finalEvasionChance = BattleStatUtility.GetFinalEvasionChance(defenderStats, attackerStats);
+        bool evaded = finalEvasionChance > 0f && UnityEngine.Random.value < finalEvasionChance;
+        Debug.Log(
+            $"[CombatEvasion] defender={name} attacker={(source != null ? source.name : "null")} defenderSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} defenderLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} rawEvasionChance={BattleStatUtility.GetEvasionChance(defenderStats):F4} accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F2} finalEvasionChance={finalEvasionChance:F4} result={(evaded ? "Miss" : "Hit")}",
+            this);
+
+        if (!evaded)
+        {
+            return false;
+        }
+
+        if (BattleTargetUtility.IsPlayer(gameObject) && BattleTargetUtility.IsMonster(source))
+        {
+            Debug.Log($"[EnemyAttack] Evaded target={name} attacker={source.name}", this);
+        }
+
+        return true;
+    }
+
     private void ShowDamagePopup(float damage, DamagePopupType popupType, bool isCritical)
     {
         if (!showDamageNumbers || damage <= 0f)
@@ -449,6 +486,30 @@ public class CombatHealth : MonoBehaviour
             }
 
             DamagePopupFloatingText.SpawnFallback(message, worldPosition, color);
+        }
+    }
+
+    private void ShowMissPopup()
+    {
+        if (!showDamageNumbers)
+        {
+            return;
+        }
+
+        Vector3 worldPosition = transform.position + damagePopupOffset;
+        worldPosition.x += UnityEngine.Random.Range(-damagePopupRandomOffset.x, damagePopupRandomOffset.x);
+        worldPosition.y += UnityEngine.Random.Range(-damagePopupRandomOffset.y, damagePopupRandomOffset.y);
+        worldPosition.z += UnityEngine.Random.Range(-damagePopupRandomOffset.x, damagePopupRandomOffset.x);
+
+        DamagePopupFloatingText popupPrefab = ResolveDamagePopupPrefab();
+        if (popupPrefab != null)
+        {
+            DamagePopupFloatingText popup = Instantiate(popupPrefab, worldPosition, Quaternion.identity);
+            popup.Show("miss", missDamageColor);
+        }
+        else
+        {
+            DamagePopupFloatingText.SpawnFallback("miss", worldPosition, missDamageColor);
         }
     }
 

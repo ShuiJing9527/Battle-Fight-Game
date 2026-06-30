@@ -149,12 +149,15 @@ MonoBehaviour:
   playerTag: Player
   moveSpeed: 2.5
   stopDistance: 0.8
+  maxHorizontalMoveSpeed: 3
   faceMoveDirection: 0
   keepFlatRotation: 1
   enableEnemySoftAvoidance: 1
   enemySeparationRadius: 1.2
   enemySeparationWeight: 0.6
   enemySeparationMaxNeighbors: 8
+  maxVerticalTargetDifference: 1.5
+  maxVerticalVelocity: 4
   attackRange: 1.35
   attackHitRange: 1.6
   attackCooldown: 1.1
@@ -167,8 +170,14 @@ MonoBehaviour:
   meleeHitForwardOffset: 0
   closeHitRadius: 0
   meleeBodyContactRadius: 0.45
+  requireGroundedToAttack: 1
+  groundedProbeDistance: 0.2
+  maxVerticalAttackDifference: 0.75
+  maxHorizontalAttackDistance: 1.35
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugSpeedDiagnostics: 0
+  debugSpeedLogInterval: 1
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -266,6 +275,9 @@ MonoBehaviour:
   attackSquashAmount: 0.2
   attackStretchAmount: 0.22
   attackStopDistance: 0.7
+  allowAttackForwardLeap: 1
+  allowAttackVerticalLeap: 1
+  maxAttackLeapDistance: 0.65
   minimumVisibleAlpha: 0.92
   deathDuration: 0.65
   deathFadeTime: 0.45
@@ -344,7 +356,7 @@ MonoBehaviour:
   physicalDefense: 10
   specialAttack: 14
   specialDefense: 10
-  speed: 6
+  speed: 7
   luck: 2
 --- !u!114 &1335638924281345140
 MonoBehaviour:

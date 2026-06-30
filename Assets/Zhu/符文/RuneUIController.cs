@@ -6,6 +6,12 @@ using UnityEngine.EventSystems;
 
 public class RuneUIController : MonoBehaviour
 {
+    private struct RuneStackEntry
+    {
+        public RuneDefinition rune;
+        public int count;
+    }
+
     private const int SkillCount = 4;
     private const int SlotsPerSkill = 5;
     private const string LabelEmpty = "Empty";
@@ -283,10 +289,9 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        List<RuneDefinition> visibleRunes = BuildVisibleRuneList();
-        int runeCount = visibleRunes.Count;
+        List<RuneStackEntry> visibleRuneStacks = BuildVisibleRuneStacks();
+        int runeCount = visibleRuneStacks.Count;
         bool hasRuneEntries = runeCount > 0;
-        Dictionary<string, int> visibleRuneIndices = new Dictionary<string, int>();
         EnsureRuneButtonTemplate();
         EnsureRuneListItemCount(runeCount);
         int childCount = runeListContent.childCount;
@@ -305,7 +310,8 @@ public class RuneUIController : MonoBehaviour
                 continue;
             }
 
-            RuneDefinition rune = i < runeCount ? visibleRunes[i] : null;
+            RuneStackEntry runeEntry = i < runeCount ? visibleRuneStacks[i] : default(RuneStackEntry);
+            RuneDefinition rune = runeEntry.rune;
             Button button = child.GetComponent<Button>();
             TextMeshProUGUI label = child.GetComponent<TextMeshProUGUI>();
             if (label == null)
@@ -318,12 +324,7 @@ public class RuneUIController : MonoBehaviour
             {
                 if (rune != null)
                 {
-                    string runeKey = GetRuneStackKey(rune);
-                    int visibleIndex = 0;
-                    visibleRuneIndices.TryGetValue(runeKey, out visibleIndex);
-                    visibleIndex++;
-                    visibleRuneIndices[runeKey] = visibleIndex;
-                    label.text = $"{GetRuneName(rune)} x{visibleIndex}";
+                    label.text = $"{GetRuneName(rune)} x{Mathf.Max(1, runeEntry.count)}";
                 }
                 else
                 {
@@ -896,6 +897,45 @@ public class RuneUIController : MonoBehaviour
         }
 
         return visibleRunes;
+    }
+
+    private List<RuneStackEntry> BuildVisibleRuneStacks()
+    {
+        List<RuneDefinition> visibleRunes = BuildVisibleRuneList();
+        List<RuneStackEntry> visibleRuneStacks = new List<RuneStackEntry>();
+        if (visibleRunes.Count == 0)
+        {
+            return visibleRuneStacks;
+        }
+
+        Dictionary<string, int> stackIndices = new Dictionary<string, int>();
+        for (int i = 0; i < visibleRunes.Count; i++)
+        {
+            RuneDefinition rune = visibleRunes[i];
+            if (rune == null)
+            {
+                continue;
+            }
+
+            string runeKey = GetRuneStackKey(rune);
+            int stackIndex;
+            if (stackIndices.TryGetValue(runeKey, out stackIndex))
+            {
+                RuneStackEntry entry = visibleRuneStacks[stackIndex];
+                entry.count++;
+                visibleRuneStacks[stackIndex] = entry;
+                continue;
+            }
+
+            stackIndices[runeKey] = visibleRuneStacks.Count;
+            visibleRuneStacks.Add(new RuneStackEntry
+            {
+                rune = rune,
+                count = 1
+            });
+        }
+
+        return visibleRuneStacks;
     }
 
     private bool IsRuneAlreadyEquipped(RuneDefinition rune)

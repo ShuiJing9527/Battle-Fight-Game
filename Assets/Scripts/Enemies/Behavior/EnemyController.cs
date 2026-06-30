@@ -47,7 +47,9 @@ public class EnemyController : MonoBehaviour
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
     [SerializeField] private bool debugMeleeHitCheck = false;
+    [SerializeField] private bool debugAttackDiagnostics = false;
     [SerializeField] private bool debugSpeedDiagnostics = false;
+    [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
 
     private Rigidbody rb;
@@ -63,8 +65,12 @@ public class EnemyController : MonoBehaviour
     private bool attackInProgress;
     private float lastLoggedMoveMultiplier = -1f;
     private float lastLoggedAttackMultiplier = -1f;
+    private float nextAttackDiagnosticTime;
     private float nextSpeedDiagnosticTime;
     private Collider[] separationHits;
+    private float lastAttackTime = -1f;
+
+    public float BaseMoveSpeed => moveSpeed;
 
     private void Start()
     {
@@ -97,16 +103,33 @@ public class EnemyController : MonoBehaviour
         ResolvePlayerTarget();
         if (rb == null || playerTarget == null)
         {
+            if (debugAttackDiagnostics && playerTarget == null)
+            {
+                Debug.Log($"[EnemyAttackDiag] name={name} target=null failReason=NoTarget", this);
+            }
             return;
         }
 
         Vector3 toPlayer = playerTarget.position - transform.position;
         toPlayer.y = 0f;
-        float distance = toPlayer.magnitude;
+        float distance = Vector3.Distance(playerTarget.position, transform.position);
+        float horizontalDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
         float verticalDifference = Mathf.Abs(playerTarget.position.y - transform.position.y);
+        float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
+        bool grounded = IsGrounded();
+        string attackFailReason = EvaluateAttackFailReason(horizontalDistance, verticalDifference, grounded);
+        bool canAttack = string.IsNullOrEmpty(attackFailReason);
+        LogAttackDiagnostics(
+            statsSpeed,
+            distance,
+            horizontalDistance,
+            verticalDifference,
+            grounded,
+            canAttack,
+            attackFailReason);
 
         // 进入攻击范围后，优先切到攻击流程，避免追击和出手同时发生。
-        if (distance <= attackRange && Time.time >= nextAttackTime && CanStartAttack(distance, verticalDifference))
+        if (canAttack)
         {
             BeginAttack();
             return;
@@ -147,11 +170,10 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
         float baseMoveSpeed = moveSpeed;
         float speedMoveMultiplier = BattleStatUtility.GetSpeedMoveMultiplier(combatStats);
         float externalMoveMultiplier = ResolveExternalMoveMultiplier();
-        float currentMoveSpeed = baseMoveSpeed * speedMoveMultiplier * externalMoveMultiplier;
+        float currentMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, baseMoveSpeed, externalMoveMultiplier);
         if (maxHorizontalMoveSpeed > 0f)
         {
             currentMoveSpeed = Mathf.Min(currentMoveSpeed, maxHorizontalMoveSpeed);
@@ -162,7 +184,7 @@ public class EnemyController : MonoBehaviour
             lastLoggedMoveMultiplier = externalMoveMultiplier;
         }
 
-        LogSpeedDiagnostics(statsSpeed, baseMoveSpeed, speedMoveMultiplier, externalMoveMultiplier, currentMoveSpeed);
+        LogSpeedDiagnostics(statsSpeed, distance, canAttack);
 
         float verticalVelocity = rb.linearVelocity.y;
         if (maxVerticalVelocity > 0f)
@@ -278,11 +300,16 @@ public class EnemyController : MonoBehaviour
 
     private void BeginAttack()
     {
+        lastAttackTime = Time.time;
         nextAttackTime = Time.time + ResolveCurrentAttackCooldown();
         pendingAttackTarget = playerTarget;
         attackInProgress = true;
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
+        if (debugAttackDiagnostics)
+        {
+            Debug.Log($"[EnemyAttack] StartAttack enemy={name} target={(pendingAttackTarget != null ? pendingAttackTarget.name : "null")}", this);
+        }
 
         // 触发攻击动画后，按动画时序进入冷却恢复阶段。
         if (slimeAnimation != null)
@@ -302,6 +329,10 @@ public class EnemyController : MonoBehaviour
     {
         attackInProgress = false;
         pendingAttackTarget = null;
+        if (debugAttackDiagnostics)
+        {
+            Debug.Log($"[EnemyAttack] AttackFinished enemy={name}", this);
+        }
     }
 
     private void HandleAttackHit(Transform target)
@@ -309,6 +340,10 @@ public class EnemyController : MonoBehaviour
         Transform hitTarget = target != null ? target : pendingAttackTarget;
         if (hitTarget == null)
         {
+            if (debugAttackDiagnostics)
+            {
+                Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target=null damage=0 reason=NoTarget", this);
+            }
             FinishAttackRecovery();
             return;
         }
@@ -319,6 +354,10 @@ public class EnemyController : MonoBehaviour
         {
             if (toTarget.sqrMagnitude > attackHitRange * attackHitRange)
             {
+                if (debugAttackDiagnostics)
+                {
+                    Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=TooFarDistance", this);
+                }
                 FinishAttackRecovery();
                 return;
             }
@@ -329,12 +368,20 @@ public class EnemyController : MonoBehaviour
         {
             if (!CanHitMeleeTarget(hitTarget))
             {
+                if (debugAttackDiagnostics)
+                {
+                    Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=HitCheckFailed", this);
+                }
                 FinishAttackRecovery();
                 return;
             }
 
             if (!BattleTargetUtility.IsPlayer(hitTarget.gameObject))
             {
+                if (debugAttackDiagnostics)
+                {
+                    Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NotPlayer", this);
+                }
                 FinishAttackRecovery();
                 return;
             }
@@ -350,7 +397,16 @@ public class EnemyController : MonoBehaviour
                     lastLoggedAttackMultiplier = ResolveAttackMultiplier();
                 }
 
+                if (debugAttackDiagnostics)
+                {
+                    Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage={currentAttackDamage:F2}", this);
+                    Debug.Log($"[EnemyAttack] ApplyDamage enemy={name} target={hitTarget.name}", this);
+                }
                 combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, damageType, gameObject));
+            }
+            else if (debugAttackDiagnostics)
+            {
+                Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NoCombatHealth", this);
             }
         }
 
@@ -625,17 +681,48 @@ public class EnemyController : MonoBehaviour
 
     private float ResolveCurrentAttackCooldown()
     {
-        float debuffCooldownMultiplier = Mathf.Max(1f, ResolveAttackMultiplier());
-        float speedCooldownMultiplier = BattleStatUtility.GetCooldownMultiplier(combatStats);
-        return Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier) * debuffCooldownMultiplier * speedCooldownMultiplier);
+        float baseAttackCooldown = Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier));
+        float attackSpeedMultiplier = BattleStatUtility.GetEnemyAttackSpeedMultiplier(combatStats);
+        float externalAttackCooldownMultiplier = Mathf.Max(1f, ResolveAttackMultiplier());
+        return Mathf.Max(0.1f, baseAttackCooldown / Mathf.Max(0.1f, attackSpeedMultiplier) * externalAttackCooldownMultiplier);
+    }
+
+    private void LogAttackDiagnostics(
+        float statsSpeed,
+        float distanceToTarget,
+        float horizontalDistance,
+        float verticalDifference,
+        bool isGrounded,
+        bool canAttack,
+        string failReason)
+    {
+        if (!debugAttackDiagnostics || Time.time < nextAttackDiagnosticTime)
+        {
+            return;
+        }
+
+        nextAttackDiagnosticTime = Time.time + Mathf.Max(0.1f, debugAttackLogInterval);
+
+        float attackCooldownMultiplier = ResolveAttackMultiplier();
+        float baseAttackCooldown = Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier));
+        float enemyAttackSpeedMultiplier = BattleStatUtility.GetEnemyAttackSpeedMultiplier(combatStats);
+        float finalAttackCooldown = Mathf.Max(0.1f, baseAttackCooldown / Mathf.Max(0.1f, enemyAttackSpeedMultiplier) * Mathf.Max(1f, attackCooldownMultiplier));
+        float timeSinceLastAttack = lastAttackTime >= 0f ? Mathf.Max(0f, Time.time - lastAttackTime) : -1f;
+        float timeUntilNextAttack = Mathf.Max(0f, nextAttackTime - Time.time);
+        bool isBlocked = attackCooldownMultiplier <= 0f;
+        bool isKnockback = false;
+        bool isStunned = false;
+        bool isAttacking = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
+
+        Debug.Log(
+            $"[EnemyAttackDiag] name={name} target={(playerTarget != null ? playerTarget.name : "null")} speed={statsSpeed:F2} attackCooldown={attackCooldown:F2} attackIntervalMultiplier={attackIntervalMultiplier:F2} baseAttackCooldown={baseAttackCooldown:F2} enemyAttackSpeedMultiplier={enemyAttackSpeedMultiplier:F2} externalAttackCooldownMultiplier={Mathf.Max(1f, attackCooldownMultiplier):F2} finalAttackCooldown={finalAttackCooldown:F2} timeSinceLastAttack={timeSinceLastAttack:F2} timeUntilNextAttack={timeUntilNextAttack:F2} distanceToTarget={distanceToTarget:F2} horizontalDistance={horizontalDistance:F2} verticalDifference={verticalDifference:F2} attackRange={attackRange:F2} maxHorizontalAttackDistance={maxHorizontalAttackDistance:F2} maxVerticalAttackDifference={maxVerticalAttackDifference:F2} requireGroundedToAttack={requireGroundedToAttack} isGrounded={isGrounded} groundedProbeDistance={groundedProbeDistance:F2} isAttacking={isAttacking} isKnockback={isKnockback} isBlocked={isBlocked} isStunned={isStunned} canAttack={canAttack} failReason={(string.IsNullOrEmpty(failReason) ? "None" : failReason)}",
+            this);
     }
 
     private void LogSpeedDiagnostics(
         float statsSpeed,
-        float baseMoveSpeed,
-        float speedMoveMultiplier,
-        float externalMoveMultiplier,
-        float finalMoveSpeed)
+        float distanceToTarget,
+        bool canAttack)
     {
         if (!debugSpeedDiagnostics || Time.time < nextSpeedDiagnosticTime)
         {
@@ -644,46 +731,97 @@ public class EnemyController : MonoBehaviour
 
         nextSpeedDiagnosticTime = Time.time + Mathf.Max(0.1f, debugSpeedLogInterval);
 
+        float speedBonus = Mathf.Max(0f, statsSpeed - 1f);
+        float baseEnemyAttackSpeedMultiplier = BattleStatUtility.EnemyAttackSpeedBaseMultiplier;
+        float extraEnemyAttackSpeedMax = BattleStatUtility.EnemyAttackSpeedExtraMax;
+        float enemyAttackSpeedSoftCap = BattleStatUtility.EnemyAttackSpeedSoftCap;
         float baseAttackCooldown = Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier));
-        float speedCooldownMultiplier = BattleStatUtility.GetCooldownMultiplier(combatStats);
-        float debuffCooldownMultiplier = Mathf.Max(1f, ResolveAttackMultiplier());
-        float finalAttackCooldown = Mathf.Max(0.1f, baseAttackCooldown * speedCooldownMultiplier * debuffCooldownMultiplier);
+        float attackSpeedMultiplier = BattleStatUtility.GetEnemyAttackSpeedMultiplier(combatStats);
+        float externalAttackCooldownMultiplier = Mathf.Max(1f, ResolveAttackMultiplier());
+        float finalAttackCooldown = Mathf.Max(0.1f, baseAttackCooldown / Mathf.Max(0.1f, attackSpeedMultiplier) * externalAttackCooldownMultiplier);
+        float timeSinceLastAttack = lastAttackTime >= 0f ? Mathf.Max(0f, Time.time - lastAttackTime) : -1f;
+        float timeUntilNextAttack = Mathf.Max(0f, nextAttackTime - Time.time);
 
         Debug.Log(
-            $"[SpeedDiag] name={name} stats.speed={statsSpeed:F2} baseMoveSpeed={baseMoveSpeed:F2} speedMoveMultiplier={speedMoveMultiplier:F2} externalMoveMultiplier={externalMoveMultiplier:F2} finalMoveSpeed={finalMoveSpeed:F2} baseAttackCooldown={baseAttackCooldown:F2} speedCooldownMultiplier={speedCooldownMultiplier:F2} finalAttackCooldown={finalAttackCooldown:F2}",
+            $"[EnemyAttackDiag] name={name} speed={statsSpeed:F2} speedBonus={speedBonus:F2} baseEnemyAttackSpeedMultiplier={baseEnemyAttackSpeedMultiplier:F2} extraEnemyAttackSpeedMax={extraEnemyAttackSpeedMax:F2} enemyAttackSpeedSoftCap={enemyAttackSpeedSoftCap:F2} enemyAttackSpeedMultiplier={attackSpeedMultiplier:F2} attackCooldown={attackCooldown:F2} attackIntervalMultiplier={attackIntervalMultiplier:F2} baseAttackCooldown={baseAttackCooldown:F2} externalAttackCooldownMultiplier={externalAttackCooldownMultiplier:F2} finalAttackCooldown={finalAttackCooldown:F2} timeSinceLastAttack={timeSinceLastAttack:F2} timeUntilNextAttack={timeUntilNextAttack:F2} canAttack={canAttack} distanceToTarget={distanceToTarget:F2} attackRange={attackRange:F2}",
             this);
     }
 
-    private bool CanStartAttack(float horizontalDistance, float verticalDifference)
+    private string EvaluateAttackFailReason(float horizontalDistance, float verticalDifference, bool isGrounded)
     {
-        if (horizontalDistance > Mathf.Max(0.1f, attackRange))
+        if (playerTarget == null)
         {
-            return false;
+            return "NoTarget";
+        }
+
+        if (attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking))
+        {
+            return "AnimationBusy";
+        }
+
+        if (Time.time < nextAttackTime)
+        {
+            return "Cooldown";
+        }
+
+        float resolvedAttackRange = Mathf.Max(0.1f, attackRange);
+        float resolvedMaxHorizontalAttackDistance = Mathf.Max(0.1f, maxHorizontalAttackDistance > 0f ? maxHorizontalAttackDistance : resolvedAttackRange);
+        if (horizontalDistance > resolvedMaxHorizontalAttackDistance)
+        {
+            return "TooFarHorizontal";
+        }
+
+        if (horizontalDistance > resolvedAttackRange)
+        {
+            return "TooFarDistance";
         }
 
         if (verticalDifference > Mathf.Max(0f, maxVerticalAttackDifference))
         {
-            return false;
+            return "TooHighVerticalDifference";
         }
 
         if (maxVerticalTargetDifference > 0f && verticalDifference > maxVerticalTargetDifference)
         {
-            return false;
+            return "TooFarDistance";
         }
 
-        if (requireGroundedToAttack && !IsGrounded())
+        if (requireGroundedToAttack && !isGrounded)
         {
-            return false;
+            return "NotGrounded";
         }
 
-        return true;
+        EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
+        if (receiver != null && receiver.GetAttackMultiplier() <= 0f)
+        {
+            return "Blocked";
+        }
+
+        return string.Empty;
     }
 
     private bool IsGrounded()
     {
         float probeDistance = Mathf.Max(0.01f, groundedProbeDistance);
-        Vector3 origin = transform.position + Vector3.up * 0.05f;
-        return Physics.Raycast(origin, Vector3.down, probeDistance + 0.05f, ~0, QueryTriggerInteraction.Ignore);
+        ResolveMeleeHitSources();
+
+        Collider sourceCollider = meleeEnemyCollider != null ? meleeEnemyCollider : GetComponent<Collider>();
+        if (sourceCollider != null)
+        {
+            Bounds bounds = sourceCollider.bounds;
+            Vector3 origin = new Vector3(bounds.center.x, bounds.min.y + 0.05f, bounds.center.z);
+            float radius = Mathf.Clamp(Mathf.Min(bounds.extents.x, bounds.extents.z) * 0.45f, 0.05f, 0.45f);
+            float castDistance = probeDistance + 0.15f;
+            if (Physics.SphereCast(origin, radius, Vector3.down, out _, castDistance, ~0, QueryTriggerInteraction.Ignore))
+            {
+                return true;
+            }
+
+            return Physics.Raycast(origin + Vector3.up * 0.02f, Vector3.down, castDistance, ~0, QueryTriggerInteraction.Ignore);
+        }
+
+        Vector3 fallbackOrigin = transform.position + Vector3.up * 0.05f;
+        return Physics.Raycast(fallbackOrigin, Vector3.down, probeDistance + 0.05f, ~0, QueryTriggerInteraction.Ignore);
     }
 
     private BattleDamageType ResolvePrimaryDamageType()

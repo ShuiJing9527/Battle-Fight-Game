@@ -82,7 +82,6 @@ public static class MonsterCombatAutoSetup
         float specialDefense = Mathf.Max(0f, stats.specialDefense);
         float speed = Mathf.Max(0.1f, stats.speed);
         float luck = Mathf.Max(0f, stats.luck);
-        float moveSpeed = ResolveMoveSpeed(identity, speed);
         float range = 1.2f;
         float hitRange = 1.25f;
         float cooldown = 1.35f;
@@ -142,9 +141,10 @@ public static class MonsterCombatAutoSetup
         EnemyController controller = monster.GetComponent<EnemyController>();
         if (controller != null)
         {
+            float baseMoveSpeed = controller.BaseMoveSpeed > 0f ? controller.BaseMoveSpeed : ResolveMoveSpeed(identity, speed);
             BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
             float attackPower = damageType == BattleDamageType.Physical ? physicalAttack : specialAttack;
-            controller.ConfigureRuntime(moveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
+            controller.ConfigureRuntime(baseMoveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
         }
     }
 

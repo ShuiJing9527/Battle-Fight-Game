@@ -64,7 +64,9 @@ public class RuneRuntimeState : MonoBehaviour
     private float appliedSpecialAttackBonus;
     private float appliedSpecialDefenseBonus;
     private float appliedSpeedBonus;
-    private float appliedLuckBonus;
+    private float appliedLuckRuneBonus;
+    private float appliedAllStatsLuckBonus;
+    private float appliedOtherLuckBonus;
 
     private float appliedMaxManaBonus;
     private float appliedManaRegenBonus;
@@ -832,13 +834,14 @@ public class RuneRuntimeState : MonoBehaviour
             {
                 int lifeAttribute = Mathf.FloorToInt(ResolveOwnerMaxHealth() / 10f);
                 int lifeStatBonus = Mathf.FloorToInt(lifeAttribute * LifeSetAllStatPerTenMaxHealth);
-                ApplyFlatCombatStatBonuses(0f, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus);
+                ApplyFlatCombatStatBonuses(0f, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, 0f);
+                appliedAllStatsLuckBonus += 0f;
             }
 
             int luckCount = GetGlobalRuneCount(RuneType.Luck);
             if (luckCount >= 1)
             {
-                appliedLuckBonus += luckCount >= 5 ? 3f : 1f;
+                appliedLuckRuneBonus += luckCount >= 5 ? 3f : 1f;
             }
         }
 
@@ -871,11 +874,13 @@ public class RuneRuntimeState : MonoBehaviour
             {
                 int manaAttribute = Mathf.FloorToInt(cooldownManager.maxMana / ManaSetAttributeUnit);
                 int manaStatBonus = Mathf.FloorToInt(manaAttribute * ManaSetAllStatPerTenMaxMana * GetManaConversionEfficiency());
-                ApplyFlatCombatStatBonuses(0f, manaStatBonus, manaStatBonus, manaStatBonus, manaStatBonus, manaStatBonus, manaStatBonus);
+                ApplyFlatCombatStatBonuses(0f, manaStatBonus, manaStatBonus, manaStatBonus, manaStatBonus, manaStatBonus, 0f);
+                appliedAllStatsLuckBonus += 0f;
             }
         }
 
         ApplyStoredStatBonuses();
+        LogAttributeDiagnostics();
 
         if (combatHealth != null)
         {
@@ -917,7 +922,7 @@ public class RuneRuntimeState : MonoBehaviour
         appliedSpecialAttackBonus += specialAttackBonus;
         appliedSpecialDefenseBonus += specialDefenseBonus;
         appliedSpeedBonus += speedBonus;
-        appliedLuckBonus += luckBonus;
+        appliedOtherLuckBonus += luckBonus;
     }
 
     private void ApplyStoredStatBonuses()
@@ -933,7 +938,7 @@ public class RuneRuntimeState : MonoBehaviour
         combatStats.specialAttack += appliedSpecialAttackBonus;
         combatStats.specialDefense += appliedSpecialDefenseBonus;
         combatStats.speed += appliedSpeedBonus;
-        combatStats.luck += appliedLuckBonus;
+        combatStats.luck += appliedLuckRuneBonus + appliedAllStatsLuckBonus + appliedOtherLuckBonus;
     }
 
     private void RemoveAppliedStatBonuses()
@@ -946,7 +951,7 @@ public class RuneRuntimeState : MonoBehaviour
             combatStats.specialAttack = Mathf.Max(0f, combatStats.specialAttack - appliedSpecialAttackBonus);
             combatStats.specialDefense = Mathf.Max(0f, combatStats.specialDefense - appliedSpecialDefenseBonus);
             combatStats.speed = Mathf.Max(0f, combatStats.speed - appliedSpeedBonus);
-            combatStats.luck = Mathf.Max(0f, combatStats.luck - appliedLuckBonus);
+            combatStats.luck = Mathf.Max(0f, combatStats.luck - (appliedLuckRuneBonus + appliedAllStatsLuckBonus + appliedOtherLuckBonus));
         }
 
         if (cooldownManager != null)
@@ -963,7 +968,9 @@ public class RuneRuntimeState : MonoBehaviour
         appliedSpecialAttackBonus = 0f;
         appliedSpecialDefenseBonus = 0f;
         appliedSpeedBonus = 0f;
-        appliedLuckBonus = 0f;
+        appliedLuckRuneBonus = 0f;
+        appliedAllStatsLuckBonus = 0f;
+        appliedOtherLuckBonus = 0f;
         appliedMaxManaBonus = 0f;
         appliedManaRegenBonus = 0f;
     }
@@ -1016,6 +1023,93 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         return 0f;
+    }
+
+    private void LogAttributeDiagnostics()
+    {
+        if (combatStats == null)
+        {
+            return;
+        }
+
+        float finalLuck = Mathf.Max(0f, combatStats.luck);
+        float appliedLuckTotal = appliedLuckRuneBonus + appliedAllStatsLuckBonus + appliedOtherLuckBonus;
+        float baseLuck = Mathf.Max(0f, finalLuck - appliedLuckTotal);
+        string equippedRunes = BuildEquippedRuneSummary();
+        Debug.Log(
+            $"[AttributeDiag] character={gameObject.name} baseLuck={baseLuck:F2} luckRuneBonus={appliedLuckRuneBonus:F2} allStatsLuckBonus={appliedAllStatsLuckBonus:F2} otherRuneLuckBonus={appliedOtherLuckBonus:F2} buffLuckBonus=0.00 finalLuck={finalLuck:F2} equippedRunes={equippedRunes}",
+            this);
+    }
+
+    private string BuildEquippedRuneSummary()
+    {
+        if (skillCaster == null)
+        {
+            return "null";
+        }
+
+        List<string> entries = new List<string>();
+        for (int skillIndex = 0; skillIndex < SkillCount; skillIndex++)
+        {
+            BattleSkill skill = skillCaster.TryGetSkillRaw(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            for (int slotIndex = 0; slotIndex < skill.equippedRunes.Length; slotIndex++)
+            {
+                RuneDefinition rune = skill.equippedRunes[slotIndex];
+                if (rune == null)
+                {
+                    continue;
+                }
+
+                entries.Add($"{GetSkillLabel(skillIndex)}:{GetRuneLabel(rune)}");
+            }
+        }
+
+        return entries.Count > 0 ? string.Join("|", entries) : "empty";
+    }
+
+    private string GetSkillLabel(int skillIndex)
+    {
+        if (skillIndex == 0)
+        {
+            return "Q";
+        }
+
+        if (skillIndex == 1)
+        {
+            return "W";
+        }
+
+        if (skillIndex == 2)
+        {
+            return "E";
+        }
+
+        if (skillIndex == 3)
+        {
+            return "R";
+        }
+
+        return $"Skill{skillIndex}";
+    }
+
+    private string GetRuneLabel(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return "Empty";
+        }
+
+        if (!string.IsNullOrWhiteSpace(rune.runeName))
+        {
+            return rune.runeName;
+        }
+
+        return rune.runeId != 0 ? $"id:{rune.runeId}" : rune.ToString();
     }
 
     private int RollRepeatableChance(float baseChance, float efficiencyMultiplier)
