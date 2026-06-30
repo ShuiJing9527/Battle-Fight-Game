@@ -41,6 +41,12 @@ public class RuneUIController : MonoBehaviour
     public TextMeshProUGUI runeTypeText;
     public TextMeshProUGUI runeDescriptionText;
     public TextMeshProUGUI runeEffectText;
+    public RectTransform runeBagViewportRect;
+    public RectTransform runeBagContentRoot;
+    public Scrollbar runeBagScrollbar;
+    public RectTransform detailPanelRoot;
+    public TextMeshProUGUI sharedDescriptionText;
+    public ScrollRect sharedDescriptionScrollRect;
 
     [Header("Skill Slots")]
     public RuneSlotView[] qSlots = new RuneSlotView[SlotsPerSkill];
@@ -81,9 +87,12 @@ public class RuneUIController : MonoBehaviour
     private GameObject attributePanel;
     private TextMeshProUGUI skillDescriptionTitleText;
     private TextMeshProUGUI skillDescriptionBodyText;
+    private RectTransform skillDescriptionBodyViewportRect;
     private TextMeshProUGUI attributePanelTitleText;
     private TextMeshProUGUI attributeFooterText;
     private RuntimeLootDropOnDeath lootDropPreview;
+    private bool isSkillDescriptionHoverActive;
+    private Transform runeButtonTemplate;
 
     public bool IsPanelOpen => IsMainPanelVisible();
 
@@ -99,6 +108,13 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private Vector2 skillDescriptionPanelSize = new Vector2(0f, 150f);
     [SerializeField] private Vector2 skillDescriptionPanelOffset = new Vector2(20f, 60f);
     [SerializeField] private Vector2 skillDescriptionPanelPadding = new Vector2(18f, 18f);
+    [SerializeField, Min(120f)] private float skillDescriptionPanelMaxHeight = 320f;
+    [SerializeField] private Vector2 runeBagItemSpacing = new Vector2(0f, 8f);
+    [SerializeField, Min(1)] private int runeBagColumnCount = 1;
+    [SerializeField] private Vector2 runeBagItemSize = new Vector2(0f, 40f);
+    [SerializeField] private float runeBagContentTopPadding = 0f;
+    [SerializeField] private float runeBagContentBottomPadding = 0f;
+    [SerializeField] private bool hideLegacyRuneDetailPanel = true;
 
     [Header("Attribute Panel")]
     [SerializeField] private Color attributePanelColor = new Color(0.10f, 0.12f, 0.18f, 0.96f);
@@ -134,6 +150,7 @@ public class RuneUIController : MonoBehaviour
         BindCloseButton();
         BindSlotButtons();
         ResolveCurrentPlayerContext();
+        EnsureRuneBagLayoutUI();
         EnsureSkillInfoUI();
         RefreshRuneList();
         RefreshSkillSlots();
@@ -222,6 +239,7 @@ public class RuneUIController : MonoBehaviour
         SetPauseState(true);
         SetOldHudVisible(false);
         ResolveCurrentPlayerContext();
+        EnsureRuneBagLayoutUI();
         EnsureSkillInfoUI();
         RefreshRuneList();
         RefreshSkillSlots();
@@ -254,6 +272,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         ResolveCurrentPlayerContext();
+        EnsureRuneBagLayoutUI();
         if (runeListContent == null)
         {
             if (!warnedMissingRuneList)
@@ -266,9 +285,11 @@ public class RuneUIController : MonoBehaviour
 
         List<RuneDefinition> visibleRunes = BuildVisibleRuneList();
         int runeCount = visibleRunes.Count;
-        int childCount = runeListContent.childCount;
         bool hasRuneEntries = runeCount > 0;
         Dictionary<string, int> visibleRuneIndices = new Dictionary<string, int>();
+        EnsureRuneButtonTemplate();
+        EnsureRuneListItemCount(runeCount);
+        int childCount = runeListContent.childCount;
 
         if (noRuneText != null)
         {
@@ -317,9 +338,43 @@ public class RuneUIController : MonoBehaviour
                 if (capturedRune != null)
                 {
                     button.onClick.AddListener(() => SelectRune(capturedRune));
+                    BindRuneHoverEvents(button, capturedRune);
+                }
+                else
+                {
+                    RemoveRuneHoverEvents(button);
                 }
             }
+
+            RectTransform childRect = child as RectTransform;
+            if (childRect != null)
+            {
+                int columns = Mathf.Max(1, runeBagColumnCount);
+                float spacingX = Mathf.Max(0f, runeBagItemSpacing.x);
+                float spacingY = Mathf.Max(0f, runeBagItemSpacing.y);
+                float itemWidth = runeBagItemSize.x > 0f ? runeBagItemSize.x : childRect.sizeDelta.x;
+                float itemHeight = runeBagItemSize.y > 0f ? runeBagItemSize.y : childRect.sizeDelta.y;
+                childRect.anchorMin = new Vector2(0f, 1f);
+                childRect.anchorMax = new Vector2(columns > 1 ? 0f : 1f, 1f);
+                childRect.pivot = new Vector2(0f, 1f);
+                if (columns > 1)
+                {
+                    childRect.sizeDelta = new Vector2(itemWidth, itemHeight);
+                }
+                else
+                {
+                    childRect.sizeDelta = new Vector2(0f, itemHeight);
+                }
+
+                int column = i % columns;
+                int row = i / columns;
+                float x = column * (itemWidth + spacingX);
+                float y = -runeBagContentTopPadding - row * (itemHeight + spacingY);
+                childRect.anchoredPosition = new Vector2(x, y);
+            }
         }
+
+        UpdateRuneListContentHeight(runeCount);
     }
 
     public void RefreshSkillSlots()
@@ -408,6 +463,10 @@ public class RuneUIController : MonoBehaviour
 
             RuneDefinition rune = GetEquippedRune(skillIndex, i);
             slotView.label.text = rune != null ? GetRuneName(rune) : LabelEmpty;
+            if (slotView.button != null)
+            {
+                BindEquippedSlotHoverEvents(slotView.button, skillIndex, rune);
+            }
         }
     }
 
@@ -444,6 +503,13 @@ public class RuneUIController : MonoBehaviour
         RuneDefinition equippedRune = skill.equippedRunes[slotIndex];
         if (equippedRune != null)
         {
+            if (!RuneMatches(selectedRune, equippedRune))
+            {
+                SetSelectedRune(equippedRune);
+                Debug.Log($"[RuneUI] Selected equipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}", this);
+                return;
+            }
+
             skill.equippedRunes[slotIndex] = null;
             currentSkillCaster.RefreshRuneState();
             RefreshRuneList();
@@ -499,6 +565,213 @@ public class RuneUIController : MonoBehaviour
         }
 
         RefreshSelectedRuneDetails(selectedRune);
+    }
+
+    private void EnsureRuneBagLayoutUI()
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        if (runeBagViewportRect == null)
+        {
+            runeBagViewportRect = FindChildRecursive(mainPanel.transform, "RuneListViewport") as RectTransform;
+        }
+
+        if (runeBagContentRoot == null)
+        {
+            runeBagContentRoot = FindChildRecursive(mainPanel.transform, "RuneListContent") as RectTransform;
+        }
+
+        if (detailPanelRoot == null)
+        {
+            detailPanelRoot = FindChildRecursive(mainPanel.transform, "RuneDetailPanel") as RectTransform;
+        }
+
+        if (runeBagScrollbar == null)
+        {
+            RectTransform bagPanel = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+            if (bagPanel != null)
+            {
+                runeBagScrollbar = bagPanel.GetComponentInChildren<Scrollbar>(true);
+            }
+        }
+
+        if (noRuneText != null && runeBagViewportRect != null && noRuneText.transform.parent != runeBagViewportRect)
+        {
+            noRuneText.transform.SetParent(runeBagViewportRect, false);
+        }
+
+        if (hideLegacyRuneDetailPanel && detailPanelRoot != null)
+        {
+            detailPanelRoot.gameObject.SetActive(false);
+        }
+
+        if (runeBagViewportRect == null || runeBagContentRoot == null)
+        {
+            return;
+        }
+
+        ScrollRect scrollRect = null;
+        RectTransform bagPanelRect = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+        if (bagPanelRect != null)
+        {
+            scrollRect = bagPanelRect.GetComponent<ScrollRect>();
+        }
+
+        if (scrollRect == null)
+        {
+            scrollRect = runeBagViewportRect.GetComponentInParent<ScrollRect>();
+        }
+
+        if (scrollRect != null)
+        {
+            scrollRect.viewport = runeBagViewportRect;
+            scrollRect.content = runeBagContentRoot;
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            if (runeBagScrollbar != null)
+            {
+                scrollRect.verticalScrollbar = runeBagScrollbar;
+                scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                runeBagScrollbar.direction = Scrollbar.Direction.BottomToTop;
+            }
+        }
+    }
+
+    private void EnsureRuneButtonTemplate()
+    {
+        if (runeButtonTemplate != null || runeListContent == null || runeListContent.childCount <= 0)
+        {
+            return;
+        }
+
+        runeButtonTemplate = runeListContent.GetChild(0);
+    }
+
+    private void EnsureRuneListItemCount(int requiredCount)
+    {
+        if (runeListContent == null || runeButtonTemplate == null)
+        {
+            return;
+        }
+
+        while (runeListContent.childCount < requiredCount)
+        {
+            Transform clone = Object.Instantiate(runeButtonTemplate, runeListContent);
+            clone.name = $"RuneItem{runeListContent.childCount}";
+            clone.gameObject.SetActive(true);
+        }
+    }
+
+    private void UpdateRuneListContentHeight(int runeCount)
+    {
+        if (runeBagContentRoot == null)
+        {
+            return;
+        }
+
+        float itemHeight = runeBagItemSize.y > 0f
+            ? runeBagItemSize.y
+            : ResolveTemplateItemHeight();
+        int columns = Mathf.Max(1, runeBagColumnCount);
+        int rows = Mathf.Max(1, Mathf.CeilToInt(runeCount / (float)columns));
+        float contentHeight = runeBagContentTopPadding
+            + rows * itemHeight
+            + Mathf.Max(0, rows - 1) * Mathf.Max(0f, runeBagItemSpacing.y)
+            + runeBagContentBottomPadding;
+        runeBagContentRoot.sizeDelta = new Vector2(runeBagContentRoot.sizeDelta.x, contentHeight);
+    }
+
+    private float ResolveTemplateItemHeight()
+    {
+        if (runeButtonTemplate is RectTransform rectTransform)
+        {
+            return Mathf.Max(1f, rectTransform.sizeDelta.y);
+        }
+
+        return 40f;
+    }
+
+    private void BindRuneHoverEvents(Button button, RuneDefinition rune)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EventTrigger trigger = button.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = button.gameObject.AddComponent<EventTrigger>();
+        }
+
+        if (trigger.triggers == null)
+        {
+            trigger.triggers = new List<EventTrigger.Entry>();
+        }
+        else
+        {
+            trigger.triggers.Clear();
+        }
+
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enterEntry.callback.AddListener(_ => ShowRuneDescription(rune));
+        trigger.triggers.Add(enterEntry);
+
+        EventTrigger.Entry exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exitEntry.callback.AddListener(_ => RestoreSharedDescription());
+        trigger.triggers.Add(exitEntry);
+    }
+
+    private void RemoveRuneHoverEvents(Button button)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EventTrigger trigger = button.GetComponent<EventTrigger>();
+        if (trigger != null && trigger.triggers != null)
+        {
+            trigger.triggers.Clear();
+        }
+    }
+
+    private void BindEquippedSlotHoverEvents(Button button, int skillIndex, RuneDefinition rune)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        EventTrigger trigger = button.GetComponent<EventTrigger>();
+        if (trigger == null)
+        {
+            trigger = button.gameObject.AddComponent<EventTrigger>();
+        }
+
+        if (trigger.triggers == null)
+        {
+            trigger.triggers = new List<EventTrigger.Entry>();
+        }
+        else
+        {
+            trigger.triggers.Clear();
+        }
+
+        RuneDefinition capturedRune = rune;
+        int capturedSkillIndex = skillIndex;
+
+        EventTrigger.Entry enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enterEntry.callback.AddListener(_ => ShowEquippedSlotDescription(capturedSkillIndex, capturedRune));
+        trigger.triggers.Add(enterEntry);
+
+        EventTrigger.Entry exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exitEntry.callback.AddListener(_ => RestoreSharedDescription());
+        trigger.triggers.Add(exitEntry);
     }
 
     private void ResolveCurrentPlayerContext()
@@ -763,46 +1036,139 @@ public class RuneUIController : MonoBehaviour
 
             if (runeTypeText != null)
             {
-                runeTypeText.text = LabelTypePlaceholder;
+                runeTypeText.text = string.Empty;
             }
 
             if (runeDescriptionText != null)
             {
-                runeDescriptionText.text = LabelDescriptionPlaceholder;
+                runeDescriptionText.text = string.Empty;
             }
 
             if (runeEffectText != null)
             {
-                runeEffectText.text = LabelEffectPlaceholder;
+                runeEffectText.text = string.Empty;
             }
 
+            RestoreSharedDescription();
             return;
         }
 
         if (runeNameText != null)
         {
-            runeNameText.text = $"Rune Name: {GetRuneName(rune)}";
+            runeNameText.text = $"Selected Rune: {GetRuneName(rune)}";
         }
 
         if (runeTypeText != null)
         {
-            string rarityText = rune.rarity.ToString();
-            string typeText = rune.GetTypeDisplayName();
-            runeTypeText.text = $"Type: {typeText} / {rarityText}";
+            runeTypeText.text = string.Empty;
         }
 
         if (runeDescriptionText != null)
         {
-            string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : rune.description.Trim();
-            runeDescriptionText.text = $"Description: {description}";
+            runeDescriptionText.text = string.Empty;
         }
 
         if (runeEffectText != null)
         {
-            string effectText = rune.GetFullEffectDescription();
-            runeEffectText.text = string.IsNullOrWhiteSpace(effectText)
-                ? $"ID: {rune.runeId}"
-                : $"ID: {rune.runeId}\n{effectText}";
+            runeEffectText.text = string.Empty;
+        }
+
+        ShowRuneDescription(rune);
+    }
+
+    private void ShowRuneDescription(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            RestoreSharedDescription();
+            return;
+        }
+
+        string rarityText = rune.rarity.ToString();
+        string typeText = rune.GetTypeDisplayName();
+        string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : rune.description.Trim();
+        string effectText = rune.GetFullEffectDescription();
+        string body = $"Type: {typeText} / {rarityText}\n\nDescription:\n{description}\n\nEffect:\n{(string.IsNullOrWhiteSpace(effectText) ? $"ID: {rune.runeId}" : effectText)}";
+        ShowSharedDescription($"Rune Name: {GetRuneName(rune)}", body, false);
+    }
+
+    private void ShowEquippedSlotDescription(int skillIndex, RuneDefinition rune)
+    {
+        if (rune != null)
+        {
+            ShowRuneDescription(rune);
+            return;
+        }
+
+        ShowSkillDescriptionByKey(GetSkillKeyName(skillIndex), ResolveCurrentPlayerIndex());
+    }
+
+    private void ShowSharedDescription(string title, string body, bool skillHover)
+    {
+        EnsureSkillDescriptionPanel();
+        if (skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
+        {
+            return;
+        }
+
+        isSkillDescriptionHoverActive = skillHover;
+        skillDescriptionTitleText.text = title ?? string.Empty;
+        skillDescriptionBodyText.text = body ?? string.Empty;
+        RefreshSkillDescriptionPanelHeight();
+        skillDescriptionPanel.SetActive(true);
+        if (sharedDescriptionScrollRect != null)
+        {
+            Canvas.ForceUpdateCanvases();
+            sharedDescriptionScrollRect.verticalNormalizedPosition = 1f;
+        }
+    }
+
+    private void ShowSkillDescriptionByKey(string key, int playerIndex)
+    {
+        string normalizedKey = (key ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(normalizedKey))
+        {
+            return;
+        }
+
+        SkillUIDefinitionEntry entry = SkillUIDefinitionDatabase.Get(playerIndex, normalizedKey);
+        if (entry == null)
+        {
+            return;
+        }
+
+        ShowSharedDescription(
+            string.IsNullOrWhiteSpace(entry.displayName) ? normalizedKey : entry.displayName,
+            SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
+            true);
+    }
+
+    private void RestoreSharedDescription()
+    {
+        if (isSkillDescriptionHoverActive)
+        {
+            isSkillDescriptionHoverActive = false;
+        }
+
+        if (selectedRune != null)
+        {
+            ShowRuneDescription(selectedRune);
+            return;
+        }
+
+        if (skillDescriptionPanel != null)
+        {
+            skillDescriptionPanel.SetActive(false);
+        }
+
+        if (skillDescriptionTitleText != null)
+        {
+            skillDescriptionTitleText.text = string.Empty;
+        }
+
+        if (skillDescriptionBodyText != null)
+        {
+            skillDescriptionBodyText.text = string.Empty;
         }
     }
 
@@ -926,7 +1292,7 @@ public class RuneUIController : MonoBehaviour
 
         if (skillDescriptionPanel != null)
         {
-            ApplySkillDescriptionPanelLayout(skillDescriptionPanel.transform as RectTransform);
+            EnsureSkillDescriptionScrollSetup();
             return;
         }
 
@@ -936,8 +1302,11 @@ public class RuneUIController : MonoBehaviour
             skillDescriptionPanel = existing.gameObject;
             skillDescriptionTitleText = existing.Find("Title")?.GetComponent<TextMeshProUGUI>();
             skillDescriptionBodyText = existing.Find("Body")?.GetComponent<TextMeshProUGUI>();
-            ApplySkillDescriptionPanelLayout(existing as RectTransform);
-            ApplySkillDescriptionTextLayout();
+            if (skillDescriptionBodyText == null)
+            {
+                skillDescriptionBodyText = existing.Find("BodyViewport/Body")?.GetComponent<TextMeshProUGUI>();
+            }
+            EnsureSkillDescriptionScrollSetup();
             skillDescriptionPanel.SetActive(false);
             return;
         }
@@ -968,10 +1337,11 @@ public class RuneUIController : MonoBehaviour
         skillDescriptionBodyText.fontSize = 18f;
         skillDescriptionBodyText.alignment = TextAlignmentOptions.TopLeft;
         skillDescriptionBodyText.enableWordWrapping = true;
-        skillDescriptionBodyText.overflowMode = TextOverflowModes.Overflow;
+        skillDescriptionBodyText.overflowMode = TextOverflowModes.Masking;
         skillDescriptionBodyText.text = string.Empty;
 
         skillDescriptionPanel = panel;
+        EnsureSkillDescriptionScrollSetup();
         ApplySkillDescriptionTextLayout();
         skillDescriptionPanel.SetActive(false);
     }
@@ -1253,12 +1623,58 @@ public class RuneUIController : MonoBehaviour
             skillDescriptionPanelOffset.y);
     }
 
+    private void EnsureSkillDescriptionScrollSetup()
+    {
+        if (skillDescriptionPanel == null || skillDescriptionBodyText == null)
+        {
+            return;
+        }
+
+        if (sharedDescriptionScrollRect == null)
+        {
+            sharedDescriptionScrollRect = skillDescriptionPanel.GetComponent<ScrollRect>();
+        }
+
+        Transform viewportTransform = skillDescriptionPanel.transform.Find("BodyViewport");
+        if (viewportTransform == null)
+        {
+            return;
+        }
+
+        skillDescriptionBodyViewportRect = viewportTransform as RectTransform;
+        if (skillDescriptionBodyText.transform.parent != viewportTransform)
+        {
+            skillDescriptionBodyText.transform.SetParent(viewportTransform, false);
+        }
+
+        sharedDescriptionText = skillDescriptionBodyText;
+        if (sharedDescriptionScrollRect != null)
+        {
+            sharedDescriptionScrollRect.viewport = skillDescriptionBodyViewportRect;
+            sharedDescriptionScrollRect.content = skillDescriptionBodyText.rectTransform;
+            sharedDescriptionScrollRect.horizontal = false;
+            sharedDescriptionScrollRect.vertical = true;
+            sharedDescriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            sharedDescriptionScrollRect.scrollSensitivity = 24f;
+
+            Scrollbar existingScrollbar = skillDescriptionPanel.GetComponentInChildren<Scrollbar>(true);
+            if (existingScrollbar != null)
+            {
+                sharedDescriptionScrollRect.verticalScrollbar = existingScrollbar;
+                sharedDescriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                existingScrollbar.direction = Scrollbar.Direction.BottomToTop;
+            }
+        }
+    }
+
     private void RefreshSkillDescriptionPanelHeight()
     {
         if (skillDescriptionPanel == null)
         {
             return;
         }
+
+        EnsureSkillDescriptionScrollSetup();
 
         RectTransform panelRect = skillDescriptionPanel.transform as RectTransform;
         if (panelRect == null)
@@ -1290,6 +1706,7 @@ public class RuneUIController : MonoBehaviour
         float titleBodySpacing = titleHeight > 0f && bodyHeight > 0f ? 14f : 0f;
         float calculatedTextHeight = titleHeight + titleBodySpacing + bodyHeight;
         float finalHeight = Mathf.Max(skillDescriptionPanelSize.y, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
+        finalHeight = Mathf.Min(finalHeight, Mathf.Max(skillDescriptionPanelSize.y, skillDescriptionPanelMaxHeight));
         panelRect.sizeDelta = new Vector2(panelWidth, finalHeight);
 
         ApplySkillDescriptionTextLayout();
@@ -1310,10 +1727,23 @@ public class RuneUIController : MonoBehaviour
         if (skillDescriptionBodyText != null)
         {
             RectTransform bodyRect = skillDescriptionBodyText.rectTransform;
-            bodyRect.anchorMin = new Vector2(0f, 0f);
+            bodyRect.anchorMin = new Vector2(0f, 1f);
             bodyRect.anchorMax = new Vector2(1f, 1f);
-            bodyRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, skillDescriptionPanelPadding.y);
-            bodyRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, -46f);
+            bodyRect.pivot = new Vector2(0.5f, 1f);
+            float viewportWidth = skillDescriptionBodyViewportRect != null
+                ? Mathf.Max(40f, skillDescriptionBodyViewportRect.rect.width - (skillDescriptionPanelPadding.x * 2f))
+                : 200f;
+            float preferredHeight = skillDescriptionBodyText.GetPreferredValues(skillDescriptionBodyText.text, viewportWidth, Mathf.Infinity).y;
+            bodyRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, 0f);
+            bodyRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, 0f);
+            bodyRect.sizeDelta = new Vector2(0f, Mathf.Max(preferredHeight, 10f));
+            bodyRect.anchoredPosition = new Vector2(0f, -skillDescriptionPanelPadding.y);
+        }
+
+        if (skillDescriptionBodyViewportRect != null)
+        {
+            skillDescriptionBodyViewportRect.offsetMin = new Vector2(0f, skillDescriptionPanelPadding.y);
+            skillDescriptionBodyViewportRect.offsetMax = new Vector2(0f, -46f);
         }
     }
 
@@ -1635,16 +2065,7 @@ public class RuneUIController : MonoBehaviour
             highlight.gameObject.SetActive(true);
         }
 
-        SkillUIDefinitionEntry entry = SkillUIDefinitionDatabase.Get(trigger.playerIndex, key);
-        if (entry == null || skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
-        {
-            return;
-        }
-
-        skillDescriptionTitleText.text = string.IsNullOrWhiteSpace(entry.displayName) ? key : entry.displayName;
-        skillDescriptionBodyText.text = SkillUIDefinitionDatabase.BuildDetailBodyText(entry);
-        RefreshSkillDescriptionPanelHeight();
-        skillDescriptionPanel.SetActive(true);
+        ShowSkillDescriptionByKey(key, trigger.playerIndex);
     }
 
     private void HandleRuneSkillHoverExit(SkillHoverTrigger trigger)
@@ -1661,22 +2082,8 @@ public class RuneUIController : MonoBehaviour
             highlight.gameObject.SetActive(false);
         }
 
-        if (skillDescriptionPanel != null)
-        {
-            skillDescriptionPanel.SetActive(false);
-        }
-
-        if (skillDescriptionTitleText != null)
-        {
-            skillDescriptionTitleText.text = string.Empty;
-        }
-
-        if (skillDescriptionBodyText != null)
-        {
-            skillDescriptionBodyText.text = string.Empty;
-        }
-
-        RefreshSkillDescriptionPanelHeight();
+        isSkillDescriptionHoverActive = false;
+        RestoreSharedDescription();
     }
 
     private int ResolveCurrentPlayerIndex()
