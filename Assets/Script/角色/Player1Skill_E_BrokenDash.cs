@@ -51,7 +51,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private PlayerMovement cachedMovement;
     private float cachedOriginalMoveSpeed = -1f;
     private readonly Dictionary<int, bool> cachedTerrainCollisionStates = new Dictionary<int, bool>();
-    private readonly Dictionary<int, bool> cachedEnemyCollisionStates = new Dictionary<int, bool>();
+    private readonly List<IgnoredColliderPair> ignoredEnemyCollisionPairs = new List<IgnoredColliderPair>();
+    private readonly HashSet<long> ignoredEnemyCollisionPairKeys = new HashSet<long>();
     private CombatHealth cachedCombatHealth;
     private Rigidbody cachedRigidbody;
     private RigidbodyConstraints cachedRigidbodyConstraints;
@@ -167,6 +168,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 nextHealTickTime += Mathf.Max(0.01f, eHealTickInterval);
             }
             elapsed += Time.deltaTime;
+            RefreshEnemyCollisionIgnores();
             EnforceGroundSafetyLock();
             yield return null;
         }
@@ -270,7 +272,14 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             return;
         }
 
-        ApplyLayerCollisionIgnore(enable, enemyCollisionLayers, cachedEnemyCollisionStates, "[E - BrokenDash] Enemy layer mask is empty, skipping enemy collision ignore.");
+        if (enable)
+        {
+            RefreshEnemyCollisionIgnores();
+        }
+        else
+        {
+            RestoreEnemyCollisionIgnores();
+        }
     }
 
     private void ApplyLayerCollisionIgnore(bool enable, LayerMask layerMask, Dictionary<int, bool> cache, string emptyMaskWarning)
@@ -325,6 +334,158 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         cachedCombatHealth?.Heal(eHealPerTick);
+    }
+
+    private void RefreshEnemyCollisionIgnores()
+    {
+        if (!IsRunningBoost || !eIgnoreEnemyCollision)
+        {
+            return;
+        }
+
+        Collider[] playerColliders = GetComponentsInChildren<Collider>(true);
+        if (playerColliders == null || playerColliders.Length == 0)
+        {
+            return;
+        }
+
+        HashSet<Collider> monsterColliders = new HashSet<Collider>();
+        MonsterIdentity[] identities = Object.FindObjectsOfType<MonsterIdentity>(true);
+        for (int i = 0; i < identities.Length; i++)
+        {
+            CollectMonsterColliders(identities[i], monsterColliders);
+        }
+
+        EnemyController[] enemies = Object.FindObjectsOfType<EnemyController>(true);
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            CollectMonsterColliders(enemies[i], monsterColliders);
+        }
+
+        foreach (Collider playerCollider in playerColliders)
+        {
+            if (!IsUsablePhysicalCollider(playerCollider))
+            {
+                continue;
+            }
+
+            foreach (Collider monsterCollider in monsterColliders)
+            {
+                if (!IsUsablePhysicalCollider(monsterCollider))
+                {
+                    continue;
+                }
+
+                if (monsterCollider.transform.IsChildOf(transform))
+                {
+                    continue;
+                }
+
+                if (!IsLayerIncluded(enemyCollisionLayers, monsterCollider.gameObject.layer))
+                {
+                    continue;
+                }
+
+                AddIgnoredEnemyCollisionPair(playerCollider, monsterCollider);
+            }
+        }
+    }
+
+    private void CollectMonsterColliders(Component monsterComponent, HashSet<Collider> output)
+    {
+        if (monsterComponent == null || output == null)
+        {
+            return;
+        }
+
+        if (!BattleTargetUtility.IsMonster(monsterComponent.gameObject))
+        {
+            return;
+        }
+
+        Collider[] colliders = monsterComponent.GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (IsUsablePhysicalCollider(collider))
+            {
+                output.Add(collider);
+            }
+        }
+    }
+
+    private void AddIgnoredEnemyCollisionPair(Collider playerCollider, Collider monsterCollider)
+    {
+        long key = GetColliderPairKey(playerCollider, monsterCollider);
+        if (!ignoredEnemyCollisionPairKeys.Add(key))
+        {
+            return;
+        }
+
+        bool originalState = Physics.GetIgnoreCollision(playerCollider, monsterCollider);
+        if (!originalState)
+        {
+            Physics.IgnoreCollision(playerCollider, monsterCollider, true);
+        }
+
+        ignoredEnemyCollisionPairs.Add(new IgnoredColliderPair(playerCollider, monsterCollider, originalState));
+    }
+
+    private void RestoreEnemyCollisionIgnores()
+    {
+        for (int i = ignoredEnemyCollisionPairs.Count - 1; i >= 0; i--)
+        {
+            IgnoredColliderPair pair = ignoredEnemyCollisionPairs[i];
+            if (pair.playerCollider != null && pair.monsterCollider != null)
+            {
+                Physics.IgnoreCollision(pair.playerCollider, pair.monsterCollider, pair.originalIgnored);
+            }
+        }
+
+        ignoredEnemyCollisionPairs.Clear();
+        ignoredEnemyCollisionPairKeys.Clear();
+    }
+
+    private static bool IsUsablePhysicalCollider(Collider collider)
+    {
+        return collider != null &&
+               collider.enabled &&
+               collider.gameObject.activeInHierarchy &&
+               !collider.isTrigger;
+    }
+
+    private static bool IsLayerIncluded(LayerMask mask, int layer)
+    {
+        int maskValue = mask.value;
+        return maskValue != 0 && (maskValue & (1 << layer)) != 0;
+    }
+
+    private static long GetColliderPairKey(Collider a, Collider b)
+    {
+        int aId = a.GetInstanceID();
+        int bId = b.GetInstanceID();
+        if (aId > bId)
+        {
+            int temp = aId;
+            aId = bId;
+            bId = temp;
+        }
+
+        return ((long)(uint)aId << 32) | (uint)bId;
+    }
+
+    private readonly struct IgnoredColliderPair
+    {
+        public readonly Collider playerCollider;
+        public readonly Collider monsterCollider;
+        public readonly bool originalIgnored;
+
+        public IgnoredColliderPair(Collider playerCollider, Collider monsterCollider, bool originalIgnored)
+        {
+            this.playerCollider = playerCollider;
+            this.monsterCollider = monsterCollider;
+            this.originalIgnored = originalIgnored;
+        }
     }
 
     private void BeginGroundSafetyLock()
