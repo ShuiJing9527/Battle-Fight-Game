@@ -44,6 +44,7 @@ public class Player01SkillController : MonoBehaviour
     private bool skillFacingLocked;
     private int lockedFacingScaleX = 1;
     private bool skillMovementFrozen;
+    private bool movementInputLocked;
     private float frozenMoveSpeed = -1f;
     private int lastFacingLockLogFrame = -1;
     private bool manaRegenMatchedToPlayer02Standard;
@@ -320,10 +321,15 @@ public class Player01SkillController : MonoBehaviour
 
     public bool TryPlayLockedSkillAnimation(string animationName, bool loop, float lockDuration)
     {
-        return TryPlayLockedSkillAnimation(animationName, loop, lockDuration, false, "Skill");
+        return PlayLockedSkillAnimationEntry(animationName, loop, lockDuration, false, "Skill") != null;
     }
 
     public bool TryPlayLockedSkillAnimation(string animationName, bool loop, float lockDuration, bool forceRestart, string source)
+    {
+        return PlayLockedSkillAnimationEntry(animationName, loop, lockDuration, forceRestart, source) != null;
+    }
+
+    public TrackEntry PlayLockedSkillAnimationEntry(string animationName, bool loop, float lockDuration, bool forceRestart, string source)
     {
         LockSkillAnimation(lockDuration);
 
@@ -331,19 +337,19 @@ public class Player01SkillController : MonoBehaviour
         if (spine == null || spine.Skeleton == null || spine.AnimationState == null)
         {
             Debug.LogWarning($"[{source}] Cannot play '{animationName}' because SkeletonAnimation is missing on {name}.", this);
-            return false;
+            return null;
         }
 
         if (string.IsNullOrWhiteSpace(animationName))
         {
             Debug.LogWarning($"[{source}] Cannot play empty animation name.", this);
-            return false;
+            return null;
         }
 
         if (spine.Skeleton.Data == null || spine.Skeleton.Data.FindAnimation(animationName) == null)
         {
             Debug.LogWarning($"[{source}] Missing Spine animation '{animationName}' on {name}.", this);
-            return false;
+            return null;
         }
 
         if (forceRestart)
@@ -355,7 +361,7 @@ public class Player01SkillController : MonoBehaviour
         if (entry == null)
         {
             Debug.LogWarning($"[{source}] Failed to play '{animationName}'.", this);
-            return false;
+            return null;
         }
 
         if (forceRestart)
@@ -365,7 +371,7 @@ public class Player01SkillController : MonoBehaviour
         }
 
         Debug.Log($"[{source}] AnimationName after set = {spine.AnimationName}", this);
-        return true;
+        return entry;
     }
 
     public void ClearSkillAnimationLock()
@@ -375,6 +381,32 @@ public class Player01SkillController : MonoBehaviour
         skillFacingLocked = false;
         lastFacingLockLogFrame = -1;
         RestoreMovementAfterSkillLock();
+    }
+
+    public void SetMovementInputLocked(bool locked, string logLabel = "Player01")
+    {
+        if (cachedMovement == null)
+        {
+            cachedMovement = GetComponent<PlayerMovement>();
+        }
+
+        bool changed = movementInputLocked != locked;
+        movementInputLocked = locked;
+        Debug.Log($"[Player01 Q Lock] SetMovementInputLocked({locked}) on {name}", this);
+        if (cachedMovement != null)
+        {
+            cachedMovement.SetMovementInputLocked(locked);
+        }
+
+        if (changed)
+        {
+            Debug.Log($"{logLabel}移动锁：{(locked ? "开启" : "关闭")}", this);
+        }
+    }
+
+    public bool IsMovementInputLocked()
+    {
+        return movementInputLocked;
     }
 
     private void CacheReferences()
@@ -629,6 +661,18 @@ public class Player01SkillController : MonoBehaviour
 
         frozenMoveSpeed = -1f;
         skillMovementFrozen = false;
+    }
+
+    private void OnDisable()
+    {
+        SetMovementInputLocked(false, "Player01 Q");
+        ClearSkillAnimationLock();
+        currentSkill = null;
+    }
+
+    private void OnDestroy()
+    {
+        SetMovementInputLocked(false, "Player01 Q");
     }
 
     private void TryCastSkillFromInput(string keyLabel, Player01SkillBase skill)

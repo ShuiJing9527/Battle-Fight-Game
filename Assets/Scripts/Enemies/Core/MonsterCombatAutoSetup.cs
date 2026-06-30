@@ -83,9 +83,16 @@ public static class MonsterCombatAutoSetup
         float speed = Mathf.Max(0.1f, stats.speed);
         float luck = Mathf.Max(0f, stats.luck);
         float moveSpeed = ResolveMoveSpeed(identity, speed);
-        float range = 1.35f;
-        float hitRange = 1.6f;
-        float cooldown = 1.1f;
+        float range = 1.2f;
+        float hitRange = 1.25f;
+        float cooldown = 1.35f;
+
+        if (identity.species == MonsterSpecies.BlueSlime)
+        {
+            range = 1.1f;
+            hitRange = 1.15f;
+            cooldown = 1.45f;
+        }
 
         if (identity.rank == MonsterRank.Elite)
         {
@@ -159,8 +166,15 @@ public static class MonsterCombatAutoSetup
 
     private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
     {
+        if (statSpeed > 0f)
+        {
+            return Mathf.Max(0.1f, statSpeed);
+        }
+
         switch (identity.species)
         {
+            case MonsterSpecies.BlueSlime:
+                return 2.2f;
             case MonsterSpecies.GreenSlime:
                 return 2.9f;
             case MonsterSpecies.LavaSlime:

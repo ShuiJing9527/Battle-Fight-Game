@@ -561,9 +561,15 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        float range = 1.35f;
-        float hitRange = 1.6f;
-        float cooldown = 1.1f;
+        float range = 1.2f;
+        float hitRange = 1.25f;
+        float cooldown = 1.35f;
+        if (identity.species == MonsterSpecies.BlueSlime)
+        {
+            range = 1.1f;
+            hitRange = 1.15f;
+            cooldown = 1.45f;
+        }
         if (identity.rank == MonsterRank.Elite)
         {
             range = 5f;
@@ -595,6 +601,11 @@ public class EnemySpawner : MonoBehaviour
 
     private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
     {
+        if (statSpeed > 0f)
+        {
+            return Mathf.Max(0.1f, statSpeed);
+        }
+
         if (identity == null)
         {
             return Mathf.Max(0.1f, statSpeed);
@@ -602,6 +613,8 @@ public class EnemySpawner : MonoBehaviour
 
         switch (identity.species)
         {
+            case MonsterSpecies.BlueSlime:
+                return 2.2f;
             case MonsterSpecies.GreenSlime:
                 return 2.9f;
             case MonsterSpecies.LavaSlime:
