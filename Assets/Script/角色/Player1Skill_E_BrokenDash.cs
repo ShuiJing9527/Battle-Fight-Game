@@ -30,6 +30,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField] private LayerMask terrainCollisionLayers = 1 << 3;
     [SerializeField] private LayerMask enemyCollisionLayers = ~0;
 
+    [Header("E - Fall Protection")]
+    [SerializeField] private bool ePreventFallThroughGround = true;
+    [SerializeField] private bool eLockYPositionDuringGhost = true;
+
     [Header("E - Ghost Visual")]
     [SerializeField] private Player01GhostStateVisual eGhostStateVisual;
     [SerializeField] private bool eEnableGhostStateVisual = true;
@@ -49,6 +53,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private readonly Dictionary<int, bool> cachedTerrainCollisionStates = new Dictionary<int, bool>();
     private readonly Dictionary<int, bool> cachedEnemyCollisionStates = new Dictionary<int, bool>();
     private CombatHealth cachedCombatHealth;
+    private Rigidbody cachedRigidbody;
+    private RigidbodyConstraints cachedRigidbodyConstraints;
+    private float cachedGhostStartY;
+    private bool hasGroundSafetyLock;
 
     private void Reset()
     {
@@ -66,6 +74,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         eIgnoreTerrainCollision = true;
         eIgnoreEnemyCollision = true;
         eImmuneToMonsterPhysicalDamage = true;
+        ePreventFallThroughGround = true;
+        eLockYPositionDuringGhost = true;
         terrainCollisionLayers = 1 << 3;
         enemyCollisionLayers = ~0;
         SyncEStateConfig();
@@ -127,6 +137,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         IsRunningBoost = true;
         SyncEStateConfig();
+        BeginGroundSafetyLock();
         ApplySpeedBoost();
         ApplyTerrainCollisionIgnore(true);
         ApplyEnemyCollisionIgnore(true);
@@ -156,6 +167,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                 nextHealTickTime += Mathf.Max(0.01f, eHealTickInterval);
             }
             elapsed += Time.deltaTime;
+            EnforceGroundSafetyLock();
             yield return null;
         }
 
@@ -169,6 +181,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         RestoreSpeed();
         ApplyTerrainCollisionIgnore(false);
         ApplyEnemyCollisionIgnore(false);
+        EndGroundSafetyLock();
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
@@ -234,6 +247,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         if (!eIgnoreTerrainCollision)
         {
+            return;
+        }
+
+        if (ePreventFallThroughGround)
+        {
+            if (debugLog && enable)
+            {
+                Debug.Log("[E - BrokenDash] Terrain collision ignore skipped by fall protection. Enemy collision ignore still applies.", this);
+            }
+
             return;
         }
 
@@ -304,6 +327,71 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         cachedCombatHealth?.Heal(eHealPerTick);
     }
 
+    private void BeginGroundSafetyLock()
+    {
+        if (!ePreventFallThroughGround || !eLockYPositionDuringGhost)
+        {
+            hasGroundSafetyLock = false;
+            return;
+        }
+
+        if (cachedRigidbody == null)
+        {
+            cachedRigidbody = GetComponent<Rigidbody>();
+        }
+
+        cachedGhostStartY = transform.position.y;
+        hasGroundSafetyLock = true;
+
+        if (cachedRigidbody == null)
+        {
+            return;
+        }
+
+        cachedRigidbodyConstraints = cachedRigidbody.constraints;
+        cachedRigidbody.constraints = cachedRigidbodyConstraints | RigidbodyConstraints.FreezePositionY;
+        cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        cachedRigidbody.angularVelocity = Vector3.zero;
+    }
+
+    private void EnforceGroundSafetyLock()
+    {
+        if (!hasGroundSafetyLock || !ePreventFallThroughGround || !eLockYPositionDuringGhost)
+        {
+            return;
+        }
+
+        Vector3 position = transform.position;
+        if (!Mathf.Approximately(position.y, cachedGhostStartY))
+        {
+            position.y = cachedGhostStartY;
+            transform.position = position;
+        }
+
+        if (cachedRigidbody != null)
+        {
+            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        }
+    }
+
+    private void EndGroundSafetyLock()
+    {
+        if (!hasGroundSafetyLock)
+        {
+            return;
+        }
+
+        EnforceGroundSafetyLock();
+
+        if (cachedRigidbody != null)
+        {
+            cachedRigidbody.constraints = cachedRigidbodyConstraints;
+            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        }
+
+        hasGroundSafetyLock = false;
+    }
+
 
     protected override void OnDisable()
     {
@@ -311,6 +399,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         RestoreSpeed();
         ApplyTerrainCollisionIgnore(false);
         ApplyEnemyCollisionIgnore(false);
+        EndGroundSafetyLock();
         IsRunningBoost = false;
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
@@ -323,6 +412,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         RestoreSpeed();
         ApplyTerrainCollisionIgnore(false);
         ApplyEnemyCollisionIgnore(false);
+        EndGroundSafetyLock();
         IsRunningBoost = false;
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
