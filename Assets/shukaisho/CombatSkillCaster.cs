@@ -122,6 +122,7 @@ public class CombatSkillCaster : MonoBehaviour
             return false;
         }
 
+        runeRuntimeState?.PrepareManaBurstForSkillCast(skillIndex, skill.energyCost);
         runeRuntimeState?.NotifySkillCastStarted(skillIndex);
         ExecuteSkill(skill, skillIndex);
         return true;

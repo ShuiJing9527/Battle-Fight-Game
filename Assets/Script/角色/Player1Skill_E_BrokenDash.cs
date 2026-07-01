@@ -7,18 +7,16 @@ using UnityEngine.Serialization;
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
     [Header("E - 灵体疾行 / 核心参数")]
-    [FormerlySerializedAs("cooldown")]
     [SerializeField, Min(0f)] private float eCooldown = 10f;
-    [FormerlySerializedAs("duration")]
-    [SerializeField, Min(0f)] private float eDuration = 4f;
+    [SerializeField, Min(0f)] private float eDuration = 3f;
     [SerializeField, Min(0f)] private float eManaCost = 30f;
 
     [Header("E - 灵体疾行 / 移动")]
-    [FormerlySerializedAs("speedMultiplier")]
-    [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 1.6f;
+    [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 2.8f;
 
     [Header("E - 灵体疾行 / 回复")]
-    [SerializeField, Min(0f)] private float eHealPerTick = 5f;
+    [SerializeField, Min(0f)] private float eHealPerTick = 0f;
+    [SerializeField, Range(0f, 1f)] private float eHealPercentPerSecond = 0.10f;
     [SerializeField, Min(0.01f)] private float eHealTickInterval = 0.5f;
 
     [Header("E - 灵体疾行 / 灵体状态")]
@@ -67,17 +65,17 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         animationName = "Run";
         debugLog = true;
         eCooldown = 10f;
-        eDuration = 4f;
+        eDuration = 3f;
         eManaCost = 30f;
-        eMoveSpeedMultiplier = 1.6f;
-        eHealPerTick = 5f;
+        eMoveSpeedMultiplier = 2.8f;
+        eHealPercentPerSecond = 0.10f;
         eHealTickInterval = 0.5f;
         eIgnoreTerrainCollision = true;
         eIgnoreEnemyCollision = true;
         eImmuneToMonsterPhysicalDamage = true;
         ePreventFallThroughGround = true;
         eLockYPositionDuringGhost = true;
-        terrainCollisionLayers = 1 << 3;
+        terrainCollisionLayers = ~0;
         enemyCollisionLayers = ~0;
         SyncEStateConfig();
     }
@@ -146,12 +144,12 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostShadowVisible(true);
         SetGhostParticlesVisible(true);
         Debug.Log(
-            $"Player01 E 灵体疾行：持续={eDuration:F2}，移速倍率={eMoveSpeedMultiplier:F2}，回血={eHealPerTick:F2}/{eHealTickInterval:F2}秒，免疫怪物物理攻击={eImmuneToMonsterPhysicalDamage}，CD={eCooldown:F2}，蓝耗={eManaCost:F2}",
+            $"Player01 E 灵体疾行：持续={eDuration:F2}，移速倍率={eMoveSpeedMultiplier:F2}，每秒回血={eHealPercentPerSecond:P0} MaxHP，免疫怪物物理攻击={eImmuneToMonsterPhysicalDamage}，CD={eCooldown:F2}，蓝耗={eManaCost:F2}",
             this);
 
         if (Controller != null)
         {
-            Controller.RestoreLocomotionAnimation(true);
+            Controller.TryPlaySkillAnimation(animationName, true);
         }
     }
 
@@ -159,21 +157,15 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         float waitTime = Mathf.Max(0f, duration);
         float elapsed = 0f;
-        float nextHealTickTime = Mathf.Max(0.01f, eHealTickInterval);
         while (elapsed < waitTime)
         {
-            if (elapsed >= nextHealTickTime)
-            {
-                ApplyHealTick();
-                nextHealTickTime += Mathf.Max(0.01f, eHealTickInterval);
-            }
+            ApplyContinuousHeal(Time.deltaTime);
             elapsed += Time.deltaTime;
             RefreshEnemyCollisionIgnores();
             EnforceGroundSafetyLock();
             yield return null;
         }
 
-        OnCastFinished();
         CompleteCast();
     }
 
@@ -252,17 +244,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             return;
         }
 
-        if (ePreventFallThroughGround)
-        {
-            if (debugLog && enable)
-            {
-                Debug.Log("[E - BrokenDash] Terrain collision ignore skipped by fall protection. Enemy collision ignore still applies.", this);
-            }
-
-            return;
-        }
-
-        ApplyLayerCollisionIgnore(enable, terrainCollisionLayers, cachedTerrainCollisionStates, "[E - BrokenDash] Terrain layer mask is empty, skipping collision ignore.");
+        LayerMask effectiveMask = ResolveNonGroundCollisionMask(~0);
+        ApplyLayerCollisionIgnore(enable, effectiveMask, cachedTerrainCollisionStates, "[E - BrokenDash] Non-ground collision mask is empty, skipping collision ignore.");
     }
 
     private void ApplyEnemyCollisionIgnore(bool enable)
@@ -321,9 +304,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
-    private void ApplyHealTick()
+    private void ApplyContinuousHeal(float deltaTime)
     {
-        if (!IsRunningBoost || eHealPerTick <= 0f)
+        if (!IsRunningBoost || deltaTime <= 0f)
         {
             return;
         }
@@ -333,7 +316,50 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             cachedCombatHealth = GetComponent<CombatHealth>();
         }
 
-        cachedCombatHealth?.Heal(eHealPerTick);
+        if (cachedCombatHealth == null)
+        {
+            return;
+        }
+
+        float maxHealth = cachedCombatHealth.MaxHealthValue;
+        if (maxHealth <= 0f || eHealPercentPerSecond <= 0f)
+        {
+            return;
+        }
+
+        float healAmount = maxHealth * eHealPercentPerSecond * deltaTime;
+        if (healAmount > 0f)
+        {
+            cachedCombatHealth.Heal(healAmount);
+        }
+    }
+
+    private static LayerMask ResolveNonGroundCollisionMask(LayerMask sourceMask)
+    {
+        int maskValue = sourceMask.value;
+        if (maskValue == 0)
+        {
+            return sourceMask;
+        }
+
+        string[] groundLikeNames =
+        {
+            "Ground",
+            "Floor",
+            "Terrain",
+            "Platform"
+        };
+
+        for (int i = 0; i < groundLikeNames.Length; i++)
+        {
+            int layer = LayerMask.NameToLayer(groundLikeNames[i]);
+            if (layer >= 0)
+            {
+                maskValue &= ~(1 << layer);
+            }
+        }
+
+        return maskValue;
     }
 
     private void RefreshEnemyCollisionIgnores()

@@ -758,7 +758,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 5
+  playerBaseMoveSpeedScale: 1
   rb: {fileID: 7237885085105757803}
+  debugSpeedDiagnostics: 0
+  debugSpeedLogInterval: 1
 --- !u!114 &3400739130519414288
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -802,6 +805,7 @@ MonoBehaviour:
   growthAttackBonusPerSoul: 0.03
   functionSoul: 0
   functionCooldownMultiplierPerSoul: 0.97
+  debugGrowthSoulRollLog: 0
 --- !u!114 &919796042838406094
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -828,6 +832,7 @@ MonoBehaviour:
   physicalDamageColor: {r: 1, g: 0.25, b: 0.25, a: 1}
   specialDamageColor: {r: 0.78, g: 0.35, b: 1, a: 1}
   criticalDamageColor: {r: 1, g: 0.84, b: 0.2, a: 1}
+  missDamageColor: {r: 0.75, g: 0.95, b: 1, a: 1}
   damagePopupOffset: {x: 0, y: 1, z: 0}
   damagePopupRandomOffset: {x: 0.3, y: 0.15}
 --- !u!114 &2746917147873669084
@@ -1249,6 +1254,8 @@ MonoBehaviour:
   quickShearSuperCritChance: 0.05
   quickShearSuperCritMultiplier: 5
   debugQuickShearCritLog: 0
+  qMovementLockDuration: -1
+  qMovementLockFallbackBuffer: 0.05
   quickShearCritFlashEffectPrefab: {fileID: 513019668223324186, guid: fae36e373b46676489b32331049e0553, type: 3}
   quickShearSuperCritFlashEffectPrefab: {fileID: 8762694852573534868, guid: 1036d377e6a0b9741b1e1e8cbfb759e0, type: 3}
   quickShearCritFlashOffset: {x: 0.9, y: 0.25, z: 0}
@@ -1309,23 +1316,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1004, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_E_BrokenDash
-  cooldown: 2.2
-  duration: 3
+  cooldown: 10
+  duration: 5
   effectPower: 4
   animationName: Run
   debugLog: 1
-  speedMultiplier: 2
-  ignoreObstacleCollision: 1
-  obstacleLayers:
+  eCooldown: 10
+  eDuration: 5
+  eManaCost: 30
+  eMoveSpeedMultiplier: 2.8
+  eHealPerTick: 0
+  eHealPercentPerSecond: 0.1
+  eHealTickInterval: 0.5
+  eIgnoreTerrainCollision: 1
+  eIgnoreEnemyCollision: 1
+  eImmuneToMonsterPhysicalDamage: 1
+  terrainCollisionLayers:
     serializedVersion: 2
     m_Bits: 8
-  baseDamage: 16
-  physicalScaling: 0.7
-  specialScaling: 0.6
-  dashHitRadius: 1.2
-  enemyLayer:
+  enemyCollisionLayers:
     serializedVersion: 2
     m_Bits: 4294967295
+  ePreventFallThroughGround: 1
+  eLockYPositionDuringGhost: 1
   eGhostStateVisual: {fileID: 9002000000000000001}
   eEnableGhostStateVisual: 1
   eGhostShadowFollower: {fileID: 2817237619367692519}

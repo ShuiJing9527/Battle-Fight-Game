@@ -44,6 +44,7 @@ public class RuneRuntimeState : MonoBehaviour
     private readonly Dictionary<RuneType, int>[] skillRuneCounts = new Dictionary<RuneType, int>[SkillCount];
     private readonly Dictionary<RuneType, int> globalMaxCounts = new Dictionary<RuneType, int>();
     private readonly List<int>[] pendingSkillFirstHitCastIds = new List<int>[SkillCount];
+    private readonly List<float>[] pendingSkillManaBurstDamages = new List<float>[SkillCount];
     private readonly int[] nextSkillCastIds = new int[SkillCount];
 
     private float lastMonsterDamageTime = float.NegativeInfinity;
@@ -86,6 +87,7 @@ public class RuneRuntimeState : MonoBehaviour
         {
             skillRuneCounts[i] = new Dictionary<RuneType, int>();
             pendingSkillFirstHitCastIds[i] = new List<int>();
+            pendingSkillManaBurstDamages[i] = new List<float>();
         }
 
         thornCounterReadyTime = 0f;
@@ -292,11 +294,55 @@ public class RuneRuntimeState : MonoBehaviour
         int manaCount = GetSkillRuneCount(skillIndex, RuneType.Mana);
         if (manaCount >= 4)
         {
-            bonusDamage += ConsumeManaBurstBonus(manaCount);
+            bonusDamage += ConsumePreparedManaBurstDamage(skillIndex);
         }
 
         DebugLog($"[RuneRuntimeState] First-hit bonus skill={skillIndex} damage={bonusDamage:F2}");
         return bonusDamage;
+    }
+
+    public void PrepareManaBurstForSkillCast(int skillIndex, float baseCost)
+    {
+        if (skillIndex < 0 || skillIndex >= skillRuneCounts.Length)
+        {
+            return;
+        }
+
+        int manaCount = GetSkillRuneCount(skillIndex, RuneType.Mana);
+        if (manaCount < 4)
+        {
+            pendingSkillManaBurstDamages[skillIndex].Add(0f);
+            return;
+        }
+
+        float consumeCap = manaCount >= 5 ? 200f : 100f;
+        float multiplier = manaCount >= 5 ? 4f : 3f;
+        float overflowBefore = manaOverflow;
+        float energyBefore = resourceBank != null ? resourceBank.currentEnergy : 0f;
+
+        float availableOverflow = Mathf.Min(manaOverflow, consumeCap);
+        float remainingCap = consumeCap - availableOverflow;
+        float availableEnergy = resourceBank != null ? Mathf.Min(resourceBank.currentEnergy, remainingCap) : 0f;
+        float consumedExtra = availableOverflow + availableEnergy;
+
+        if (availableOverflow > 0f)
+        {
+            manaOverflow = Mathf.Max(0f, manaOverflow - availableOverflow);
+        }
+
+        if (resourceBank != null && availableEnergy > 0f)
+        {
+            resourceBank.currentEnergy = Mathf.Max(0f, resourceBank.currentEnergy - availableEnergy);
+        }
+
+        float pendingDamage = consumedExtra * multiplier * GetManaConversionEfficiency();
+        pendingSkillManaBurstDamages[skillIndex].Add(pendingDamage);
+
+        float energyAfter = resourceBank != null ? resourceBank.currentEnergy : 0f;
+        float overflowAfter = manaOverflow;
+        Debug.Log(
+            $"[ManaRuneBurst.Cast] skillIndex={skillIndex}, manaCount={manaCount}, baseCost={baseCost:F2}, cap={consumeCap:F2}, consumedExtra={consumedExtra:F2}, multiplier={multiplier:F2}, pendingDamage={pendingDamage:F2}, energyBefore={energyBefore:F2}, energyAfter={energyAfter:F2}, overflowBefore={overflowBefore:F2}, overflowAfter={overflowAfter:F2}",
+            this);
     }
 
     public void NotifyMonsterDamagedBySkill(int skillIndex, CombatHealth target, float actualDamage)
@@ -539,28 +585,23 @@ public class RuneRuntimeState : MonoBehaviour
         }
     }
 
-    private float ConsumeManaBurstBonus(int manaCount)
+    private float ConsumePreparedManaBurstDamage(int skillIndex)
     {
-        if (resourceBank == null)
+        if (skillIndex < 0 || skillIndex >= pendingSkillManaBurstDamages.Length)
         {
             return 0f;
         }
 
-        float consumeCap = manaCount >= 5 ? 200f : 100f;
-        float multiplier = manaCount >= 5 ? 4f : 3f;
-
-        float availableOverflow = Mathf.Min(manaOverflow, consumeCap);
-        float remainingCap = consumeCap - availableOverflow;
-        float availableEnergy = Mathf.Min(resourceBank.currentEnergy, remainingCap);
-        float totalConsumed = availableOverflow + availableEnergy;
-        if (totalConsumed <= 0f)
+        List<float> pendingDamages = pendingSkillManaBurstDamages[skillIndex];
+        if (pendingDamages == null || pendingDamages.Count == 0)
         {
             return 0f;
         }
 
-        manaOverflow -= availableOverflow;
-        resourceBank.currentEnergy = Mathf.Max(0f, resourceBank.currentEnergy - availableEnergy);
-        return totalConsumed * multiplier * GetManaConversionEfficiency();
+        float pendingDamage = pendingDamages[0];
+        pendingDamages.RemoveAt(0);
+        Debug.Log($"[ManaRuneBurst.Hit] skillIndex={skillIndex}, consumedPendingDamage={pendingDamage:F2}", this);
+        return pendingDamage;
     }
 
     private void ApplyThornRetaliation(GameObject attacker, int thornCount)
@@ -792,6 +833,7 @@ public class RuneRuntimeState : MonoBehaviour
         {
             skillRuneCounts[i].Clear();
             pendingSkillFirstHitCastIds[i].Clear();
+            pendingSkillManaBurstDamages[i].Clear();
             nextSkillCastIds[i] = 0;
         }
     }

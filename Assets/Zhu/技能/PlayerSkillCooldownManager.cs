@@ -44,6 +44,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     private float runtimeCurrentMana;
     private float nextDebugManaLogTime;
     private CombatStats combatStats;
+    private RuneRuntimeState runeRuntimeState;
 
     private void Awake()
     {
@@ -53,6 +54,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         }
 
         combatStats = GetComponent<CombatStats>();
+        runeRuntimeState = GetComponent<RuneRuntimeState>();
         runtimeCurrentCD = new float[SkillCount];
 
         if (resourceBank != null)
@@ -145,6 +147,13 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         {
             runtimeCurrentMana -= data.manaCost;
         }
+
+        if (runeRuntimeState == null)
+        {
+            runeRuntimeState = GetComponent<RuneRuntimeState>();
+        }
+
+        runeRuntimeState?.PrepareManaBurstForSkillCast(skillIndex, data.manaCost);
 
         runtimeCurrentCD[skillIndex] = Mathf.Max(0f, data.maxCooldown * ResolveCooldownMultiplier());
         return true;
