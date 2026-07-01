@@ -192,7 +192,8 @@ public class EnemyController : MonoBehaviour
         float baseMoveSpeed = moveSpeed;
         float speedMoveMultiplier = BattleStatUtility.GetSpeedMoveMultiplier(combatStats);
         float externalMoveMultiplier = ResolveExternalMoveMultiplier();
-        float currentMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, baseMoveSpeed, externalMoveMultiplier);
+        float rawMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, baseMoveSpeed, externalMoveMultiplier);
+        float currentMoveSpeed = BattleStatUtility.ClampActualMoveSpeed(rawMoveSpeed, out _);
         if (maxHorizontalMoveSpeed > 0f)
         {
             currentMoveSpeed = Mathf.Min(currentMoveSpeed, maxHorizontalMoveSpeed);

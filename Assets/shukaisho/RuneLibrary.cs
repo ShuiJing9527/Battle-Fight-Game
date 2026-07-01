@@ -96,7 +96,7 @@ public class RuneLibrary : MonoBehaviour
         }
     }
 
-    [ContextMenu("Sync English Rune Text")]
+    [ContextMenu("Sync Rune Text")]
     public void SyncDefaultText()
     {
         if (runes == null)

@@ -27,7 +27,7 @@ public static class MonsterCombatAutoSetup
             identity.rank = forcedRank ?? ResolveRank(identity.species);
         }
 
-        identity.attackStyle = ResolveAttackStyle(identity.rank);
+        identity.attackStyle = ResolveAttackStyle(identity);
 
         SyncExistingStats(monster, identity);
         EnsureRuntimeComponents(monster);
@@ -49,8 +49,14 @@ public static class MonsterCombatAutoSetup
         return species == MonsterSpecies.RainbowSlime ? MonsterRank.Boss : MonsterRank.Normal;
     }
 
-    private static MonsterAttackStyle ResolveAttackStyle(MonsterRank rank)
+    private static MonsterAttackStyle ResolveAttackStyle(MonsterIdentity identity)
     {
+        if (identity != null && identity.rank == MonsterRank.Boss && IsSlimeSpecies(identity.species))
+        {
+            return MonsterAttackStyle.Melee;
+        }
+
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
         if (rank == MonsterRank.Boss)
         {
             return MonsterAttackStyle.ElementalBoss;
@@ -101,9 +107,18 @@ public static class MonsterCombatAutoSetup
         }
         else if (identity.rank == MonsterRank.Boss)
         {
-            range = 8f;
-            hitRange = 8f;
-            cooldown = 2.2f;
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.6f;
+                hitRange = 1.8f;
+                cooldown = 1.5f;
+            }
+            else
+            {
+                range = 8f;
+                hitRange = 8f;
+                cooldown = 2.2f;
+            }
         }
 
         ApplyStatVariance(monster, ref maxHealth, ref physicalAttack, ref specialAttack, ref physicalDefense, ref specialDefense, ref speed);
@@ -194,6 +209,15 @@ public static class MonsterCombatAutoSetup
             default:
                 return Mathf.Max(0.1f, statSpeed > 0f ? statSpeed : 2.5f);
         }
+    }
+
+    private static bool IsSlimeSpecies(MonsterSpecies species)
+    {
+        return species == MonsterSpecies.BlueSlime ||
+               species == MonsterSpecies.GreenSlime ||
+               species == MonsterSpecies.LavaSlime ||
+               species == MonsterSpecies.PoisonSlime ||
+               species == MonsterSpecies.RainbowSlime;
     }
 
     private static void EnsureRuntimeComponents(GameObject monster)

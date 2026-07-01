@@ -113,61 +113,61 @@ public class RuneDefinition
             case RuneType.Life:
                 rune.runeId = 101;
                 rune.runeName = "Life Rune";
-                rune.description = "A rune born from vitality. It strengthens the body and turns life force into healing, damage, and growth.";
-                rune.tier1Effect = "Max HP +10%.";
-                rune.tier2Effect = "When using the socketed skill, restore HP equal to 1% of max HP.";
-                rune.tier3Effect = "Overflow healing from this effect becomes permanent shield, up to 50% of max HP.";
-                rune.tier4Effect = "The first enemy hit by the socketed skill takes bonus damage equal to 1% of max HP. Triggers once per cast.";
-                rune.tier5Effect = "When killing a monster, gain 1 Life Attribute Soul and 1 Life Recovery Soul.";
-                rune.setBonusEffect = "1-piece max HP bonus becomes 50%; 2-piece healing becomes 5%; 3-piece permanent shield cap becomes 100% of max HP; 4-piece bonus damage becomes 5% of max HP; 5-piece also grants all-stat bonuses based on max HP.";
+                rune.description = "A rune born from life force. It strengthens the body and converts vitality into healing, damage, shields, and growth.";
+                rune.tier1Effect = "When you kill a monster, gain 1 Life Attribute Soul and 1 Life Recovery Soul.";
+                rune.tier2Effect = "When you cast a skill, restore HP equal to 5% of your max HP. This can trigger once per skill cast.";
+                rune.tier3Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 5% of your max HP. This can trigger once per skill cast.";
+                rune.tier4Effect = "If healing from Life Rune effects overheals you, the overflow is converted into permanent shield. Permanent shield is capped at 100% of your max HP.";
+                rune.tier5Effect = "Max HP increased by 50%.";
+                rune.setBonusEffect = "Life Awakening. Gain all-stat bonuses based on max HP. Every 10 max HP counts as 1 Life Attribute. All stats except HP are increased by 10% of that Life Attribute value, rounded down.";
                 break;
 
             case RuneType.Shield:
                 rune.runeId = 102;
                 rune.runeName = "Shield Rune";
-                rune.description = "A rune shaped by protective will. It stores shield power and converts shield strength into defense and offense.";
-                rune.tier1Effect = "After taking no monster damage for 3 seconds, gain shield equal to 15% of max HP.";
-                rune.tier2Effect = "While shielded, damage dealt +25%.";
-                rune.tier3Effect = "Shield gained +100%.";
-                rune.tier4Effect = "The first enemy hit by the socketed skill takes bonus damage equal to 10% of current shield. Triggers once per cast.";
-                rune.tier5Effect = "When killing a monster, gain 1 Shield Soul.";
-                rune.setBonusEffect = "1-piece shield becomes 50% of max HP; 2-piece damage bonus becomes 50%; 3-piece shield gained becomes +200%; 4-piece bonus damage becomes 25% of current shield; 5-piece permanently increases shield efficiency by 10% whenever a Boss is killed.";
+                rune.description = "A rune formed from protective will. It builds shields when you avoid damage and converts shield power into stronger defense and offense.";
+                rune.tier1Effect = "After not taking monster damage for 3 seconds, gain a shield equal to 50% of your max HP.";
+                rune.tier2Effect = "While you have a shield, your damage dealt is increased by 50%.";
+                rune.tier3Effect = "When you kill a monster, gain 1 Shield Soul.";
+                rune.tier4Effect = "Shield gained is increased by 200%.";
+                rune.tier5Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 35% of your current shield. This can trigger once per skill cast.";
+                rune.setBonusEffect = "Guardian Ascension. Shield cap is increased to 300% of your max HP. Each time you kill an elite monster or Boss, shield efficiency is permanently increased by 15%.";
                 break;
 
             case RuneType.Mana:
                 rune.runeId = 103;
                 rune.runeName = "Mana Rune";
-                rune.description = "A rune condensed from pure mana. It expands mana capacity, improves mana recovery, and turns overflow mana into burst damage.";
-                rune.tier1Effect = "Max Mana +150.";
-                rune.tier2Effect = "Mana recovery speed +150%.";
-                rune.tier3Effect = "When killing a monster, drop 1 extra Mana Soul. Overflow recovery from Mana Souls becomes Mana Overflow, up to 100% of max Mana.";
-                rune.tier4Effect = "On the first enemy hit by the socketed skill, consume up to 100 Mana or Mana Overflow to deal bonus damage equal to consumed value x3.";
-                rune.tier5Effect = "Convert max Mana into all-stat bonuses at 20% efficiency.";
-                rune.setBonusEffect = "1-piece max Mana bonus becomes 400; 2-piece mana recovery becomes +300%; 3-piece Mana Soul recovery becomes 300% and Mana Overflow cap becomes 200% of max Mana; 4-piece consume cap becomes 200 and damage multiplier becomes x4; 5-piece permanently increases mana conversion efficiency by 10% whenever a Boss is killed.";
+                rune.description = "A rune condensed from pure mana. It expands mana capacity, strengthens Mana Soul recovery, and converts overflowing mana into burst power and all-around growth.";
+                rune.tier1Effect = "Max Mana increased by 300.";
+                rune.tier2Effect = "Mana regeneration speed increased by 300%.";
+                rune.tier3Effect = "When you kill a monster, an additional Mana Soul drops. If Mana Soul recovery overflows your mana, the overflow is converted into Mana Overflow. Mana Overflow is capped at 200% of your max mana.";
+                rune.tier4Effect = "After casting a skill, the first enemy hit additionally consumes up to 150 mana or Mana Overflow and deals bonus damage equal to the actual extra consumed amount x4. This can trigger once per skill cast.";
+                rune.tier5Effect = "Gain all-stat bonuses based on max mana. Every 10 max mana counts as 1 Mana Attribute. All stats except HP and MP are increased by 25% of that Mana Attribute value, rounded down.";
+                rune.setBonusEffect = "Mana Ascension. Mana Soul recovery is increased to 400% of its original value, and Mana Overflow cap is increased to 300% of max mana. Each time you kill an elite monster or Boss, mana conversion efficiency is permanently increased by 15%.";
                 break;
 
             case RuneType.Thorn:
                 rune.runeId = 104;
                 rune.runeName = "Thorn Rune";
-                rune.description = "A rune formed from pain and retaliation. It reduces incoming damage and converts attacks taken into counter damage.";
-                rune.tier1Effect = "Damage taken -15%.";
-                rune.tier2Effect = "When hit by a monster, deal thorn damage to the attacker equal to 15% of total attributes.";
-                rune.tier3Effect = "The first damage dealt by the socketed skill adds bonus damage equal to 150% of thorn damage. Triggers once per cast.";
-                rune.tier4Effect = "When hit by a monster, automatically trigger Thorn Counter from the socketed skill without cooldown or resource cost. Base trigger cooldown: 4 seconds.";
-                rune.tier5Effect = "Thorn damage +100%.";
-                rune.setBonusEffect = "1-piece damage reduction becomes 35%; 2-piece thorn damage becomes 40% of total attributes; 3-piece added damage becomes 300% of thorn damage; 4-piece trigger cooldown becomes 2 seconds; 5-piece permanently increases thorn efficiency by 15% whenever a Boss is killed.";
+                rune.description = "A rune born from pain and the will to counterattack. It reduces incoming damage and converts attacks received into retaliatory power.";
+                rune.tier1Effect = "Damage taken is reduced by 25%.";
+                rune.tier2Effect = "When hit by a monster, deal Thorn damage to the attacker equal to 30% of your total stats.";
+                rune.tier3Effect = "Thorn damage increased by 150%.";
+                rune.tier4Effect = "When you deal damage, add bonus damage equal to 250% of your Thorn damage. This can trigger once per skill cast.";
+                rune.tier5Effect = "When hit by a monster, automatically release Thorn Counter. Thorn Counter creates a thorn burst centered on the attacker, dealing damage equal to 400% of your Thorn damage to enemies in range. This effect has its own cooldown and does not trigger other auto-cast effects.";
+                rune.setBonusEffect = "Pain Backlash. Thorn damage is additionally increased by 100%. Each time you kill an elite monster or Boss, thorn efficiency is permanently increased by 15%.";
                 break;
 
             case RuneType.Luck:
                 rune.runeId = 105;
                 rune.runeName = "Luck Rune";
-                rune.description = "A rune condensed from the breath of fate. It improves Soul gains and turns lucky combat rewards into long-term growth.";
-                rune.tier1Effect = "Luck +1.";
-                rune.tier2Effect = "When a monster drops an Attribute Soul, it has a 20% chance to increase that Soul's point value by 1, up to 5.";
-                rune.tier3Effect = "When killing a monster, there is a 15% chance to drop 1 extra random Attribute Soul.";
-                rune.tier4Effect = "When picking up any Soul, there is a 10% chance to copy 1 Soul of the same type. Copied Soul point value is 1.";
-                rune.tier5Effect = "When killing a Boss, drop 2 extra random Attribute Souls.";
-                rune.setBonusEffect = "1-piece Luck bonus becomes +5; 2-piece point increase chance becomes 35%; 3-piece extra Attribute Soul chance becomes 25%; 4-piece copy chance becomes 25% and copied Soul point value becomes 3; 5-piece permanently increases luck efficiency by 5% whenever a Boss is killed.";
+                rune.description = "A rune condensed from the breath of fate. It improves Soul acquisition efficiency and turns chance-based combat rewards into long-term growth.";
+                rune.tier1Effect = "Luck increased by 5.";
+                rune.tier2Effect = "When a monster drops an Attribute Soul, there is a 30% chance to increase that Soul's point value by 1, up to a maximum of 5.";
+                rune.tier3Effect = "When you kill a monster, there is a 25% chance to drop 1 additional random Attribute Soul.";
+                rune.tier4Effect = "When you pick up any Soul, there is a 20% chance to copy 1 Soul of the same type. The copied Soul has a fixed value of 2 points.";
+                rune.tier5Effect = "When you kill an elite monster or Boss, drop 5 additional random Attribute Souls.";
+                rune.setBonusEffect = "Fate's Favor. Luck Rune trigger chances are increased by 50%. Each time you kill an elite monster or Boss, luck efficiency is permanently increased by 10%.";
                 break;
         }
 

@@ -160,7 +160,9 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        float finalDamage = stats != null ? stats.ReduceDamage(damage) : Mathf.Max(0f, damage.amount);
+        float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
+        damage.amount = outgoingDamage;
+        float finalDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
         Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
@@ -220,7 +222,7 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        float finalDamage = Mathf.Max(0f, amount);
+        float finalDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(source, amount);
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
 
@@ -437,10 +439,17 @@ public class CombatHealth : MonoBehaviour
         finalEvasionChance = 0f;
         CombatStats defenderStats = stats;
         CombatStats attackerStats = BattleStatUtility.GetCombatStats(source);
-        finalEvasionChance = BattleStatUtility.GetFinalEvasionChance(defenderStats, attackerStats);
-        bool evaded = finalEvasionChance > 0f && UnityEngine.Random.value < finalEvasionChance;
+        BattleStatUtility.ResolveFinalEvasionAndHitChance(
+            gameObject,
+            source,
+            out float rawEvasionChance,
+            out float clampedEvasionChance,
+            out finalEvasionChance,
+            out float finalHitChance);
+        float randomRoll = UnityEngine.Random.value;
+        bool evaded = finalEvasionChance > 0f && randomRoll < finalEvasionChance;
         Debug.Log(
-            $"[CombatEvasion] defender={name} attacker={(source != null ? source.name : "null")} defenderSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} defenderLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} rawEvasionChance={BattleStatUtility.GetEvasionChance(defenderStats):F4} accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F2} finalEvasionChance={finalEvasionChance:F4} result={(evaded ? "Miss" : "Hit")}",
+            $"[CombatEvasion] attacker={(source != null ? source.name : "null")} attackerRank={BattleStatUtility.GetAttackerRankLabel(source)} defender={name} defenderSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} defenderLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} rawEvasionChance={rawEvasionChance:F4} clampedEvasionChance={clampedEvasionChance:F4} accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F2} finalEvasionChance={finalEvasionChance:F4} finalHitChance={finalHitChance:F4} randomRoll={randomRoll:F4} result={(evaded ? "Miss" : "Hit")}",
             this);
 
         if (!evaded)

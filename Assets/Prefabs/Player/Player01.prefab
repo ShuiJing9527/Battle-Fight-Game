@@ -302,7 +302,7 @@ TrailRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 30
   m_Time: 1
   m_PreviewTimeScale: 1
   m_Parameters:
@@ -445,7 +445,7 @@ TrailRenderer:
   m_GlobalIlluminationMeshLod: 0
   m_SortingLayerID: 0
   m_SortingLayer: 0
-  m_SortingOrder: 30
+  m_SortingOrder: 40
   m_Time: 0.5
   m_PreviewTimeScale: 1
   m_Parameters:
@@ -1336,7 +1336,7 @@ MonoBehaviour:
     m_Bits: 8
   enemyCollisionLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
+    m_Bits: 128
   ePreventFallThroughGround: 1
   eLockYPositionDuringGhost: 1
   eGhostStateVisual: {fileID: 9002000000000000001}

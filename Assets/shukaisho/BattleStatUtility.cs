@@ -2,10 +2,16 @@ using UnityEngine;
 
 public static class BattleStatUtility
 {
+    public const float ActualMoveSpeedCap = 30f;
+    public const float PlayerExcessMoveSpeedDamageBonusPerPoint = 0.01f;
+    public const float MaxFinalEvasionChance = 0.50f;
+    public const float MinFinalHitChance = 0.50f;
+    public const float MinBossFinalHitChance = 0.60f;
+    public const float MaxFinalHitChance = 0.95f;
     private const float BaseEvasionChance = 0.05f;
     private const float SpeedMoveBonusPerPoint = 0.0075f;
     private const float SpeedCooldownBonusPerPoint = 0.015f;
-    private const float EvasionSpeedBonusPerPoint = 0.005f;
+    private const float EvasionSpeedBonusPerPoint = 0f;
     private const float EvasionLuckBonusPerPoint = 0.04f;
     public const float EnemyAttackSpeedBaseMultiplier = 1.0f;
     public const float EnemyAttackSpeedExtraMax = 1.0f;
@@ -14,6 +20,8 @@ public static class BattleStatUtility
     private const float CritRatePerLuck = 0.055f;
     private const float MaxCritRate = 0.75f;
     private const float BaseCritDamageMultiplier = 1.5f;
+    private const float PlayerCritDamagePerSpeed = 0.003f;
+    private const float MaxPlayerCritDamageMultiplier = 2.5f;
     private const float CritDamagePerLuck = 0.04f;
     private const float MaxCritDamageMultiplier = 2.1f;
 
@@ -89,6 +97,30 @@ public static class BattleStatUtility
         return Mathf.Max(0f, baseMoveSpeed) * GetSpeedMoveMultiplier(stats) * externalMultiplier;
     }
 
+    public static float ClampActualMoveSpeed(float rawMoveSpeed, out float excessMoveSpeed)
+    {
+        float safeRawMoveSpeed = Mathf.Max(0f, rawMoveSpeed);
+        float cap = Mathf.Max(0f, ActualMoveSpeedCap);
+        excessMoveSpeed = Mathf.Max(0f, safeRawMoveSpeed - cap);
+        return Mathf.Min(safeRawMoveSpeed, cap);
+    }
+
+    public static float GetPlayerExcessMoveSpeedDamageMultiplier(GameObject owner)
+    {
+        PlayerMovement movement = ResolvePlayerMovement(owner);
+        if (movement == null)
+        {
+            return 1f;
+        }
+
+        return 1f + Mathf.Max(0f, movement.ExcessMoveSpeedDamageBonus);
+    }
+
+    public static float ApplyPlayerMoveSpeedDamageBonus(GameObject owner, float damage)
+    {
+        return Mathf.Max(0f, damage) * GetPlayerExcessMoveSpeedDamageMultiplier(owner);
+    }
+
     public static float ResolveCooldown(CombatStats stats, float baseCooldown, float externalCooldownMultiplier = 1f)
     {
         float resolvedBaseCooldown = Mathf.Max(0f, baseCooldown);
@@ -115,7 +147,17 @@ public static class BattleStatUtility
             return 0f;
         }
 
-        return Mathf.Clamp01(BaseEvasionChance * GetEvasionMultiplier(stats));
+        return Mathf.Clamp(BaseEvasionChance * GetEvasionMultiplier(stats), 0f, MaxFinalEvasionChance);
+    }
+
+    public static float GetRawEvasionChance(CombatStats stats)
+    {
+        if (stats == null)
+        {
+            return 0f;
+        }
+
+        return Mathf.Max(0f, BaseEvasionChance * GetEvasionMultiplier(stats));
     }
 
     public static float GetAccuracyMultiplier(CombatStats attackerStats)
@@ -138,7 +180,31 @@ public static class BattleStatUtility
             return 0f;
         }
 
-        return Mathf.Clamp01(rawEvasionChance / accuracyMultiplier);
+        return Mathf.Clamp(rawEvasionChance / accuracyMultiplier, 0f, MaxFinalEvasionChance);
+    }
+
+    public static float GetFinalEvasionChance(GameObject defender, GameObject attacker)
+    {
+        ResolveFinalEvasionAndHitChance(defender, attacker, out _, out _, out float finalEvasionChance, out _);
+        return finalEvasionChance;
+    }
+
+    public static void ResolveFinalEvasionAndHitChance(
+        GameObject defender,
+        GameObject attacker,
+        out float rawEvasionChance,
+        out float clampedEvasionChance,
+        out float finalEvasionChance,
+        out float finalHitChance)
+    {
+        CombatStats defenderStats = GetCombatStats(defender);
+        CombatStats attackerStats = GetCombatStats(attacker);
+        rawEvasionChance = GetRawEvasionChance(defenderStats);
+        clampedEvasionChance = GetEvasionChance(defenderStats);
+        float accuracyAdjustedEvasion = GetFinalEvasionChance(defenderStats, attackerStats);
+        float minHitChance = ResolveMinHitChance(defender, attacker);
+        finalHitChance = Mathf.Clamp(1f - accuracyAdjustedEvasion, minHitChance, MaxFinalHitChance);
+        finalEvasionChance = Mathf.Clamp01(1f - finalHitChance);
     }
 
     public static bool TryRollEvasion(GameObject target, out float evasionChance)
@@ -155,9 +221,7 @@ public static class BattleStatUtility
 
     public static bool TryRollEvasion(GameObject defender, GameObject attacker, out float finalEvasionChance)
     {
-        CombatStats defenderStats = GetCombatStats(defender);
-        CombatStats attackerStats = GetCombatStats(attacker);
-        finalEvasionChance = GetFinalEvasionChance(defenderStats, attackerStats);
+        finalEvasionChance = GetFinalEvasionChance(defender, attacker);
         if (finalEvasionChance <= 0f)
         {
             return false;
@@ -178,6 +242,21 @@ public static class BattleStatUtility
         return Mathf.Min(MaxCritDamageMultiplier, BaseCritDamageMultiplier + luck * CritDamagePerLuck);
     }
 
+    public static float GetCritDamageMultiplier(GameObject attacker)
+    {
+        CombatStats stats = GetCombatStats(attacker);
+        if (BattleTargetUtility.IsPlayer(attacker))
+        {
+            float finalSpeed = stats != null ? Mathf.Max(0f, stats.speed) : 0f;
+            return Mathf.Clamp(
+                BaseCritDamageMultiplier + finalSpeed * PlayerCritDamagePerSpeed,
+                BaseCritDamageMultiplier,
+                MaxPlayerCritDamageMultiplier);
+        }
+
+        return GetCritDamageMultiplier(stats);
+    }
+
     public static bool TryRollCritical(GameObject attacker, out float critDamageMultiplier)
     {
         CombatStats stats = GetCombatStats(attacker);
@@ -193,7 +272,7 @@ public static class BattleStatUtility
             return false;
         }
 
-        critDamageMultiplier = GetCritDamageMultiplier(stats);
+        critDamageMultiplier = GetCritDamageMultiplier(attacker);
         return critDamageMultiplier > 1f;
     }
 
@@ -215,5 +294,78 @@ public static class BattleStatUtility
         return damageType == BattleDamageType.Physical
             ? Mathf.Max(0f, stats.physicalAttack)
             : Mathf.Max(0f, stats.specialAttack);
+    }
+
+    private static PlayerMovement ResolvePlayerMovement(GameObject owner)
+    {
+        if (owner == null)
+        {
+            return null;
+        }
+
+        PlayerMovement movement = owner.GetComponent<PlayerMovement>();
+        if (movement == null)
+        {
+            movement = owner.GetComponentInParent<PlayerMovement>();
+        }
+
+        return movement;
+    }
+
+    private static float ResolveMinHitChance(GameObject defender, GameObject attacker)
+    {
+        if (!BattleTargetUtility.IsPlayer(defender))
+        {
+            return 0f;
+        }
+
+        if (attacker == null)
+        {
+            return MinFinalHitChance;
+        }
+
+        if (!BattleTargetUtility.IsMonster(attacker))
+        {
+            return 0f;
+        }
+
+        return IsBossLikeMonster(attacker) ? MinBossFinalHitChance : MinFinalHitChance;
+    }
+
+    public static bool IsBossLikeMonster(GameObject owner)
+    {
+        if (owner == null)
+        {
+            return false;
+        }
+
+        MonsterIdentity identity = owner.GetComponent<MonsterIdentity>();
+        if (identity == null)
+        {
+            identity = owner.GetComponentInParent<MonsterIdentity>();
+        }
+
+        return identity != null && identity.rank == MonsterRank.Boss;
+    }
+
+    public static string GetAttackerRankLabel(GameObject owner)
+    {
+        if (owner == null)
+        {
+            return "Unknown";
+        }
+
+        MonsterIdentity identity = owner.GetComponent<MonsterIdentity>();
+        if (identity == null)
+        {
+            identity = owner.GetComponentInParent<MonsterIdentity>();
+        }
+
+        if (identity != null)
+        {
+            return identity.rank.ToString();
+        }
+
+        return BattleTargetUtility.IsPlayer(owner) ? "Player" : "Unknown";
     }
 }
