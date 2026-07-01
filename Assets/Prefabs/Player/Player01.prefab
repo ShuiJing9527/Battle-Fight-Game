@@ -757,7 +757,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 5
+  moveSpeed: 4
   playerBaseMoveSpeedScale: 1
   rb: {fileID: 7237885085105757803}
   debugSpeedDiagnostics: 0
@@ -1324,7 +1324,7 @@ MonoBehaviour:
   eCooldown: 10
   eDuration: 5
   eManaCost: 30
-  eMoveSpeedMultiplier: 2.8
+  eMoveSpeedMultiplier: 2.25
   eHealPerTick: 0
   eHealPercentPerSecond: 0.1
   eHealTickInterval: 0.5

@@ -12,7 +12,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField, Min(0f)] private float eManaCost = 30f;
 
     [Header("E - 灵体疾行 / 移动")]
-    [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 2.8f;
+    [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 2.25f;
 
     [Header("E - 灵体疾行 / 回复")]
     [SerializeField, Min(0f)] private float eHealPerTick = 0f;
@@ -25,8 +25,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField] private bool eIgnoreEnemyCollision = true;
     [SerializeField] private bool eImmuneToMonsterPhysicalDamage = true;
     [FormerlySerializedAs("obstacleLayers")]
-    [SerializeField] private LayerMask terrainCollisionLayers = 1 << 3;
-    [SerializeField] private LayerMask enemyCollisionLayers = ~0;
+    [SerializeField] private LayerMask terrainCollisionLayers = 0;
+    [SerializeField] private LayerMask enemyCollisionLayers = 0;
 
     [Header("E - Fall Protection")]
     [SerializeField] private bool ePreventFallThroughGround = true;
@@ -48,7 +48,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     private PlayerMovement cachedMovement;
     private float cachedOriginalMoveSpeed = -1f;
-    private readonly Dictionary<int, bool> cachedTerrainCollisionStates = new Dictionary<int, bool>();
+    private readonly List<IgnoredColliderPair> ignoredTerrainCollisionPairs = new List<IgnoredColliderPair>();
+    private readonly HashSet<long> ignoredTerrainCollisionPairKeys = new HashSet<long>();
     private readonly List<IgnoredColliderPair> ignoredEnemyCollisionPairs = new List<IgnoredColliderPair>();
     private readonly HashSet<long> ignoredEnemyCollisionPairKeys = new HashSet<long>();
     private CombatHealth cachedCombatHealth;
@@ -67,7 +68,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         eCooldown = 10f;
         eDuration = 3f;
         eManaCost = 30f;
-        eMoveSpeedMultiplier = 2.8f;
+        eMoveSpeedMultiplier = 2.25f;
         eHealPercentPerSecond = 0.10f;
         eHealTickInterval = 0.5f;
         eIgnoreTerrainCollision = true;
@@ -75,8 +76,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         eImmuneToMonsterPhysicalDamage = true;
         ePreventFallThroughGround = true;
         eLockYPositionDuringGhost = true;
-        terrainCollisionLayers = ~0;
-        enemyCollisionLayers = ~0;
+        terrainCollisionLayers = BuildLayerMask("Wall", "AirWall", "Obstacle");
+        enemyCollisionLayers = BuildLayerMask("Enemy", "Monster");
         SyncEStateConfig();
     }
 
@@ -98,6 +99,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private void Awake()
     {
         SyncEStateConfig();
+        SanitizeCollisionMasks();
         cachedMovement = GetComponent<PlayerMovement>();
         cachedCombatHealth = GetComponent<CombatHealth>();
         CacheGhostStateVisual();
@@ -120,11 +122,13 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         base.Initialize(controller);
         SyncEStateConfig();
+        SanitizeCollisionMasks();
     }
 
     private void OnValidate()
     {
         SyncEStateConfig();
+        SanitizeCollisionMasks();
     }
 
     protected override bool ShouldLoopAnimation()
@@ -161,6 +165,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         {
             ApplyContinuousHeal(Time.deltaTime);
             elapsed += Time.deltaTime;
+            RefreshTerrainCollisionIgnores();
             RefreshEnemyCollisionIgnores();
             EnforceGroundSafetyLock();
             yield return null;
@@ -244,8 +249,14 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
             return;
         }
 
-        LayerMask effectiveMask = ResolveNonGroundCollisionMask(~0);
-        ApplyLayerCollisionIgnore(enable, effectiveMask, cachedTerrainCollisionStates, "[E - BrokenDash] Non-ground collision mask is empty, skipping collision ignore.");
+        if (enable)
+        {
+            RefreshTerrainCollisionIgnores();
+        }
+        else
+        {
+            RestoreTerrainCollisionIgnores();
+        }
     }
 
     private void ApplyEnemyCollisionIgnore(bool enable)
@@ -262,45 +273,6 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         else
         {
             RestoreEnemyCollisionIgnores();
-        }
-    }
-
-    private void ApplyLayerCollisionIgnore(bool enable, LayerMask layerMask, Dictionary<int, bool> cache, string emptyMaskWarning)
-    {
-        int playerLayer = gameObject.layer;
-        int mask = layerMask.value;
-        if (mask == 0)
-        {
-            if (debugLog && enable)
-            {
-                Debug.LogWarning(emptyMaskWarning, this);
-            }
-
-            return;
-        }
-
-        for (int layer = 0; layer < 32; layer++)
-        {
-            int layerBit = 1 << layer;
-            if ((mask & layerBit) == 0)
-            {
-                continue;
-            }
-
-            if (enable)
-            {
-                if (!cache.ContainsKey(layer))
-                {
-                    cache[layer] = Physics.GetIgnoreLayerCollision(playerLayer, layer);
-                }
-
-                Physics.IgnoreLayerCollision(playerLayer, layer, true);
-            }
-            else if (cache.TryGetValue(layer, out bool originalState))
-            {
-                Physics.IgnoreLayerCollision(playerLayer, layer, originalState);
-                cache.Remove(layer);
-            }
         }
     }
 
@@ -334,32 +306,48 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
-    private static LayerMask ResolveNonGroundCollisionMask(LayerMask sourceMask)
+    private void RefreshTerrainCollisionIgnores()
     {
-        int maskValue = sourceMask.value;
-        if (maskValue == 0)
+        if (!IsRunningBoost || !eIgnoreTerrainCollision)
         {
-            return sourceMask;
+            return;
         }
 
-        string[] groundLikeNames =
+        Collider[] playerColliders = GetComponentsInChildren<Collider>(true);
+        if (playerColliders == null || playerColliders.Length == 0)
         {
-            "Ground",
-            "Floor",
-            "Terrain",
-            "Platform"
-        };
+            return;
+        }
 
-        for (int i = 0; i < groundLikeNames.Length; i++)
+        Collider[] worldColliders = Object.FindObjectsOfType<Collider>(true);
+        if (worldColliders == null || worldColliders.Length == 0)
         {
-            int layer = LayerMask.NameToLayer(groundLikeNames[i]);
-            if (layer >= 0)
+            return;
+        }
+
+        foreach (Collider playerCollider in playerColliders)
+        {
+            if (!IsUsablePhysicalCollider(playerCollider))
             {
-                maskValue &= ~(1 << layer);
+                continue;
+            }
+
+            for (int i = 0; i < worldColliders.Length; i++)
+            {
+                Collider targetCollider = worldColliders[i];
+                if (!ShouldIgnoreTerrainCollider(targetCollider))
+                {
+                    continue;
+                }
+
+                if (targetCollider.transform.IsChildOf(transform))
+                {
+                    continue;
+                }
+
+                AddIgnoredCollisionPair(playerCollider, targetCollider, ignoredTerrainCollisionPairs, ignoredTerrainCollisionPairKeys);
             }
         }
-
-        return maskValue;
     }
 
     private void RefreshEnemyCollisionIgnores()
@@ -412,7 +400,12 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
                     continue;
                 }
 
-                AddIgnoredEnemyCollisionPair(playerCollider, monsterCollider);
+                if (IsGroundLikeLayer(monsterCollider.gameObject.layer))
+                {
+                    continue;
+                }
+
+                AddIgnoredCollisionPair(playerCollider, monsterCollider, ignoredEnemyCollisionPairs, ignoredEnemyCollisionPairKeys);
             }
         }
     }
@@ -440,36 +433,57 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
     }
 
-    private void AddIgnoredEnemyCollisionPair(Collider playerCollider, Collider monsterCollider)
+    private bool ShouldIgnoreTerrainCollider(Collider targetCollider)
     {
-        long key = GetColliderPairKey(playerCollider, monsterCollider);
-        if (!ignoredEnemyCollisionPairKeys.Add(key))
+        return IsUsablePhysicalCollider(targetCollider) &&
+               IsLayerIncluded(terrainCollisionLayers, targetCollider.gameObject.layer) &&
+               !IsGroundLikeLayer(targetCollider.gameObject.layer);
+    }
+
+    private void AddIgnoredCollisionPair(
+        Collider playerCollider,
+        Collider targetCollider,
+        List<IgnoredColliderPair> pairCache,
+        HashSet<long> pairKeys)
+    {
+        long key = GetColliderPairKey(playerCollider, targetCollider);
+        if (!pairKeys.Add(key))
         {
             return;
         }
 
-        bool originalState = Physics.GetIgnoreCollision(playerCollider, monsterCollider);
+        bool originalState = Physics.GetIgnoreCollision(playerCollider, targetCollider);
         if (!originalState)
         {
-            Physics.IgnoreCollision(playerCollider, monsterCollider, true);
+            Physics.IgnoreCollision(playerCollider, targetCollider, true);
         }
 
-        ignoredEnemyCollisionPairs.Add(new IgnoredColliderPair(playerCollider, monsterCollider, originalState));
+        pairCache.Add(new IgnoredColliderPair(playerCollider, targetCollider, originalState));
+    }
+
+    private void RestoreTerrainCollisionIgnores()
+    {
+        RestoreIgnoredCollisionPairs(ignoredTerrainCollisionPairs, ignoredTerrainCollisionPairKeys);
     }
 
     private void RestoreEnemyCollisionIgnores()
     {
-        for (int i = ignoredEnemyCollisionPairs.Count - 1; i >= 0; i--)
+        RestoreIgnoredCollisionPairs(ignoredEnemyCollisionPairs, ignoredEnemyCollisionPairKeys);
+    }
+
+    private static void RestoreIgnoredCollisionPairs(List<IgnoredColliderPair> pairCache, HashSet<long> pairKeys)
+    {
+        for (int i = pairCache.Count - 1; i >= 0; i--)
         {
-            IgnoredColliderPair pair = ignoredEnemyCollisionPairs[i];
-            if (pair.playerCollider != null && pair.monsterCollider != null)
+            IgnoredColliderPair pair = pairCache[i];
+            if (pair.playerCollider != null && pair.targetCollider != null)
             {
-                Physics.IgnoreCollision(pair.playerCollider, pair.monsterCollider, pair.originalIgnored);
+                Physics.IgnoreCollision(pair.playerCollider, pair.targetCollider, pair.originalIgnored);
             }
         }
 
-        ignoredEnemyCollisionPairs.Clear();
-        ignoredEnemyCollisionPairKeys.Clear();
+        pairCache.Clear();
+        pairKeys.Clear();
     }
 
     private static bool IsUsablePhysicalCollider(Collider collider)
@@ -484,6 +498,74 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         int maskValue = mask.value;
         return maskValue != 0 && (maskValue & (1 << layer)) != 0;
+    }
+
+    private static bool IsGroundLikeLayer(int layer)
+    {
+        if (layer < 0)
+        {
+            return false;
+        }
+
+        string layerName = LayerMask.LayerToName(layer);
+        if (string.IsNullOrWhiteSpace(layerName))
+        {
+            return false;
+        }
+
+        return layerName == "Ground" ||
+               layerName == "Floor" ||
+               layerName == "Terrain" ||
+               layerName == "Platform";
+    }
+
+    private static LayerMask BuildLayerMask(params string[] layerNames)
+    {
+        int mask = 0;
+        for (int i = 0; i < layerNames.Length; i++)
+        {
+            int layer = LayerMask.NameToLayer(layerNames[i]);
+            if (layer >= 0)
+            {
+                mask |= 1 << layer;
+            }
+        }
+
+        return mask;
+    }
+
+    private void SanitizeCollisionMasks()
+    {
+        terrainCollisionLayers = SanitizeMask(
+            terrainCollisionLayers,
+            fallbackIfEverything: BuildLayerMask("Wall", "AirWall", "Obstacle"));
+        enemyCollisionLayers = SanitizeMask(
+            enemyCollisionLayers,
+            fallbackIfEverything: BuildLayerMask("Enemy", "Monster"));
+    }
+
+    private static LayerMask SanitizeMask(LayerMask sourceMask, LayerMask fallbackIfEverything)
+    {
+        int maskValue = sourceMask.value;
+        if (maskValue == ~0 && fallbackIfEverything.value != 0)
+        {
+            maskValue = fallbackIfEverything.value;
+        }
+
+        for (int layer = 0; layer < 32; layer++)
+        {
+            if ((maskValue & (1 << layer)) == 0)
+            {
+                continue;
+            }
+
+            if (IsGroundLikeLayer(layer))
+            {
+                maskValue &= ~(1 << layer);
+            }
+        }
+
+        return maskValue;
     }
 
     private static long GetColliderPairKey(Collider a, Collider b)
@@ -503,13 +585,13 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private readonly struct IgnoredColliderPair
     {
         public readonly Collider playerCollider;
-        public readonly Collider monsterCollider;
+        public readonly Collider targetCollider;
         public readonly bool originalIgnored;
 
-        public IgnoredColliderPair(Collider playerCollider, Collider monsterCollider, bool originalIgnored)
+        public IgnoredColliderPair(Collider playerCollider, Collider targetCollider, bool originalIgnored)
         {
             this.playerCollider = playerCollider;
-            this.monsterCollider = monsterCollider;
+            this.targetCollider = targetCollider;
             this.originalIgnored = originalIgnored;
         }
     }
