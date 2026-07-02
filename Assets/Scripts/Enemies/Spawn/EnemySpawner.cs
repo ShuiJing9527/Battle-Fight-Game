@@ -15,6 +15,8 @@ public class EnemySpawner : MonoBehaviour
         public float specialDefense;
         public float speed;
         public float luck;
+        public bool hasScaleTarget;
+        public Vector3 scaleTargetLocalScale;
     }
 
     [Header("Enemy")]
@@ -40,38 +42,77 @@ public class EnemySpawner : MonoBehaviour
     public int normalReinforceCountMax = 5;
 
     [Header("Monster Stat Growth")]
+    [Tooltip("Base HP multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseHealthMultiplier = 1f;
+    [Tooltip("Base physical attack multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseAttackMultiplier = 1f;
+    [Tooltip("Base physical defense multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseDefenseMultiplier = 1f;
+    [Tooltip("Base special attack multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseSpecialAttackMultiplier = 1f;
+    [Tooltip("Base special defense multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseSpecialDefenseMultiplier = 1f;
+    [Tooltip("Base speed multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
+    [Min(0.01f)] public float baseSpeedMultiplier = 1f;
+    [Tooltip("Minimum interval between extra monster growth rolls.")]
     public float monsterStatGrowthIntervalMin = 30f;
+    [Tooltip("Maximum interval between extra monster growth rolls.")]
     public float monsterStatGrowthIntervalMax = 60f;
+    [Tooltip("Additional global growth applied per roll to every living monster at the low end.")]
     [Range(0.01f, 0.5f)] public float monsterStatGrowthPercentMin = 0.01f;
+    [Tooltip("Additional global growth applied per roll to every living monster at the high end.")]
     [Range(0.01f, 0.5f)] public float monsterStatGrowthPercentMax = 0.05f;
+    [Tooltip("Current extra global monster multiplier accumulated by growth rolls. 1 means no extra growth.")]
     [Min(1f)] public float currentMonsterStatMultiplier = 1f;
 
     [Header("Rank Multipliers - Normal")]
+    [Tooltip("Normal monster HP multiplier after base and time growth. 1 means unchanged.")]
     public float normalHealthMultiplier = 1f;
+    [Tooltip("Normal monster physical attack multiplier after base and time growth. 1 means unchanged.")]
     public float normalAttackMultiplier = 1f;
+    [Tooltip("Normal monster physical defense multiplier after base and time growth. 1 means unchanged.")]
     public float normalDefenseMultiplier = 1f;
+    [Tooltip("Normal monster special attack multiplier after base and time growth. 1 means unchanged.")]
     public float normalMagicMultiplier = 1f;
+    [Tooltip("Normal monster special defense multiplier after base and time growth. 1 means unchanged.")]
     public float normalResistanceMultiplier = 1f;
+    [Tooltip("Normal monster speed multiplier after base and time growth. 1 means unchanged.")]
     public float normalSpeedMultiplier = 1f;
 
     [Header("Rank Multipliers - Elite")]
+    [Tooltip("Elite monster HP multiplier after base and time growth. 1 means unchanged.")]
     public float eliteHealthMultiplier = 3f;
+    [Tooltip("Elite monster physical attack multiplier after base and time growth. 1 means unchanged.")]
     public float eliteAttackMultiplier = 2f;
+    [Tooltip("Elite monster physical defense multiplier after base and time growth. 1 means unchanged.")]
     public float eliteDefenseMultiplier = 1.5f;
+    [Tooltip("Elite monster special attack multiplier after base and time growth. 1 means unchanged.")]
     public float eliteMagicMultiplier = 2f;
+    [Tooltip("Elite monster special defense multiplier after base and time growth. 1 means unchanged.")]
     public float eliteResistanceMultiplier = 1.5f;
+    [Tooltip("Elite monster speed multiplier after base and time growth. 1 means unchanged.")]
     public float eliteSpeedMultiplier = 1.1f;
+    [Tooltip("Elite attack interval multiplier passed to EnemyController. Values above 1 make attacks slower in the current formula.")]
     public float eliteAttackIntervalMultiplier = 1.1f;
+    [Tooltip("Elite outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float eliteOutgoingDamageMultiplier = 1f;
 
     [Header("Rank Multipliers - Boss")]
+    [Tooltip("Boss HP multiplier after base and time growth. 1 means unchanged.")]
     public float bossHealthMultiplier = 10f;
+    [Tooltip("Boss physical attack multiplier after base and time growth. 1 means unchanged.")]
     public float bossAttackMultiplier = 5f;
+    [Tooltip("Boss physical defense multiplier after base and time growth. 1 means unchanged.")]
     public float bossDefenseMultiplier = 3f;
+    [Tooltip("Boss special attack multiplier after base and time growth. 1 means unchanged.")]
     public float bossMagicMultiplier = 5f;
+    [Tooltip("Boss special defense multiplier after base and time growth. 1 means unchanged.")]
     public float bossResistanceMultiplier = 3f;
+    [Tooltip("Boss speed multiplier after base and time growth. 1 means unchanged.")]
     public float bossSpeedMultiplier = 1f;
+    [Tooltip("Boss attack interval multiplier passed to EnemyController. Values above 1 make attacks slower in the current formula.")]
     public float bossAttackIntervalMultiplier = 1.8f;
+    [Tooltip("Boss outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float bossOutgoingDamageMultiplier = 1.5f;
 
     [Header("Elite")]
@@ -86,16 +127,78 @@ public class EnemySpawner : MonoBehaviour
     public int maxAliveBossCount = 1;
 
     [Header("Final Moment Boss")]
+    [Tooltip("FinalRush boss HP multiplier applied on top of base, time, and rank multipliers.")]
     [SerializeField, Min(0.01f)] private float finalMomentBossHpMultiplier = 1.5f;
+    [Tooltip("FinalRush boss physical and special attack multiplier applied on top of base, time, and rank multipliers.")]
     [SerializeField, Min(0.01f)] private float finalMomentBossAttackMultiplier = 1.25f;
+    [Tooltip("FinalRush boss physical defense multiplier applied on top of base, time, and rank multipliers.")]
+    [SerializeField, Min(0.01f)] private float finalMomentBossDefenseMultiplier = 1f;
+    [Tooltip("FinalRush boss special attack multiplier applied on top of base, time, and rank multipliers.")]
+    [SerializeField, Min(0.01f)] private float finalMomentBossSpecialAttackMultiplier = 1.25f;
+    [Tooltip("FinalRush boss special defense multiplier applied on top of base, time, and rank multipliers.")]
+    [SerializeField, Min(0.01f)] private float finalMomentBossSpecialDefenseMultiplier = 1f;
+    [Tooltip("FinalRush boss speed multiplier applied on top of base, time, and rank multipliers.")]
     [SerializeField, Min(0.01f)] private float finalMomentBossSpeedMultiplier = 1f;
 
     [Header("Ultimate Countdown Boss")]
+    [Tooltip("Extra cleanup boss HP gained per remaining non-boss enemy when spawn-stopped cleanup begins.")]
     [SerializeField, Min(0f)] private float ultimateBossHpPerRemainingEnemy = 0.05f;
+    [Tooltip("Extra cleanup boss attack gained per remaining non-boss enemy when spawn-stopped cleanup begins.")]
     [SerializeField, Min(0f)] private float ultimateBossAttackPerRemainingEnemy = 0.03f;
+    [Tooltip("Maximum HP multiplier reachable from the dynamic cleanup boss reinforcement.")]
     [SerializeField, Min(1f)] private float ultimateBossMaxHpMultiplier = 5f;
+    [Tooltip("Maximum attack multiplier reachable from the dynamic cleanup boss reinforcement.")]
     [SerializeField, Min(1f)] private float ultimateBossMaxAttackMultiplier = 3f;
+    [Tooltip("Cleanup boss speed multiplier from the dynamic spawn-stopped boss reinforcement.")]
     [SerializeField, Min(0.01f)] private float ultimateBossSpeedMultiplier = 1f;
+    [Tooltip("Additional cleanup boss HP multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossHealthMultiplier = 1f;
+    [Tooltip("Additional cleanup boss physical attack multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossAttackMultiplier = 1f;
+    [Tooltip("Additional cleanup boss physical defense multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossDefenseMultiplier = 1f;
+    [Tooltip("Additional cleanup boss special attack multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossSpecialAttackMultiplier = 1f;
+    [Tooltip("Additional cleanup boss special defense multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossSpecialDefenseMultiplier = 1f;
+    [Tooltip("Additional cleanup boss speed multiplier applied only to the post-FinalRush cleanup boss.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossSpeedMultiplier = 1f;
+    [Tooltip("Additional cleanup boss visual scale multiplier applied only to the post-FinalRush cleanup boss. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossScaleMultiplier = 1f;
+    [Tooltip("Additional cleanup boss outgoing damage multiplier applied only to the post-FinalRush cleanup boss. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossOutgoingDamageMultiplier = 1f;
+    [Tooltip("Additional cleanup boss attack interval multiplier applied only to the post-FinalRush cleanup boss. Values below 1 make attacks faster.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossAttackIntervalMultiplier = 1f;
+    [Tooltip("Additional cleanup boss reward multiplier applied only to the post-FinalRush cleanup boss. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float cleanupBossRewardMultiplier = 1f;
+
+    [Header("Cleanup Boss Phase Split")]
+    [Tooltip("Whether the post-FinalRush cleanup boss uses HP threshold phase split instead of death split.")]
+    [SerializeField] private bool cleanupBossPhaseSplitEnabled = true;
+    [Tooltip("Cleanup boss HP ratio thresholds that each trigger one split wave. 0.7 means 70% HP.")]
+    [SerializeField] private float[] cleanupBossSplitHealthThresholds = { 0.7f, 0.5f, 0.3f };
+    [Tooltip("How many children the cleanup boss spawns at each HP threshold.")]
+    [SerializeField, Min(0)] private int cleanupBossSplitCountPerThreshold = 2;
+    [Tooltip("How far cleanup boss split children scatter from the boss position.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitScatterRadius = 1.5f;
+    [Tooltip("Target rank used for cleanup boss split children. Boss is automatically downgraded to Elite.")]
+    [SerializeField] private MonsterRank cleanupBossSplitChildRank = MonsterRank.Elite;
+    [Tooltip("Cleanup boss split child HP ratio applied after normal spawn-time scaling.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitChildHealthRatio = 0.35f;
+    [Tooltip("Cleanup boss split child physical and special attack ratio applied after normal spawn-time scaling.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitChildAttackRatio = 0.55f;
+    [Tooltip("Cleanup boss split child physical and special defense ratio applied after normal spawn-time scaling.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitChildDefenseRatio = 0.5f;
+    [Tooltip("Cleanup boss split child speed ratio applied after normal spawn-time scaling.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitChildSpeedRatio = 1f;
+    [Tooltip("Cleanup boss split child visual scale ratio applied after normal spawn-time scaling.")]
+    [SerializeField, Min(0f)] private float cleanupBossSplitChildScaleRatio = 0.75f;
+    [Tooltip("If false, cleanup boss split children cannot split again.")]
+    [SerializeField] private bool cleanupBossSplitChildrenCanSplit = false;
+    [Tooltip("Print one-shot cleanup boss phase split logs on initialize, threshold trigger, and body death.")]
+    [SerializeField] private bool debugCleanupBossPhaseSplit = false;
+    [Tooltip("Print cleanup boss scaling breakdown whenever cleanup boss stats are recalculated.")]
+    [SerializeField] private bool debugCleanupBossScaling = false;
 
     [Header("Spawn Around Player")]
     public bool spawnAroundPlayer = true;
@@ -116,6 +219,7 @@ public class EnemySpawner : MonoBehaviour
     [Header("Timed Difficulty")]
     [SerializeField] private EnemyDifficultyDirector difficultyDirector;
     [SerializeField] private bool debugDifficultySpawnLogs = false;
+    [SerializeField] private bool debugScalingBreakdown = false;
 
     private Player2Bootstrap playerBootstrap;
     private TODController todController;
@@ -142,6 +246,9 @@ public class EnemySpawner : MonoBehaviour
     {
         public float hpMultiplier;
         public float attackMultiplier;
+        public float defenseMultiplier;
+        public float specialAttackMultiplier;
+        public float specialDefenseMultiplier;
         public float speedMultiplier;
         public int remainingEnemyCount;
     }
@@ -411,15 +518,143 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        SpawnSplitChildrenInternal(
+            eliteSource,
+            sourceIdentity.species,
+            MonsterRank.Normal,
+            count,
+            scatterRadius,
+            1f,
+            1f,
+            1f,
+            1f,
+            1f,
+            false,
+            true,
+            false,
+            "EliteDeathSplit");
+    }
+
+    public void SpawnSplitChildren(
+        GameObject bossSource,
+        int count,
+        float scatterRadius,
+        MonsterRank childRank,
+        float healthRatio,
+        float attackRatio,
+        float defenseRatio,
+        float speedRatio,
+        float scaleRatio,
+        bool childrenCanSplit,
+        bool isCleanupBoss,
+        bool debugLog)
+    {
+        SpawnSplitChildrenAndCollect(
+            bossSource,
+            count,
+            scatterRadius,
+            childRank,
+            healthRatio,
+            attackRatio,
+            defenseRatio,
+            speedRatio,
+            scaleRatio,
+            childrenCanSplit,
+            isCleanupBoss,
+            debugLog,
+            "Death");
+    }
+
+    public List<GameObject> SpawnSplitChildrenAndCollect(
+        GameObject bossSource,
+        int count,
+        float scatterRadius,
+        MonsterRank childRank,
+        float healthRatio,
+        float attackRatio,
+        float defenseRatio,
+        float speedRatio,
+        float scaleRatio,
+        bool childrenCanSplit,
+        bool isCleanupBoss,
+        bool debugLog,
+        string splitTriggerLabel = "Death")
+    {
+        if (bossSource == null || count <= 0 || !CanSpawnByDifficulty("BossSplit"))
+        {
+            return new List<GameObject>();
+        }
+
+        MonsterIdentity sourceIdentity = bossSource.GetComponent<MonsterIdentity>();
+        if (sourceIdentity == null || sourceIdentity.rank != MonsterRank.Boss || !IsSlimeSpecies(sourceIdentity.species))
+        {
+            return new List<GameObject>();
+        }
+
+        MonsterRank resolvedChildRank = childRank == MonsterRank.Boss ? MonsterRank.Elite : childRank;
+        List<GameObject> sourcePool = ResolveSplitPoolForRank(resolvedChildRank);
+        if (sourcePool == null || sourcePool.Count == 0)
+        {
+            Debug.LogWarning("[EnemySpawner] Boss split failed: child prefab pool is empty.", this);
+            return new List<GameObject>();
+        }
+
+        if (debugLog)
+        {
+            Debug.Log(
+                $"[BossSplit] boss name={bossSource.name} split trigger={splitTriggerLabel} child count={count} child rank={resolvedChildRank} child health ratio={healthRatio:F2} child attack ratio={attackRatio:F2} child defense ratio={defenseRatio:F2} child speed ratio={speedRatio:F2} childrenCanSplit={childrenCanSplit} cleanupBoss={isCleanupBoss}",
+                bossSource);
+        }
+
+        return SpawnSplitChildrenInternal(
+            bossSource,
+            sourceIdentity.species,
+            resolvedChildRank,
+            count,
+            scatterRadius,
+            healthRatio,
+            attackRatio,
+            defenseRatio,
+            speedRatio,
+            scaleRatio,
+            childrenCanSplit,
+            true,
+            false,
+            isCleanupBoss ? $"CleanupBoss{splitTriggerLabel}Split" : $"Boss{splitTriggerLabel}Split");
+    }
+
+    private List<GameObject> SpawnSplitChildrenInternal(
+        GameObject sourceEnemy,
+        MonsterSpecies species,
+        MonsterRank childRank,
+        int count,
+        float scatterRadius,
+        float healthRatio,
+        float attackRatio,
+        float defenseRatio,
+        float speedRatio,
+        float scaleRatio,
+        bool childrenCanSplit,
+        bool suppressRuneDrop,
+        bool keepAsCleanupBoss,
+        string splitSource)
+    {
+        List<GameObject> sourcePool = ResolveSplitPoolForRank(childRank);
+        if (sourceEnemy == null || count <= 0 || sourcePool == null || sourcePool.Count == 0)
+        {
+            return new List<GameObject>();
+        }
+
+        List<GameObject> spawnedChildren = new List<GameObject>(count);
         for (int i = 0; i < count; i++)
         {
-            GameObject selectedEnemy = ResolveNormalSplitPrefab(sourcePool, sourceIdentity.species);
+            GameObject selectedEnemy = ResolveNormalSplitPrefab(sourcePool, species);
             if (selectedEnemy == null)
             {
                 continue;
             }
 
-            Vector3 spawnPosition = eliteSource.transform.position + ResolveSplitOffset(scatterRadius, i, count);
+            Vector3 spawnPosition = sourceEnemy.transform.position + ResolveSplitOffset(scatterRadius, i, count);
             spawnPosition.y = selectedEnemy.transform.position.y;
             GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
 
@@ -429,12 +664,13 @@ public class EnemySpawner : MonoBehaviour
                 cloneIdentity = spawnedEnemy.AddComponent<MonsterIdentity>();
             }
 
-            cloneIdentity.species = sourceIdentity.species;
-            cloneIdentity.rank = MonsterRank.Normal;
-            cloneIdentity.suppressRuneDrop = true;
+            cloneIdentity.species = species;
+            cloneIdentity.rank = childRank;
+            cloneIdentity.suppressRuneDrop = suppressRuneDrop;
 
-            MonsterCombatAutoSetup.Configure(spawnedEnemy, sourceIdentity.species, MonsterRank.Normal);
+            MonsterCombatAutoSetup.Configure(spawnedEnemy, species, childRank);
             ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
+            ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
             RegisterSpawnedEnemy(spawnedEnemy);
 
             EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
@@ -449,6 +685,89 @@ public class EnemySpawner : MonoBehaviour
             {
                 enemyController.SetTarget(ResolveActivePlayerTarget(), "Spawner");
             }
+
+            if (!childrenCanSplit)
+            {
+                EliteSlimeSplitOnDeath splitComponent = spawnedEnemy.GetComponent<EliteSlimeSplitOnDeath>();
+                if (splitComponent != null)
+                {
+                    splitComponent.enabled = false;
+                }
+            }
+
+            if (!keepAsCleanupBoss && spawnedEnemy == cleanupBossInstance)
+            {
+                cleanupBossInstance = null;
+            }
+
+            spawnedChildren.Add(spawnedEnemy);
+        }
+
+        return spawnedChildren;
+    }
+
+    private List<GameObject> ResolveSplitPoolForRank(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Elite:
+                return ResolvePool(eliteEnemyPrefabs, fallbackEliteEnemyPrefabs);
+            case MonsterRank.Boss:
+                return ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs);
+            default:
+                return ResolvePool(normalEnemyPrefabs, fallbackNormalEnemyPrefabs);
+        }
+    }
+
+    private void ApplySplitChildModifiers(
+        GameObject spawnedEnemy,
+        float healthRatio,
+        float attackRatio,
+        float defenseRatio,
+        float speedRatio,
+        float scaleRatio)
+    {
+        if (spawnedEnemy == null)
+        {
+            return;
+        }
+
+        CombatStats stats = spawnedEnemy.GetComponent<CombatStats>();
+        BattleResourceBank resourceBank = spawnedEnemy.GetComponent<BattleResourceBank>();
+        CombatHealth combatHealth = spawnedEnemy.GetComponent<CombatHealth>();
+        if (stats != null)
+        {
+            stats.maxHealth = Mathf.Max(1f, Mathf.Round(stats.maxHealth * Mathf.Max(0f, healthRatio)));
+            stats.physicalAttack = Mathf.Max(0f, Mathf.Round(stats.physicalAttack * Mathf.Max(0f, attackRatio)));
+            stats.specialAttack = Mathf.Max(0f, Mathf.Round(stats.specialAttack * Mathf.Max(0f, attackRatio)));
+            stats.physicalDefense = Mathf.Max(0f, Mathf.Round(stats.physicalDefense * Mathf.Max(0f, defenseRatio)));
+            stats.specialDefense = Mathf.Max(0f, Mathf.Round(stats.specialDefense * Mathf.Max(0f, defenseRatio)));
+            stats.speed = Mathf.Max(0.1f, RoundToDecimals(stats.speed * Mathf.Max(0f, speedRatio), 2));
+        }
+
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = stats != null ? stats.maxHealth : resourceBank.maxHealth;
+            resourceBank.currentHealth = resourceBank.maxHealth;
+        }
+
+        if (combatHealth != null)
+        {
+            combatHealth.stats = stats;
+            combatHealth.resourceBank = resourceBank;
+            combatHealth.currentHealth = stats != null ? stats.maxHealth : combatHealth.currentHealth;
+        }
+
+        if (Mathf.Abs(scaleRatio - 1f) > 0.0001f)
+        {
+            Transform scaleTarget = spawnedEnemy.transform;
+            MonsterRankVisual rankVisual = spawnedEnemy.GetComponent<MonsterRankVisual>();
+            if (rankVisual != null && rankVisual.visualRoot != null)
+            {
+                scaleTarget = rankVisual.visualRoot;
+            }
+
+            scaleTarget.localScale *= Mathf.Max(0.01f, scaleRatio);
         }
     }
 
@@ -534,6 +853,7 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        bool hasScaleTarget = TryGetEnemyScaleTarget(enemy, out Transform scaleTarget);
         monsterBaseSnapshots[enemy.GetInstanceID()] = new MonsterBaseSnapshot
         {
             initialized = true,
@@ -543,7 +863,9 @@ public class EnemySpawner : MonoBehaviour
             specialAttack = Mathf.Max(0f, stats.specialAttack),
             specialDefense = Mathf.Max(0f, stats.specialDefense),
             speed = Mathf.Max(0.1f, stats.speed),
-            luck = Mathf.Max(0f, stats.luck)
+            luck = Mathf.Max(0f, stats.luck),
+            hasScaleTarget = hasScaleTarget,
+            scaleTargetLocalScale = scaleTarget != null ? scaleTarget.localScale : Vector3.one
         };
     }
 
@@ -600,22 +922,29 @@ public class EnemySpawner : MonoBehaviour
         MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
         float timeMultiplier = Mathf.Max(1f, currentMonsterStatMultiplier);
-        float healthMultiplier = timeMultiplier * ResolveRankHealthMultiplier(rank);
-        float attackMultiplier = timeMultiplier * ResolveRankAttackMultiplier(rank);
-        float defenseMultiplier = timeMultiplier * ResolveRankDefenseMultiplier(rank);
-        float magicMultiplier = timeMultiplier * ResolveRankMagicMultiplier(rank);
-        float resistanceMultiplier = timeMultiplier * ResolveRankResistanceMultiplier(rank);
-        float speedMultiplier = timeMultiplier * ResolveRankSpeedMultiplier(rank);
+        float rankHealthMultiplier = ResolveRankHealthMultiplier(rank);
+        float rankAttackMultiplier = ResolveRankAttackMultiplier(rank);
+        float rankDefenseMultiplier = ResolveRankDefenseMultiplier(rank);
+        float rankMagicMultiplier = ResolveRankMagicMultiplier(rank);
+        float rankResistanceMultiplier = ResolveRankResistanceMultiplier(rank);
+        float rankSpeedMultiplier = ResolveRankSpeedMultiplier(rank);
 
         float specialBossHpMultiplier = 1f;
         float specialBossAttackMultiplier = 1f;
+        float specialBossDefenseMultiplier = 1f;
+        float specialBossSpecialAttackMultiplier = 1f;
+        float specialBossSpecialDefenseMultiplier = 1f;
         float specialBossSpeedMultiplier = 1f;
         int enemyId = enemy.GetInstanceID();
 
-        if (rank == MonsterRank.Boss && finalMomentBossEnemyIds.Contains(enemyId))
+        bool isCleanupBoss = rank == MonsterRank.Boss && enemy == cleanupBossInstance;
+        if (rank == MonsterRank.Boss && !isCleanupBoss && finalMomentBossEnemyIds.Contains(enemyId))
         {
             specialBossHpMultiplier = Mathf.Max(specialBossHpMultiplier, Mathf.Max(0.01f, finalMomentBossHpMultiplier));
             specialBossAttackMultiplier = Mathf.Max(specialBossAttackMultiplier, Mathf.Max(0.01f, finalMomentBossAttackMultiplier));
+            specialBossDefenseMultiplier = Mathf.Max(specialBossDefenseMultiplier, Mathf.Max(0.01f, finalMomentBossDefenseMultiplier));
+            specialBossSpecialAttackMultiplier = Mathf.Max(specialBossSpecialAttackMultiplier, Mathf.Max(0.01f, finalMomentBossSpecialAttackMultiplier));
+            specialBossSpecialDefenseMultiplier = Mathf.Max(specialBossSpecialDefenseMultiplier, Mathf.Max(0.01f, finalMomentBossSpecialDefenseMultiplier));
             specialBossSpeedMultiplier = Mathf.Max(specialBossSpeedMultiplier, Mathf.Max(0.01f, finalMomentBossSpeedMultiplier));
         }
 
@@ -623,13 +952,28 @@ public class EnemySpawner : MonoBehaviour
         {
             specialBossHpMultiplier = Mathf.Max(specialBossHpMultiplier, Mathf.Max(0.01f, ultimateModifiers.hpMultiplier));
             specialBossAttackMultiplier = Mathf.Max(specialBossAttackMultiplier, Mathf.Max(0.01f, ultimateModifiers.attackMultiplier));
+            specialBossDefenseMultiplier = Mathf.Max(specialBossDefenseMultiplier, Mathf.Max(0.01f, ultimateModifiers.defenseMultiplier));
+            specialBossSpecialAttackMultiplier = Mathf.Max(specialBossSpecialAttackMultiplier, Mathf.Max(0.01f, ultimateModifiers.specialAttackMultiplier));
+            specialBossSpecialDefenseMultiplier = Mathf.Max(specialBossSpecialDefenseMultiplier, Mathf.Max(0.01f, ultimateModifiers.specialDefenseMultiplier));
             specialBossSpeedMultiplier = Mathf.Max(specialBossSpeedMultiplier, Mathf.Max(0.01f, ultimateModifiers.speedMultiplier));
         }
 
-        healthMultiplier *= specialBossHpMultiplier;
-        attackMultiplier *= specialBossAttackMultiplier;
-        magicMultiplier *= specialBossAttackMultiplier;
-        speedMultiplier *= specialBossSpeedMultiplier;
+        if (isCleanupBoss)
+        {
+            specialBossHpMultiplier *= Mathf.Max(0.01f, cleanupBossHealthMultiplier);
+            specialBossAttackMultiplier *= Mathf.Max(0.01f, cleanupBossAttackMultiplier);
+            specialBossDefenseMultiplier *= Mathf.Max(0.01f, cleanupBossDefenseMultiplier);
+            specialBossSpecialAttackMultiplier *= Mathf.Max(0.01f, cleanupBossSpecialAttackMultiplier);
+            specialBossSpecialDefenseMultiplier *= Mathf.Max(0.01f, cleanupBossSpecialDefenseMultiplier);
+            specialBossSpeedMultiplier *= Mathf.Max(0.01f, cleanupBossSpeedMultiplier);
+        }
+
+        float healthMultiplier = Mathf.Max(0.01f, baseHealthMultiplier) * timeMultiplier * rankHealthMultiplier * specialBossHpMultiplier;
+        float attackMultiplier = Mathf.Max(0.01f, baseAttackMultiplier) * timeMultiplier * rankAttackMultiplier * specialBossAttackMultiplier;
+        float defenseMultiplier = Mathf.Max(0.01f, baseDefenseMultiplier) * timeMultiplier * rankDefenseMultiplier * specialBossDefenseMultiplier;
+        float magicMultiplier = Mathf.Max(0.01f, baseSpecialAttackMultiplier) * timeMultiplier * rankMagicMultiplier * specialBossSpecialAttackMultiplier;
+        float resistanceMultiplier = Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * timeMultiplier * rankResistanceMultiplier * specialBossSpecialDefenseMultiplier;
+        float speedMultiplier = Mathf.Max(0.01f, baseSpeedMultiplier) * timeMultiplier * rankSpeedMultiplier * specialBossSpeedMultiplier;
 
         stats.maxHealth = Mathf.Max(1f, Mathf.Round(snapshot.maxHealth * healthMultiplier));
         stats.physicalAttack = Mathf.Max(0f, Mathf.Round(snapshot.physicalAttack * attackMultiplier));
@@ -657,6 +1001,51 @@ public class EnemySpawner : MonoBehaviour
         }
 
         ConfigureEnemyController(enemy, stats);
+        ApplyCleanupBossVisualScale(enemy, snapshot, isCleanupBoss);
+
+        if (debugScalingBreakdown)
+        {
+            EnemyDifficultyDirector director = ResolveDifficultyDirector();
+            Debug.Log(
+                "[EnemyScaling] " +
+                $"name={enemy.name} species={(identity != null ? identity.species.ToString() : "Unknown")} rank={rank} phase={(director != null ? director.CurrentPhase.ToString() : "None")} " +
+                $"baseHP={snapshot.maxHealth:F1} baseATK={snapshot.physicalAttack:F1} baseDEF={snapshot.physicalDefense:F1} baseSATK={snapshot.specialAttack:F1} baseSDEF={snapshot.specialDefense:F1} baseSPD={snapshot.speed:F2} " +
+                $"baseMulHP={baseHealthMultiplier:F2} baseMulATK={baseAttackMultiplier:F2} baseMulDEF={baseDefenseMultiplier:F2} baseMulSATK={baseSpecialAttackMultiplier:F2} baseMulSDEF={baseSpecialDefenseMultiplier:F2} baseMulSPD={baseSpeedMultiplier:F2} " +
+                $"timeMul={timeMultiplier:F2} rankHP={rankHealthMultiplier:F2} rankATK={rankAttackMultiplier:F2} rankDEF={rankDefenseMultiplier:F2} rankSATK={rankMagicMultiplier:F2} rankSDEF={rankResistanceMultiplier:F2} rankSPD={rankSpeedMultiplier:F2} " +
+                $"specialBossHP={specialBossHpMultiplier:F2} specialBossATK={specialBossAttackMultiplier:F2} specialBossDEF={specialBossDefenseMultiplier:F2} specialBossSATK={specialBossSpecialAttackMultiplier:F2} specialBossSDEF={specialBossSpecialDefenseMultiplier:F2} specialBossSPD={specialBossSpeedMultiplier:F2} " +
+                $"finalHP={stats.maxHealth:F1} finalATK={stats.physicalAttack:F1} finalDEF={stats.physicalDefense:F1} finalSATK={stats.specialAttack:F1} finalSDEF={stats.specialDefense:F1} finalSPD={stats.speed:F2}",
+                enemy);
+        }
+
+        if (isCleanupBoss && debugCleanupBossScaling)
+        {
+            EnemyDifficultyDirector director = ResolveDifficultyDirector();
+            float cleanupDynamicHpMultiplier = 1f;
+            float cleanupDynamicAttackMultiplier = 1f;
+            float cleanupDynamicDefenseMultiplier = 1f;
+            float cleanupDynamicSpecialAttackMultiplier = 1f;
+            float cleanupDynamicSpecialDefenseMultiplier = 1f;
+            float cleanupDynamicSpeedMultiplier = 1f;
+            if (ultimateBossModifiersByEnemyId.TryGetValue(enemyId, out UltimateBossModifiers cleanupModifiers))
+            {
+                cleanupDynamicHpMultiplier = cleanupModifiers.hpMultiplier;
+                cleanupDynamicAttackMultiplier = cleanupModifiers.attackMultiplier;
+                cleanupDynamicDefenseMultiplier = cleanupModifiers.defenseMultiplier;
+                cleanupDynamicSpecialAttackMultiplier = cleanupModifiers.specialAttackMultiplier;
+                cleanupDynamicSpecialDefenseMultiplier = cleanupModifiers.specialDefenseMultiplier;
+                cleanupDynamicSpeedMultiplier = cleanupModifiers.speedMultiplier;
+            }
+
+            Debug.Log(
+                "[CleanupBossScaling] " +
+                $"name={enemy.name} phase={(director != null ? director.CurrentPhase.ToString() : "None")} " +
+                $"baseHP={snapshot.maxHealth:F1} baseATK={snapshot.physicalAttack:F1} baseDEF={snapshot.physicalDefense:F1} baseSATK={snapshot.specialAttack:F1} baseSDEF={snapshot.specialDefense:F1} baseSPD={snapshot.speed:F2} " +
+                $"rankHP={rankHealthMultiplier:F2} rankATK={rankAttackMultiplier:F2} rankDEF={rankDefenseMultiplier:F2} rankSATK={rankMagicMultiplier:F2} rankSDEF={rankResistanceMultiplier:F2} rankSPD={rankSpeedMultiplier:F2} " +
+                $"cleanupDynamicHP={cleanupDynamicHpMultiplier:F2} cleanupDynamicATK={cleanupDynamicAttackMultiplier:F2} cleanupDynamicDEF={cleanupDynamicDefenseMultiplier:F2} cleanupDynamicSATK={cleanupDynamicSpecialAttackMultiplier:F2} cleanupDynamicSDEF={cleanupDynamicSpecialDefenseMultiplier:F2} cleanupDynamicSPD={cleanupDynamicSpeedMultiplier:F2} " +
+                $"cleanupHP={cleanupBossHealthMultiplier:F2} cleanupATK={cleanupBossAttackMultiplier:F2} cleanupDEF={cleanupBossDefenseMultiplier:F2} cleanupSATK={cleanupBossSpecialAttackMultiplier:F2} cleanupSDEF={cleanupBossSpecialDefenseMultiplier:F2} cleanupSPD={cleanupBossSpeedMultiplier:F2} cleanupScale={cleanupBossScaleMultiplier:F2} cleanupAttackInterval={cleanupBossAttackIntervalMultiplier:F2} cleanupOutgoingDamage={cleanupBossOutgoingDamageMultiplier:F2} cleanupReward={cleanupBossRewardMultiplier:F2} " +
+                $"finalHP={stats.maxHealth:F1} finalATK={stats.physicalAttack:F1} finalDEF={stats.physicalDefense:F1} finalSATK={stats.specialAttack:F1} finalSDEF={stats.specialDefense:F1} finalSPD={stats.speed:F2}",
+                enemy);
+        }
     }
 
     private void ConfigureEnemyController(GameObject enemy, CombatStats stats)
@@ -712,6 +1101,14 @@ public class EnemySpawner : MonoBehaviour
         float moveSpeed = controller.BaseMoveSpeed > 0f ? controller.BaseMoveSpeed : ResolveMoveSpeed(identity, stats.speed);
         BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
         float attackPower = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
+        float attackIntervalMultiplier = ResolveRankAttackIntervalMultiplier(identity.rank);
+        float outgoingDamageMultiplier = ResolveRankOutgoingDamageMultiplier(identity.rank);
+        if (enemy == cleanupBossInstance)
+        {
+            attackIntervalMultiplier *= Mathf.Max(0.01f, cleanupBossAttackIntervalMultiplier);
+            outgoingDamageMultiplier *= Mathf.Max(0.01f, cleanupBossOutgoingDamageMultiplier);
+        }
+
         controller.ConfigureRuntime(
             moveSpeed,
             0.8f,
@@ -720,9 +1117,38 @@ public class EnemySpawner : MonoBehaviour
             cooldown,
             attackPower,
             identity.attackStyle,
-            ResolveRankAttackIntervalMultiplier(identity.rank),
-            ResolveRankOutgoingDamageMultiplier(identity.rank));
+            attackIntervalMultiplier,
+            outgoingDamageMultiplier);
         controller.SetTarget(ResolveActivePlayerTarget(), "Spawner");
+    }
+
+    private void ApplyCleanupBossVisualScale(GameObject enemy, MonsterBaseSnapshot snapshot, bool isCleanupBoss)
+    {
+        if (!isCleanupBoss || !snapshot.hasScaleTarget || !TryGetEnemyScaleTarget(enemy, out Transform scaleTarget) || scaleTarget == null)
+        {
+            return;
+        }
+
+        scaleTarget.localScale = Vector3.Scale(snapshot.scaleTargetLocalScale, Vector3.one * Mathf.Max(0.01f, cleanupBossScaleMultiplier));
+    }
+
+    private static bool TryGetEnemyScaleTarget(GameObject enemy, out Transform scaleTarget)
+    {
+        scaleTarget = null;
+        if (enemy == null)
+        {
+            return false;
+        }
+
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        if (rankVisual != null && rankVisual.visualRoot != null)
+        {
+            scaleTarget = rankVisual.visualRoot;
+            return true;
+        }
+
+        scaleTarget = enemy.transform;
+        return scaleTarget != null;
     }
 
     private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
@@ -1207,6 +1633,8 @@ public class EnemySpawner : MonoBehaviour
         PromoteBossToFinalMoment(ultimateBoss);
         MarkBossAsUltimate(ultimateBoss, remainingNonBossEnemyCount);
         cleanupBossInstance = ultimateBoss;
+        ApplyCurrentMultiplierToMonster(ultimateBoss, refillCurrentHealth: true);
+        ConfigureCleanupBossPhaseSplit(ultimateBoss);
         ResolveDifficultyDirector()?.ArmSpawnStoppedBossVictory(ultimateBoss);
     }
 
@@ -1289,11 +1717,45 @@ public class EnemySpawner : MonoBehaviour
             attackMultiplier = Mathf.Max(
                 Mathf.Max(0.01f, finalMomentBossAttackMultiplier),
                 Mathf.Min(Mathf.Max(1f, 1f + Mathf.Max(0, remainingNonBossEnemyCount) * Mathf.Max(0f, ultimateBossAttackPerRemainingEnemy)), Mathf.Max(1f, ultimateBossMaxAttackMultiplier))),
+            defenseMultiplier = Mathf.Max(0.01f, finalMomentBossDefenseMultiplier),
+            specialAttackMultiplier = Mathf.Max(0.01f, finalMomentBossSpecialAttackMultiplier),
+            specialDefenseMultiplier = Mathf.Max(0.01f, finalMomentBossSpecialDefenseMultiplier),
             speedMultiplier = Mathf.Max(0.01f, Mathf.Min(Mathf.Max(0.01f, ultimateBossSpeedMultiplier), 1.1f))
         };
 
         ultimateBossModifiersByEnemyId[boss.GetInstanceID()] = modifiers;
         ApplyCurrentMultiplierToMonster(boss, refillCurrentHealth: true);
+    }
+
+    private void ConfigureCleanupBossPhaseSplit(GameObject cleanupBoss)
+    {
+        if (cleanupBoss == null)
+        {
+            return;
+        }
+
+        CleanupBossPhaseSplit phaseSplit = cleanupBoss.GetComponent<CleanupBossPhaseSplit>();
+        if (phaseSplit == null)
+        {
+            phaseSplit = cleanupBoss.AddComponent<CleanupBossPhaseSplit>();
+        }
+
+        phaseSplit.Initialize(
+            this,
+            cleanupBoss,
+            cleanupBossPhaseSplitEnabled,
+            cleanupBossSplitHealthThresholds,
+            cleanupBossSplitCountPerThreshold,
+            cleanupBossSplitScatterRadius,
+            cleanupBossSplitChildRank,
+            cleanupBossSplitChildHealthRatio,
+            cleanupBossSplitChildAttackRatio,
+            cleanupBossSplitChildDefenseRatio,
+            cleanupBossSplitChildSpeedRatio,
+            cleanupBossSplitChildScaleRatio,
+            cleanupBossSplitChildrenCanSplit,
+            cleanupBossRewardMultiplier,
+            debugCleanupBossPhaseSplit);
     }
 
     private int CountAliveNonBossEnemies()

@@ -50737,6 +50737,43 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 257076096}
   m_CullTransparentMesh: 1
+--- !u!84 &359019896
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &441632486
 GameObject:
   m_ObjectHideFlags: 0
@@ -71999,6 +72036,12 @@ MonoBehaviour:
   normalReinforceIntervalMax: 10
   normalReinforceCountMin: 1
   normalReinforceCountMax: 5
+  baseHealthMultiplier: 1
+  baseAttackMultiplier: 1
+  baseDefenseMultiplier: 1
+  baseSpecialAttackMultiplier: 1
+  baseSpecialDefenseMultiplier: 1
+  baseSpeedMultiplier: 1
   monsterStatGrowthIntervalMin: 30
   monsterStatGrowthIntervalMax: 60
   monsterStatGrowthPercentMin: 0.01
@@ -72029,18 +72072,47 @@ MonoBehaviour:
   eliteSpawnIntervalMin: 20
   eliteSpawnIntervalMax: 40
   eliteGuaranteedSpawnTime: 30
-  maxAliveEliteCount: 1
+  maxAliveEliteCount: 4
   bossCheckIntervalGameHours: 6
   bossSpawnChancePerCheck: 0.25
   maxAliveBossCount: 1
   finalMomentBossHpMultiplier: 1.5
   finalMomentBossAttackMultiplier: 1.25
+  finalMomentBossDefenseMultiplier: 1
+  finalMomentBossSpecialAttackMultiplier: 1.25
+  finalMomentBossSpecialDefenseMultiplier: 1
   finalMomentBossSpeedMultiplier: 1
   ultimateBossHpPerRemainingEnemy: 0.05
   ultimateBossAttackPerRemainingEnemy: 0.03
   ultimateBossMaxHpMultiplier: 5
   ultimateBossMaxAttackMultiplier: 3
   ultimateBossSpeedMultiplier: 1
+  cleanupBossHealthMultiplier: 1
+  cleanupBossAttackMultiplier: 1
+  cleanupBossDefenseMultiplier: 1
+  cleanupBossSpecialAttackMultiplier: 1
+  cleanupBossSpecialDefenseMultiplier: 1
+  cleanupBossSpeedMultiplier: 1
+  cleanupBossScaleMultiplier: 1
+  cleanupBossOutgoingDamageMultiplier: 1
+  cleanupBossAttackIntervalMultiplier: 1
+  cleanupBossRewardMultiplier: 1
+  cleanupBossPhaseSplitEnabled: 1
+  cleanupBossSplitHealthThresholds:
+  - 0.7
+  - 0.5
+  - 0.3
+  cleanupBossSplitCountPerThreshold: 10
+  cleanupBossSplitScatterRadius: 1.5
+  cleanupBossSplitChildRank: 1
+  cleanupBossSplitChildHealthRatio: 0.35
+  cleanupBossSplitChildAttackRatio: 0.55
+  cleanupBossSplitChildDefenseRatio: 0.5
+  cleanupBossSplitChildSpeedRatio: 1
+  cleanupBossSplitChildScaleRatio: 0.75
+  cleanupBossSplitChildrenCanSplit: 0
+  debugCleanupBossPhaseSplit: 0
+  debugCleanupBossScaling: 0
   spawnAroundPlayer: 1
   spawnMinDistance: 6
   spawnMaxDistance: 12
@@ -72053,6 +72125,7 @@ MonoBehaviour:
   freezeEnemyVerticalPosition: 0
   difficultyDirector: {fileID: 0}
   debugDifficultySpawnLogs: 0
+  debugScalingBreakdown: 0
 --- !u!1 &1119862288
 GameObject:
   m_ObjectHideFlags: 0
@@ -81850,7 +81923,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 1862789227}
+  m_CustomBakedTexture: {fileID: 359019896}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -81898,13 +81971,23 @@ MonoBehaviour:
   normalLevelInterval: 60
   finalRushStartTime: 480
   finalRushDuration: 180
+  baseHealthMultiplier: 1
+  baseAttackMultiplier: 1
+  baseDefenseMultiplier: 1
+  baseSpecialAttackMultiplier: 1
+  baseSpecialDefenseMultiplier: 1
+  baseSpeedMultiplier: 1
   hpGrowthPerLevel: 0.25
   attackGrowthPerLevel: 0.18
   defenseGrowthPerLevel: 0.1
+  specialAttackGrowthPerLevel: 0.12
+  specialDefenseGrowthPerLevel: 0.1
   speedGrowthPerLevel: 0.05
   finalRushHpMultiplier: 2
   finalRushAttackMultiplier: 1.8
   finalRushDefenseMultiplier: 1.4
+  finalRushSpecialAttackMultiplier: 2.2
+  finalRushSpecialDefenseMultiplier: 1.8
   finalRushSpeedMultiplier: 1.2
   spawnRateGrowthPerLevel: 0.08
   extraMaxAlivePerLevel: 2
@@ -102931,7 +103014,7 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.9926224, g: 0.79911613, b: 0.35519004, a: 1}
+  m_Color: {r: 0.9854652, g: 0.7209469, b: 0.3258722, a: 1}
   m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
@@ -102994,7 +103077,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.58902925, y: 0.15782993, z: 0.20512685, w: 0.7655438}
+  m_LocalRotation: {x: 0.59614766, y: 0.1597373, z: 0.20364502, w: 0.7600136}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -104661,43 +104744,6 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1855723239}
   m_CullTransparentMesh: 1
---- !u!84 &1862789227
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &1864013316
 GameObject:
   m_ObjectHideFlags: 0

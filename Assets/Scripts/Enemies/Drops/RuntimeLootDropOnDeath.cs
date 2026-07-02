@@ -103,6 +103,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
         bool suppressRuneDrop = identity != null && identity.suppressRuneDrop;
+        CleanupBossPhaseSplit cleanupBossPhaseSplit = GetComponent<CleanupBossPhaseSplit>();
+        float cleanupBossRewardMultiplier = cleanupBossPhaseSplit != null
+            ? cleanupBossPhaseSplit.CleanupBossRewardMultiplier
+            : 1f;
         float killerLuck = ResolveLuck(killer);
         RuneRuntimeState runeRuntimeState = ResolveRuneRuntimeState(killer);
         int dropCallId = ++nextRuneDropCallId;
@@ -110,6 +114,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         int dropperInstanceId = GetInstanceID();
 
         int soulCount = rank == MonsterRank.Boss ? 4 : (rank == MonsterRank.Elite ? 2 : 1);
+        if (cleanupBossPhaseSplit != null)
+        {
+            soulCount = Mathf.Max(0, Mathf.RoundToInt(soulCount * cleanupBossRewardMultiplier));
+        }
         for (int i = 0; i < soulCount; i++)
         {
             SoulType soulType = GetRandomSoulTypeByWeight();
@@ -152,6 +160,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         if (rank != MonsterRank.Normal)
         {
             runeCount = Mathf.Clamp(runeCount, 1, 3);
+        }
+        if (cleanupBossPhaseSplit != null)
+        {
+            runeCount = Mathf.Max(0, Mathf.RoundToInt(runeCount * cleanupBossRewardMultiplier));
         }
         int baseRuneDropCount = GetBaseRuneDropCount(rank);
         int extraRuneCount = Mathf.Max(0, runeCount - baseRuneDropCount);

@@ -15,26 +15,63 @@ public class EnemyDifficultyDirector : MonoBehaviour
     private static bool isShuttingDown;
 
     [Header("Timeline")]
+    [Tooltip("Seconds required to gain one normal difficulty level before FinalRush starts.")]
     [SerializeField, Min(1f)] private float normalLevelInterval = 10f;
+    [Tooltip("Elapsed battle time in seconds when FinalRush begins.")]
     [SerializeField, Min(0f)] private float finalRushStartTime = 600f;
+    [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
     [SerializeField, Min(0f)] private float finalRushDuration = 180f;
 
+    [Header("Base Multipliers")]
+    [Tooltip("Base HP multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseHealthMultiplier = 1f;
+    [Tooltip("Base physical attack multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseAttackMultiplier = 1f;
+    [Tooltip("Base physical defense multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseDefenseMultiplier = 1f;
+    [Tooltip("Base special attack multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpecialAttackMultiplier = 1f;
+    [Tooltip("Base special defense multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpecialDefenseMultiplier = 1f;
+    [Tooltip("Base speed multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpeedMultiplier = 1f;
+
     [Header("Per-Level Growth")]
+    [Tooltip("Additive HP growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
     [SerializeField, Min(0f)] private float hpGrowthPerLevel = 0.10f;
+    [Tooltip("Additive physical attack growth per difficulty level. 0.12 means +12% per level before FinalRush overrides.")]
     [SerializeField, Min(0f)] private float attackGrowthPerLevel = 0.12f;
+    [Tooltip("Additive physical defense growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
     [SerializeField, Min(0f)] private float defenseGrowthPerLevel = 0.10f;
+    [Tooltip("Additive special attack growth per difficulty level. 0.12 means +12% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float specialAttackGrowthPerLevel = 0.12f;
+    [Tooltip("Additive special defense growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float specialDefenseGrowthPerLevel = 0.10f;
+    [Tooltip("Additive speed growth per difficulty level. 0.06 means +6% per level before FinalRush overrides.")]
     [SerializeField, Min(0f)] private float speedGrowthPerLevel = 0.06f;
 
     [Header("Final Rush Multipliers")]
+    [Tooltip("Extra HP multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 2.5f;
+    [Tooltip("Extra physical attack multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 2.2f;
+    [Tooltip("Extra physical defense multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.8f;
+    [Tooltip("Extra special attack multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 2.2f;
+    [Tooltip("Extra special defense multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.8f;
+    [Tooltip("Extra speed multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.4f;
 
     [Header("Spawn Pressure")]
+    [Tooltip("Additive spawn-rate growth per difficulty level. Higher values make spawn intervals shorter.")]
     [SerializeField, Min(0f)] private float spawnRateGrowthPerLevel = 0.08f;
+    [Tooltip("Extra alive-enemy cap granted per difficulty level.")]
     [SerializeField, Min(0)] private int extraMaxAlivePerLevel = 2;
+    [Tooltip("FinalRush multiplier applied to the resolved spawn interval. Values below 1 spawn faster.")]
     [SerializeField, Min(0.01f)] private float finalRushSpawnIntervalMultiplier = 0.25f;
+    [Tooltip("Extra alive-enemy cap granted while FinalRush is active.")]
     [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 40;
 
     [Header("Boss Spawn By Kills")]
@@ -110,10 +147,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
     public bool CanSpawnEnemies => currentPhase == DifficultyPhase.Normal || currentPhase == DifficultyPhase.FinalRush;
     public bool ShouldAllowSpawning => CanSpawnEnemies;
 
-    public float CurrentHpMultiplier => ResolvePerSpawnMultiplier(1f + CurrentDifficultyLevel * hpGrowthPerLevel, finalRushHpMultiplier);
-    public float CurrentAttackMultiplier => ResolvePerSpawnMultiplier(1f + CurrentDifficultyLevel * attackGrowthPerLevel, finalRushAttackMultiplier);
-    public float CurrentDefenseMultiplier => ResolvePerSpawnMultiplier(1f + CurrentDifficultyLevel * defenseGrowthPerLevel, finalRushDefenseMultiplier);
-    public float CurrentSpeedMultiplier => ResolvePerSpawnMultiplier(1f + CurrentDifficultyLevel * speedGrowthPerLevel, finalRushSpeedMultiplier);
+    public float CurrentHpMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseHealthMultiplier) * (1f + CurrentDifficultyLevel * hpGrowthPerLevel), finalRushHpMultiplier);
+    public float CurrentAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseAttackMultiplier) * (1f + CurrentDifficultyLevel * attackGrowthPerLevel), finalRushAttackMultiplier);
+    public float CurrentDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseDefenseMultiplier) * (1f + CurrentDifficultyLevel * defenseGrowthPerLevel), finalRushDefenseMultiplier);
+    public float CurrentSpecialAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialAttackMultiplier) * (1f + CurrentDifficultyLevel * specialAttackGrowthPerLevel), finalRushSpecialAttackMultiplier);
+    public float CurrentSpecialDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * (1f + CurrentDifficultyLevel * specialDefenseGrowthPerLevel), finalRushSpecialDefenseMultiplier);
+    public float CurrentSpeedMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpeedMultiplier) * (1f + CurrentDifficultyLevel * speedGrowthPerLevel), finalRushSpeedMultiplier);
     public float CurrentSpawnIntervalMultiplier => ResolveSpawnIntervalMultiplier();
     public int CurrentExtraMaxAlive => ResolveExtraMaxAlive();
     public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
@@ -161,17 +200,25 @@ public class EnemyDifficultyDirector : MonoBehaviour
             return;
         }
 
+        float baseHp = stats.maxHealth;
+        float baseAttack = stats.physicalAttack;
+        float baseDefense = stats.physicalDefense;
+        float baseSpecialAttack = stats.specialAttack;
+        float baseSpecialDefense = stats.specialDefense;
+        float baseSpeed = stats.speed;
         float hpMultiplier = CurrentHpMultiplier;
         float attackMultiplier = CurrentAttackMultiplier;
         float defenseMultiplier = CurrentDefenseMultiplier;
+        float specialAttackMultiplier = CurrentSpecialAttackMultiplier;
+        float specialDefenseMultiplier = CurrentSpecialDefenseMultiplier;
         float speedMultiplier = CurrentSpeedMultiplier;
 
-        stats.maxHealth = Mathf.Max(1f, Mathf.Round(stats.maxHealth * hpMultiplier));
-        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(stats.physicalAttack * attackMultiplier));
-        stats.specialAttack = Mathf.Max(0f, Mathf.Round(stats.specialAttack * attackMultiplier));
-        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(stats.physicalDefense * defenseMultiplier));
-        stats.specialDefense = Mathf.Max(0f, Mathf.Round(stats.specialDefense * defenseMultiplier));
-        stats.speed = Mathf.Max(0.1f, RoundToDecimals(stats.speed * speedMultiplier, 2));
+        stats.maxHealth = Mathf.Max(1f, Mathf.Round(baseHp * hpMultiplier));
+        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(baseAttack * attackMultiplier));
+        stats.specialAttack = Mathf.Max(0f, Mathf.Round(baseSpecialAttack * specialAttackMultiplier));
+        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(baseDefense * defenseMultiplier));
+        stats.specialDefense = Mathf.Max(0f, Mathf.Round(baseSpecialDefense * specialDefenseMultiplier));
+        stats.speed = Mathf.Max(0.1f, RoundToDecimals(baseSpeed * speedMultiplier, 2));
 
         BattleResourceBank resourceBank = enemy.GetComponent<BattleResourceBank>();
         CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
@@ -200,10 +247,14 @@ public class EnemyDifficultyDirector : MonoBehaviour
         if (debugScaleLogs)
         {
             Debug.Log(
-                "[EnemyDifficultyScale] " +
-                $"enemy={enemy.name} phase={currentPhase} level={CurrentDifficultyLevel} " +
-                $"hpMultiplier={hpMultiplier:F2} attackMultiplier={attackMultiplier:F2} " +
-                $"defenseMultiplier={defenseMultiplier:F2} speedMultiplier={speedMultiplier:F2}",
+                "[EnemyScaling] " +
+                $"name={enemy.name} species={(identity != null ? identity.species.ToString() : "Unknown")} rank={(identity != null ? identity.rank.ToString() : "Unknown")} phase={currentPhase} " +
+                $"baseHP={baseHp:F1} difficultyHP={hpMultiplier:F2} finalHP={stats.maxHealth:F1} " +
+                $"baseATK={baseAttack:F1} difficultyATK={attackMultiplier:F2} finalATK={stats.physicalAttack:F1} " +
+                $"baseDEF={baseDefense:F1} difficultyDEF={defenseMultiplier:F2} finalDEF={stats.physicalDefense:F1} " +
+                $"baseSATK={baseSpecialAttack:F1} difficultySATK={specialAttackMultiplier:F2} finalSATK={stats.specialAttack:F1} " +
+                $"baseSDEF={baseSpecialDefense:F1} difficultySDEF={specialDefenseMultiplier:F2} finalSDEF={stats.specialDefense:F1} " +
+                $"baseSPD={baseSpeed:F2} difficultySPD={speedMultiplier:F2} finalSPD={stats.speed:F2}",
                 enemy);
         }
     }
@@ -230,6 +281,9 @@ public class EnemyDifficultyDirector : MonoBehaviour
             return;
         }
 
+        Debug.Log(
+            $"[CleanupBossVictory] cleanup boss body died boss={(defeatedBoss != null ? defeatedBoss.name : "null")} cleanupBossInstanceMatched={defeatedBoss == cleanupBossInstance} remainingSplitChildrenIgnored=true victoryTriggered=true",
+            this);
         bossDefeated = true;
         spawnStoppedBossVictoryArmed = false;
         cleanupBossInstance = null;
@@ -381,6 +435,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
         cleanupBossInstance = cleanupBoss;
         spawnStoppedBossVictoryArmed = true;
         bossDefeated = false;
+        Debug.Log($"[CleanupBossVictory] cleanup boss armed boss={cleanupBoss.name}", this);
     }
 
     public bool HasFinalRushStarted => finalRushStarted;
@@ -485,8 +540,8 @@ public class EnemyDifficultyDirector : MonoBehaviour
         Log(
             "[EnemyDifficulty] " +
             $"elapsed={elapsedTime:F1} phase={currentPhase} level={CurrentDifficultyLevel} " +
-            $"hpMul={CurrentHpMultiplier:F2} atkMul={CurrentAttackMultiplier:F2} " +
-            $"defMul={CurrentDefenseMultiplier:F2} spdMul={CurrentSpeedMultiplier:F2} " +
+            $"hpMul={CurrentHpMultiplier:F2} atkMul={CurrentAttackMultiplier:F2} defMul={CurrentDefenseMultiplier:F2} " +
+            $"sAtkMul={CurrentSpecialAttackMultiplier:F2} sDefMul={CurrentSpecialDefenseMultiplier:F2} spdMul={CurrentSpeedMultiplier:F2} " +
             $"spawnIntervalMul={CurrentSpawnIntervalMultiplier:F2} extraMaxAlive={CurrentExtraMaxAlive} " +
             $"spawnStopped={!CanSpawnEnemies}");
     }
