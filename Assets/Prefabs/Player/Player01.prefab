@@ -1364,22 +1364,58 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_R_NeedleShot
   cooldown: 1.15
-  duration: 0.45
+  duration: 1.25
   effectPower: 1.35
   animationName: ATK1
   debugLog: 1
-  needlePrefab: {fileID: 0}
-  needleCount: 3
-  needleSpreadAngle: 10
-  needleSpeed: 14
-  baseDamage: 50
-  physicalScaling: 0.25
-  specialScaling: 1.1
-  healPercentOfDamage: 0.25
-  enemyLayer:
+  useSpineAnimationEvents: 0
+  thrustVfxEventName: R_ThrustVfx
+  thrustHitEventName: R_ThrustHit
+  needleStartEventName: R_Needles
+  thrustVfxStartTime: 0.15
+  thrustHitTime: 0.22
+  needleStartTime: 0.45
+  needleInterval: 0.12
+  skillEndTime: 1.25
+  thrustVfxPrefab: {fileID: 11400000, guid: 6d6b3a1158d84f80848d2c2ba4f39c11, type: 3}
+  thrustVfxAnchor: {fileID: 0}
+  thrustDamage: 40
+  thrustRange: 2.4
+  thrustWidth: 1.2
+  thrustHeight: 1.4
+  thrustForwardOffset: 1.2
+  thrustHitLayers:
     serializedVersion: 2
-    m_Bits: 4294967295
-  spawnOffset: {x: 0.85, y: 0.15, z: 0}
+    m_Bits: 128
+  debugDrawThrustHitbox: 0
+  needlePrefab: {fileID: 6860482820014089041, guid: 2782e2742c693e3459f55aaec3c41f7f, type: 3}
+  needleCount: 4
+  spawnRadiusMin: 3.5
+  spawnRadiusMax: 5.5
+  heightMin: 0.5
+  heightMax: 2.2
+  targetHeightOffset: 0.8
+  horizontalRandomAngle: 18
+  enforceNeedleMinVisibleAngle: 1
+  minVisibleAngle: 12
+  useRandomSeed: 1
+  randomSeed: 101
+  needleDamage: 50
+  needlePhysicalScaling: 0.25
+  needleSpecialScaling: 1.1
+  travelSpeed: 14
+  passThroughDistance: 4.5
+  fadeDuration: 0.3
+  needleHealPercentOfDamage: 0.25
+  needleHitLayers:
+    serializedVersion: 2
+    m_Bits: 128
+  needleHitRadius: 0.3
+  targetSearchRadius: 14
+  targetSearchLayers:
+    serializedVersion: 2
+    m_Bits: 128
+  fallbackTargetDistance: 6
 --- !u!114 &9002000000000000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
