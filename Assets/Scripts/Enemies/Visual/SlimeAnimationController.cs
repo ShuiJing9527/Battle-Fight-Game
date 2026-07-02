@@ -52,6 +52,15 @@ public class SlimeAnimationController : MonoBehaviour
     public AttackHitEvent onAttackHit = new AttackHitEvent();
     public bool IsAttacking => isAttacking;
     public bool IsDying => isDying;
+    public float AttackWindup => Mathf.Max(0.01f, attackChargeTime);
+    public float AttackRecovery => Mathf.Max(0.01f, attackRecoverTime);
+    public float AttackAnimationDuration => Mathf.Max(0.01f, attackChargeTime) + Mathf.Max(0.01f, attackJumpTime) + Mathf.Max(0.01f, attackRecoverTime);
+    public string SelectedAttackClipName => "ProceduralJumpAttack";
+    public float SelectedAttackClipLength => AttackAnimationDuration;
+    public float AnimatorPlaybackSpeed => 1f;
+    public bool AllowAttackForwardLeap => allowAttackForwardLeap;
+    public bool AllowAttackVerticalLeap => allowAttackVerticalLeap;
+    public float MaxAttackLeapDistance => maxAttackLeapDistance;
 
     private CombatHealth combatHealth;
     private bool previousCombatDestroyOnDeath = true;

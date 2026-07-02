@@ -136,6 +136,7 @@ public class EnemySpawner : MonoBehaviour
     private bool finalMomentBossTriggered;
     private bool spawnStoppedResolutionTriggered;
     private DifficultyPhase lastObservedDifficultyPhase = DifficultyPhase.Normal;
+    private GameObject cleanupBossInstance;
 
     private struct UltimateBossModifiers
     {
@@ -675,17 +676,21 @@ public class EnemySpawner : MonoBehaviour
         float range = 1.2f;
         float hitRange = 1.25f;
         float cooldown = 1.35f;
-        if (identity.species == MonsterSpecies.BlueSlime)
-        {
-            range = 1.1f;
-            hitRange = 1.15f;
-            cooldown = 1.45f;
-        }
         if (identity.rank == MonsterRank.Elite)
         {
-            range = 5f;
-            hitRange = 6f;
-            cooldown = 1.6f;
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.35f;
+                hitRange = 1.45f;
+                cooldown = 1.45f;
+                identity.attackStyle = MonsterAttackStyle.Melee;
+            }
+            else
+            {
+                range = 5f;
+                hitRange = 6f;
+                cooldown = 1.6f;
+            }
         }
         else if (identity.rank == MonsterRank.Boss)
         {
@@ -1201,7 +1206,8 @@ public class EnemySpawner : MonoBehaviour
 
         PromoteBossToFinalMoment(ultimateBoss);
         MarkBossAsUltimate(ultimateBoss, remainingNonBossEnemyCount);
-        ResolveDifficultyDirector()?.ArmSpawnStoppedBossVictory();
+        cleanupBossInstance = ultimateBoss;
+        ResolveDifficultyDirector()?.ArmSpawnStoppedBossVictory(ultimateBoss);
     }
 
     private void EnsureFinalMomentBoss()
@@ -1261,12 +1267,10 @@ public class EnemySpawner : MonoBehaviour
         int bossId = boss.GetInstanceID();
         if (!finalMomentBossEnemyIds.Add(bossId))
         {
-            ResolveDifficultyDirector()?.ArmFinalRushVictory();
             return;
         }
 
         ApplyCurrentMultiplierToMonster(boss, refillCurrentHealth: true);
-        ResolveDifficultyDirector()?.ArmFinalRushVictory();
     }
 
     private void MarkBossAsUltimate(GameObject boss, int remainingNonBossEnemyCount)
@@ -1530,6 +1534,11 @@ public class EnemySpawner : MonoBehaviour
 
         if (destroyedEnemy != null)
         {
+            if (destroyedEnemy == cleanupBossInstance)
+            {
+                cleanupBossInstance = null;
+            }
+
             aliveEnemies.Remove(destroyedEnemy);
             monsterBaseSnapshots.Remove(destroyedEnemy.GetInstanceID());
             finalMomentBossEnemyIds.Remove(destroyedEnemy.GetInstanceID());

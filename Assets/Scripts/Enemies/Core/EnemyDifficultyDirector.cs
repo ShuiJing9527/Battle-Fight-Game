@@ -52,10 +52,13 @@ public class EnemyDifficultyDirector : MonoBehaviour
     private DifficultyPhase currentPhase = DifficultyPhase.Normal;
     private bool finalRushLogged;
     private bool spawnStoppedLogged;
+    private bool finalRushStarted;
+    private bool finalRushEnded;
     private bool bossDefeated;
     private bool victoryTriggered;
     private bool finalRushVictoryArmed;
     private bool spawnStoppedBossVictoryArmed;
+    private GameObject cleanupBossInstance;
     private int totalEnemyKills;
     private int spawnedBossCountByKills;
     private const float FinalRushBonusLevelInterval = 5f;
@@ -205,15 +208,14 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
     }
 
-    public void NotifyBossDefeated()
+    public void NotifyBossDefeated(GameObject defeatedBoss)
     {
         if (currentPhase == DifficultyPhase.Victory)
         {
             return;
         }
 
-        bool shouldTriggerVictory = currentPhase == DifficultyPhase.FinalRush || spawnStoppedBossVictoryArmed;
-        if (!shouldTriggerVictory)
+        if (!spawnStoppedBossVictoryArmed || !finalRushStarted || !finalRushEnded)
         {
             return;
         }
@@ -223,11 +225,15 @@ public class EnemyDifficultyDirector : MonoBehaviour
             return;
         }
 
-        bossDefeated = true;
-        if (currentPhase == DifficultyPhase.FinalRush || spawnStoppedBossVictoryArmed)
+        if (cleanupBossInstance == null || defeatedBoss != cleanupBossInstance)
         {
-            SetVictory(currentPhase == DifficultyPhase.FinalRush ? "FinalRushBossDefeated" : "UltimateBossDefeatedAfterFinalRushCountdown");
+            return;
         }
+
+        bossDefeated = true;
+        spawnStoppedBossVictoryArmed = false;
+        cleanupBossInstance = null;
+        SetVictory("CleanupBossDefeatedAfterFinalRush");
     }
 
     public bool NotifyEnemyKilled(bool wasBoss)
@@ -301,6 +307,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
         {
             currentPhase = DifficultyPhase.FinalRush;
             finalRushVictoryArmed = false;
+            finalRushStarted = true;
             if (!finalRushLogged)
             {
                 finalRushLogged = true;
@@ -313,6 +320,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
             currentPhase = DifficultyPhase.SpawnStopped;
             elapsedTime = FinalRushEndTime;
             finalRushVictoryArmed = false;
+            finalRushEnded = true;
             if (!spawnStoppedLogged)
             {
                 spawnStoppedLogged = true;
@@ -323,7 +331,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     private void CheckVictoryFromRemainingEnemies()
     {
-        if (currentPhase != DifficultyPhase.FinalRush || !finalRushVictoryArmed || victoryTriggered)
+        if (!debugLogs || currentPhase != DifficultyPhase.SpawnStopped || victoryTriggered)
         {
             return;
         }
@@ -335,15 +343,9 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
         lastRemainingEnemyCheckTime = Time.time;
         int aliveEnemies = CountAliveEnemiesForVictory();
-        if (debugLogs)
-        {
-            Debug.Log($"[VictoryCheck] aliveEnemies={aliveEnemies} phase={currentPhase}", this);
-        }
-
-        if (aliveEnemies <= 0)
-        {
-            SetVictory("AllEnemiesClearedDuringFinalRush");
-        }
+        Debug.Log(
+            $"[VictoryCheck] aliveEnemies={aliveEnemies} phase={currentPhase} cleanupBossArmed={spawnStoppedBossVictoryArmed} cleanupBoss={(cleanupBossInstance != null ? cleanupBossInstance.name : "null")}",
+            this);
     }
 
     private void SetVictory(string reason)
@@ -361,23 +363,29 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     public void ArmFinalRushVictory()
     {
-        if (currentPhase != DifficultyPhase.FinalRush || currentPhase == DifficultyPhase.Victory)
-        {
-            return;
-        }
-
-        finalRushVictoryArmed = true;
+        finalRushVictoryArmed = false;
     }
 
-    public void ArmSpawnStoppedBossVictory()
+    public void ArmSpawnStoppedBossVictory(GameObject cleanupBoss)
     {
         if (currentPhase != DifficultyPhase.SpawnStopped || currentPhase == DifficultyPhase.Victory)
         {
             return;
         }
 
+        if (!finalRushStarted || !finalRushEnded || cleanupBoss == null)
+        {
+            return;
+        }
+
+        cleanupBossInstance = cleanupBoss;
         spawnStoppedBossVictoryArmed = true;
+        bossDefeated = false;
     }
+
+    public bool HasFinalRushStarted => finalRushStarted;
+    public bool HasFinalRushEnded => finalRushEnded;
+    public GameObject CleanupBossInstance => cleanupBossInstance;
 
     private int CountAliveEnemiesForVictory()
     {
@@ -556,7 +564,7 @@ public sealed class EnemyDifficultyTrackedEnemy : MonoBehaviour
         deathNotified = true;
         if (isBoss && director != null)
         {
-            director.NotifyBossDefeated();
+            director.NotifyBossDefeated(gameObject);
         }
     }
 }

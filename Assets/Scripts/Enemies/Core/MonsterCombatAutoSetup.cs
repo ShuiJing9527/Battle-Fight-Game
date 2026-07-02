@@ -51,7 +51,7 @@ public static class MonsterCombatAutoSetup
 
     private static MonsterAttackStyle ResolveAttackStyle(MonsterIdentity identity)
     {
-        if (identity != null && identity.rank == MonsterRank.Boss && IsSlimeSpecies(identity.species))
+        if (identity != null && IsSlimeSpecies(identity.species))
         {
             return MonsterAttackStyle.Melee;
         }
@@ -92,18 +92,20 @@ public static class MonsterCombatAutoSetup
         float hitRange = 1.25f;
         float cooldown = 1.35f;
 
-        if (identity.species == MonsterSpecies.BlueSlime)
-        {
-            range = 1.1f;
-            hitRange = 1.15f;
-            cooldown = 1.45f;
-        }
-
         if (identity.rank == MonsterRank.Elite)
         {
-            range = 5f;
-            hitRange = 6f;
-            cooldown = 1.6f;
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.35f;
+                hitRange = 1.45f;
+                cooldown = 1.45f;
+            }
+            else
+            {
+                range = 5f;
+                hitRange = 6f;
+                cooldown = 1.6f;
+            }
         }
         else if (identity.rank == MonsterRank.Boss)
         {

@@ -759,6 +759,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 4
   playerBaseMoveSpeedScale: 1
+  speedStatMoveRatio: 0.005
+  maxActualMoveSpeed: 12
   rb: {fileID: 7237885085105757803}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1
@@ -1214,10 +1216,14 @@ MonoBehaviour:
   debugLog: 1
   slashCount: 3
   slashInterval: 0.2
-  physicalBaseDamage: 20
+  physicalBaseDamage: 40
   specialBaseDamage: 20
-  physicalScaling: 0.6
+  physicalScaling: 0.5
   specialScaling: 0.8
+  quickShearPerSlashDamageMultiplier: 1
+  quickShearBonusDamage: 0
+  quickShearFinalDamageMultiplier: 1
+  quickShearVeilBarrierDamageMultiplier: 1
   qRange: 2
   enemyLayer:
     serializedVersion: 2

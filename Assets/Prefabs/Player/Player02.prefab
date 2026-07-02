@@ -500,8 +500,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 5.5
+  moveSpeed: 4.5
   playerBaseMoveSpeedScale: 1
+  speedStatMoveRatio: 0.005
+  maxActualMoveSpeed: 12
   rb: {fileID: 4389982266256825078}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1
@@ -1232,8 +1234,14 @@ MonoBehaviour:
   baseDamage: 10
   physicalScaling: 0.8
   specialScaling: 1
-  qStarFallDamageRadius: 0.8
-  qStarFallEnableDamage: 1
+  qPhysicalBaseDamage: 10
+  qPhysicalFromPhysicalAttackScaling: 0.6
+  qPhysicalFromSpecialAttackScaling: 0
+  qSpecialBaseDamage: 20
+  qSpecialFromPhysicalAttackScaling: 0
+  qSpecialFromSpecialAttackScaling: 0.3
+  qStarFallDamageRadius: 1
+  qStarFallEnableDamage: 0
   qStarFallDamageMultiplier: 1
   qDamageDebugLog: 0
   debugCriticalLog: 1
@@ -1333,7 +1341,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a1994dff4cc9c84cbcf8969b78086bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
-  wCooldown: 8
+  wCooldown: 12
   manaCost: 40
   wShieldDuration: 5
   wDamageReduction: 0.4
@@ -1341,12 +1349,19 @@ MonoBehaviour:
   wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
   wOrbitStarBladeDamageShieldRatio: 0.5
+  wOrbitStarBladeFlatDamage: 0
+  wOrbitStarBladePhysicalSplitRatio: 0.5
+  wOrbitStarBladeSpecialSplitRatio: 0.5
+  wOrbitStarBladeFinalDamageMultiplier: 1
   wOrbitStarBladeHitRadius: 0.45
   wOrbitStarBladeKnockbackForce: 4
   wOrbitStarBladeHitInterval: 0.35
   wDamageReductionPerSword: 0.03
   wMaxDamageReduction: 0.8
-  wCounterDamageRatio: 0.5
+  wCounterDamageFromShieldRatio: 0.5
+  wCounterDamageFromBlockedDamageRatio: 0
+  wCounterFlatDamage: 0
+  wCounterFinalDamageMultiplier: 1
   wEffectScale: {x: 1.2, y: 1.2, z: 1.2}
   wEffectScaleMultiplier: 1
   wBaseOrbitStarBladeCount: 3
@@ -1384,15 +1399,19 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45276561a2769df41a45b9e9df485010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
-  cooldown: 3
-  manaCost: 20
+  cooldown: 2.5
+  manaCost: 10
   dashDistance: 4
   dashDuration: 0.15
   eRailDuration: 0.4
   ePhysicalBaseDamage: 10
-  ePhysicalAttackMultiplier: 0.6
-  eMagicBaseDamage: 30
-  eMagicAttackMultiplier: 0.3
+  ePhysicalFromPhysicalAttackScaling: 0.6
+  ePhysicalFromSpecialAttackScaling: 0
+  eSpecialBaseDamage: 30
+  eSpecialFromPhysicalAttackScaling: 0
+  eSpecialFromSpecialAttackScaling: 0.3
+  ePhysicalDamageMultiplier: 1
+  eSpecialDamageMultiplier: 1
   ePathHitRadius: 0.6
   eEnableAfterimageShader: 1
   eAfterimageSourceRenderer: {fileID: 7009046691658483294}
@@ -1452,10 +1471,17 @@ MonoBehaviour:
   rExtraDamagePerOverflowStarBlade: 10
   rDamageDebugLog: 0
   rSwarmDebugLog: 0
-  debugCriticalLog: 0
+  debugCriticalLog: 1
   baseDamage: 12
   physicalScaling: 0.5
   specialScaling: 1.3
+  rSwarmTickPhysicalBaseDamage: 10
+  rSwarmTickPhysicalFromPhysicalAttackScaling: 0.8
+  rSwarmTickPhysicalFromSpecialAttackScaling: 0
+  rSwarmTickSpecialBaseDamage: 40
+  rSwarmTickSpecialFromPhysicalAttackScaling: 0
+  rSwarmTickSpecialFromSpecialAttackScaling: 0.4
+  rSwarmTickDamageMultiplier: 1
   rEffectScale: {x: 0.3, y: 0.3, z: 0.3}
   rEffectRotationZ: 0
   rEffectOffset: {x: 0, y: 0, z: 0}
@@ -1521,7 +1547,13 @@ MonoBehaviour:
   rStarRainFallSpeed: 10
   rStarRainRandomDelay: 0.15
   rStarRainDamageRadius: 1.2
-  rStarRainDamageMultiplier: 0.6
+  rStarRainImpactDamageMultiplier: 0.6
+  rStarRainImpactPhysicalBaseDamage: 4
+  rStarRainImpactPhysicalFromPhysicalAttackScaling: 0.45
+  rStarRainImpactPhysicalFromSpecialAttackScaling: 0
+  rStarRainImpactSpecialBaseDamage: 15
+  rStarRainImpactSpecialFromPhysicalAttackScaling: 0
+  rStarRainImpactSpecialFromSpecialAttackScaling: 0.2
   rStarRainContinueAfterOrbit: 1
   rStarRainExtraDurationAfterOrbit: 0.6
   rStarRainAngleMin: 10

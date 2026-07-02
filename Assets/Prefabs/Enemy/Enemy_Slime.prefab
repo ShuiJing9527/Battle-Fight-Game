@@ -240,9 +240,9 @@ MonoBehaviour:
   closeHitRadius: 0
   meleeBodyContactRadius: 0.45
   requireGroundedToAttack: 1
-  groundedProbeDistance: 0.35
-  maxVerticalAttackDifference: 0.45
-  maxHorizontalAttackDistance: 1.15
+  groundedProbeDistance: 0.2
+  maxVerticalAttackDifference: 0.75
+  maxHorizontalAttackDistance: 1.35
   debugLog: 0
   debugMeleeHitCheck: 0
   debugSpeedDiagnostics: 0
@@ -275,9 +275,9 @@ MonoBehaviour:
   attackSquashAmount: 0.2
   attackStretchAmount: 0.22
   attackStopDistance: 0.7
-  allowAttackForwardLeap: 0
-  allowAttackVerticalLeap: 0
-  maxAttackLeapDistance: 0.15
+  allowAttackForwardLeap: 1
+  allowAttackVerticalLeap: 1
+  maxAttackLeapDistance: 0.65
   minimumVisibleAlpha: 0.92
   deathDuration: 0.65
   deathFadeTime: 0.45

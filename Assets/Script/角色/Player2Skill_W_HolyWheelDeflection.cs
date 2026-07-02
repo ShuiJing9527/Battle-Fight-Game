@@ -26,6 +26,14 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [Header("W - 星刃护盾 / 接触伤害")]
     [InspectorName("W 星刃伤害占护盾比例")]
     [SerializeField, Min(0f)] private float wOrbitStarBladeDamageShieldRatio = 0.5f;
+    [InspectorName("W 星刃固定追加伤害")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeFlatDamage = 0f;
+    [InspectorName("W 星刃物理段占比")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladePhysicalSplitRatio = 0.5f;
+    [InspectorName("W 星刃特殊段占比")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeSpecialSplitRatio = 0.5f;
+    [InspectorName("W 星刃最终伤害倍率")]
+    [SerializeField, Min(0f)] private float wOrbitStarBladeFinalDamageMultiplier = 1f;
     [InspectorName("W 星刃碰撞半径")]
     [SerializeField, Min(0.05f)] private float wOrbitStarBladeHitRadius = 0.45f;
     [InspectorName("W 星刃击退力度")]
@@ -39,7 +47,14 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [InspectorName("W 最大减伤")]
     [SerializeField] private float wMaxDamageReduction = 0.8f;
     [InspectorName("W 反击伤害比例")]
-    [SerializeField] private float wCounterDamageRatio = 0.1f;
+    [FormerlySerializedAs("wCounterDamageRatio")]
+    [SerializeField, Min(0f)] private float wCounterDamageFromShieldRatio = 0.1f;
+    [InspectorName("W 被挡伤害转反击比例")]
+    [SerializeField, Min(0f)] private float wCounterDamageFromBlockedDamageRatio = 0f;
+    [InspectorName("W 反击固定追加伤害")]
+    [SerializeField, Min(0f)] private float wCounterFlatDamage = 0f;
+    [InspectorName("W 反击最终倍率")]
+    [SerializeField, Min(0f)] private float wCounterFinalDamageMultiplier = 1f;
 
     [Header("W - 星环剑轮 / 视觉")]
     [InspectorName("W 特效尺寸")]
@@ -238,7 +253,11 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float blockedDamage = clampedRaw * currentWFinalDamageReduction;
         float damageAfterReduction = clampedRaw - blockedDamage;
         float currentShieldValue = ResolveCurrentShieldValue();
-        float counterDamage = currentShieldValue * Mathf.Max(0f, wCounterDamageRatio);
+        float counterDamage =
+            currentShieldValue * Mathf.Max(0f, wCounterDamageFromShieldRatio)
+            + blockedDamage * Mathf.Max(0f, wCounterDamageFromBlockedDamageRatio)
+            + Mathf.Max(0f, wCounterFlatDamage);
+        counterDamage *= Mathf.Max(0f, wCounterFinalDamageMultiplier);
 
         Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Shield={currentShieldValue:F2}, Counter={counterDamage:F2}", this);
         ApplyWCounterDamage(incomingDamage, counterDamage);
@@ -502,10 +521,11 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         // W 星刃护盾命中时按“护盾值 50% 混合伤害”拆成物理/法术两段结算。
-        float mixedDamage = Mathf.Max(0f, currentWOrbitBladeDamage);
-        float splitRawDamage = mixedDamage * 0.5f;
-        float physicalFinalDamage = Mathf.Max(1f, splitRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f));
-        float specialFinalDamage = Mathf.Max(1f, splitRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f));
+        float mixedDamage = Mathf.Max(0f, currentWOrbitBladeDamage) + Mathf.Max(0f, wOrbitStarBladeFlatDamage);
+        float physicalRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladePhysicalSplitRatio);
+        float specialRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladeSpecialSplitRatio);
+        float physicalFinalDamage = Mathf.Max(1f, (physicalRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier));
+        float specialFinalDamage = Mathf.Max(1f, (specialRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier));
 
         if (combatHealth != null && combatHealth.gameObject != Owner.gameObject)
         {

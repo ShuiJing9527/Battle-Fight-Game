@@ -18,12 +18,26 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float physicalScaling = 0.8f;
     [HideInInspector]
     [SerializeField] private float specialScaling = 1.0f;
+    [Header("Q - 神圣星刃 / 伤害参数")]
+    [Tooltip("Q 物理段固定基础伤害。")]
+    [SerializeField, Min(0f)] private float qPhysicalBaseDamage = 5f;
+    [Tooltip("Q 物理段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qPhysicalFromPhysicalAttackScaling = 0.6f;
+    [Tooltip("Q 物理段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qPhysicalFromSpecialAttackScaling = 0f;
+    [Tooltip("Q 特殊段固定基础伤害。")]
+    [SerializeField, Min(0f)] private float qSpecialBaseDamage = 20f;
+    [Tooltip("Q 特殊段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qSpecialFromPhysicalAttackScaling = 0f;
+    [Tooltip("Q 特殊段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qSpecialFromSpecialAttackScaling = 0.3f;
     [InspectorName("Q Star Fall Damage Radius")]
     [SerializeField] private float qStarFallDamageRadius = 0.8f;
     [InspectorName("Q Star Fall Enable Damage")]
     [SerializeField] private bool qStarFallEnableDamage = false;
     [InspectorName("Q Star Fall Damage Multiplier")]
-    [SerializeField] private float qStarFallDamageMultiplier = 1f;
+    [Tooltip("Q 星刃落地总伤害倍率，会乘在物理段与特殊段合并后的结果上。")]
+    [SerializeField, Min(0f)] private float qStarFallDamageMultiplier = 1f;
     [SerializeField] private bool qDamageDebugLog = false;
     [SerializeField] private bool debugCriticalLog = false;
 
@@ -604,8 +618,14 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         float targetPhysicalDefense = targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f;
         float targetSpecialDefense = targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f;
 
-        float physicalRaw = 5f + attackerPhysicalAttack * 0.6f;
-        float specialRaw = 20f + attackerSpecialAttack * 0.3f;
+        float physicalRaw =
+            Mathf.Max(0f, qPhysicalBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, qPhysicalFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, qPhysicalFromSpecialAttackScaling);
+        float specialRaw =
+            Mathf.Max(0f, qSpecialBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, qSpecialFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, qSpecialFromSpecialAttackScaling);
 
         float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
         float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);

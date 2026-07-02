@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using Spine.Unity;
+using UnityEngine.Serialization;
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
     [Header("E - 星痕瞬移 / 核心参数")]
@@ -12,10 +13,25 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private float eRailDuration = 0.6f;
     [Header("E - 星痕瞬移 / 路径伤害")]
+    [Tooltip("E 物理段固定基础伤害。")]
     [SerializeField, Min(0f)] private float ePhysicalBaseDamage = 10f;
-    [SerializeField, Min(0f)] private float ePhysicalAttackMultiplier = 0.6f;
-    [SerializeField, Min(0f)] private float eMagicBaseDamage = 30f;
-    [SerializeField, Min(0f)] private float eMagicAttackMultiplier = 0.3f;
+    [Tooltip("E 物理段从物理攻击获得的倍率。")]
+    [FormerlySerializedAs("ePhysicalAttackMultiplier")]
+    [SerializeField, Min(0f)] private float ePhysicalFromPhysicalAttackScaling = 0.6f;
+    [Tooltip("E 物理段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float ePhysicalFromSpecialAttackScaling = 0f;
+    [Tooltip("E 特殊段固定基础伤害。")]
+    [FormerlySerializedAs("eMagicBaseDamage")]
+    [SerializeField, Min(0f)] private float eSpecialBaseDamage = 30f;
+    [Tooltip("E 特殊段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float eSpecialFromPhysicalAttackScaling = 0f;
+    [Tooltip("E 特殊段从特殊攻击获得的倍率。")]
+    [FormerlySerializedAs("eMagicAttackMultiplier")]
+    [SerializeField, Min(0f)] private float eSpecialFromSpecialAttackScaling = 0.3f;
+    [Tooltip("E 物理段最终倍率。")]
+    [SerializeField, Min(0f)] private float ePhysicalDamageMultiplier = 1f;
+    [Tooltip("E 特殊段最终倍率。")]
+    [SerializeField, Min(0f)] private float eSpecialDamageMultiplier = 1f;
     [SerializeField, Min(0f)] private float ePathHitRadius = 0.6f;
 
     [Header("E - 星痕瞬移 / 残影特效")]
@@ -170,7 +186,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         Debug.Log(
-            $"Player02 E 星痕瞬移：距离={dashDistanceValue:F2}，持续={dashDurationSeconds:F2}，路径伤害半径={Mathf.Max(0f, ePathHitRadius):F2}，物理伤害={ePhysicalBaseDamage:F0}+{ePhysicalAttackMultiplier * 100f:F0}%物攻，法术伤害={eMagicBaseDamage:F0}+{eMagicAttackMultiplier * 100f:F0}%特攻，CD={cooldown:F2}，蓝耗={manaCost:F2}",
+            $"Player02 E 星痕瞬移：距离={dashDistanceValue:F2}，持续={dashDurationSeconds:F2}，路径伤害半径={Mathf.Max(0f, ePathHitRadius):F2}，物理伤害={ePhysicalBaseDamage:F0}+PATK*{ePhysicalFromPhysicalAttackScaling:F2}+SATK*{ePhysicalFromSpecialAttackScaling:F2}，特殊伤害={eSpecialBaseDamage:F0}+PATK*{eSpecialFromPhysicalAttackScaling:F2}+SATK*{eSpecialFromSpecialAttackScaling:F2}，CD={cooldown:F2}，蓝耗={manaCost:F2}",
             this);
 
         int spawnedAfterimages = 0;
@@ -341,10 +357,16 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         float targetPhysicalDefense = targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f;
         float targetSpecialDefense = targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f;
 
-        float physicalRaw = Mathf.Max(0f, ePhysicalBaseDamage) + attackerPhysicalAttack * Mathf.Max(0f, ePhysicalAttackMultiplier);
-        float magicRaw = Mathf.Max(0f, eMagicBaseDamage) + attackerSpecialAttack * Mathf.Max(0f, eMagicAttackMultiplier);
-        float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
-        float magicFinal = Mathf.Max(1f, magicRaw - targetSpecialDefense);
+        float physicalRaw =
+            Mathf.Max(0f, ePhysicalBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, ePhysicalFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, ePhysicalFromSpecialAttackScaling);
+        float specialRaw =
+            Mathf.Max(0f, eSpecialBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, eSpecialFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, eSpecialFromSpecialAttackScaling);
+        float physicalFinal = Mathf.Max(1f, (physicalRaw - targetPhysicalDefense) * Mathf.Max(0f, ePhysicalDamageMultiplier));
+        float specialFinal = Mathf.Max(1f, (specialRaw - targetSpecialDefense) * Mathf.Max(0f, eSpecialDamageMultiplier));
 
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
         float beforeHealth = ResolveCurrentHealth(combatHealth);
@@ -352,11 +374,11 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         if (combatHealth != null && combatHealth.gameObject != source)
         {
             combatHealth.ApplyDirectDamage(physicalFinal, source, DamagePopupType.Physical);
-            combatHealth.ApplyDirectDamage(magicFinal, source, DamagePopupType.Special);
+            combatHealth.ApplyDirectDamage(specialFinal, source, DamagePopupType.Special);
         }
         else if (enemyHealth != null && enemyHealth.gameObject != source)
         {
-            int totalDamage = Mathf.Max(2, Mathf.RoundToInt(physicalFinal) + Mathf.RoundToInt(magicFinal));
+            int totalDamage = Mathf.Max(2, Mathf.RoundToInt(physicalFinal) + Mathf.RoundToInt(specialFinal));
             enemyHealth.TakeDamage(totalDamage, source);
         }
 

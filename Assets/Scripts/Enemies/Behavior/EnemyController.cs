@@ -8,6 +8,7 @@ public class EnemyController : MonoBehaviour
     private const float ProjectileSpawnForwardOffset = 0.5f;
     private const float BossProjectileScale = 0.45f;
     private const float NormalProjectileScale = 0.28f;
+    private const float EdgeDistanceEpsilon = 0.02f;
 
     [Header("Target")]
     [SerializeField] private Transform playerTarget;
@@ -43,6 +44,7 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float groundedProbeDistance = 0.2f;
     [SerializeField] private float maxVerticalAttackDifference = 0.75f;
     [SerializeField] private float maxHorizontalAttackDistance = 1.35f;
+    [SerializeField, Min(0f)] private float groundedAttackGraceTime = 0f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
@@ -50,11 +52,14 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugAttackDiagnostics = false;
     [SerializeField] private bool debugSpeedDiagnostics = false;
     [SerializeField] private bool debugChaseDiagnostics = true;
+    [SerializeField] private bool debugAttackStateTransitions = false;
+    [SerializeField] private bool debugSlimeAttackLogs = false;
     [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
     [SerializeField, Min(0.05f)] private float targetResolveRetryInterval = 0.25f;
 
     private Rigidbody rb;
+    private MonsterIdentity monsterIdentity;
     private Player2Bootstrap playerBootstrap;
     private SlimeAnimationController slimeAnimation;
     private EnemyDebuffReceiver debuffReceiver;
@@ -73,6 +78,21 @@ public class EnemyController : MonoBehaviour
     private float nextTargetResolveTime;
     private Collider[] separationHits;
     private float lastAttackTime = -1f;
+    private float lastGroundedTime = float.NegativeInfinity;
+    private EnemyAttackRuntimeState lastLoggedAttackState = EnemyAttackRuntimeState.None;
+    private Collider lastLoggedMeleeCollider;
+    private bool hasLoggedRuntimeAttackConfig;
+
+    private enum EnemyAttackRuntimeState
+    {
+        None,
+        NoTarget,
+        Chase,
+        HoldPosition,
+        AttackReady,
+        AttackInProgress,
+        AttackRecovery
+    }
 
     public float BaseMoveSpeed => moveSpeed;
 
@@ -80,6 +100,7 @@ public class EnemyController : MonoBehaviour
     {
         MonsterCombatAutoSetup.Configure(gameObject);
         rb = GetComponent<Rigidbody>();
+        monsterIdentity = GetComponent<MonsterIdentity>();
         combatStats = GetComponent<CombatStats>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
         ResolveMeleeHitSources();
@@ -128,26 +149,38 @@ public class EnemyController : MonoBehaviour
 
         Vector3 toPlayer = playerTarget.position - transform.position;
         toPlayer.y = 0f;
-        float distance = Vector3.Distance(playerTarget.position, transform.position);
-        float horizontalDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
+        float centerDistance = Vector3.Distance(playerTarget.position, transform.position);
+        float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
         float verticalDifference = Mathf.Abs(playerTarget.position.y - transform.position.y);
+        float horizontalEdgeDistance = ResolveHorizontalEdgeDistance(playerTarget, out Vector3 enemyClosestPoint, out Vector3 playerClosestPoint);
+        float attackDistance = UsesProjectileAttack() ? horizontalCenterDistance : horizontalEdgeDistance;
         float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
-        bool grounded = IsGrounded();
-        string attackFailReason = EvaluateAttackFailReason(horizontalDistance, verticalDifference, grounded);
+        bool grounded = IsGroundedForAttack();
+        string attackFailReason = EvaluateAttackFailReason(attackDistance, verticalDifference, grounded);
         bool canAttack = string.IsNullOrEmpty(attackFailReason);
+        LogRuntimeAttackConfigOnce();
         LogAttackDiagnostics(
             statsSpeed,
-            distance,
-            horizontalDistance,
+            centerDistance,
+            attackDistance,
             verticalDifference,
             grounded,
             canAttack,
             attackFailReason);
-
-        // 进入攻击范围后，优先切到攻击流程，避免追击和出手同时发生。
+        // Enter attack flow as soon as the target is in range so chase does not keep pushing the player.
         if (canAttack)
         {
-            LogChaseDiagnostics(horizontalDistance, false, true, false, false, false, "Attack", 0f, playerTarget != null ? playerTarget.name : "null", "InAttackRange");
+            LogChaseDiagnostics(attackDistance, false, true, false, false, false, "Attack", 0f, playerTarget != null ? playerTarget.name : "null", "InAttackRange");
+            LogAttackStateChange(
+                EnemyAttackRuntimeState.AttackReady,
+                centerDistance,
+                attackDistance,
+                verticalDifference,
+                grounded,
+                canAttack,
+                "InAttackRange",
+                enemyClosestPoint,
+                playerClosestPoint);
             BeginAttack();
             return;
         }
@@ -156,7 +189,17 @@ public class EnemyController : MonoBehaviour
         if (attackInProgress)
         {
             rb.linearVelocity = Vector3.zero;
-            LogChaseDiagnostics(horizontalDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", "AttackInProgress");
+            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", "AttackInProgress");
+            LogAttackStateChange(
+                EnemyAttackRuntimeState.AttackInProgress,
+                centerDistance,
+                attackDistance,
+                verticalDifference,
+                grounded,
+                false,
+                "AttackInProgress",
+                enemyClosestPoint,
+                playerClosestPoint);
             if (keepFlatRotation)
             {
                 transform.rotation = initialRotation;
@@ -164,12 +207,22 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // 追击到停止距离内就停下，避免贴脸抖动和过冲。
-        if (distance <= stopDistance || distance < MovementZeroEpsilon)
+        // Hold position inside stop distance to avoid face-hug jitter and constant pushing.
+        if (attackDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon || centerDistance < MovementZeroEpsilon)
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
-            LogChaseDiagnostics(horizontalDistance, false, false, false, false, false, "HoldPosition", 0f, playerTarget != null ? playerTarget.name : "null", "StopDistance");
+            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "HoldPosition", 0f, playerTarget != null ? playerTarget.name : "null", "StopDistance");
+            LogAttackStateChange(
+                EnemyAttackRuntimeState.HoldPosition,
+                centerDistance,
+                attackDistance,
+                verticalDifference,
+                grounded,
+                false,
+                "StopDistance",
+                enemyClosestPoint,
+                playerClosestPoint);
             if (keepFlatRotation)
             {
                 transform.rotation = initialRotation;
@@ -177,7 +230,8 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        Vector3 direction = toPlayer / distance;
+        float safeHorizontalCenterDistance = Mathf.Max(horizontalCenterDistance, MovementZeroEpsilon);
+        Vector3 direction = toPlayer / safeHorizontalCenterDistance;
         if (enableEnemySoftAvoidance)
         {
             Vector3 separationDirection = ResolveEnemySeparationDirection();
@@ -190,7 +244,6 @@ public class EnemyController : MonoBehaviour
         }
 
         float baseMoveSpeed = moveSpeed;
-        float speedMoveMultiplier = BattleStatUtility.GetSpeedMoveMultiplier(combatStats);
         float externalMoveMultiplier = ResolveExternalMoveMultiplier();
         float rawMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, baseMoveSpeed, externalMoveMultiplier);
         float currentMoveSpeed = BattleStatUtility.ClampActualMoveSpeed(rawMoveSpeed, out _);
@@ -204,9 +257,9 @@ public class EnemyController : MonoBehaviour
             lastLoggedMoveMultiplier = externalMoveMultiplier;
         }
 
-        LogSpeedDiagnostics(statsSpeed, distance, canAttack);
+        LogSpeedDiagnostics(statsSpeed, centerDistance, canAttack);
         LogChaseDiagnostics(
-            horizontalDistance,
+            attackDistance,
             currentMoveSpeed > MovementZeroEpsilon,
             false,
             false,
@@ -216,6 +269,16 @@ public class EnemyController : MonoBehaviour
             currentMoveSpeed,
             playerTarget != null ? playerTarget.name : "null",
             string.IsNullOrEmpty(attackFailReason) ? "Chase" : attackFailReason);
+        LogAttackStateChange(
+            EnemyAttackRuntimeState.Chase,
+            centerDistance,
+            attackDistance,
+            verticalDifference,
+            grounded,
+            canAttack,
+            string.IsNullOrEmpty(attackFailReason) ? "Chase" : attackFailReason,
+            enemyClosestPoint,
+            playerClosestPoint);
 
         float verticalVelocity = rb.linearVelocity.y;
         if (maxVerticalVelocity > 0f)
@@ -340,18 +403,30 @@ public class EnemyController : MonoBehaviour
         nextAttackTime = Time.time + ResolveCurrentAttackCooldown();
         pendingAttackTarget = playerTarget;
         attackInProgress = true;
+        CancelInvoke(nameof(FinishAttackRecovery));
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
         if (debugAttackDiagnostics)
         {
             Debug.Log($"[EnemyAttack] StartAttack enemy={name} target={(pendingAttackTarget != null ? pendingAttackTarget.name : "null")}", this);
         }
+        LogSlimeAttackLifecycle("BeginAttack", pendingAttackTarget, "Triggered");
+        LogAttackStateChange(
+            EnemyAttackRuntimeState.AttackInProgress,
+            playerTarget != null ? Vector3.Distance(playerTarget.position, transform.position) : -1f,
+            playerTarget != null ? ResolveHorizontalEdgeDistance(playerTarget, out _, out _) : -1f,
+            playerTarget != null ? Mathf.Abs(playerTarget.position.y - transform.position.y) : 0f,
+            IsGroundedForAttack(),
+            false,
+            "BeginAttack",
+            Vector3.zero,
+            Vector3.zero);
 
         // 触发攻击动画后，按动画时序进入冷却恢复阶段。
         if (slimeAnimation != null)
         {
+            LogSlimeAttackLifecycle("PlayAttackAnimation", pendingAttackTarget, "SlimeAnimation");
             slimeAnimation.PlayAttack(pendingAttackTarget);
-            CancelInvoke(nameof(FinishAttackRecovery));
             Invoke(nameof(FinishAttackRecovery), AttackRecoveryDurationSeconds);
         }
         else
@@ -364,22 +439,35 @@ public class EnemyController : MonoBehaviour
     private void FinishAttackRecovery()
     {
         attackInProgress = false;
+        LogSlimeAttackLifecycle("AttackFinished", pendingAttackTarget, "RecoveryComplete");
         pendingAttackTarget = null;
         if (debugAttackDiagnostics)
         {
             Debug.Log($"[EnemyAttack] AttackFinished enemy={name}", this);
         }
+        LogAttackStateChange(
+            EnemyAttackRuntimeState.AttackRecovery,
+            playerTarget != null ? Vector3.Distance(playerTarget.position, transform.position) : -1f,
+            playerTarget != null ? ResolveHorizontalEdgeDistance(playerTarget, out _, out _) : -1f,
+            playerTarget != null ? Mathf.Abs(playerTarget.position.y - transform.position.y) : 0f,
+            IsGroundedForAttack(),
+            false,
+            "FinishAttackRecovery",
+            Vector3.zero,
+            Vector3.zero);
     }
 
     private void HandleAttackHit(Transform target)
     {
         Transform hitTarget = target != null ? target : pendingAttackTarget;
+        LogSlimeAttackLifecycle("AttackHitCallback", hitTarget, hitTarget != null ? "CallbackReceived" : "NoTarget");
         if (hitTarget == null)
         {
             if (debugAttackDiagnostics)
             {
                 Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target=null damage=0 reason=NoTarget", this);
             }
+            LogAttackAttempt(hitTarget, false, false, false, false, "NoTarget");
             FinishAttackRecovery();
             return;
         }
@@ -394,20 +482,24 @@ public class EnemyController : MonoBehaviour
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=TooFarDistance", this);
                 }
+                LogAttackAttempt(hitTarget, true, false, false, false, "TooFarDistance");
                 FinishAttackRecovery();
                 return;
             }
 
+            LogAttackAttempt(hitTarget, true, true, true, true, "Projectile");
             ExecuteProjectileAttack(hitTarget);
         }
         else
         {
-            if (!CanHitMeleeTarget(hitTarget))
+            bool insideHitRange = CanHitMeleeTarget(hitTarget);
+            if (!insideHitRange)
             {
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=HitCheckFailed", this);
                 }
+                LogAttackAttempt(hitTarget, true, false, true, false, "HitCheckFailed");
                 FinishAttackRecovery();
                 return;
             }
@@ -418,6 +510,7 @@ public class EnemyController : MonoBehaviour
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NotPlayer", this);
                 }
+                LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "NotPlayer");
                 FinishAttackRecovery();
                 return;
             }
@@ -427,6 +520,7 @@ public class EnemyController : MonoBehaviour
             {
                 BattleDamageType damageType = ResolvePrimaryDamageType();
                 float currentAttackDamage = ResolveCurrentAttackDamage(damageType);
+                LogSlimeAttackLifecycle("ApplyMeleeHit", hitTarget, $"damage={currentAttackDamage:F2}");
                 if (debugLog && Mathf.Abs(ResolveAttackMultiplier() - lastLoggedAttackMultiplier) > 0.001f)
                 {
                     Debug.Log($"[EnemyController] finalAttackDamage={currentAttackDamage:F2} multiplier={ResolveAttackMultiplier():F2}", this);
@@ -439,10 +533,12 @@ public class EnemyController : MonoBehaviour
                     Debug.Log($"[EnemyAttack] ApplyDamage enemy={name} target={hitTarget.name}", this);
                 }
                 combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, damageType, gameObject));
+                LogAttackAttempt(hitTarget, true, insideHitRange, true, true, "DamageApplied");
             }
             else if (debugAttackDiagnostics)
             {
                 Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NoCombatHealth", this);
+                LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "NoCombatHealth");
             }
         }
 
@@ -456,7 +552,7 @@ public class EnemyController : MonoBehaviour
             return false;
         }
 
-        if (requireGroundedToAttack && !IsGrounded())
+        if (requireGroundedToAttack && !IsGroundedForAttack())
         {
             return false;
         }
@@ -511,6 +607,16 @@ public class EnemyController : MonoBehaviour
                 meleeEnemyCollider = candidate;
                 break;
             }
+        }
+
+        if (debugSlimeAttackLogs && meleeEnemyCollider != null && meleeEnemyCollider != lastLoggedMeleeCollider)
+        {
+            Bounds bounds = meleeEnemyCollider.bounds;
+            float radius = meleeEnemyCollider is SphereCollider sphereCollider ? sphereCollider.radius : -1f;
+            Debug.Log(
+                $"[SlimeAttackCollider] name={name} collider={meleeEnemyCollider.name} isTrigger={meleeEnemyCollider.isTrigger} radius={(radius >= 0f ? radius.ToString("F2") : "n/a")} boundsSize={bounds.size}",
+                this);
+            lastLoggedMeleeCollider = meleeEnemyCollider;
         }
 
         if (meleeEnemySpriteRenderer == null)
@@ -587,6 +693,25 @@ public class EnemyController : MonoBehaviour
         }
 
         return hitTarget.position;
+    }
+
+    private float ResolveHorizontalEdgeDistance(Transform hitTarget, out Vector3 enemyClosest, out Vector3 playerClosest)
+    {
+        if (hitTarget == null)
+        {
+            enemyClosest = transform.position;
+            playerClosest = transform.position;
+            return float.MaxValue;
+        }
+
+        Vector3 playerCenter = ResolvePlayerBodyCenter(hitTarget);
+        enemyClosest = ResolveEnemyClosestPoint(playerCenter);
+        playerClosest = ResolvePlayerClosestPoint(hitTarget, enemyClosest);
+        Vector3 flatEnemyPoint = enemyClosest;
+        flatEnemyPoint.y = 0f;
+        Vector3 flatPlayerPoint = playerClosest;
+        flatPlayerPoint.y = 0f;
+        return Vector3.Distance(flatEnemyPoint, flatPlayerPoint);
     }
 
     private Collider ResolvePlayerCollider(Transform hitTarget)
@@ -856,6 +981,54 @@ public class EnemyController : MonoBehaviour
             this);
     }
 
+    private void LogAttackStateChange(
+        EnemyAttackRuntimeState newState,
+        float centerDistance,
+        float edgeDistance,
+        float verticalDifference,
+        bool isGrounded,
+        bool canBeginAttack,
+        string reason,
+        Vector3 enemyClosestPoint,
+        Vector3 playerClosestPoint)
+    {
+        if (lastLoggedAttackState == newState)
+        {
+            return;
+        }
+
+        if (!debugAttackStateTransitions)
+        {
+            LogSlimeAttackCheck(newState, centerDistance, edgeDistance, verticalDifference, isGrounded, canBeginAttack, reason);
+            lastLoggedAttackState = newState;
+            return;
+        }
+
+        Debug.Log(
+            $"[EnemyAttackState] name={name} kind={(monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown")} rank={(monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown")} attackStyle={attackStyle} oldState={lastLoggedAttackState} newState={newState} centerDistance={centerDistance:F2} edgeDistance={edgeDistance:F2} attackRange={attackRange:F2} attackHitRange={attackHitRange:F2} stopDistance={stopDistance:F2} cooldownRemaining={Mathf.Max(0f, nextAttackTime - Time.time):F2} enemyClosest={enemyClosestPoint} playerClosest={playerClosestPoint} reason={reason}",
+            this);
+        LogSlimeAttackCheck(newState, centerDistance, edgeDistance, verticalDifference, isGrounded, canBeginAttack, reason);
+        lastLoggedAttackState = newState;
+    }
+
+    private void LogAttackAttempt(
+        Transform hitTarget,
+        bool insideAttackRange,
+        bool insideHitRange,
+        bool attackTriggered,
+        bool damageApplied,
+        string failureReason)
+    {
+        if (!debugAttackDiagnostics)
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[EnemyAttackAttempt] name={name} kind={(monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown")} rank={(monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown")} attackStyle={attackStyle} target={(hitTarget != null ? hitTarget.name : "null")} insideAttackRange={insideAttackRange} insideHitRange={insideHitRange} attackTriggered={attackTriggered} hitDetected={insideHitRange} damageApplied={damageApplied} failureReason={failureReason}",
+            this);
+    }
+
     private string EvaluateAttackFailReason(float horizontalDistance, float verticalDifference, bool isGrounded)
     {
         if (playerTarget == null)
@@ -909,7 +1082,18 @@ public class EnemyController : MonoBehaviour
         return string.Empty;
     }
 
-    private bool IsGrounded()
+    private bool IsGroundedForAttack()
+    {
+        if (ProbeGrounded())
+        {
+            lastGroundedTime = Time.time;
+            return true;
+        }
+
+        return Time.time - lastGroundedTime <= Mathf.Max(0f, groundedAttackGraceTime);
+    }
+
+    private bool ProbeGrounded()
     {
         float probeDistance = Mathf.Max(0.01f, groundedProbeDistance);
         ResolveMeleeHitSources();
@@ -918,19 +1102,96 @@ public class EnemyController : MonoBehaviour
         if (sourceCollider != null)
         {
             Bounds bounds = sourceCollider.bounds;
-            Vector3 origin = new Vector3(bounds.center.x, bounds.min.y + 0.05f, bounds.center.z);
+            Vector3 origin = bounds.center + Vector3.up * 0.05f;
             float radius = Mathf.Clamp(Mathf.Min(bounds.extents.x, bounds.extents.z) * 0.45f, 0.05f, 0.45f);
-            float castDistance = probeDistance + 0.15f;
+            float castDistance = Mathf.Max(probeDistance + bounds.extents.y + 0.1f, probeDistance + 0.15f);
             if (Physics.SphereCast(origin, radius, Vector3.down, out _, castDistance, ~0, QueryTriggerInteraction.Ignore))
             {
                 return true;
             }
 
-            return Physics.Raycast(origin + Vector3.up * 0.02f, Vector3.down, castDistance, ~0, QueryTriggerInteraction.Ignore);
+            return Physics.Raycast(origin, Vector3.down, castDistance + radius, ~0, QueryTriggerInteraction.Ignore);
         }
 
         Vector3 fallbackOrigin = transform.position + Vector3.up * 0.05f;
         return Physics.Raycast(fallbackOrigin, Vector3.down, probeDistance + 0.05f, ~0, QueryTriggerInteraction.Ignore);
+    }
+
+    private bool IsSlimeIdentity()
+    {
+        if (monsterIdentity == null)
+        {
+            return false;
+        }
+
+        switch (monsterIdentity.species)
+        {
+            case MonsterSpecies.BlueSlime:
+            case MonsterSpecies.GreenSlime:
+            case MonsterSpecies.LavaSlime:
+            case MonsterSpecies.PoisonSlime:
+            case MonsterSpecies.RainbowSlime:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void LogRuntimeAttackConfigOnce()
+    {
+        if (!debugSlimeAttackLogs || hasLoggedRuntimeAttackConfig || !IsSlimeIdentity())
+        {
+            return;
+        }
+
+        ResolveMeleeHitSources();
+        Bounds colliderBounds = meleeEnemyCollider != null ? meleeEnemyCollider.bounds : default;
+        float bodyRadius = meleeEnemyCollider is SphereCollider sphereCollider ? sphereCollider.radius : -1f;
+        float speedValue = combatStats != null ? combatStats.speed : 0f;
+        float physicalAttack = combatStats != null ? combatStats.physicalAttack : 0f;
+        float specialAttack = combatStats != null ? combatStats.specialAttack : 0f;
+        float attackWindup = slimeAnimation != null ? slimeAnimation.AttackWindup : 0f;
+        float attackRecovery = slimeAnimation != null ? slimeAnimation.AttackRecovery : 0f;
+        float attackAnimationDuration = slimeAnimation != null ? slimeAnimation.AttackAnimationDuration : 0f;
+        string attackClipName = slimeAnimation != null ? slimeAnimation.SelectedAttackClipName : "None";
+        float attackClipLength = slimeAnimation != null ? slimeAnimation.SelectedAttackClipLength : 0f;
+        float animatorSpeed = slimeAnimation != null ? slimeAnimation.AnimatorPlaybackSpeed : 1f;
+        string sourceName = name.Replace("(Clone)", string.Empty).Trim();
+        Debug.Log(
+            $"[SlimeRuntimeComparison] name={name} prefab/source name={sourceName} monsterKind={monsterIdentity.species} rank={monsterIdentity.rank} attackStyle={attackStyle} attackRange={attackRange:F2} attackHitRange={attackHitRange:F2} attackCooldown={attackCooldown:F2} stoppingDistance={stopDistance:F2} verticalTolerance={maxVerticalAttackDifference:F2} requireGrounded={requireGroundedToAttack} groundGrace={groundedAttackGraceTime:F2} groundProbeDistance={groundedProbeDistance:F2} attackWindup={attackWindup:F2} attackRecovery={attackRecovery:F2} animationDuration={attackAnimationDuration:F2} targetRefreshInterval={targetResolveRetryInterval:F2} speed={speedValue:F2} physicalAttack={physicalAttack:F2} specialAttack={specialAttack:F2} bodyColliderRadius={(bodyRadius >= 0f ? bodyRadius.ToString("F2") : "n/a")} bodyColliderBounds={colliderBounds.size} rigidbodyMass={(rb != null ? rb.mass.ToString("F2") : "n/a")} animatorSpeed={animatorSpeed:F2} selectedAttackClipName={attackClipName} selectedAttackClipLength={attackClipLength:F2} allowAttackForwardLeap={(slimeAnimation != null && slimeAnimation.AllowAttackForwardLeap)} allowAttackVerticalLeap={(slimeAnimation != null && slimeAnimation.AllowAttackVerticalLeap)} maxAttackLeapDistance={(slimeAnimation != null ? slimeAnimation.MaxAttackLeapDistance.ToString("F2") : "0.00")}",
+            this);
+        hasLoggedRuntimeAttackConfig = true;
+    }
+
+    private void LogSlimeAttackCheck(
+        EnemyAttackRuntimeState newState,
+        float centerDistance,
+        float edgeDistance,
+        float verticalDifference,
+        bool isGrounded,
+        bool canBeginAttack,
+        string failureReason)
+    {
+        if (!debugSlimeAttackLogs || !IsSlimeIdentity())
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[SlimeAttackCheck] name={name} kind={monsterIdentity.species} rank={monsterIdentity.rank} attackStyle={attackStyle} target={(playerTarget != null ? playerTarget.name : "null")} centerDistance={centerDistance:F2} edgeDistance={edgeDistance:F2} attackRange={attackRange:F2} attackHitRange={attackHitRange:F2} verticalDifference={verticalDifference:F2} isGrounded={isGrounded} isAttacking={attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking)} cooldownRemaining={Mathf.Max(0f, nextAttackTime - Time.time):F2} canBeginAttack={canBeginAttack} failureReason={(string.IsNullOrEmpty(failureReason) ? newState.ToString() : failureReason)}",
+            this);
+    }
+
+    private void LogSlimeAttackLifecycle(string stage, Transform target, string detail)
+    {
+        if (!debugSlimeAttackLogs || !IsSlimeIdentity())
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[SlimeAttackLifecycle] stage={stage} name={name} kind={monsterIdentity.species} rank={monsterIdentity.rank} attackStyle={attackStyle} target={(target != null ? target.name : "null")} detail={detail}",
+            this);
     }
 
     private BattleDamageType ResolvePrimaryDamageType()

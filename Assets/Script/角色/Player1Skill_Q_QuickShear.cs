@@ -10,11 +10,24 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [Header("Q")]
     [SerializeField, Min(1)] private int slashCount = 3;
     [SerializeField, Min(0f)] private float slashInterval = 0.15f;
+    [Header("Q - QuickShear / Damage Parameters")]
+    [Tooltip("每次斩击使用的物理段基础伤害。")]
     [FormerlySerializedAs("baseDamage")]
     [SerializeField, Min(0f)] private float physicalBaseDamage = 30f;
+    [Tooltip("每次斩击使用的特殊段基础伤害。")]
     [SerializeField, Min(0f)] private float specialBaseDamage = 20f;
+    [Tooltip("Q 特殊段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float physicalScaling = 0.2f;
+    [Tooltip("Q 物理段从特殊攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float specialScaling = 0.6f;
+    [Tooltip("每段斩击的最终伤害倍率。")]
+    [SerializeField, Min(0f)] private float quickShearPerSlashDamageMultiplier = 1f;
+    [Tooltip("Q 固定追加伤害。")]
+    [SerializeField, Min(0f)] private float quickShearBonusDamage = 0f;
+    [Tooltip("Q 总伤害最终倍率。")]
+    [SerializeField, Min(0f)] private float quickShearFinalDamageMultiplier = 1f;
+    [Tooltip("Q 在帷幕类技能状态下的额外伤害修正。默认 1 表示不额外修正。")]
+    [SerializeField, Min(0f)] private float quickShearVeilBarrierDamageMultiplier = 1f;
     [SerializeField, Min(0f)] private float qRange = 2f;
     [SerializeField] private LayerMask enemyLayer = ~0;
     [SerializeField] private Transform hitPoint;
@@ -92,6 +105,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         specialBaseDamage = 20f;
         physicalScaling = 0.2f;
         specialScaling = 0.6f;
+        quickShearPerSlashDamageMultiplier = 1f;
+        quickShearBonusDamage = 0f;
+        quickShearFinalDamageMultiplier = 1f;
+        quickShearVeilBarrierDamageMultiplier = 1f;
         qRange = 2f;
         enemyLayer = ~0;
         manaCost = 10f;
@@ -324,7 +341,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             Debug.Log($"[Q - QuickShear] Slash {slashIndex}/{slashTotal} requested '{animationName}' via shared controller entry.", this);
             Debug.Log(
-                $"[Q - QuickShear] damageFormula=({physicalBaseDamage:F2} + SATK*{specialScaling:F2}) + ({specialBaseDamage:F2} + PATK*{physicalScaling:F2}), range={qRange:F2}",
+                $"[Q - QuickShear] damageFormula=((PBase {physicalBaseDamage:F2} + SATK*{specialScaling:F2}) + (SBase {specialBaseDamage:F2} + PATK*{physicalScaling:F2}) + Bonus {quickShearBonusDamage:F2}) * Slash {quickShearPerSlashDamageMultiplier:F2} * Final {quickShearFinalDamageMultiplier:F2}, range={qRange:F2}",
                 this);
         }
 
@@ -846,6 +863,14 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             WarnMissingCombatStatsOnce();
         }
 
+        rawDamage += Mathf.Max(0f, quickShearBonusDamage);
+        rawDamage *= Mathf.Max(0f, quickShearPerSlashDamageMultiplier);
+
+        if (Controller != null && Controller.IsVeilBarrierActive())
+        {
+            rawDamage *= Mathf.Max(0f, quickShearVeilBarrierDamageMultiplier);
+        }
+
         BattleResourceBank bank = gameObject.GetComponent<BattleResourceBank>();
         if (bank == null)
         {
@@ -856,6 +881,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             rawDamage *= bank.SkillDamageMultiplier;
         }
+
+        rawDamage *= Mathf.Max(0f, quickShearFinalDamageMultiplier);
 
         float afterBaseCrit = BattleStatUtility.ApplyCriticalDamage(gameObject, rawDamage, out bool baseCritTriggered);
         bool extraCritTriggered = Random.value < Mathf.Clamp01(quickShearExtraCritChance);
@@ -885,7 +912,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             float totalMultiplier = rawDamage > 0f ? finalDamage / rawDamage : 1f;
             Debug.Log(
                 $"[QuickShear Crit] manaCost={manaCost:F2}, cooldown={ResolveRuntimeCooldownSeconds():F2}, PATK={physicalAttackValue:F2}, SATK={specialAttackValue:F2}, " +
-                $"Formula=((30 + SATK*{specialScaling:F2}) + (20 + PATK*{physicalScaling:F2})) => Raw={rawDamage:F2}, NormalCritDamage={normalCritDamage:F2}, Final={finalDamage:F2}, " +
+                $"Formula=(({physicalBaseDamage:F2} + SATK*{specialScaling:F2}) + ({specialBaseDamage:F2} + PATK*{physicalScaling:F2}) + {quickShearBonusDamage:F2}) * Slash{quickShearPerSlashDamageMultiplier:F2} * Veil{(Controller != null && Controller.IsVeilBarrierActive() ? quickShearVeilBarrierDamageMultiplier : 1f):F2} * Final{quickShearFinalDamageMultiplier:F2} => Raw={rawDamage:F2}, NormalCritDamage={normalCritDamage:F2}, Final={finalDamage:F2}, " +
                 $"BaseCrit={baseCritTriggered}, ExtraCrit={extraCritTriggered}, SuperCrit={superCritTriggered}, " +
                 $"BaseChainMultiplier={baseChainMultiplier:F2}, QCritMode={qCritMode}, QuickShearMultiplier={qCritMultiplier:F2}, TotalMultiplier={totalMultiplier:F2}",
                 this);
