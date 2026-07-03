@@ -1,5 +1,9 @@
 ﻿using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections;
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class SceneLoader : MonoBehaviour
 {
@@ -10,7 +14,6 @@ public class SceneLoader : MonoBehaviour
         _gameManager = GameManager.Instance;
     }
 
-    // 加载指定场景（兼容GameManager）
     public void LoadScene(string sceneName)
     {
         if (_gameManager == null || string.IsNullOrEmpty(sceneName))
@@ -18,14 +21,28 @@ public class SceneLoader : MonoBehaviour
             Debug.LogWarning("场景名为空，取消加载");
             return;
         }
-        SceneManager.LoadScene(sceneName);
+        StartCoroutine(LoadSceneCoroutine(sceneName));
     }
 
-    // 退出游戏（无报错版）
+    private IEnumerator LoadSceneCoroutine(string sceneName)
+    {
+        AsyncOperation asyncLoad = SceneManager.LoadSceneAsync(sceneName);
+        asyncLoad.allowSceneActivation = false;
+
+        while (!asyncLoad.isDone)
+        {
+            yield return null;
+            if (asyncLoad.progress >= 0.9f)
+            {
+                asyncLoad.allowSceneActivation = true;
+            }
+        }
+    }
+
     public void QuitGame()
     {
 #if UNITY_EDITOR
-        UnityEditor.EditorApplication.isPlaying = false;
+        EditorApplication.isPlaying = false;
 #else
         Application.Quit();
 #endif
