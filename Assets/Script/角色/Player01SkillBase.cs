@@ -30,6 +30,8 @@ public abstract class Player01SkillBase : MonoBehaviour
 
     public bool CanCastNow()
     {
+        PrepareCastValidation();
+
         if (SkillResource != null && SkillIndex >= 0)
         {
             return SkillResource.IsSkillCastable(SkillIndex);
@@ -61,6 +63,10 @@ public abstract class Player01SkillBase : MonoBehaviour
     }
 
     protected virtual void OnCastFinished()
+    {
+    }
+
+    protected virtual void PrepareCastValidation()
     {
     }
 
@@ -126,6 +132,8 @@ public abstract class Player01SkillBase : MonoBehaviour
 
     protected bool TryReserveCast()
     {
+        PrepareCastValidation();
+
         if (!CanCastNow())
         {
             if (debugLog)
