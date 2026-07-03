@@ -25,13 +25,13 @@ Material:
     m_TexEnvs: []
     m_Ints: []
     m_Floats:
-    - _EmissionIntensity: 2.05
+    - _EmissionIntensity: 2.5
     - _FresnelIntensity: 1.8
     - _FresnelPower: 1.95
     - _NoiseContrast: 0.96
     - _NoiseScale: 4.2
     - _NoiseSpeed: 1.5
-    - _Opacity: 0.34
+    - _Opacity: 0.55
     - _TailFadeLength: 0.96
     - _TailFadePower: 1
     - _TailFadeStart: 0.02
