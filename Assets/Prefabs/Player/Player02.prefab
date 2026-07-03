@@ -1470,16 +1470,16 @@ MonoBehaviour:
   rVisibleStarBladeLimit: 64
   rExtraDamagePerOverflowStarBlade: 10
   rDamageDebugLog: 0
-  rSwarmDebugLog: 0
-  debugCriticalLog: 1
+  rSwarmDebugLog: 1
+  debugCriticalLog: 0
   baseDamage: 12
   physicalScaling: 0.5
   specialScaling: 1.3
-  rSwarmTickPhysicalBaseDamage: 10
+  rSwarmTickPhysicalBaseDamage: 20
   rSwarmTickPhysicalFromPhysicalAttackScaling: 0.8
   rSwarmTickPhysicalFromSpecialAttackScaling: 0
   rSwarmTickSpecialBaseDamage: 40
-  rSwarmTickSpecialFromPhysicalAttackScaling: 0
+  rSwarmTickSpecialFromPhysicalAttackScaling: 0.4
   rSwarmTickSpecialFromSpecialAttackScaling: 0.4
   rSwarmTickDamageMultiplier: 1
   rEffectScale: {x: 0.3, y: 0.3, z: 0.3}

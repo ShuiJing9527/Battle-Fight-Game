@@ -1429,12 +1429,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1005, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_R_NeedleShot
-  cooldown: 0.4
+  cooldown: 25
   duration: 1.25
   effectPower: 1.35
   animationName: ATK1
   debugLog: 1
-  manaCostPercent: 0.1
+  manaCostPercent: 0.31
   useSpineAnimationEvents: 0
   thrustVfxEventName: R_ThrustVfx
   thrustHitEventName: R_ThrustHit

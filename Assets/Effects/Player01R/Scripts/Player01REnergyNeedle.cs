@@ -14,6 +14,7 @@ public class Player01REnergyNeedle : MonoBehaviour
     [SerializeField] private Renderer[] fadeRenderers;
     [SerializeField] private TrailRenderer trailRenderer;
     [SerializeField] private ParticleSystem[] tailParticles;
+    [SerializeField] private Player01RNeedleDistortionController[] distortionControllers;
 
     [Header("Shader Fade")]
     [Tooltip("Shader property used to control per-instance opacity during fade.")]
@@ -52,6 +53,8 @@ public class Player01REnergyNeedle : MonoBehaviour
         EnsureBindings();
         ResetVisualState();
         SetParticleEmissionEnabled(true);
+        ResetDistortionState();
+        PlayDistortionFadeIn();
         isFading = false;
         isFlying = true;
         fadeTimer = 0f;
@@ -119,6 +122,7 @@ public class Player01REnergyNeedle : MonoBehaviour
         isFading = true;
         fadeTimer = 0f;
         SetParticleEmissionEnabled(false);
+        PlayDistortionFadeOut();
     }
 
     private void EnsureBindings()
@@ -136,6 +140,11 @@ public class Player01REnergyNeedle : MonoBehaviour
         if (tailParticles == null || tailParticles.Length == 0)
         {
             tailParticles = GetComponentsInChildren<ParticleSystem>(true);
+        }
+
+        if (distortionControllers == null || distortionControllers.Length == 0)
+        {
+            distortionControllers = GetComponentsInChildren<Player01RNeedleDistortionController>(true);
         }
 
         opacityPropertyId = Shader.PropertyToID(opacityPropertyName);
@@ -258,6 +267,63 @@ public class Player01REnergyNeedle : MonoBehaviour
         if (trailRenderer != null && !enabled)
         {
             trailRenderer.emitting = false;
+        }
+    }
+
+    private void ResetDistortionState()
+    {
+        if (distortionControllers == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < distortionControllers.Length; i++)
+        {
+            Player01RNeedleDistortionController controller = distortionControllers[i];
+            if (controller == null)
+            {
+                continue;
+            }
+
+            controller.ResetStateInstant(0f);
+        }
+    }
+
+    private void PlayDistortionFadeIn()
+    {
+        if (distortionControllers == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < distortionControllers.Length; i++)
+        {
+            Player01RNeedleDistortionController controller = distortionControllers[i];
+            if (controller == null)
+            {
+                continue;
+            }
+
+            controller.PlayFadeIn();
+        }
+    }
+
+    private void PlayDistortionFadeOut()
+    {
+        if (distortionControllers == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < distortionControllers.Length; i++)
+        {
+            Player01RNeedleDistortionController controller = distortionControllers[i];
+            if (controller == null)
+            {
+                continue;
+            }
+
+            controller.BeginFadeOut();
         }
     }
 

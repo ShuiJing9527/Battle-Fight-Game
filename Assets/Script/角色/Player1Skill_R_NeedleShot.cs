@@ -8,7 +8,8 @@ using UnityEngine.Serialization;
 public class Player1Skill_R_NeedleShot : Player01SkillBase
 {
     [Header("R - Resources")]
-    [SerializeField, Range(0f, 1f)] private float manaCostPercent = 0.60f;
+    [Tooltip("Base mana cost before any future mana cost modifiers are applied.")]
+    [SerializeField, Min(0f)] private float baseManaCost = 60f;
 
     [Header("R - Animation")]
     [SerializeField] private bool useSpineAnimationEvents;
@@ -115,7 +116,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         needleStartTime = 0.82f;
         needleInterval = 0.12f;
         skillEndTime = 1.25f;
-        manaCostPercent = 0.60f;
+        baseManaCost = 60f;
         thrustPhysicalBaseDamage = 60f;
         thrustSpecialToPhysicalScale = 0.80f;
         thrustSpecialBaseDamage = 40f;
@@ -919,17 +920,16 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private float ResolveManaCost()
     {
-        float maxMana = SkillResource != null ? SkillResource.GetMaxMana() : 0f;
-        if (maxMana <= 0f)
-        {
-            BattleResourceBank bank = GetComponent<BattleResourceBank>();
-            if (bank != null)
-            {
-                maxMana = Mathf.Max(0f, bank.maxEnergy);
-            }
-        }
+        return CalculateFinalManaCost(baseManaCost);
+    }
 
-        return Mathf.Max(0f, maxMana * Mathf.Clamp01(manaCostPercent));
+    private float CalculateFinalManaCost(float configuredBaseManaCost)
+    {
+        float finalManaCost = Mathf.Max(0f, configuredBaseManaCost);
+
+        // Future mana-cost modifiers should be applied here so the skill keeps using
+        // the shared SkillResource gate/consume flow without changing cast logic.
+        return Mathf.Max(0f, finalManaCost);
     }
 
     private float ResolveRuntimeCooldownSeconds()
