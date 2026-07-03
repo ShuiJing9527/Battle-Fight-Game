@@ -7,6 +7,9 @@ using UnityEngine.Serialization;
 
 public class Player1Skill_R_NeedleShot : Player01SkillBase
 {
+    [Header("R - Resources")]
+    [SerializeField, Range(0f, 1f)] private float manaCostPercent = 0.60f;
+
     [Header("R - Animation")]
     [SerializeField] private bool useSpineAnimationEvents;
     [SerializeField] private string thrustVfxEventName = "R_ThrustVfx";
@@ -14,9 +17,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField] private string needleStartEventName = "R_Needles";
 
     [Header("R - Timing")]
-    [SerializeField, Min(0f)] private float thrustVfxStartTime = 0.15f;
-    [SerializeField, Min(0f)] private float thrustHitTime = 0.22f;
-    [SerializeField, Min(0f)] private float needleStartTime = 0.45f;
+    [SerializeField, Min(0f)] private float thrustVfxStartTime = 0.48f;
+    [SerializeField, Min(0f)] private float thrustHitTime = 0.58f;
+    [SerializeField, Min(0f)] private float needleStartTime = 0.82f;
     [SerializeField, Min(0f)] private float needleInterval = 0.12f;
     [SerializeField, Min(0f)] private float skillEndTime = 1.25f;
 
@@ -25,7 +28,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField] private Transform thrustVfxAnchor;
 
     [Header("R - Thrust Damage")]
-    [SerializeField, Min(0f)] private float thrustDamage = 40f;
+    [SerializeField, Min(0f)] private float thrustPhysicalBaseDamage = 60f;
+    [SerializeField, Min(0f)] private float thrustSpecialToPhysicalScale = 0.80f;
+    [SerializeField, Min(0f)] private float thrustSpecialBaseDamage = 40f;
+    [SerializeField, Min(0f)] private float thrustPhysicalToSpecialScale = 0.40f;
     [SerializeField, Min(0.1f)] private float thrustRange = 2.4f;
     [SerializeField, Min(0.1f)] private float thrustWidth = 1.2f;
     [SerializeField, Min(0.1f)] private float thrustHeight = 1.4f;
@@ -38,7 +44,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [FormerlySerializedAs("needlePrefab")]
     [SerializeField] private GameObject needlePrefab;
     [FormerlySerializedAs("needleCount")]
-    [SerializeField, Min(1)] private int needleCount = 4;
+    [SerializeField, Min(1)] private int minNeedleCount = 4;
+    [SerializeField, Min(1)] private int maxNeedleCount = 12;
     [SerializeField, Min(0.1f)] private float spawnRadiusMin = 3.5f;
     [SerializeField, Min(0.1f)] private float spawnRadiusMax = 5.5f;
     [SerializeField] private float heightMin = 0.5f;
@@ -52,24 +59,31 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     [Header("R - Needle Damage")]
     [FormerlySerializedAs("baseDamage")]
-    [SerializeField, Min(0f)] private float needleDamage = 50f;
-    [SerializeField, Min(0f)] private float needlePhysicalScaling = 0.25f;
-    [SerializeField, Min(0f)] private float needleSpecialScaling = 1.1f;
+    [FormerlySerializedAs("needleDamage")]
+    [SerializeField, Min(0f)] private float needleDamageMultiplier = 0.50f;
     [FormerlySerializedAs("needleSpeed")]
     [SerializeField, Min(0.01f)] private float travelSpeed = 38f;
     [SerializeField, Min(0f)] private float passThroughDistance = 4.5f;
     [SerializeField, Min(0.01f)] private float fadeDuration = 0.3f;
-    [FormerlySerializedAs("healPercentOfDamage")]
-    [SerializeField, Range(0f, 1f)] private float needleHealPercentOfDamage = 0.25f;
     [SerializeField] private LayerMask needleHitLayers = ~0;
     [SerializeField, Min(0.01f)] private float needleHitRadius = 0.3f;
+
+    [Header("R - Recovery")]
+    [FormerlySerializedAs("needleHealPercentOfDamage")]
+    [SerializeField, Range(0f, 1f)] private float healFromDamagePercent = 0.50f;
+
+    [Header("R - Cooldown On Kill")]
+    [SerializeField, Min(0f)] private float cooldownReductionPerKill = 1.0f;
 
     [Header("R - Targeting")]
     [SerializeField, Min(0.5f)] private float targetSearchRadius = 14f;
     [SerializeField] private LayerMask targetSearchLayers = ~0;
     [SerializeField, Min(0.5f)] private float fallbackTargetDistance = 6f;
+    [SerializeField] private Player01EyeFireROffset eyeFireROffset;
 
     private readonly HashSet<CombatHealth> thrustDamagedTargets = new HashSet<CombatHealth>();
+    private readonly HashSet<CombatHealth> killCreditTargets = new HashSet<CombatHealth>();
+    private readonly List<CombatHealth> thrustPhaseTargets = new List<CombatHealth>();
     private readonly List<Player01REnergyNeedle> activeNeedles = new List<Player01REnergyNeedle>();
     private readonly List<GameObject> runtimeVfxInstances = new List<GameObject>();
 
@@ -81,38 +95,49 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private bool thrustVfxTriggered;
     private bool thrustHitTriggered;
     private bool needlePhaseTriggered;
+    private Coroutine releaseRoutine;
+    private float castFacingSign = 1f;
+    private int currentNeedleCount;
+    private int currentKillCount;
+    private float currentTotalActualDamage;
+    private float currentTotalHealAmount;
+    private float currentTotalCooldownReduction;
 
     private void Reset()
     {
-        cooldown = 12f;
+        cooldown = 15f;
         duration = 1.25f;
         effectPower = 50f;
         animationName = "ATK01";
         debugLog = true;
-        thrustVfxStartTime = 0.15f;
-        thrustHitTime = 0.22f;
-        needleStartTime = 0.45f;
+        thrustVfxStartTime = 0.48f;
+        thrustHitTime = 0.58f;
+        needleStartTime = 0.82f;
         needleInterval = 0.12f;
         skillEndTime = 1.25f;
-        thrustDamage = 40f;
+        manaCostPercent = 0.60f;
+        thrustPhysicalBaseDamage = 60f;
+        thrustSpecialToPhysicalScale = 0.80f;
+        thrustSpecialBaseDamage = 40f;
+        thrustPhysicalToSpecialScale = 0.40f;
         thrustRange = 2.4f;
         thrustWidth = 1.2f;
         thrustHeight = 1.4f;
         thrustForwardOffset = 1.2f;
-        needleCount = 4;
+        minNeedleCount = 4;
+        maxNeedleCount = 12;
         spawnRadiusMin = 3.5f;
         spawnRadiusMax = 5.5f;
         heightMin = 0.5f;
         heightMax = 2.2f;
         targetHeightOffset = 0.8f;
         horizontalRandomAngle = 18f;
-        needleDamage = 50f;
-        needlePhysicalScaling = 0.25f;
-        needleSpecialScaling = 1.1f;
+        needleDamageMultiplier = 0.50f;
         travelSpeed = 38f;
         passThroughDistance = 4.5f;
         fadeDuration = 0.3f;
-        needleHealPercentOfDamage = 0.25f;
+        healFromDamagePercent = 0.50f;
+        cooldownReductionPerKill = 1.0f;
         targetSearchRadius = 14f;
         fallbackTargetDistance = 6f;
     }
@@ -120,13 +145,27 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private void Awake()
     {
         runeRuntimeState = ResolveRuneRuntimeState();
+        if (eyeFireROffset == null)
+        {
+            eyeFireROffset = GetComponent<Player01EyeFireROffset>();
+        }
         SyncLayerMasks();
+        SyncSkillConfig();
     }
 
     private void OnValidate()
     {
+        cooldown = Mathf.Max(0f, cooldown);
         duration = Mathf.Max(duration, skillEndTime);
+        minNeedleCount = Mathf.Max(1, minNeedleCount);
+        maxNeedleCount = Mathf.Max(minNeedleCount, maxNeedleCount);
         SyncLayerMasks();
+        SyncSkillConfig();
+    }
+
+    private void Update()
+    {
+        SyncSkillConfig();
     }
 
     protected override void OnDisable()
@@ -148,17 +187,53 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         return "R - Needle Shot";
     }
 
+    protected override void PrepareCastValidation()
+    {
+        SyncSkillConfig();
+    }
+
     protected override void OnCastStarted()
     {
         runeRuntimeState = ResolveRuneRuntimeState();
         currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
         thrustDamagedTargets.Clear();
+        thrustPhaseTargets.Clear();
+        killCreditTargets.Clear();
         preferredNeedleTarget = null;
         thrustVfxTriggered = false;
         thrustHitTriggered = false;
         needlePhaseTriggered = false;
+        currentNeedleCount = 0;
+        currentKillCount = 0;
+        currentTotalActualDamage = 0f;
+        currentTotalHealAmount = 0f;
+        currentTotalCooldownReduction = 0f;
         ClearDestroyedNeedles();
+        castFacingSign = ResolveFacingSign();
         Controller?.SetMovementInputLocked(true, "Player01 R");
+        Controller?.SetFacingInputLocked(true, castFacingSign, "Player01 R");
+        Player01EyeFireROffset[] eyeFireOffsets = GetComponentsInChildren<Player01EyeFireROffset>(true);
+        Debug.Log(
+            $"[R EyeFire] Component Count Under Player01 = {eyeFireOffsets.Length}\n" +
+            $"[R EyeFire] Component Instance ID = {(eyeFireROffset != null ? eyeFireROffset.GetInstanceID() : 0)}\n" +
+            $"[R EyeFire] Component GameObject = {(eyeFireROffset != null ? eyeFireROffset.gameObject.name : "null")}\n" +
+            $"[R EyeFire] Offset Root = {(eyeFireROffset != null && eyeFireROffset.OffsetRoot != null ? eyeFireROffset.OffsetRoot.name : "null")}\n" +
+            $"[R EyeFire] Offset Root Instance ID = {(eyeFireROffset != null && eyeFireROffset.OffsetRoot != null ? eyeFireROffset.OffsetRoot.GetInstanceID() : 0)}",
+            eyeFireROffset != null ? eyeFireROffset : this);
+        eyeFireROffset?.BeginROffset(castFacingSign);
+
+        if (debugLog)
+        {
+            ResolveCurrentStats(out float physicalAttack, out float specialAttack);
+            ResolveThrustDamageValues(physicalAttack, specialAttack, out float thrustPhysicalDamage, out float thrustSpecialDamage);
+            ResolveNeedleDamageValues(physicalAttack, specialAttack, out float needlePhysicalDamage, out float needleSpecialDamage);
+            Debug.Log(
+                $"[Player01 R] Cast success MP={ResolveManaCost():F2} PATK={physicalAttack:F2} SATK={specialAttack:F2} " +
+                $"thrustPhysical={thrustPhysicalDamage:F2} thrustSpecial={thrustSpecialDamage:F2} " +
+                $"needlePhysical={needlePhysicalDamage:F2} needleSpecial={needleSpecialDamage:F2} " +
+                $"cooldown={ResolveRuntimeCooldownSeconds():F2} castFacingSign={castFacingSign:F2}",
+                this);
+        }
     }
 
     protected override IEnumerator CastRoutine()
@@ -211,11 +286,23 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             yield return FireNeedlePhase();
         }
 
+        releaseRoutine = StartCoroutine(FinishCastAndRestoreIdleRoutine());
+        yield return releaseRoutine;
         CompleteCast();
     }
 
     protected override void OnCastFinished()
     {
+        if (debugLog)
+        {
+            PlayerSkillCooldownManager cooldownManager = SkillResource;
+            float currentCooldownRemaining = cooldownManager != null ? cooldownManager.GetCurrentSkillCD(SkillIndex) : 0f;
+            Debug.Log(
+                $"[Player01 R] End needles={currentNeedleCount} actualDamage={currentTotalActualDamage:F2} heal={currentTotalHealAmount:F2} " +
+                $"kills={currentKillCount} cooldownReduced={currentTotalCooldownReduction:F2} remainingCD={currentCooldownRemaining:F2}",
+                this);
+        }
+
         ReleaseSkillState();
     }
 
@@ -293,6 +380,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         instance.name = thrustVfxPrefab.name + "_Runtime";
         instance.transform.localPosition = Vector3.zero;
         instance.transform.localRotation = Quaternion.identity;
+        instance.transform.localScale = Vector3.one;
         runtimeVfxInstances.Add(instance.gameObject);
         instance.Play(ResolveFacingSign());
     }
@@ -306,9 +394,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private IEnumerator FireNeedlePhase()
     {
         Vector3 targetPoint = ResolveNeedleTargetPoint();
+        currentNeedleCount = ResolveNeedleCount();
         Player01RFourNeedleUtility.SpawnSettings settings = new Player01RFourNeedleUtility.SpawnSettings
         {
-            needleCount = Mathf.Max(1, needleCount),
+            needleCount = currentNeedleCount,
             spawnRadiusMin = spawnRadiusMin,
             spawnRadiusMax = spawnRadiusMax,
             heightMin = heightMin,
@@ -320,14 +409,19 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         };
 
         randomGenerator = useRandomSeed
-            ? new System.Random(System.Environment.TickCount ^ GetInstanceID())
-            : new System.Random(randomSeed);
+            ? new System.Random(randomSeed)
+            : new System.Random(System.Environment.TickCount ^ GetInstanceID() ^ currentRuneCastId);
 
         Vector3[] spawnPositions = Player01RFourNeedleUtility.BuildSpawnPositions(
             targetPoint,
             Controller != null ? Controller.GetFacingWorldDirection() : transform.forward,
             settings,
             NextRange);
+
+        if (debugLog)
+        {
+            Debug.Log($"[Player01 R] needleCount={currentNeedleCount} targetPoint={targetPoint}", this);
+        }
 
         for (int i = 0; i < spawnPositions.Length; i++)
         {
@@ -359,6 +453,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             return;
         }
 
+        ResolveCurrentStats(out float physicalAttack, out float specialAttack);
+        ResolveNeedleDamageValues(physicalAttack, specialAttack, out float needlePhysicalDamage, out float needleSpecialDamage);
+
         needle.name = needle.name + "_R_" + index;
         needle.Launch(
             spawnPosition,
@@ -374,14 +471,15 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         }
 
         damageDealer.Initialize(
+            this,
             gameObject,
-            ResolveNeedleDamage(),
+            needlePhysicalDamage,
+            needleSpecialDamage,
             needleHitLayers,
             SkillIndex,
             currentRuneCastId,
-            needleHealPercentOfDamage,
-            needleHitRadius,
-            BattleDamageType.Special);
+            healFromDamagePercent,
+            needleHitRadius);
 
         activeNeedles.Add(needle);
     }
@@ -399,7 +497,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         Vector3 center = transform.position + facing * (Mathf.Max(0.05f, thrustForwardOffset) + halfExtents.z);
 
         Collider[] hits = Physics.OverlapBox(center, halfExtents, orientation, thrustHitLayers, QueryTriggerInteraction.Collide);
-        float resolvedDamage = Mathf.Max(0f, thrustDamage);
+        ResolveCurrentStats(out float physicalAttack, out float specialAttack);
+        ResolveThrustDamageValues(physicalAttack, specialAttack, out float thrustPhysicalDamage, out float thrustSpecialDamage);
 
         for (int i = 0; i < hits.Length; i++)
         {
@@ -415,13 +514,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
                 continue;
             }
 
-            float appliedDamage = resolvedDamage + ConsumeRuneFirstHitBonusDamage();
-            float beforeHealth = ResolveCurrentHealth(combatHealth);
-            combatHealth.TakeDamage(new BattleDamage(appliedDamage, BattleDamageType.Physical, gameObject));
-            float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
-            runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
+            thrustPhaseTargets.Add(combatHealth);
+            ApplyHybridDamageToTarget(combatHealth, thrustPhysicalDamage, thrustSpecialDamage);
 
-            if (preferredNeedleTarget == null && actualDamage > 0f)
+            if (preferredNeedleTarget == null)
             {
                 preferredNeedleTarget = combatHealth;
             }
@@ -430,6 +526,16 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private Vector3 ResolveNeedleTargetPoint()
     {
+        if (TryResolveAverageCenter(thrustPhaseTargets, out Vector3 hitCenter))
+        {
+            return hitCenter;
+        }
+
+        if (TryResolveAverageCenter(FindLivingTargetsInSearchRadius(), out Vector3 searchCenter))
+        {
+            return searchCenter;
+        }
+
         CombatHealth targetHealth = ResolveNeedleTarget();
         if (targetHealth != null)
         {
@@ -475,17 +581,6 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
         preferredNeedleTarget = nearest;
         return nearest;
-    }
-
-    private float ResolveNeedleDamage()
-    {
-        return PlayerSkillDamageUtility.CalculateHybridSkillDamage(
-            this,
-            gameObject,
-            needleDamage,
-            needlePhysicalScaling,
-            needleSpecialScaling,
-            "Player01 R Needle");
     }
 
     private Vector3 ResolveTargetCenter(Transform target)
@@ -561,6 +656,11 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         return Mathf.Lerp(min, max, (float)randomGenerator.NextDouble());
     }
 
+    public void RegisterNeedleDamageResult(CombatHealth target, float actualDamage, bool killedByThisHit)
+    {
+        RegisterDamageResult(target, actualDamage, killedByThisHit);
+    }
+
     private float ConsumeRuneFirstHitBonusDamage()
     {
         return runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(SkillIndex, currentRuneCastId) : 0f;
@@ -588,6 +688,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private void CleanupRuntimeState(bool destroyActiveNeedles)
     {
+        if (releaseRoutine != null)
+        {
+            StopCoroutine(releaseRoutine);
+            releaseRoutine = null;
+        }
+
         DetachAnimationEvents();
         StopAndClearRuntimeVfx();
         if (destroyActiveNeedles)
@@ -600,14 +706,260 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         }
 
         thrustDamagedTargets.Clear();
+        thrustPhaseTargets.Clear();
+        killCreditTargets.Clear();
         preferredNeedleTarget = null;
         currentRuneCastId = -1;
         thrustVfxTriggered = false;
         thrustHitTriggered = false;
         needlePhaseTriggered = false;
+        currentNeedleCount = 0;
+        currentKillCount = 0;
+        currentTotalActualDamage = 0f;
+        currentTotalHealAmount = 0f;
+        currentTotalCooldownReduction = 0f;
         castRoutine = null;
-        Controller?.SetMovementInputLocked(false, "Player01 R");
-        Controller?.ClearSkillAnimationLock();
+        if (destroyActiveNeedles)
+        {
+            eyeFireROffset?.ImmediateReset();
+            Controller?.SetMovementInputLocked(false, "Player01 R");
+            Controller?.SetFacingInputLocked(false, castFacingSign, "Player01 R");
+            Controller?.ClearSkillAnimationLock();
+        }
+        else
+        {
+            eyeFireROffset?.EndROffset();
+        }
+    }
+
+    private IEnumerator FinishCastAndRestoreIdleRoutine()
+    {
+        if (Controller == null)
+        {
+            yield break;
+        }
+
+        Debug.Log("[Player01 R End] R animation finished", this);
+        Controller.RestoreLocomotionAnimationIgnoringSkillLock(true);
+        Debug.Log("[Player01 R End] Idle restored", this);
+        yield return null;
+        Controller.SetMovementInputLocked(false, "Player01 R");
+        Debug.Log("[Player01 R End] movement unlocked", this);
+        Controller.SetFacingInputLocked(false, castFacingSign, "Player01 R");
+        Debug.Log("[Player01 R End] facing unlocked", this);
+        Controller.ClearSkillAnimationLock();
+        releaseRoutine = null;
+    }
+
+    private void ApplyHybridDamageToTarget(CombatHealth combatHealth, float physicalDamage, float specialDamage)
+    {
+        if (combatHealth == null || combatHealth.IsDead)
+        {
+            return;
+        }
+
+        float beforeHealth = ResolveCurrentHealth(combatHealth);
+        float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
+        float resolvedPhysicalDamage = Mathf.Max(0f, physicalDamage + runeBonusDamage);
+        float resolvedSpecialDamage = Mathf.Max(0f, specialDamage);
+
+        if (resolvedPhysicalDamage > 0f)
+        {
+            combatHealth.TakeDamage(new BattleDamage(resolvedPhysicalDamage, BattleDamageType.Physical, gameObject));
+        }
+
+        if (!combatHealth.IsDead && resolvedSpecialDamage > 0f)
+        {
+            combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, gameObject));
+        }
+
+        float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+        runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
+        RegisterDamageResult(combatHealth, actualDamage, actualDamage > 0f && combatHealth.IsDead);
+    }
+
+    private void RegisterDamageResult(CombatHealth target, float actualDamage, bool killedByThisHit)
+    {
+        if (actualDamage <= 0f)
+        {
+            return;
+        }
+
+        currentTotalActualDamage += actualDamage;
+
+        float healAmount = actualDamage * Mathf.Clamp01(healFromDamagePercent);
+        if (healAmount > 0f)
+        {
+            CombatHealth sourceHealth = GetComponent<CombatHealth>();
+            if (sourceHealth != null)
+            {
+                sourceHealth.Heal(healAmount);
+            }
+            else
+            {
+                BattleResourceBank bank = GetComponent<BattleResourceBank>();
+                bank?.Heal(healAmount);
+            }
+
+            currentTotalHealAmount += healAmount;
+        }
+
+        if (killedByThisHit && target != null && killCreditTargets.Add(target))
+        {
+            currentKillCount++;
+            currentTotalCooldownReduction += cooldownReductionPerKill;
+            ApplyKillCooldownReduction();
+        }
+    }
+
+    private void ApplyKillCooldownReduction()
+    {
+        if (SkillResource == null || cooldownReductionPerKill <= 0f)
+        {
+            return;
+        }
+
+        float remaining = SkillResource.ReduceCurrentSkillCooldown(SkillIndex, cooldownReductionPerKill);
+        Controller?.SyncSkillHudCooldown("R");
+
+        if (debugLog)
+        {
+            Debug.Log($"[Player01 R] kill cooldown reduction applied -{cooldownReductionPerKill:F2}s => remaining={remaining:F2}", this);
+        }
+    }
+
+    private int ResolveNeedleCount()
+    {
+        int resolvedMin = Mathf.Max(1, minNeedleCount);
+        int resolvedMax = Mathf.Max(resolvedMin, maxNeedleCount);
+        if (randomGenerator == null)
+        {
+            randomGenerator = useRandomSeed
+                ? new System.Random(randomSeed)
+                : new System.Random(System.Environment.TickCount ^ GetInstanceID() ^ currentRuneCastId);
+        }
+
+        return randomGenerator.Next(resolvedMin, resolvedMax + 1);
+    }
+
+    private void ResolveCurrentStats(out float physicalAttack, out float specialAttack)
+    {
+        CombatStats combatStats = GetComponent<CombatStats>();
+        physicalAttack = combatStats != null ? Mathf.Max(0f, combatStats.physicalAttack) : 0f;
+        specialAttack = combatStats != null ? Mathf.Max(0f, combatStats.specialAttack) : 0f;
+    }
+
+    private void ResolveThrustDamageValues(float physicalAttack, float specialAttack, out float physicalDamage, out float specialDamage)
+    {
+        physicalDamage = Mathf.Max(0f, thrustPhysicalBaseDamage + specialAttack * thrustSpecialToPhysicalScale);
+        specialDamage = Mathf.Max(0f, thrustSpecialBaseDamage + physicalAttack * thrustPhysicalToSpecialScale);
+    }
+
+    private void ResolveNeedleDamageValues(float physicalAttack, float specialAttack, out float physicalDamage, out float specialDamage)
+    {
+        ResolveThrustDamageValues(physicalAttack, specialAttack, out float thrustPhysicalDamage, out float thrustSpecialDamage);
+        float multiplier = Mathf.Max(0f, needleDamageMultiplier);
+        physicalDamage = thrustPhysicalDamage * multiplier;
+        specialDamage = thrustSpecialDamage * multiplier;
+    }
+
+    private List<CombatHealth> FindLivingTargetsInSearchRadius()
+    {
+        List<CombatHealth> targets = new List<CombatHealth>();
+        Collider[] hits = Physics.OverlapSphere(transform.position, Mathf.Max(0.5f, targetSearchRadius), targetSearchLayers, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+            if (hit == null || !BattleTargetUtility.IsMonster(hit, transform))
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
+            if (combatHealth == null || combatHealth.IsDead || targets.Contains(combatHealth))
+            {
+                continue;
+            }
+
+            targets.Add(combatHealth);
+        }
+
+        return targets;
+    }
+
+    private bool TryResolveAverageCenter(List<CombatHealth> targets, out Vector3 center)
+    {
+        center = Vector3.zero;
+        if (targets == null || targets.Count == 0)
+        {
+            return false;
+        }
+
+        int validCount = 0;
+        for (int i = 0; i < targets.Count; i++)
+        {
+            CombatHealth target = targets[i];
+            if (target == null || target.IsDead)
+            {
+                continue;
+            }
+
+            center += ResolveTargetCenter(target.transform);
+            validCount++;
+        }
+
+        if (validCount <= 0)
+        {
+            return false;
+        }
+
+        center /= validCount;
+        return true;
+    }
+
+    private float ResolveManaCost()
+    {
+        float maxMana = SkillResource != null ? SkillResource.GetMaxMana() : 0f;
+        if (maxMana <= 0f)
+        {
+            BattleResourceBank bank = GetComponent<BattleResourceBank>();
+            if (bank != null)
+            {
+                maxMana = Mathf.Max(0f, bank.maxEnergy);
+            }
+        }
+
+        return Mathf.Max(0f, maxMana * Mathf.Clamp01(manaCostPercent));
+    }
+
+    private float ResolveRuntimeCooldownSeconds()
+    {
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            return SkillResource.GetSkillMaxCD(SkillIndex);
+        }
+
+        return Mathf.Max(0f, cooldown);
+    }
+
+    private void SyncSkillConfig()
+    {
+        cooldown = Mathf.Max(0f, cooldown);
+        duration = Mathf.Max(duration, skillEndTime);
+
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            SkillResource.OverrideSkillConfig(SkillIndex, cooldown, ResolveManaCost());
+        }
+
+        if (Controller != null)
+        {
+            var rCooldownField = typeof(Player01SkillController).GetField("rCooldown", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (rCooldownField != null)
+            {
+                rCooldownField.SetValue(Controller, cooldown);
+            }
+        }
     }
 
     private void ReleaseSkillState()

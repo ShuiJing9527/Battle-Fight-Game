@@ -2,6 +2,7 @@ using UnityEngine;
 
 public class EyeFireHorizontalRotationController : MonoBehaviour
 {
+    [SerializeField] private Player01SkillController skillController;
     [SerializeField] private bool useKeyboardInput = true;
     [SerializeField] private float horizontalThreshold = 0.1f;
     [SerializeField] private float moveRightZAngle = 90f;
@@ -18,6 +19,7 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
 
     private void Awake()
     {
+        ResolveSkillController();
         CacheInitialTransform();
         RestoreInitialTransform();
         CacheIdleRotation();
@@ -40,8 +42,14 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
             CacheIdleRotation();
         }
 
-        float horizontal = Input.GetAxisRaw("Horizontal");
+        if (IsFacingLocked())
+        {
+            return;
+        }
+
         Quaternion targetRotation = transform.localRotation;
+
+        float horizontal = Input.GetAxisRaw("Horizontal");
 
         if (horizontal > horizontalThreshold)
         {
@@ -56,6 +64,11 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
             targetRotation = idleRotation;
         }
 
+        ApplyTargetRotation(targetRotation);
+    }
+
+    private void ApplyTargetRotation(Quaternion targetRotation)
+    {
         if (rotateLerpSpeed <= 0f)
         {
             transform.localRotation = targetRotation;
@@ -64,6 +77,12 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
 
         float t = Mathf.Clamp01(Time.deltaTime * rotateLerpSpeed);
         transform.localRotation = Quaternion.Slerp(transform.localRotation, targetRotation, t);
+    }
+
+    private bool IsFacingLocked()
+    {
+        ResolveSkillController();
+        return skillController != null && skillController.IsFacingInputLocked;
     }
 
     private void CacheIdleRotation()
@@ -99,8 +118,17 @@ public class EyeFireHorizontalRotationController : MonoBehaviour
 
     public void Reinitialize()
     {
+        ResolveSkillController();
         CacheInitialTransform();
         RestoreInitialTransform();
         CacheIdleRotation();
+    }
+
+    private void ResolveSkillController()
+    {
+        if (skillController == null)
+        {
+            skillController = GetComponentInParent<Player01SkillController>();
+        }
     }
 }

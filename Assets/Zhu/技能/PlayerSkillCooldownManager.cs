@@ -189,6 +189,36 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         return skillDatas[idx].manaCost;
     }
 
+    public void OverrideSkillConfig(int skillIndex, float maxCooldown, float manaCost)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return;
+        }
+
+        SkillCostCDData data = skillDatas[skillIndex];
+        data.maxCooldown = Mathf.Max(0f, maxCooldown);
+        data.manaCost = Mathf.Max(0f, manaCost);
+        skillDatas[skillIndex] = data;
+    }
+
+    public float ReduceCurrentSkillCooldown(int skillIndex, float reductionSeconds)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return 0f;
+        }
+
+        float clampedReduction = Mathf.Max(0f, reductionSeconds);
+        if (clampedReduction <= 0f)
+        {
+            return runtimeCurrentCD[skillIndex];
+        }
+
+        runtimeCurrentCD[skillIndex] = Mathf.Max(0f, runtimeCurrentCD[skillIndex] - clampedReduction);
+        return runtimeCurrentCD[skillIndex];
+    }
+
     public float GetCurrentMana()
     {
         return resourceBank != null ? resourceBank.currentEnergy : runtimeCurrentMana;

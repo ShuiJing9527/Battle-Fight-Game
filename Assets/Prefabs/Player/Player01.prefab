@@ -26,11 +26,11 @@ Transform:
   m_GameObject: {fileID: 2487214793288127944}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 4, z: -0.5}
+  m_LocalPosition: {x: 0, y: 4, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 6725505632984679695}
+  - {fileID: 3262133100658078899}
   m_Father: {fileID: 6137005466732063120}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!114 &2704762549544208665
@@ -45,12 +45,45 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 5b672d5a73fe6384a847f3034be9e56c, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::EyeFireHorizontalRotationController
+  skillController: {fileID: 0}
   useKeyboardInput: 1
   horizontalThreshold: 0
   moveRightZAngle: 75
   moveLeftZAngle: -90
   returnToIdleWhenNoHorizontalInput: 1
   rotateLerpSpeed: 30
+--- !u!1 &3366445644338476486
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 3262133100658078899}
+  m_Layer: 0
+  m_Name: EyeFireROffsetRoot
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &3262133100658078899
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 3366445644338476486}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 6725505632984679695}
+  m_Father: {fileID: 5988219753920495105}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &4506008496835575958
 GameObject:
   m_ObjectHideFlags: 0
@@ -391,8 +424,8 @@ Transform:
   m_GameObject: {fileID: 5564418885629852989}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 4.45, z: -0.1}
-  m_LocalScale: {x: 5, y: 0.7, z: 0.7}
+  m_LocalPosition: {x: 0, y: 4, z: 0}
+  m_LocalScale: {x: 1, y: 0.7, z: 0.7}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 2481653623127205859}
@@ -536,11 +569,11 @@ Transform:
   m_GameObject: {fileID: 6284736616834087478}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: 0.7071068, w: 0.7071068}
-  m_LocalPosition: {x: 0, y: 4, z: -0.5}
+  m_LocalPosition: {x: 0, y: 4, z: 0}
   m_LocalScale: {x: 10, y: 7, z: 7}
   m_ConstrainProportionsScale: 0
   m_Children: []
-  m_Father: {fileID: 5988219753920495105}
+  m_Father: {fileID: 3262133100658078899}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 90}
 --- !u!33 &422191370296094423
 MeshFilter:
@@ -612,6 +645,37 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ForceRendererSortingOrder
   sortingLayerName: Default
   sortingOrder: 50
+--- !u!1 &6461507244506487480
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 5103700462333239305}
+  m_Layer: 0
+  m_Name: RThrustVfxAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &5103700462333239305
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6461507244506487480}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6137005466732063120}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &6750421073738647037
 GameObject:
   m_ObjectHideFlags: 0
@@ -669,6 +733,7 @@ GameObject:
   - component: {fileID: 9002000000000000001}
   - component: {fileID: 2817237619367692519}
   - component: {fileID: 9102100000000000001}
+  - component: {fileID: 6314844839368463526}
   m_Layer: 0
   m_Name: Player01
   m_TagString: Player
@@ -695,6 +760,7 @@ Transform:
   - {fileID: 1877475523376043010}
   - {fileID: 7623519995364397733}
   - {fileID: 9150000000000000002}
+  - {fileID: 5103700462333239305}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!65 &6043594468974671780
@@ -1363,23 +1429,27 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8a3d5c3c6cf64f2eb07c4f3b2d1f1005, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player1Skill_R_NeedleShot
-  cooldown: 1.15
+  cooldown: 0.4
   duration: 1.25
   effectPower: 1.35
   animationName: ATK1
   debugLog: 1
+  manaCostPercent: 0.1
   useSpineAnimationEvents: 0
   thrustVfxEventName: R_ThrustVfx
   thrustHitEventName: R_ThrustHit
   needleStartEventName: R_Needles
-  thrustVfxStartTime: 0.15
-  thrustHitTime: 0.22
-  needleStartTime: 0.45
+  thrustVfxStartTime: 0.48
+  thrustHitTime: 0.58
+  needleStartTime: 0.82
   needleInterval: 0.12
   skillEndTime: 1.25
   thrustVfxPrefab: {fileID: 11400000, guid: 6d6b3a1158d84f80848d2c2ba4f39c11, type: 3}
-  thrustVfxAnchor: {fileID: 0}
-  thrustDamage: 40
+  thrustVfxAnchor: {fileID: 5103700462333239305}
+  thrustPhysicalBaseDamage: 60
+  thrustSpecialToPhysicalScale: 0.8
+  thrustSpecialBaseDamage: 40
+  thrustPhysicalToSpecialScale: 0.4
   thrustRange: 2.4
   thrustWidth: 1.2
   thrustHeight: 1.4
@@ -1389,7 +1459,8 @@ MonoBehaviour:
     m_Bits: 128
   debugDrawThrustHitbox: 0
   needlePrefab: {fileID: 6860482820014089041, guid: 2782e2742c693e3459f55aaec3c41f7f, type: 3}
-  needleCount: 4
+  minNeedleCount: 4
+  maxNeedleCount: 12
   spawnRadiusMin: 3.5
   spawnRadiusMax: 5.5
   heightMin: 0.5
@@ -1400,22 +1471,22 @@ MonoBehaviour:
   minVisibleAngle: 12
   useRandomSeed: 1
   randomSeed: 101
-  needleDamage: 50
-  needlePhysicalScaling: 0.25
-  needleSpecialScaling: 1.1
+  needleDamageMultiplier: 50
   travelSpeed: 14
   passThroughDistance: 4.5
   fadeDuration: 0.3
-  needleHealPercentOfDamage: 0.25
   needleHitLayers:
     serializedVersion: 2
     m_Bits: 128
   needleHitRadius: 0.3
+  healFromDamagePercent: 0.25
+  cooldownReductionPerKill: 1
   targetSearchRadius: 14
   targetSearchLayers:
     serializedVersion: 2
     m_Bits: 128
   fallbackTargetDistance: 6
+  eyeFireROffset: {fileID: 0}
 --- !u!114 &9002000000000000001
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1527,6 +1598,34 @@ MonoBehaviour:
   includeRendererRoots:
   - {fileID: 5599230753579677837}
   excludeRendererRoots: []
+--- !u!114 &6314844839368463526
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 83d0e68f431795d4893fcbc47346b5e1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player01EyeFireROffset
+  offsetRoot: {fileID: 3262133100658078899}
+  backwardOffset: 0.8
+  backwardVerticalOffset: 0
+  backwardDuration: 0.12
+  rHoldLocalOffset: {x: 2.9, y: -0.8, z: 0}
+  rHoldOffsetIsForFacingRight: 1
+  returnBackwardOffset: 0.15
+  returnBackwardVerticalOffset: 0
+  returnBackwardDuration: 0.1
+  forwardOffset: 0.35
+  verticalOffset: 0
+  moveInDuration: 0.16
+  holdDuration: 0
+  returnDuration: 0.1
+  useLocalSpace: 1
+  debugLog: 1
 --- !u!1 &8709825368551096566
 GameObject:
   m_ObjectHideFlags: 0

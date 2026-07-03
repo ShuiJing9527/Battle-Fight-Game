@@ -5,35 +5,38 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
 {
     [SerializeField, Min(0.01f)] private float hitRadius = 0.3f;
     [SerializeField] private LayerMask hitLayers = ~0;
-    [SerializeField, Min(0f)] private float damageAmount = 0f;
-    [SerializeField] private BattleDamageType damageType = BattleDamageType.Special;
+    [SerializeField, Min(0f)] private float physicalDamageAmount = 0f;
+    [SerializeField, Min(0f)] private float specialDamageAmount = 0f;
 
     private readonly HashSet<CombatHealth> hitTargets = new HashSet<CombatHealth>();
     private GameObject source;
     private float healPercentOfDamage;
     private int skillSlotIndex = -1;
     private int runeCastId = -1;
+    private Player1Skill_R_NeedleShot ownerSkill;
     private Vector3 previousPosition;
     private bool initialized;
 
     public void Initialize(
+        Player1Skill_R_NeedleShot ownerSkill,
         GameObject source,
-        float damageAmount,
+        float physicalDamageAmount,
+        float specialDamageAmount,
         LayerMask hitLayers,
         int skillSlotIndex,
         int runeCastId,
         float healPercentOfDamage = 0f,
-        float hitRadius = 0.3f,
-        BattleDamageType damageType = BattleDamageType.Special)
+        float hitRadius = 0.3f)
     {
+        this.ownerSkill = ownerSkill;
         this.source = source;
-        this.damageAmount = Mathf.Max(0f, damageAmount);
+        this.physicalDamageAmount = Mathf.Max(0f, physicalDamageAmount);
+        this.specialDamageAmount = Mathf.Max(0f, specialDamageAmount);
         this.hitLayers = hitLayers;
         this.skillSlotIndex = skillSlotIndex;
         this.runeCastId = runeCastId;
         this.healPercentOfDamage = Mathf.Clamp01(healPercentOfDamage);
         this.hitRadius = Mathf.Max(0.01f, hitRadius);
-        this.damageType = damageType;
         previousPosition = transform.position;
         initialized = true;
     }
@@ -45,7 +48,7 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
 
     private void Update()
     {
-        if (!initialized || source == null || damageAmount <= 0f)
+        if (!initialized || source == null || (physicalDamageAmount <= 0f && specialDamageAmount <= 0f))
         {
             previousPosition = transform.position;
             return;
@@ -80,12 +83,30 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
                 continue;
             }
 
-            float resolvedDamage = damageAmount + ConsumeRuneFirstHitBonusDamage();
             float beforeHealth = ResolveCurrentHealth(combatHealth);
-            combatHealth.TakeDamage(new BattleDamage(resolvedDamage, damageType, source));
+            float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
+            if (physicalDamageAmount + runeBonusDamage > 0f)
+            {
+                combatHealth.TakeDamage(new BattleDamage(physicalDamageAmount + runeBonusDamage, BattleDamageType.Physical, source));
+            }
+
+            if (!combatHealth.IsDead && specialDamageAmount > 0f)
+            {
+                combatHealth.TakeDamage(new BattleDamage(specialDamageAmount, BattleDamageType.Special, source));
+            }
+
             float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+            bool killedByThisHit = actualDamage > 0f && combatHealth.IsDead;
             ResolveRuneRuntimeState()?.NotifyMonsterDamagedBySkill(skillSlotIndex, combatHealth, actualDamage);
-            HealSource(actualDamage * healPercentOfDamage);
+
+            if (ownerSkill != null)
+            {
+                ownerSkill.RegisterNeedleDamageResult(combatHealth, actualDamage, killedByThisHit);
+            }
+            else
+            {
+                HealSource(actualDamage * healPercentOfDamage);
+            }
         }
     }
 

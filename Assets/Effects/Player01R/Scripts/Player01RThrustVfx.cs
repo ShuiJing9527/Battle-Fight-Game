@@ -10,15 +10,17 @@ public class Player01RThrustVfx : MonoBehaviour
 
     [Header("Frames")]
     [SerializeField] private Sprite[] spriteFrames;
-    [SerializeField, Min(1f)] private float frameRate = 24f;
+    [SerializeField, Min(1f)] private float frameRate = 14f;
     [SerializeField] private bool playOnEnable = false;
-    [SerializeField] private bool loop;
+    [SerializeField] private bool loop = false;
     [SerializeField] private bool autoHideOnComplete = true;
 
     [Header("Placement")]
     [SerializeField] private Vector3 localPositionOffset = new Vector3(1.1f, 0.35f, 0f);
     [SerializeField] private Vector3 localRotation;
     [SerializeField] private Vector3 localScale = Vector3.one;
+    [SerializeField] private bool mirrorPositionOffsetWithFacing = true;
+    [SerializeField] private bool sourceFramesFaceLeft = true;
 
     [Header("Sorting")]
     [SerializeField] private string sortingLayerName = "Default";
@@ -67,15 +69,7 @@ public class Player01RThrustVfx : MonoBehaviour
     {
         ResolveBindings();
         ApplyStaticSettings();
-
-        if (thrustSpriteAnimationRoot != null)
-        {
-            thrustSpriteAnimationRoot.localPosition = new Vector3(localPositionOffset.x * facingSign, localPositionOffset.y, localPositionOffset.z);
-            thrustSpriteAnimationRoot.localRotation = Quaternion.Euler(localRotation);
-            Vector3 finalScale = localScale;
-            finalScale.x = Mathf.Abs(finalScale.x) * Mathf.Sign(Mathf.Approximately(facingSign, 0f) ? 1f : facingSign);
-            thrustSpriteAnimationRoot.localScale = finalScale;
-        }
+        ApplyPlacementAndFacing(facingSign);
 
         bool hasFrames = spriteFrames != null && spriteFrames.Length > 0;
         if (!hasFrames || sequencePlayer == null || targetSpriteRenderer == null)
@@ -90,15 +84,18 @@ public class Player01RThrustVfx : MonoBehaviour
         }
 
         targetSpriteRenderer.enabled = true;
+        targetSpriteRenderer.flipX = facingSign < 0f;
         sequencePlayer.SetFrames(spriteFrames);
         sequencePlayer.SetFrameRate(frameRate);
         sequencePlayer.SetPlayOnEnable(false);
         sequencePlayer.SetLoop(loop);
         sequencePlayer.SetAutoHideOnComplete(autoHideOnComplete);
+        sequencePlayer.SetScaleRange(localScale, localScale);
         sequencePlayer.SetLifetime(ResolvePlaybackLifetime());
         sequencePlayer.SetDestroyOnComplete(false);
         sequencePlayer.SetSorting(sortingLayerName, orderInLayer);
         sequencePlayer.Play();
+        ApplyPlacementAndFacing(facingSign);
 
         if (autoCleanupRoutine != null)
         {
@@ -119,11 +116,6 @@ public class Player01RThrustVfx : MonoBehaviour
 
     private void ResolveBindings()
     {
-        if (thrustSpriteAnimationRoot == null)
-        {
-            thrustSpriteAnimationRoot = transform.childCount > 0 ? transform.GetChild(0) : transform;
-        }
-
         if (sequencePlayer == null)
         {
             sequencePlayer = GetComponentInChildren<ScissorFrameEffectPlayer>(true);
@@ -132,6 +124,18 @@ public class Player01RThrustVfx : MonoBehaviour
         if (targetSpriteRenderer == null)
         {
             targetSpriteRenderer = GetComponentInChildren<SpriteRenderer>(true);
+        }
+
+        if (thrustSpriteAnimationRoot == null)
+        {
+            if (sequencePlayer != null)
+            {
+                thrustSpriteAnimationRoot = sequencePlayer.transform;
+            }
+            else
+            {
+                thrustSpriteAnimationRoot = transform.childCount > 0 ? transform.GetChild(0) : transform;
+            }
         }
     }
 
@@ -148,8 +152,41 @@ public class Player01RThrustVfx : MonoBehaviour
         sequencePlayer.SetDestroyOnComplete(false);
         sequencePlayer.SetLifetime(ResolvePlaybackLifetime());
         sequencePlayer.SetFrameRate(frameRate);
+        sequencePlayer.SetScaleRange(localScale, localScale);
         sequencePlayer.SetFrames(spriteFrames);
         sequencePlayer.SetSorting(sortingLayerName, orderInLayer);
+    }
+
+    private void ApplyPlacementAndFacing(float facingSign)
+    {
+        ResolveBindings();
+        bool facingRight = facingSign > 0f;
+        bool shouldFlipX = sourceFramesFaceLeft ? facingRight : !facingRight;
+        Vector3 resolvedLocalPosition = localPositionOffset;
+
+        if (thrustSpriteAnimationRoot != null)
+        {
+            if (mirrorPositionOffsetWithFacing)
+            {
+                resolvedLocalPosition.x = facingRight
+                    ? Mathf.Abs(localPositionOffset.x)
+                    : -Mathf.Abs(localPositionOffset.x);
+            }
+
+            thrustSpriteAnimationRoot.localPosition = resolvedLocalPosition;
+            thrustSpriteAnimationRoot.localRotation = Quaternion.Euler(localRotation);
+            thrustSpriteAnimationRoot.localScale = localScale;
+        }
+
+        if (targetSpriteRenderer != null)
+        {
+            targetSpriteRenderer.flipX = shouldFlipX;
+        }
+
+        Debug.Log(
+            $"[Player01 R ThrustVfx] facingSign={facingSign:F2}, facing={(facingRight ? "Right" : "Left")}, " +
+            $"sourceFramesFaceLeft={sourceFramesFaceLeft}, flipX={shouldFlipX}, localPosition={resolvedLocalPosition}",
+            this);
     }
 
     private float ResolvePlaybackLifetime()

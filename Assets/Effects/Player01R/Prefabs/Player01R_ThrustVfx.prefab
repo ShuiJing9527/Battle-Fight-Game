@@ -56,16 +56,18 @@ MonoBehaviour:
   - {fileID: -2130884495, guid: 6f1859490ff0d824ba4806883c30b870, type: 3}
   - {fileID: -258315464, guid: 6f1859490ff0d824ba4806883c30b870, type: 3}
   - {fileID: -174117841, guid: 6f1859490ff0d824ba4806883c30b870, type: 3}
-  frameRate: 24
-  playOnEnable: 0
+  frameRate: 14
+  playOnEnable: 1
   loop: 0
   autoHideOnComplete: 0
-  localPositionOffset: {x: 1.1, y: 0.35, z: 0}
+  localPositionOffset: {x: 4, y: -1, z: 0}
   localRotation: {x: 0, y: 0, z: 0}
-  localScale: {x: 1, y: 1, z: 1}
+  localScale: {x: 12, y: 12, z: 12}
+  mirrorPositionOffsetWithFacing: 1
+  sourceFramesFaceLeft: 1
   sortingLayerName: Default
   orderInLayer: 90
-  fallbackLifetime: 0.2
+  fallbackLifetime: 0.35
   destroyRootOnComplete: 1
 --- !u!1 &100001
 GameObject:

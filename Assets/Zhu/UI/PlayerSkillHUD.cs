@@ -103,7 +103,7 @@ public class PlayerSkillHUD : MonoBehaviour
         }
 
         HandleDebugCooldownKeys();
-        UpdateCooldownVisuals(Time.unscaledDeltaTime);
+        UpdateCooldownVisuals(Time.deltaTime);
     }
 
     private void Initialize()
@@ -512,6 +512,19 @@ public class PlayerSkillHUD : MonoBehaviour
 
         cooldownDurations[index] = duration;
         cooldownRemaining[index] = duration;
+        RefreshCooldownVisual(index);
+    }
+
+    public void SyncSkillCooldown(string key, float remaining, float duration)
+    {
+        int index = ResolveSlotIndex(key);
+        if (index < 0)
+        {
+            return;
+        }
+
+        cooldownDurations[index] = Mathf.Max(0f, duration);
+        cooldownRemaining[index] = Mathf.Clamp(remaining, 0f, cooldownDurations[index] > 0f ? cooldownDurations[index] : 0f);
         RefreshCooldownVisual(index);
     }
 

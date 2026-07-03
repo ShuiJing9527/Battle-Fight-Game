@@ -18,7 +18,6 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
     private float elapsed;
     private bool playing;
     private Color baseColor = Color.white;
-    private float scaleDirectionX = 1f;
 
     private void Awake()
     {
@@ -61,7 +60,6 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         ResolveRenderer();
         CacheBaseColor();
         elapsed = 0f;
-        scaleDirectionX = transform.localScale.x < 0f ? -1f : 1f;
         if (targetRenderer == null || frames == null || frames.Length == 0)
         {
             playing = false;
@@ -151,6 +149,12 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         destroyOnComplete = value;
     }
 
+    public void SetScaleRange(Vector3 start, Vector3 end)
+    {
+        startScale = start;
+        endScale = end;
+    }
+
     private void ResolveRenderer()
     {
         if (targetRenderer == null)
@@ -193,9 +197,7 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
 
     private void ApplyScale(float normalized)
     {
-        Vector3 scale = Vector3.LerpUnclamped(startScale, endScale, normalized);
-        scale.x = Mathf.Abs(scale.x) * scaleDirectionX;
-        transform.localScale = scale;
+        transform.localScale = Vector3.LerpUnclamped(startScale, endScale, normalized);
     }
 
     private void ApplyAlpha(float normalized)
