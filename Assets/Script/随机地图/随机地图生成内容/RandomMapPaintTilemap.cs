@@ -42,6 +42,22 @@ namespace UnderTheStars.GenerationMap
             return null;
         }
 
+        public void ClearFloorTileCell(int tilemapIndex, Vector2Int point)
+        {
+            if (floorTilemap == null || tilemapIndex < 0 || tilemapIndex >= floorTilemap.Length)
+            {
+                return;
+            }
+
+            Tilemap tilemap = floorTilemap[tilemapIndex];
+            if (tilemap == null)
+            {
+                return;
+            }
+
+            tilemap.SetTile(new Vector3Int(point.x, point.y, 0), null);
+        }
+
         private async UniTask PaintTile(HashSet<Vector2Int> points, Tilemap tilemap, TileBase tile)
         {
             int count = 0;

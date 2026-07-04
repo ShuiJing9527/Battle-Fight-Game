@@ -28,6 +28,14 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private RandomMapPaintTilemap paintTilemap;// Tilemap painter
         [SerializeField] private RandomMapPainProp paintProp;// Prop painter
 
+        [Header("Shore Sand")]
+        [SerializeField] private bool enableShoreSand = true;
+        [SerializeField] private GameObject shoreSandNormalPrefab;
+        [SerializeField] private GameObject shoreSandOceanTransitionPrefab;
+        [SerializeField] private GameObject shoreSandGrassTransitionPrefab;
+        [SerializeField] private Transform shoreSandParent;
+        [SerializeField] private float shoreSandHeightOffset = 0.02f;
+
         [Header("区域大小与范围")]
         [SerializeField] private Vector2Int regionSize;// Legacy serialized data for migration
         [SerializeField] private Vector2Int regionArea;// Base region dimensions (width,height)
@@ -57,9 +65,20 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int>[,] floorPoints;// Floor points
         private HashSet<Vector2Int>[,] propsPoints;// Prop points
         private HashSet<Vector2Int> wallColliderPoints;// Wall collider points
+        private HashSet<Vector2Int> generatedShoreSandPoints;// Shore sand points
+        private bool hasLoggedMissingShoreSandPrefabWarning;
         private ActiveRegionLayout[] activeRegionLayouts;
         private int activeRegionColumns;
         private int activeRegionRows;
+        private const string GeneratedShoreSandRootName = "Generated Shore Sand";
+
+        private enum ShoreEdgeDirection
+        {
+            Up,
+            Down,
+            Left,
+            Right
+        }
 
         private struct ActiveRegionLayout
         {
@@ -89,6 +108,32 @@ namespace UnderTheStars.GenerationMap
                 return new BoundsInt(
                     new Vector3Int(min.x, min.y, 0),
                     new Vector3Int((max.x - min.x) + 1, (max.y - min.y) + 1, 1));
+            }
+        }
+
+        private struct ShoreSandPlacement
+        {
+            public Vector2Int point;
+            public GameObject prefab;
+            public ShoreEdgeDirection direction;
+            public bool replacesGrassTile;
+            public bool marksAsBeach;
+            public bool usesGrassTransitionDirectionMapping;
+
+            public ShoreSandPlacement(
+                Vector2Int point,
+                GameObject prefab,
+                ShoreEdgeDirection direction,
+                bool replacesGrassTile,
+                bool marksAsBeach,
+                bool usesGrassTransitionDirectionMapping)
+            {
+                this.point = point;
+                this.prefab = prefab;
+                this.direction = direction;
+                this.replacesGrassTile = replacesGrassTile;
+                this.marksAsBeach = marksAsBeach;
+                this.usesGrassTransitionDirectionMapping = usesGrassTransitionDirectionMapping;
             }
         }
 
@@ -131,6 +176,8 @@ namespace UnderTheStars.GenerationMap
             }
 
             await UniTask.WhenAll(paintTasks);
+
+            GenerateShoreSand();
 
             // Place player
             SpawnPropsOnFloor();
@@ -204,7 +251,14 @@ namespace UnderTheStars.GenerationMap
                     AreaType areaType = ResolveRegionAreaType(x, y);
                     foreach (Vector2Int point in regionPointSet)
                     {
-                        result[point] = areaType;
+                        if (generatedShoreSandPoints != null && generatedShoreSandPoints.Contains(point))
+                        {
+                            result[point] = AreaType.Beach;
+                        }
+                        else
+                        {
+                            result[point] = areaType;
+                        }
                     }
                 }
             }
@@ -867,6 +921,8 @@ namespace UnderTheStars.GenerationMap
             floorPoints = null;
             propsPoints = null;
             wallColliderPoints = null;
+            generatedShoreSandPoints = null;
+            hasLoggedMissingShoreSandPrefabWarning = false;
         }
 
         /// <summary> Initialize map random seed. </summary>
@@ -1035,6 +1091,397 @@ namespace UnderTheStars.GenerationMap
             }
 
             return 0;
+        }
+
+        private void GenerateShoreSand()
+        {
+            generatedShoreSandPoints = null;
+            ClearGeneratedShoreSandInstances();
+
+            if (!enableShoreSand)
+            {
+                return;
+            }
+
+            if (!HasAllShoreSandPrefabsAssigned())
+            {
+                if (!hasLoggedMissingShoreSandPrefabWarning)
+                {
+                    Debug.LogWarning("[RandomMapGeneration] Shore Sand is enabled, but one or more Shore Sand prefabs are not assigned. Assign Normal, Ocean Transition, and Grass Transition prefabs in the inspector. Shore sand generation will be skipped.", this);
+                    hasLoggedMissingShoreSandPrefabWarning = true;
+                }
+
+                return;
+            }
+
+            if (paintTilemap == null || floorPoints == null)
+            {
+                return;
+            }
+
+            Tilemap referenceTilemap = paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex());
+            if (referenceTilemap == null)
+            {
+                return;
+            }
+
+            Dictionary<Vector2Int, AreaType> areaByPoint = new Dictionary<Vector2Int, AreaType>();
+            Dictionary<Vector2Int, int> tilemapIndexByPoint = new Dictionary<Vector2Int, int>();
+            HashSet<Vector2Int> allLandPoints = CollectLandPointMetadata(areaByPoint, tilemapIndexByPoint);
+            if (allLandPoints.Count == 0)
+            {
+                return;
+            }
+
+            List<ShoreSandPlacement> placements = new List<ShoreSandPlacement>();
+            HashSet<Vector2Int> reservedPoints = new HashSet<Vector2Int>();
+            foreach (Vector2Int point in allLandPoints)
+            {
+                if (!areaByPoint.TryGetValue(point, out AreaType areaType) || areaType != AreaType.Grass)
+                {
+                    continue;
+                }
+
+                if (TryBuildShoreSandStrip(point, allLandPoints, areaByPoint, reservedPoints, out List<ShoreSandPlacement> stripPlacements))
+                {
+                    for (int i = 0; i < stripPlacements.Count; i++)
+                    {
+                        placements.Add(stripPlacements[i]);
+                        reservedPoints.Add(stripPlacements[i].point);
+                    }
+                }
+            }
+
+            if (placements.Count == 0)
+            {
+                return;
+            }
+
+            Transform parent = ResolveGeneratedShoreSandParent();
+            generatedShoreSandPoints = new HashSet<Vector2Int>(placements.Count);
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                Vector2Int point = placements[i].point;
+                if (!tilemapIndexByPoint.TryGetValue(point, out int tilemapIndex))
+                {
+                    continue;
+                }
+
+                if (placements[i].replacesGrassTile)
+                {
+                    paintTilemap.ClearFloorTileCell(tilemapIndex, point);
+                }
+
+                Vector3 worldPosition = referenceTilemap.GetCellCenterWorld(new Vector3Int(point.x, point.y, 0));
+                worldPosition.y += shoreSandHeightOffset;
+
+                GameObject prefab = placements[i].prefab;
+                Quaternion baseRotation = prefab != null ? prefab.transform.rotation : Quaternion.identity;
+                float appendedYaw = placements[i].usesGrassTransitionDirectionMapping
+                    ? ResolveGrassTransitionYaw(placements[i].direction)
+                    : ResolveShoreSandYaw(placements[i].direction);
+                Quaternion rotationOffset = Quaternion.Euler(0f, appendedYaw, 0f);
+                Quaternion finalRotation = rotationOffset * baseRotation;
+
+                Instantiate(prefab, worldPosition, finalRotation, parent);
+                if (placements[i].marksAsBeach)
+                {
+                    generatedShoreSandPoints.Add(point);
+                }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+                if (placements[i].usesGrassTransitionDirectionMapping)
+                {
+                    Debug.Log(
+                        $"[ShoreSand.GrassTransitionRotation] point={point} inlandDirection={placements[i].direction} prefabDefaultY={NormalizeYaw(baseRotation.eulerAngles.y):F1} appendedYaw={appendedYaw:F1} finalWorldY={NormalizeYaw(finalRotation.eulerAngles.y):F1}",
+                        this);
+                }
+#endif
+            }
+        }
+
+        private bool HasAllShoreSandPrefabsAssigned()
+        {
+            return shoreSandNormalPrefab != null &&
+                   shoreSandOceanTransitionPrefab != null &&
+                   shoreSandGrassTransitionPrefab != null;
+        }
+
+        private HashSet<Vector2Int> CollectLandPointMetadata(
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            Dictionary<Vector2Int, int> tilemapIndexByPoint)
+        {
+            HashSet<Vector2Int> allLandPoints = new HashSet<Vector2Int>();
+            if (floorPoints == null)
+            {
+                return allLandPoints;
+            }
+
+            for (int x = 0; x < floorPoints.GetLength(0); x++)
+            {
+                for (int y = 0; y < floorPoints.GetLength(1); y++)
+                {
+                    HashSet<Vector2Int> regionPointSet = floorPoints[x, y];
+                    if (regionPointSet == null || regionPointSet.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    AreaType areaType = ResolveRegionAreaType(x, y);
+                    int tilemapIndex = ResolveRegionRenderTilemapIndex(x, y);
+                    foreach (Vector2Int point in regionPointSet)
+                    {
+                        allLandPoints.Add(point);
+                        areaByPoint[point] = areaType;
+                        tilemapIndexByPoint[point] = tilemapIndex;
+                    }
+                }
+            }
+
+            return allLandPoints;
+        }
+
+        private int ResolveRegionRenderTilemapIndex(int gridX, int gridY)
+        {
+            if (activeRegionLayouts != null)
+            {
+                for (int i = 0; i < activeRegionLayouts.Length; i++)
+                {
+                    if (activeRegionLayouts[i].gridX == gridX && activeRegionLayouts[i].gridY == gridY)
+                    {
+                        return Mathf.Max(0, activeRegionLayouts[i].renderTilemapIndex);
+                    }
+                }
+            }
+
+            return 0;
+        }
+
+        private bool TryBuildShoreSandStrip(
+            Vector2Int outerPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> reservedPoints,
+            out List<ShoreSandPlacement> placements)
+        {
+            placements = null;
+
+            if (!TryGetSingleSeaEdgeDirection(outerPoint, allLandPoints, out ShoreEdgeDirection oceanDirection))
+            {
+                return false;
+            }
+
+            Vector2Int inwardOffset = GetOppositeCardinalOffset(oceanDirection);
+            Vector2Int middlePoint = outerPoint + inwardOffset;
+            Vector2Int innerPoint = middlePoint + inwardOffset;
+
+            if (!IsGrassLandPoint(middlePoint, allLandPoints, areaByPoint) ||
+                !IsGrassLandPoint(innerPoint, allLandPoints, areaByPoint))
+            {
+                return false;
+            }
+
+            if (reservedPoints.Contains(outerPoint) ||
+                reservedPoints.Contains(middlePoint) ||
+                reservedPoints.Contains(innerPoint))
+            {
+                return false;
+            }
+
+            ShoreEdgeDirection grassDirection = GetOppositeDirection(oceanDirection);
+            placements = new List<ShoreSandPlacement>(3)
+            {
+                new ShoreSandPlacement(
+                    outerPoint,
+                    shoreSandOceanTransitionPrefab,
+                    oceanDirection,
+                    true,
+                    true,
+                    false),
+                new ShoreSandPlacement(
+                    middlePoint,
+                    shoreSandNormalPrefab,
+                    oceanDirection,
+                    false,
+                    false,
+                    false),
+                new ShoreSandPlacement(
+                    innerPoint,
+                    shoreSandGrassTransitionPrefab,
+                    grassDirection,
+                    false,
+                    false,
+                    true)
+            };
+
+            return true;
+        }
+
+        private static bool IsGrassLandPoint(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            return allLandPoints.Contains(point) &&
+                   areaByPoint.TryGetValue(point, out AreaType areaType) &&
+                   areaType == AreaType.Grass;
+        }
+
+        private static bool TryGetSingleSeaEdgeDirection(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            out ShoreEdgeDirection shoreDirection)
+        {
+            shoreDirection = ShoreEdgeDirection.Up;
+            int seaSideCount = 0;
+
+            if (!allLandPoints.Contains(point + Vector2Int.up))
+            {
+                shoreDirection = ShoreEdgeDirection.Up;
+                seaSideCount++;
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.down))
+            {
+                shoreDirection = ShoreEdgeDirection.Down;
+                seaSideCount++;
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.left))
+            {
+                shoreDirection = ShoreEdgeDirection.Left;
+                seaSideCount++;
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.right))
+            {
+                shoreDirection = ShoreEdgeDirection.Right;
+                seaSideCount++;
+            }
+
+            return seaSideCount == 1;
+        }
+
+        private static ShoreEdgeDirection GetOppositeDirection(ShoreEdgeDirection direction)
+        {
+            switch (direction)
+            {
+                case ShoreEdgeDirection.Up:
+                    return ShoreEdgeDirection.Down;
+                case ShoreEdgeDirection.Down:
+                    return ShoreEdgeDirection.Up;
+                case ShoreEdgeDirection.Left:
+                    return ShoreEdgeDirection.Right;
+                case ShoreEdgeDirection.Right:
+                    return ShoreEdgeDirection.Left;
+                default:
+                    return ShoreEdgeDirection.Up;
+            }
+        }
+
+        private static Vector2Int GetOppositeCardinalOffset(ShoreEdgeDirection direction)
+        {
+            switch (direction)
+            {
+                case ShoreEdgeDirection.Up:
+                    return Vector2Int.down;
+                case ShoreEdgeDirection.Down:
+                    return Vector2Int.up;
+                case ShoreEdgeDirection.Left:
+                    return Vector2Int.right;
+                case ShoreEdgeDirection.Right:
+                    return Vector2Int.left;
+                default:
+                    return Vector2Int.zero;
+            }
+        }
+
+        private static float ResolveShoreSandYaw(ShoreEdgeDirection shoreDirection)
+        {
+            switch (shoreDirection)
+            {
+                case ShoreEdgeDirection.Up:
+                    return 0f;
+                case ShoreEdgeDirection.Right:
+                    return 90f;
+                case ShoreEdgeDirection.Down:
+                    return 180f;
+                case ShoreEdgeDirection.Left:
+                    return 270f;
+                default:
+                    return 0f;
+            }
+        }
+
+        private static float ResolveGrassTransitionYaw(ShoreEdgeDirection inlandGrassDirection)
+        {
+            switch (inlandGrassDirection)
+            {
+                case ShoreEdgeDirection.Down:
+                    return 0f;
+                case ShoreEdgeDirection.Left:
+                    return 90f;
+                case ShoreEdgeDirection.Up:
+                    return 180f;
+                case ShoreEdgeDirection.Right:
+                    return 270f;
+                default:
+                    return 0f;
+            }
+        }
+
+        private static float NormalizeYaw(float yaw)
+        {
+            yaw %= 360f;
+            if (yaw < 0f)
+            {
+                yaw += 360f;
+            }
+
+            return yaw;
+        }
+
+        private Transform ResolveGeneratedShoreSandParent()
+        {
+            if (shoreSandParent != null)
+            {
+                return shoreSandParent;
+            }
+
+            Transform existing = transform.Find(GeneratedShoreSandRootName);
+            if (existing != null)
+            {
+                shoreSandParent = existing;
+                return shoreSandParent;
+            }
+
+            GameObject parentObject = new GameObject(GeneratedShoreSandRootName);
+            parentObject.transform.SetParent(transform, false);
+            shoreSandParent = parentObject.transform;
+            return shoreSandParent;
+        }
+
+        private void ClearGeneratedShoreSandInstances()
+        {
+            Transform parent = shoreSandParent != null ? shoreSandParent : transform.Find(GeneratedShoreSandRootName);
+            if (parent == null)
+            {
+                return;
+            }
+
+            for (int i = parent.childCount - 1; i >= 0; i--)
+            {
+                Transform child = parent.GetChild(i);
+                if (Application.isPlaying)
+                {
+                    Destroy(child.gameObject);
+                }
+                else
+                {
+                    DestroyImmediate(child.gameObject);
+                }
+            }
         }
         #endregion
     }
