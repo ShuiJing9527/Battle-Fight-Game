@@ -258,6 +258,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private int currentROverflowStarBladeCount;
     private int currentROverflowBonusDamage;
     private int remainingRVisibleStarBladeSpawnBudget;
+    protected override int SkillIndex => 3;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -302,6 +303,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         currentROverflowBonusDamage = 0;
         remainingRVisibleStarBladeSpawnBudget = 0;
         activeRuneCastId = -1;
+        ResetRuneCastContext();
         CleanupRSwarmVisuals();
         CleanupRStarRainVisuals();
         if (activeRSwarmRoot != null)
@@ -351,7 +353,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float finalDuration = ResolveFinalSwarmDuration(totalStarBladeCount);
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
-        activeRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(3) : -1;
+        PrepareRuneCastContext();
+        activeRuneCastId = CurrentRuneCastId;
         if (rSwarmDebugLog)
         {
             Debug.Log(
@@ -1175,8 +1178,18 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
         float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
 
-        float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier);
+        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        float finalDamage =
+            (physicalFinal + specialFinal)
+            * Mathf.Max(0f, damageMultiplier)
+            * Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier())
+            * manaMultiplier;
         finalDamage += GetCurrentROverflowBonusDamage();
+
+        if (manaMultiplier > 1f)
+        {
+            LogManaRuneApplied("Player02 R", "Damage", physicalFinal + specialFinal, (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier) * manaMultiplier);
+        }
 
         if (rDamageDebugLog)
         {

@@ -19,16 +19,31 @@ public class RuneRuntimeState : MonoBehaviour
     private const int SkillCount = 4;
     private const int SkillSlotCount = 5;
     private const float LifeSetAllStatPerTenMaxHealth = 0.10f;
-    private const float ManaSetAllStatPerTenMaxMana = 0.25f;
+    private const float ManaSetAllStatPerTenMaxMana = 0.10f;
     private const float ManaSetAttributeUnit = 10f;
     private const float ShieldNoDamageDelay = 3f;
-    private const float ThornCounterBaseCooldown = 4f;
-    private const float ThornCounterSetCooldown = 2f;
     private const float ThornCounterExecutionLockSeconds = 1f;
+    private const string DefaultThornCounterBurstPrefabResourcePath = "Prefabs/Effects/Runes/RuneThornCounterBurst";
+    private const float ShieldEfficiencyCap = 3f;
+    private const float ManaConversionEfficiencyCap = 3f;
+    private const float ThornEfficiencyCap = 3f;
+    private const float LuckEfficiencyCap = 5f;
+    private const float LuckSetChanceMultiplier = 1.5f;
+    private const float ThornBaseMonsterDamageReductionMultiplier = 0.75f;
+    private const float ThornBaseCounterCooldownSeconds = 4f;
+    private const float ThornSetCounterCooldownSeconds = 2f;
 
     [Header("Thorn Counter")]
     [SerializeField, Min(0.1f)] private float thornCounterBurstRadius = 3f;
+    [SerializeField, Min(0f)] private float thornCounterCooldown = ThornBaseCounterCooldownSeconds;
+    [SerializeField, Min(0f)] private float thornCounterDamageMultiplier = 3f;
+    [SerializeField, Min(0.05f)] private float thornCounterEffectDuration = 0.24f;
+    [SerializeField] private LayerMask thornCounterTargetLayers = ~0;
     [SerializeField] private GameObject thornCounterBurstPrefab;
+
+    [Header("Mana Rune")]
+    [Range(0f, 1f)]
+    [SerializeField] private float manaRuneExtraCostMaxManaPercent = 0.20f;
 
     [Header("Debug")]
     [SerializeField] private bool runeDebugLog = false;
@@ -42,15 +57,15 @@ public class RuneRuntimeState : MonoBehaviour
     private bool isRebuildingFromEquippedRunes;
 
     private readonly Dictionary<RuneType, int>[] skillRuneCounts = new Dictionary<RuneType, int>[SkillCount];
-    private readonly Dictionary<RuneType, int> globalMaxCounts = new Dictionary<RuneType, int>();
+    private readonly Dictionary<RuneType, int> globalRuneCounts = new Dictionary<RuneType, int>();
     private readonly List<int>[] pendingSkillFirstHitCastIds = new List<int>[SkillCount];
-    private readonly List<float>[] pendingSkillManaBurstDamages = new List<float>[SkillCount];
     private readonly int[] nextSkillCastIds = new int[SkillCount];
 
     private float lastMonsterDamageTime = float.NegativeInfinity;
     private bool shieldGeneratedSinceLastMonsterDamage;
     private float thornCounterReadyTime;
     private bool thornCounterInProgress;
+    private bool suppressReactiveAutoEffects;
     private Coroutine thornCounterReleaseCoroutine;
     private float manaOverflow;
 
@@ -87,7 +102,6 @@ public class RuneRuntimeState : MonoBehaviour
         {
             skillRuneCounts[i] = new Dictionary<RuneType, int>();
             pendingSkillFirstHitCastIds[i] = new List<int>();
-            pendingSkillManaBurstDamages[i] = new List<float>();
         }
 
         thornCounterReadyTime = 0f;
@@ -120,17 +134,18 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        float shieldPercent = 0.50f;
-        float shieldAmount = ResolveOwnerMaxHealth() * shieldPercent;
-        if (shieldAmount <= 0f)
+        float shieldTarget = ResolveOwnerMaxHealth() * 0.50f;
+        float currentShield = resourceBank.CurrentShield;
+        if (shieldTarget <= 0f || currentShield >= shieldTarget)
         {
             return;
         }
 
+        float shieldAmount = shieldTarget - currentShield;
         shieldGeneratedSinceLastMonsterDamage = true;
         resourceBank.AddShield(shieldAmount);
         ClampCurrentShieldToRuneCap();
-        DebugLog($"[RuneRuntimeState] Shield rune passive granted shield={shieldAmount:F2}");
+        DebugLog($"[RuneRuntimeState] Shield rune passive granted missingShield={shieldAmount:F2}, targetShield={shieldTarget:F2}");
     }
 
     public void RebuildFromEquippedRunes()
@@ -170,11 +185,8 @@ public class RuneRuntimeState : MonoBehaviour
                     skillRuneCounts[skillIndex][rune.runeType] = currentCount;
 
                     int globalCurrent = 0;
-                    globalMaxCounts.TryGetValue(rune.runeType, out globalCurrent);
-                    if (currentCount > globalCurrent)
-                    {
-                        globalMaxCounts[rune.runeType] = currentCount;
-                    }
+                    globalRuneCounts.TryGetValue(rune.runeType, out globalCurrent);
+                    globalRuneCounts[rune.runeType] = globalCurrent + 1;
                 }
             }
         }
@@ -207,7 +219,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         int count = 0;
-        globalMaxCounts.TryGetValue(runeType, out count);
+        globalRuneCounts.TryGetValue(runeType, out count);
         return count;
     }
 
@@ -221,7 +233,7 @@ public class RuneRuntimeState : MonoBehaviour
         int castId = ++nextSkillCastIds[skillIndex];
         pendingSkillFirstHitCastIds[skillIndex].Add(castId);
 
-        int lifeCount = GetSkillRuneCount(skillIndex, RuneType.Life);
+        int lifeCount = GetGlobalRuneCount(RuneType.Life);
         if (lifeCount >= 2)
         {
             ApplyLifeRuneCastHeal(lifeCount);
@@ -236,7 +248,7 @@ public class RuneRuntimeState : MonoBehaviour
         int shieldCount = GetGlobalRuneCount(RuneType.Shield);
         if (shieldCount >= 2 && resourceBank != null && resourceBank.CurrentShield > 0f)
         {
-            multiplier *= 1.5f;
+            multiplier *= 1.3f;
         }
 
         return multiplier;
@@ -273,28 +285,22 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         float bonusDamage = 0f;
-        int lifeCount = GetSkillRuneCount(skillIndex, RuneType.Life);
+        int lifeCount = GetGlobalRuneCount(RuneType.Life);
         if (lifeCount >= 3)
         {
             bonusDamage += ResolveOwnerMaxHealth() * 0.05f;
         }
 
-        int shieldCount = GetSkillRuneCount(skillIndex, RuneType.Shield);
+        int shieldCount = GetGlobalRuneCount(RuneType.Shield);
         if (shieldCount >= 5 && resourceBank != null)
         {
-            bonusDamage += resourceBank.CurrentShield * 0.35f * GetShieldEfficiency();
+            bonusDamage += resourceBank.CurrentShield * 0.15f * GetShieldEfficiency();
         }
 
-        int thornCount = GetSkillRuneCount(skillIndex, RuneType.Thorn);
+        int thornCount = GetGlobalRuneCount(RuneType.Thorn);
         if (thornCount >= 4)
         {
-            bonusDamage += ResolveBaseThornDamage(thornCount) * 2.5f;
-        }
-
-        int manaCount = GetSkillRuneCount(skillIndex, RuneType.Mana);
-        if (manaCount >= 4)
-        {
-            bonusDamage += ConsumePreparedManaBurstDamage(skillIndex);
+            bonusDamage += ResolveBaseThornDamage(thornCount) * 1.5f;
         }
 
         DebugLog($"[RuneRuntimeState] First-hit bonus skill={skillIndex} damage={bonusDamage:F2}");
@@ -303,46 +309,78 @@ public class RuneRuntimeState : MonoBehaviour
 
     public void PrepareManaBurstForSkillCast(int skillIndex, float baseCost)
     {
+        // Deprecated: mana rune 4-piece no longer uses first-hit deferred consumption.
+    }
+
+    public float TriggerManaRuneCastEffect(int skillIndex)
+    {
+        int currentSkillManaCount = skillIndex >= 0 && skillIndex < skillRuneCounts.Length
+            ? GetSkillRuneCount(skillIndex, RuneType.Mana)
+            : 0;
+        int globalManaCount = GetGlobalRuneCount(RuneType.Mana);
+        ManaRuneLog($"Trigger entered. skill={SkillIndexToName(skillIndex)}, manaRuneCount={currentSkillManaCount}, globalManaRuneCount={globalManaCount}");
+
         if (skillIndex < 0 || skillIndex >= skillRuneCounts.Length)
         {
-            return;
+            ManaRuneLog($"Skipped. reason=invalid-skill-index-{skillIndex}");
+            return 0f;
         }
 
-        int manaCount = GetSkillRuneCount(skillIndex, RuneType.Mana);
+        int manaCount = globalManaCount;
         if (manaCount < 4)
         {
-            pendingSkillManaBurstDamages[skillIndex].Add(0f);
-            return;
+            ManaRuneLog("Skipped. reason=global-mana-rune-count-below-4");
+            return 0f;
         }
 
-        float consumeCap = 150f;
-        float multiplier = 4f;
-        float overflowBefore = manaOverflow;
-        float energyBefore = resourceBank != null ? resourceBank.currentEnergy : 0f;
-
-        float availableOverflow = Mathf.Min(manaOverflow, consumeCap);
-        float remainingCap = consumeCap - availableOverflow;
-        float availableEnergy = resourceBank != null ? Mathf.Min(resourceBank.currentEnergy, remainingCap) : 0f;
-        float consumedExtra = availableOverflow + availableEnergy;
-
-        if (availableOverflow > 0f)
+        float maxMana = ResolveOwnerMaxMana(out string maxManaSource);
+        ManaRuneLog($"maxMana source={maxManaSource}, value={maxMana:F2}");
+        float maxExtraCost = Mathf.Max(0f, maxMana * Mathf.Clamp01(manaRuneExtraCostMaxManaPercent));
+        ManaRuneLog($"Cast triggered. skill={SkillIndexToName(skillIndex)}, maxMana={maxMana:F2}, cap={maxExtraCost:F2}");
+        if (maxExtraCost <= 0f)
         {
-            manaOverflow = Mathf.Max(0f, manaOverflow - availableOverflow);
+            ManaRuneLog("Skipped. reason=non-positive-cap");
+            return 0f;
         }
 
-        if (resourceBank != null && availableEnergy > 0f)
+        float beforeOverflow = Mathf.Max(0f, manaOverflow);
+        float beforeMana = ResolveCurrentVisibleMana();
+        ManaRuneLog($"overflow={beforeOverflow:F2}, currentEnergy={beforeMana:F2}");
+        ManaRuneLog($"Before. overflow={beforeOverflow:F2}, mana={beforeMana:F2}");
+
+        float availableOverflow = Mathf.Min(beforeOverflow, maxExtraCost);
+        float remainingCap = maxExtraCost - availableOverflow;
+        float currentMana = beforeMana;
+        float availableMana = Mathf.Min(currentMana, remainingCap);
+
+        float consumedOverflow = availableOverflow;
+        float requestedManaConsume = availableMana;
+        float consumedMana = 0f;
+
+        if (consumedOverflow > 0f)
         {
-            resourceBank.currentEnergy = Mathf.Max(0f, resourceBank.currentEnergy - availableEnergy);
+            manaOverflow = Mathf.Max(0f, manaOverflow - consumedOverflow);
         }
 
-        float pendingDamage = consumedExtra * multiplier * GetManaConversionEfficiency();
-        pendingSkillManaBurstDamages[skillIndex].Add(pendingDamage);
+        if (requestedManaConsume > 0f)
+        {
+            consumedMana = ConsumeVisibleMana(requestedManaConsume);
+        }
 
-        float energyAfter = resourceBank != null ? resourceBank.currentEnergy : 0f;
-        float overflowAfter = manaOverflow;
-        Debug.Log(
-            $"[ManaRuneBurst.Cast] skillIndex={skillIndex}, manaCount={manaCount}, baseCost={baseCost:F2}, cap={consumeCap:F2}, consumedExtra={consumedExtra:F2}, multiplier={multiplier:F2}, pendingDamage={pendingDamage:F2}, energyBefore={energyBefore:F2}, energyAfter={energyAfter:F2}, overflowBefore={overflowBefore:F2}, overflowAfter={overflowAfter:F2}",
-            this);
+        float actualExtraConsumed = consumedOverflow + consumedMana;
+        ManaRuneLog($"Consumed overflow={consumedOverflow:F2}, mana={consumedMana:F2}, total={actualExtraConsumed:F2}");
+        if (actualExtraConsumed <= 0f)
+        {
+            ManaRuneLog("Skipped. reason=no-available-extra-resource");
+            return 0f;
+        }
+
+        ManaRuneLog($"After. overflow={Mathf.Max(0f, manaOverflow):F2}, mana={ResolveCurrentVisibleMana():F2}");
+
+        float extraRatio = maxExtraCost > 0f ? actualExtraConsumed / maxExtraCost : 0f;
+        float effectStrength = Mathf.Clamp01(extraRatio * GetManaConversionEfficiency());
+        ManaRuneLog($"Effect ratio={extraRatio:F2}, strength={effectStrength:F2}, conversionEfficiency={GetManaConversionEfficiency():F2}");
+        return effectStrength;
     }
 
     public void NotifyMonsterDamagedBySkill(int skillIndex, CombatHealth target, float actualDamage)
@@ -352,24 +390,42 @@ public class RuneRuntimeState : MonoBehaviour
 
     public void NotifyIncomingMonsterDamage(GameObject attacker, float damageAmount)
     {
-        if (damageAmount <= 0f)
+        DevThornCounterEntryLog(attacker, damageAmount);
+
+        if (suppressReactiveAutoEffects)
         {
+            ThornCounterLog("Skipped incoming monster damage auto-effects because suppressReactiveAutoEffects is active.");
+            DevThornCounterLog("Trigger rejected. reason=suppressReactiveAutoEffects");
             return;
         }
+
+        if (damageAmount <= 0f)
+        {
+            DevThornCounterLog($"Trigger rejected. reason=damageAmount<=0 damage={damageAmount:F2}");
+            return;
+        }
+
+        GameObject resolvedAttacker = ResolveMonsterAttackerObject(attacker);
+        DevThornCounterLog($"Incoming monster damage. attacker={(resolvedAttacker != null ? resolvedAttacker.name : "<null>")} rawSource={(attacker != null ? attacker.name : "<null>")} damage={damageAmount:F2}");
 
         lastMonsterDamageTime = Time.time;
         shieldGeneratedSinceLastMonsterDamage = false;
 
         int thornCount = GetGlobalRuneCount(RuneType.Thorn);
+        DevThornCounterLog($"Active thorn count={thornCount}");
         if (thornCount >= 2)
         {
-            ApplyThornRetaliation(attacker, thornCount);
+            ApplyThornRetaliation(resolvedAttacker, thornCount);
         }
 
         if (thornCount >= 5)
         {
-            ThornCounterLog($"Incoming monster damage detected. attacker={(attacker != null ? attacker.name : "<null>")}, damage={damageAmount:F2}, thornCount={thornCount}");
-            TryTriggerThornCounter(attacker, thornCount);
+            ThornCounterLog($"Incoming monster damage detected. attacker={(resolvedAttacker != null ? resolvedAttacker.name : "<null>")}, damage={damageAmount:F2}, thornCount={thornCount}");
+            TryTriggerThornCounter(resolvedAttacker, thornCount);
+        }
+        else
+        {
+            DevThornCounterLog($"Trigger rejected. reason=thornCount<{5}");
         }
     }
 
@@ -381,33 +437,32 @@ public class RuneRuntimeState : MonoBehaviour
             return 1f;
         }
 
-        return 3f * GetShieldEfficiency();
+        return 2f * GetShieldEfficiency();
     }
 
     public float GetShieldEfficiency()
     {
-        return 1f + Mathf.Max(0f, shieldEfficiencyBonus);
+        return Mathf.Min(1f + Mathf.Max(0f, shieldEfficiencyBonus), ShieldEfficiencyCap);
     }
 
     public float GetManaConversionEfficiency()
     {
-        return 1f + Mathf.Max(0f, manaConversionEfficiencyBonus);
+        return Mathf.Min(1f + Mathf.Max(0f, manaConversionEfficiencyBonus), ManaConversionEfficiencyCap);
     }
 
     public float GetThornEfficiency()
     {
-        return 1f + Mathf.Max(0f, thornEfficiencyBonus);
+        return Mathf.Min(1f + Mathf.Max(0f, thornEfficiencyBonus), ThornEfficiencyCap);
     }
 
     public float GetLuckEfficiency()
     {
-        float multiplier = 1f + Mathf.Max(0f, luckEfficiencyBonus);
-        if (GetGlobalRuneCount(RuneType.Luck) >= 5)
-        {
-            multiplier *= 1.5f;
-        }
+        return Mathf.Min(1f + Mathf.Max(0f, luckEfficiencyBonus), LuckEfficiencyCap);
+    }
 
-        return multiplier;
+    public float GetLuckChanceMultiplier()
+    {
+        return GetLuckEfficiency() * (GetGlobalRuneCount(RuneType.Luck) >= 5 ? LuckSetChanceMultiplier : 1f);
     }
 
     public void AddManaOverflow(float amount)
@@ -438,7 +493,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         float baseChance = 0.30f;
-        int triggers = RollRepeatableChance(baseChance, GetLuckEfficiency());
+        int triggers = RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
         if (triggers <= 0)
         {
             return Mathf.Clamp(originalPoint, 1, 5);
@@ -456,7 +511,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         float baseChance = 0.25f;
-        return RollRepeatableChance(baseChance, GetLuckEfficiency());
+        return RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
     }
 
     public int GetSoulPickupCopyCount()
@@ -468,7 +523,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         float baseChance = 0.20f;
-        return RollRepeatableChance(baseChance, GetLuckEfficiency());
+        return RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
     }
 
     public int GetSoulPickupCopyPoint()
@@ -551,22 +606,22 @@ public class RuneRuntimeState : MonoBehaviour
     {
         if (GetGlobalRuneCount(RuneType.Shield) >= 5)
         {
-            shieldEfficiencyBonus += 0.15f;
+            shieldEfficiencyBonus = Mathf.Min(shieldEfficiencyBonus + 0.10f, ShieldEfficiencyCap - 1f);
         }
 
         if (GetGlobalRuneCount(RuneType.Mana) >= 5)
         {
-            manaConversionEfficiencyBonus += 0.15f;
+            manaConversionEfficiencyBonus = Mathf.Min(manaConversionEfficiencyBonus + 0.10f, ManaConversionEfficiencyCap - 1f);
         }
 
         if (GetGlobalRuneCount(RuneType.Thorn) >= 5)
         {
-            thornEfficiencyBonus += 0.15f;
+            thornEfficiencyBonus = Mathf.Min(thornEfficiencyBonus + 0.10f, ThornEfficiencyCap - 1f);
         }
 
         if (GetGlobalRuneCount(RuneType.Luck) >= 5)
         {
-            luckEfficiencyBonus += 0.10f;
+            luckEfficiencyBonus = Mathf.Min(luckEfficiencyBonus + 0.10f, LuckEfficiencyCap - 1f);
         }
 
         ApplyGlobalPassiveBonuses();
@@ -606,25 +661,6 @@ public class RuneRuntimeState : MonoBehaviour
         }
     }
 
-    private float ConsumePreparedManaBurstDamage(int skillIndex)
-    {
-        if (skillIndex < 0 || skillIndex >= pendingSkillManaBurstDamages.Length)
-        {
-            return 0f;
-        }
-
-        List<float> pendingDamages = pendingSkillManaBurstDamages[skillIndex];
-        if (pendingDamages == null || pendingDamages.Count == 0)
-        {
-            return 0f;
-        }
-
-        float pendingDamage = pendingDamages[0];
-        pendingDamages.RemoveAt(0);
-        Debug.Log($"[ManaRuneBurst.Hit] skillIndex={skillIndex}, consumedPendingDamage={pendingDamage:F2}", this);
-        return pendingDamage;
-    }
-
     private void ApplyThornRetaliation(GameObject attacker, int thornCount)
     {
         if (attacker == null)
@@ -652,18 +688,21 @@ public class RuneRuntimeState : MonoBehaviour
         if (attacker == null)
         {
             ThornCounterLog("Skipped thorn burst: attacker is null.");
+            DevThornCounterLog("Trigger rejected. reason=attacker is null");
             return;
         }
 
         if (thornCounterInProgress)
         {
             ThornCounterLog("Skipped thorn burst: thornCounterInProgress is true.");
+            DevThornCounterLog("Trigger rejected. reason=thornCounterInProgress");
             return;
         }
 
         if (Time.time < thornCounterReadyTime)
         {
             ThornCounterLog($"Skipped thorn burst: cooldown not ready. now={Time.time:F2}, readyTime={thornCounterReadyTime:F2}");
+            DevThornCounterLog($"Trigger rejected. reason=cooldown not ready now={Time.time:F2} readyTime={thornCounterReadyTime:F2}");
             return;
         }
 
@@ -671,15 +710,20 @@ public class RuneRuntimeState : MonoBehaviour
         if (attackerHealth == null)
         {
             ThornCounterLog($"Skipped thorn burst: attacker CombatHealth not found on {attacker.name}.");
+            DevThornCounterLog($"Trigger rejected. reason=attacker CombatHealth missing attacker={attacker.name}");
             return;
         }
 
         BeginThornCounterExecution(thornCount);
-        ThornCounterLog($"Triggering thorn burst counter. center={attackerHealth.name}, radius={thornCounterBurstRadius:F2}, cooldown={(thornCount >= 5 ? ThornCounterSetCooldown : ThornCounterBaseCooldown):F2}s");
+        Vector3 burstCenter = ResolveThornCounterBurstCenter();
+        float resolvedCooldown = ResolveThornCounterCooldown();
+        DevThornCounterLog($"Trigger accepted. attacker={attackerHealth.name} cooldown={resolvedCooldown:F2}");
+        ThornCounterLog($"Triggering thorn burst counter. center={burstCenter}, radius={thornCounterBurstRadius:F2}, cooldown={resolvedCooldown:F2}s");
         bool triggered = ExecuteThornCounterBurst(attackerHealth, thornCount);
         if (!triggered)
         {
             ThornCounterLog("Thorn burst counter found no valid monster targets or could not execute.");
+            DevThornCounterLog("Trigger rejected after begin. reason=ExecuteThornCounterBurst returned false");
             EndThornCounterExecution();
         }
         else
@@ -693,54 +737,85 @@ public class RuneRuntimeState : MonoBehaviour
         if (attackerHealth == null)
         {
             ThornCounterLog("Skipped thorn burst execution: attackerHealth is null.");
+            DevThornCounterLog("Burst rejected. reason=attackerHealth is null");
             return false;
         }
 
         float radius = Mathf.Max(0.1f, thornCounterBurstRadius);
-        float burstMultiplier = 4f;
-        float burstDamage = ResolveBaseThornDamage(thornCount) * burstMultiplier;
+        float burstMultiplier = Mathf.Max(0f, thornCounterDamageMultiplier);
+        float baseThornDamage = ResolveBaseThornDamage(thornCount);
+        float burstDamage = baseThornDamage * burstMultiplier;
+        Vector3 burstCenter = ResolveThornCounterBurstCenter();
+        DevThornCounterLog($"Burst center={burstCenter}, radius={radius:F2}");
+        DevThornCounterLog($"Base thorn damage={baseThornDamage:F2}, multiplier={burstMultiplier:F2}, final damage={burstDamage:F2}");
         if (burstDamage <= 0f)
         {
             ThornCounterLog("Skipped thorn burst execution: burstDamage <= 0.");
+            DevThornCounterLog("Burst rejected. reason=burstDamage<=0");
             return false;
         }
 
-        if (thornCounterBurstPrefab != null)
+        GameObject burstPrefab = ResolveThornCounterBurstPrefab();
+        if (burstPrefab != null)
         {
-            Instantiate(thornCounterBurstPrefab, attackerHealth.transform.position, Quaternion.identity);
+            GameObject burstInstance = Instantiate(burstPrefab, burstCenter, Quaternion.identity);
+            RuneThornCounterEffect burstEffect = burstInstance.GetComponent<RuneThornCounterEffect>();
+            if (burstEffect != null)
+            {
+                burstEffect.Configure(radius, thornCounterEffectDuration);
+            }
         }
 
-        Collider[] hits = Physics.OverlapSphere(
-            attackerHealth.transform.position,
-            radius,
-            ~0,
-            QueryTriggerInteraction.Collide);
+        Collider[] hits = Physics.OverlapSphere(burstCenter, radius, thornCounterTargetLayers, QueryTriggerInteraction.Collide);
+        DevThornCounterLog($"Colliders found={hits.Length}");
 
         HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
         int hitCount = 0;
+        suppressReactiveAutoEffects = true;
 
-        for (int i = 0; i < hits.Length; i++)
+        try
         {
-            Collider hit = hits[i];
-            if (!BattleTargetUtility.IsMonster(hit, transform))
+            if (!damagedCombatTargets.Contains(attackerHealth) && attackerHealth != combatHealth)
             {
-                continue;
+                float beforeHealth = ResolveCurrentHealth(attackerHealth);
+                attackerHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
+                float afterHealth = ResolveCurrentHealth(attackerHealth);
+                damagedCombatTargets.Add(attackerHealth);
+                hitCount++;
+                DevThornCounterLog($"Applied damage to {attackerHealth.name} result={Mathf.Max(0f, beforeHealth - afterHealth):F2}");
             }
 
-            CombatHealth targetHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
-            if (targetHealth != null)
+            for (int i = 0; i < hits.Length; i++)
             {
-                if (targetHealth == combatHealth || !damagedCombatTargets.Add(targetHealth))
+                Collider hit = hits[i];
+                if (!BattleTargetUtility.IsMonster(hit, transform))
                 {
                     continue;
                 }
 
-                targetHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
-                hitCount++;
-                continue;
+                CombatHealth targetHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
+                if (targetHealth != null)
+                {
+                    if (targetHealth == combatHealth || !damagedCombatTargets.Add(targetHealth))
+                    {
+                        continue;
+                    }
+
+                    float beforeHealth = ResolveCurrentHealth(targetHealth);
+                    targetHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
+                    float afterHealth = ResolveCurrentHealth(targetHealth);
+                    hitCount++;
+                    DevThornCounterLog($"Applied damage to {targetHealth.name} result={Mathf.Max(0f, beforeHealth - afterHealth):F2}");
+                    continue;
+                }
             }
         }
+        finally
+        {
+            suppressReactiveAutoEffects = false;
+        }
 
+        DevThornCounterLog($"Unique enemies found={damagedCombatTargets.Count}");
         ThornCounterLog($"Thorn burst dealt {burstDamage:F2} damage in radius {radius:F2}, targetsHit={hitCount}.");
         return hitCount > 0;
     }
@@ -748,7 +823,7 @@ public class RuneRuntimeState : MonoBehaviour
     private void BeginThornCounterExecution(int thornCount)
     {
         thornCounterInProgress = true;
-        thornCounterReadyTime = Time.time + (thornCount >= 5 ? ThornCounterSetCooldown : ThornCounterBaseCooldown);
+        thornCounterReadyTime = Time.time + Mathf.Max(0f, ResolveThornCounterCooldown());
         ThornCounterLog($"Counter execution lock started. readyTime={thornCounterReadyTime:F2}");
         if (thornCounterReleaseCoroutine != null)
         {
@@ -777,6 +852,28 @@ public class RuneRuntimeState : MonoBehaviour
         ThornCounterLog("Counter execution lock released after delay.");
     }
 
+    private GameObject ResolveThornCounterBurstPrefab()
+    {
+        if (thornCounterBurstPrefab != null)
+        {
+            return thornCounterBurstPrefab;
+        }
+
+        thornCounterBurstPrefab = Resources.Load<GameObject>(DefaultThornCounterBurstPrefabResourcePath);
+        if (thornCounterBurstPrefab == null)
+        {
+            ThornCounterLog($"Failed to load thorn counter prefab from Resources/{DefaultThornCounterBurstPrefabResourcePath}.");
+        }
+
+        return thornCounterBurstPrefab;
+    }
+
+    private Vector3 ResolveThornCounterBurstCenter()
+    {
+        Transform centerTransform = combatHealth != null ? combatHealth.transform : transform;
+        return centerTransform != null ? centerTransform.position : Vector3.zero;
+    }
+
     private int ResolveBestSkillIndexForRune(RuneType runeType)
     {
         int bestIndex = -1;
@@ -798,11 +895,12 @@ public class RuneRuntimeState : MonoBehaviour
     {
         if (combatStats == null)
         {
+            DevThornCounterLog("Base thorn damage resolved to 0 because combatStats is null.");
             return 0f;
         }
 
         float attributeSum =
-            Mathf.Max(0f, combatStats.maxHealth) +
+            Mathf.Max(0f, combatStats.maxHealth) * 0.10f +
             Mathf.Max(0f, combatStats.physicalAttack) +
             Mathf.Max(0f, combatStats.physicalDefense) +
             Mathf.Max(0f, combatStats.specialAttack) +
@@ -810,18 +908,18 @@ public class RuneRuntimeState : MonoBehaviour
             Mathf.Max(0f, combatStats.speed) +
             Mathf.Max(0f, combatStats.luck);
 
-        float thornDamage = attributeSum * 0.30f * GetThornEfficiency();
+        float thornDamageMultiplier = 1f;
         if (thornCount >= 3)
         {
-            thornDamage *= 2.5f;
+            thornDamageMultiplier += 1f;
         }
 
         if (thornCount >= 5)
         {
-            thornDamage *= 2f;
+            thornDamageMultiplier += 1f;
         }
 
-        return thornDamage;
+        return attributeSum * 0.30f * thornDamageMultiplier * GetThornEfficiency();
     }
 
     private void ApplyBonusManaRecovery(float amount)
@@ -853,6 +951,91 @@ public class RuneRuntimeState : MonoBehaviour
         manaOverflow = Mathf.Clamp(manaOverflow, 0f, Mathf.Max(0f, cap));
     }
 
+    private float ResolveOwnerMaxMana(out string source)
+    {
+        if (cooldownManager == null)
+        {
+            cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        }
+
+        if (cooldownManager != null && cooldownManager.maxMana > 0f)
+        {
+            source = "PlayerSkillCooldownManager.maxMana";
+            return cooldownManager.maxMana;
+        }
+
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (resourceBank != null && resourceBank.maxEnergy > 0f)
+        {
+            source = "BattleResourceBank.maxEnergy";
+            return resourceBank.maxEnergy;
+        }
+
+        source = "None";
+        return 0f;
+    }
+
+    private float ResolveCurrentVisibleMana()
+    {
+        if (cooldownManager == null)
+        {
+            cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        }
+
+        if (cooldownManager != null)
+        {
+            return Mathf.Max(0f, cooldownManager.GetCurrentMana());
+        }
+
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        return resourceBank != null ? Mathf.Max(0f, resourceBank.currentEnergy) : 0f;
+    }
+
+    private float ConsumeVisibleMana(float requestedAmount)
+    {
+        float clampedRequest = Mathf.Max(0f, requestedAmount);
+        if (clampedRequest <= 0f)
+        {
+            return 0f;
+        }
+
+        if (cooldownManager == null)
+        {
+            cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        }
+
+        if (cooldownManager != null)
+        {
+            return cooldownManager.TryConsumeAdditionalMana(clampedRequest);
+        }
+
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (resourceBank == null)
+        {
+            return 0f;
+        }
+
+        float spendAmount = Mathf.Min(Mathf.Max(0f, resourceBank.currentEnergy), clampedRequest);
+        if (spendAmount <= 0f)
+        {
+            return 0f;
+        }
+
+        return resourceBank.TrySpendEnergy(spendAmount) ? spendAmount : 0f;
+    }
+
     private void ClampCurrentShieldToRuneCap()
     {
         if (resourceBank == null || GetGlobalRuneCount(RuneType.Shield) < 5)
@@ -877,6 +1060,77 @@ public class RuneRuntimeState : MonoBehaviour
         return debugRuneThornCounter;
     }
 
+    public bool TryGrantRuneForTesting(RuneType runeType, string source = "RuneTestLoadout")
+    {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+        if (runeType == RuneType.None)
+        {
+            return false;
+        }
+
+        if (skillCaster == null)
+        {
+            skillCaster = GetComponent<CombatSkillCaster>();
+        }
+
+        if (skillCaster == null)
+        {
+            return false;
+        }
+
+        RuneInventory inventory = GetComponent<RuneInventory>();
+        if (inventory == null)
+        {
+            inventory = gameObject.AddComponent<RuneInventory>();
+        }
+
+        if (!TryResolveRuneTestTargetSkill(out BattleSkill targetSkill))
+        {
+            return false;
+        }
+
+        RuneDefinition displacedRune = null;
+        int targetSlotIndex = -1;
+        int slotLength = targetSkill.equippedRunes != null ? targetSkill.equippedRunes.Length : 0;
+        for (int slotIndex = 0; slotIndex < slotLength; slotIndex++)
+        {
+            if (targetSkill.equippedRunes[slotIndex] == null)
+            {
+                targetSlotIndex = slotIndex;
+                break;
+            }
+        }
+
+        if (targetSlotIndex < 0)
+        {
+            targetSlotIndex = 0;
+            displacedRune = targetSkill.equippedRunes != null && targetSkill.equippedRunes.Length > 0
+                ? targetSkill.equippedRunes[0]
+                : null;
+        }
+
+        if (targetSlotIndex < 0 || targetSkill.equippedRunes == null || targetSlotIndex >= targetSkill.equippedRunes.Length)
+        {
+            return false;
+        }
+
+        if (displacedRune != null)
+        {
+            inventory.AddRune(displacedRune, $"{source}-Displaced");
+        }
+
+        RuneDefinition grantedRune = RuneDefinition.CreateDefaultRune(runeType);
+        inventory.AddRune(grantedRune, source);
+        targetSkill.equippedRunes[targetSlotIndex] = grantedRune;
+        inventory.RemoveRune(grantedRune);
+        skillCaster.RefreshRuneState();
+        RebuildFromEquippedRunes();
+        return true;
+#else
+        return false;
+#endif
+    }
+
     private void ThornCounterLog(string message)
     {
         if (!debugRuneThornCounter)
@@ -885,6 +1139,95 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         Debug.Log($"[Rune][ThornCounter] {message}", this);
+    }
+
+    private bool TryResolveRuneTestTargetSkill(out BattleSkill targetSkill)
+    {
+        targetSkill = null;
+
+        if (skillCaster == null)
+        {
+            return false;
+        }
+
+        BattleSkill fallbackSkill = null;
+        int fallbackSlotCount = -1;
+        for (int i = 0; i < SkillCount; i++)
+        {
+            BattleSkill candidate = skillCaster.TryGetSkillRaw(i);
+            if (candidate == null || candidate.equippedRunes == null || candidate.equippedRunes.Length <= 0)
+            {
+                continue;
+            }
+
+            for (int slotIndex = 0; slotIndex < candidate.equippedRunes.Length; slotIndex++)
+            {
+                if (candidate.equippedRunes[slotIndex] == null)
+                {
+                    targetSkill = candidate;
+                    return true;
+                }
+            }
+
+            if (candidate.equippedRunes.Length > fallbackSlotCount)
+            {
+                fallbackSlotCount = candidate.equippedRunes.Length;
+                fallbackSkill = candidate;
+            }
+        }
+
+        targetSkill = fallbackSkill;
+        return targetSkill != null;
+    }
+
+    private GameObject ResolveMonsterAttackerObject(GameObject attacker)
+    {
+        if (attacker == null)
+        {
+            return null;
+        }
+
+        if (BattleTargetUtility.IsMonster(attacker))
+        {
+            CombatHealth attackerHealth = attacker.GetComponentInParent<CombatHealth>();
+            return attackerHealth != null ? attackerHealth.gameObject : attacker;
+        }
+
+        CombatHealth parentHealth = attacker.GetComponentInParent<CombatHealth>();
+        if (parentHealth != null && BattleTargetUtility.IsMonster(parentHealth.gameObject))
+        {
+            return parentHealth.gameObject;
+        }
+
+        EnemyController enemyController = attacker.GetComponentInParent<EnemyController>();
+        if (enemyController != null)
+        {
+            return enemyController.gameObject;
+        }
+
+        MonsterIdentity identity = attacker.GetComponentInParent<MonsterIdentity>();
+        if (identity != null)
+        {
+            return identity.gameObject;
+        }
+
+        return null;
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void DevThornCounterLog(string message)
+    {
+        Debug.Log($"[ThornCounter] {message}", this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void DevThornCounterEntryLog(GameObject attacker, float damageAmount)
+    {
+        Debug.Log(
+            $"[ThornCounter] Notify entered. attacker={(attacker != null ? attacker.name : "<null>")}, damage={damageAmount:F2}",
+            this);
     }
 
     private static string SkillIndexToName(int skillIndex)
@@ -901,12 +1244,11 @@ public class RuneRuntimeState : MonoBehaviour
 
     private void ClearRuneCounts()
     {
-        globalMaxCounts.Clear();
+        globalRuneCounts.Clear();
         for (int i = 0; i < skillRuneCounts.Length; i++)
         {
             skillRuneCounts[i].Clear();
             pendingSkillFirstHitCastIds[i].Clear();
-            pendingSkillManaBurstDamages[i].Clear();
             nextSkillCastIds[i] = 0;
         }
     }
@@ -946,7 +1288,7 @@ public class RuneRuntimeState : MonoBehaviour
             int lifeSetCount = GetGlobalRuneCount(RuneType.Life);
             if (lifeSetCount >= 5)
             {
-                int lifeAttribute = Mathf.FloorToInt(ResolveOwnerMaxHealth() / 10f);
+                int lifeAttribute = Mathf.FloorToInt((Mathf.Max(0f, combatStats.maxHealth) + appliedHealthBonus) / 10f);
                 int lifeStatBonus = Mathf.FloorToInt(lifeAttribute * LifeSetAllStatPerTenMaxHealth);
                 ApplyFlatCombatStatBonuses(0f, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, lifeStatBonus, 0f);
                 appliedAllStatsLuckBonus += 0f;
@@ -966,12 +1308,12 @@ public class RuneRuntimeState : MonoBehaviour
             int manaCount = GetGlobalRuneCount(RuneType.Mana);
             if (manaCount >= 1)
             {
-                appliedMaxManaBonus = 300f;
+                appliedMaxManaBonus = 200f;
             }
 
             if (manaCount >= 2)
             {
-                appliedManaRegenBonus = baseManaRegen * 3f;
+                appliedManaRegenBonus = baseManaRegen * 1.5f;
             }
 
             cooldownManager.maxMana = Mathf.Max(0f, baseMaxMana + appliedMaxManaBonus);
@@ -979,7 +1321,7 @@ public class RuneRuntimeState : MonoBehaviour
 
             if (resourceBank != null)
             {
-                resourceBank.maxEnergy = Mathf.Max(resourceBank.maxEnergy, cooldownManager.maxMana);
+                resourceBank.maxEnergy = Mathf.Max(0f, cooldownManager.maxMana);
                 resourceBank.currentEnergy = Mathf.Clamp(resourceBank.currentEnergy, 0f, resourceBank.maxEnergy);
                 ClampManaOverflowToRuneCap();
             }
@@ -995,19 +1337,6 @@ public class RuneRuntimeState : MonoBehaviour
 
         ApplyStoredStatBonuses();
         LogAttributeDiagnostics();
-
-        if (combatHealth != null)
-        {
-            int thornCount = GetGlobalRuneCount(RuneType.Thorn);
-            if (thornCount >= 1)
-            {
-                combatHealth.SetIncomingDamageMultiplier("RuneThornReduction", 0.75f);
-            }
-            else
-            {
-                combatHealth.RemoveIncomingDamageMultiplier("RuneThornReduction");
-            }
-        }
 
         ClampCurrentShieldToRuneCap();
 
@@ -1245,6 +1574,40 @@ public class RuneRuntimeState : MonoBehaviour
         return guaranteedTriggers;
     }
 
+    private static float ResolveCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
+    }
+
+    public float GetIncomingMonsterDamageMultiplier()
+    {
+        return GetGlobalRuneCount(RuneType.Thorn) >= 1 ? ThornBaseMonsterDamageReductionMultiplier : 1f;
+    }
+
+    private float ResolveThornCounterCooldown()
+    {
+        if (GetGlobalRuneCount(RuneType.Thorn) >= 5)
+        {
+            return ThornSetCounterCooldownSeconds;
+        }
+
+        return Mathf.Max(0f, thornCounterCooldown > 0f ? thornCounterCooldown : ThornBaseCounterCooldownSeconds);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void ManaRuneLog(string message)
+    {
+        Debug.Log($"[ManaRune] {message}", this);
+    }
+
     private void DebugLog(string message)
     {
         if (!runeDebugLog)
@@ -1254,4 +1617,5 @@ public class RuneRuntimeState : MonoBehaviour
 
         Debug.Log(message, this);
     }
+
 }

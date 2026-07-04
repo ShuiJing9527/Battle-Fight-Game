@@ -163,6 +163,12 @@ public class CombatHealth : MonoBehaviour
         float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
         damage.amount = outgoingDamage;
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
+        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
+        runeRuntimeState = ResolveRuneRuntimeState();
+        if (resolvedMonsterSource != null && runeRuntimeState != null)
+        {
+            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
+        }
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
         Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
@@ -183,9 +189,29 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
-            if (BattleTargetUtility.IsPlayer(gameObject) && damage.source != null && BattleTargetUtility.IsMonster(damage.source))
+            ThornCounterEntryLog("TakeDamage(BattleDamage)", gameObject, damage.source, finalDamage);
+            ThornCounterEntryLog(
+                "TakeDamage(BattleDamage):ResolvedSource",
+                gameObject,
+                resolvedMonsterSource != null ? resolvedMonsterSource : damage.source,
+                finalDamage);
+            bool targetIsPlayer = BattleTargetUtility.IsPlayer(gameObject);
+            ThornCounterNotifyCheckLog(targetIsPlayer, runeRuntimeState, resolvedMonsterSource);
+            if (!targetIsPlayer)
             {
-                runeRuntimeState?.NotifyIncomingMonsterDamage(damage.source, finalDamage);
+                ThornCounterNotifySkippedLog("target-not-player");
+            }
+            else if (runeRuntimeState == null)
+            {
+                ThornCounterNotifySkippedLog("rune-runtime-state-null");
+            }
+            else if (resolvedMonsterSource == null)
+            {
+                ThornCounterNotifySkippedLog("source-not-monster");
+            }
+            else
+            {
+                runeRuntimeState.NotifyIncomingMonsterDamage(resolvedMonsterSource, finalDamage);
             }
 
             Damaged?.Invoke(finalDamage, damage.source);
@@ -223,6 +249,12 @@ public class CombatHealth : MonoBehaviour
         }
 
         float finalDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(source, amount);
+        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(source);
+        runeRuntimeState = ResolveRuneRuntimeState();
+        if (resolvedMonsterSource != null && runeRuntimeState != null)
+        {
+            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
+        }
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = AbsorbShieldDamage(finalDamage);
 
@@ -238,9 +270,30 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
-            if (BattleTargetUtility.IsPlayer(gameObject) && source != null && BattleTargetUtility.IsMonster(source))
+            ThornCounterEntryLog("ApplyDirectDamage", gameObject, source, finalDamage);
+            ThornCounterEntryLog(
+                "ApplyDirectDamage:ResolvedSource",
+                gameObject,
+                resolvedMonsterSource != null ? resolvedMonsterSource : source,
+                finalDamage);
+            bool targetIsPlayer = BattleTargetUtility.IsPlayer(gameObject);
+            runeRuntimeState = ResolveRuneRuntimeState();
+            ThornCounterNotifyCheckLog(targetIsPlayer, runeRuntimeState, resolvedMonsterSource);
+            if (!targetIsPlayer)
             {
-                runeRuntimeState?.NotifyIncomingMonsterDamage(source, finalDamage);
+                ThornCounterNotifySkippedLog("target-not-player");
+            }
+            else if (runeRuntimeState == null)
+            {
+                ThornCounterNotifySkippedLog("rune-runtime-state-null");
+            }
+            else if (resolvedMonsterSource == null)
+            {
+                ThornCounterNotifySkippedLog("source-not-monster");
+            }
+            else
+            {
+                runeRuntimeState.NotifyIncomingMonsterDamage(resolvedMonsterSource, finalDamage);
             }
 
             Damaged?.Invoke(finalDamage, source);
@@ -424,6 +477,68 @@ public class CombatHealth : MonoBehaviour
         return source is string stringKey ? stringKey : source.GetHashCode().ToString();
     }
 
+    private static GameObject ResolveIncomingMonsterSource(GameObject source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        if (BattleTargetUtility.IsMonster(source))
+        {
+            CombatHealth sourceHealth = source.GetComponentInParent<CombatHealth>();
+            if (sourceHealth != null)
+            {
+                return sourceHealth.gameObject;
+            }
+
+            return source.transform.root != null ? source.transform.root.gameObject : source;
+        }
+
+        CombatHealth parentHealth = source.GetComponentInParent<CombatHealth>();
+        if (parentHealth != null && BattleTargetUtility.IsMonster(parentHealth.gameObject))
+        {
+            return parentHealth.gameObject;
+        }
+
+        EnemyController enemyController = source.GetComponentInParent<EnemyController>();
+        if (enemyController != null)
+        {
+            return enemyController.gameObject;
+        }
+
+        MonsterIdentity monsterIdentity = source.GetComponentInParent<MonsterIdentity>();
+        if (monsterIdentity != null)
+        {
+            return monsterIdentity.gameObject;
+        }
+
+        return null;
+    }
+
+    private RuneRuntimeState ResolveRuneRuntimeState()
+    {
+        if (runeRuntimeState != null)
+        {
+            return runeRuntimeState;
+        }
+
+        runeRuntimeState = GetComponent<RuneRuntimeState>();
+        if (runeRuntimeState != null)
+        {
+            return runeRuntimeState;
+        }
+
+        runeRuntimeState = GetComponentInParent<RuneRuntimeState>();
+        if (runeRuntimeState != null)
+        {
+            return runeRuntimeState;
+        }
+
+        runeRuntimeState = GetComponentInChildren<RuneRuntimeState>();
+        return runeRuntimeState;
+    }
+
     private void HandleResourceBankOnShieldChanged(float currentShield, float maxShield)
     {
         OnShieldChanged?.Invoke(currentShield, maxShield);
@@ -580,5 +695,30 @@ public class CombatHealth : MonoBehaviour
         }
 
         animator.SetTrigger(triggerName);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void ThornCounterEntryLog(string methodName, GameObject target, GameObject source, float finalDamage)
+    {
+        Debug.Log(
+            $"[ThornCounter] Damage entry reached. method={methodName}, target={(target != null ? target.name : "<null>")}, source={(source != null ? source.name : "<null>")}, finalDamage={finalDamage:F2}",
+            this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void ThornCounterNotifyCheckLog(bool targetIsPlayer, RuneRuntimeState runtimeState, GameObject resolvedSource)
+    {
+        Debug.Log(
+            $"[ThornCounter] Notify check. targetIsPlayer={targetIsPlayer}, runtimeState={(runtimeState != null ? runtimeState.GetType().Name : "<null>")}, resolvedSource={(resolvedSource != null ? resolvedSource.name : "<null>")}",
+            this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void ThornCounterNotifySkippedLog(string reason)
+    {
+        Debug.Log($"[ThornCounter] Notify skipped. reason={reason}", this);
     }
 }

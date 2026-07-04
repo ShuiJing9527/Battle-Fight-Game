@@ -126,8 +126,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
     protected override void OnCastStarted()
     {
-        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
-        runeRuntimeState?.NotifySkillCastStarted(SkillIndex);
+        runeRuntimeState = ResolvePlayerRuneRuntimeState();
         IsDefending = true;
         SyncSkillTiming();
         CacheReferences();
@@ -329,7 +328,13 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             return;
         }
 
-        float multiplier = 1f - Mathf.Clamp01(wPlayerDamageReductionRatio);
+        float effectiveReductionRatio = Mathf.Clamp01(wPlayerDamageReductionRatio * ResolveManaRuneScaledMultiplier(0.25f));
+        if (effectiveReductionRatio > wPlayerDamageReductionRatio)
+        {
+            LogManaRuneApplied("W", "DamageReductionRatio", wPlayerDamageReductionRatio, effectiveReductionRatio);
+        }
+
+        float multiplier = 1f - effectiveReductionRatio;
         cachedCombatHealth.AddDamageReductionModifier(damageModifierKey, multiplier);
         playerDamageModifierApplied = true;
 

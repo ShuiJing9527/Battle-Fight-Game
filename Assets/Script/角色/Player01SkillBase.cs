@@ -21,6 +21,9 @@ public abstract class Player01SkillBase : MonoBehaviour
     protected float nextCastTime;
     protected Coroutine castRoutine;
     protected bool castFinished;
+    protected int CurrentRuneCastId { get; private set; } = -1;
+    protected float CurrentManaRuneEffectStrength { get; private set; }
+    private RuneRuntimeState cachedRuneRuntimeState;
 
     public virtual void Initialize(Player01SkillController controller)
     {
@@ -169,6 +172,7 @@ public abstract class Player01SkillBase : MonoBehaviour
             nextCastTime = Time.time + Mathf.Max(0f, cooldown);
         }
 
+        PrepareRuneCastContext();
         castFinished = false;
         return true;
     }
@@ -194,6 +198,7 @@ public abstract class Player01SkillBase : MonoBehaviour
         castRoutine = null;
 
         OnCastFinished();
+        ResetRuneCastContext();
 
         if (Controller != null)
         {
@@ -211,5 +216,92 @@ public abstract class Player01SkillBase : MonoBehaviour
         castRoutine = null;
 
         CompleteCast();
+    }
+
+    private void PrepareRuneCastContext()
+    {
+        CurrentRuneCastId = -1;
+        CurrentManaRuneEffectStrength = 0f;
+
+        if (SkillIndex < 0)
+        {
+            return;
+        }
+
+        RuneRuntimeState runtimeState = ResolvePlayerRuneRuntimeState();
+        if (runtimeState == null)
+        {
+            LogManaRuneCastFlow("Skipped. reason=rune-runtime-state-null");
+            return;
+        }
+
+        LogManaRuneCastFlow($"PrepareRuneCastContext entered. skill={GetSkillLabel()} index={SkillIndex}");
+        CurrentRuneCastId = runtimeState.NotifySkillCastStarted(SkillIndex);
+        CurrentManaRuneEffectStrength = runtimeState.TriggerManaRuneCastEffect(SkillIndex);
+        LogManaRuneCastFlow($"PrepareRuneCastContext result. skill={GetSkillLabel()} castId={CurrentRuneCastId} strength={CurrentManaRuneEffectStrength:F2}");
+    }
+
+    private void ResetRuneCastContext()
+    {
+        CurrentRuneCastId = -1;
+        CurrentManaRuneEffectStrength = 0f;
+    }
+
+    protected RuneRuntimeState ResolvePlayerRuneRuntimeState()
+    {
+        if (cachedRuneRuntimeState != null)
+        {
+            return cachedRuneRuntimeState;
+        }
+
+        cachedRuneRuntimeState = GetComponent<RuneRuntimeState>();
+        if (cachedRuneRuntimeState != null)
+        {
+            return cachedRuneRuntimeState;
+        }
+
+        if (Controller != null)
+        {
+            cachedRuneRuntimeState = Controller.GetComponent<RuneRuntimeState>();
+            if (cachedRuneRuntimeState != null)
+            {
+                return cachedRuneRuntimeState;
+            }
+        }
+
+        cachedRuneRuntimeState = GetComponentInParent<RuneRuntimeState>();
+        return cachedRuneRuntimeState;
+    }
+
+    protected float ResolveManaRuneScaledMultiplier(float maxBonusRatio)
+    {
+        return 1f + Mathf.Clamp01(maxBonusRatio) * Mathf.Clamp01(CurrentManaRuneEffectStrength);
+    }
+
+    protected float ResolveRuneOutgoingDamageMultiplier()
+    {
+        RuneRuntimeState runtimeState = ResolvePlayerRuneRuntimeState();
+        if (runtimeState == null || SkillIndex < 0)
+        {
+            return 1f;
+        }
+
+        return Mathf.Max(0f, runtimeState.GetOutgoingDamageMultiplier(SkillIndex));
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    protected void LogManaRuneApplied(string skillLabel, string propertyName, float beforeValue, float afterValue)
+    {
+        Debug.Log(
+            $"[ManaRune] Applied to skill={skillLabel}, property={propertyName}, before={beforeValue:F2}, after={afterValue:F2}",
+            this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void LogManaRuneCastFlow(string message)
+    {
+        Debug.Log($"[ManaRune] {message}", this);
     }
 }

@@ -195,8 +195,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     protected override void OnCastStarted()
     {
-        runeRuntimeState = ResolveRuneRuntimeState();
-        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
+        runeRuntimeState = ResolvePlayerRuneRuntimeState();
+        currentRuneCastId = CurrentRuneCastId;
         thrustDamagedTargets.Clear();
         thrustPhaseTargets.Clear();
         killCreditTargets.Clear();
@@ -854,6 +854,20 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     {
         physicalDamage = Mathf.Max(0f, thrustPhysicalBaseDamage + specialAttack * thrustSpecialToPhysicalScale);
         specialDamage = Mathf.Max(0f, thrustSpecialBaseDamage + physicalAttack * thrustPhysicalToSpecialScale);
+        float outgoingDamageMultiplier = ResolveRuneOutgoingDamageMultiplier();
+        physicalDamage *= outgoingDamageMultiplier;
+        specialDamage *= outgoingDamageMultiplier;
+
+        float manaRuneMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        if (manaRuneMultiplier > 1f)
+        {
+            float beforePhysical = physicalDamage;
+            float beforeSpecial = specialDamage;
+            physicalDamage *= manaRuneMultiplier;
+            specialDamage *= manaRuneMultiplier;
+            LogManaRuneApplied("R", "ThrustPhysicalDamage", beforePhysical, physicalDamage);
+            LogManaRuneApplied("R", "ThrustSpecialDamage", beforeSpecial, specialDamage);
+        }
     }
 
     private void ResolveNeedleDamageValues(float physicalAttack, float specialAttack, out float physicalDamage, out float specialDamage)

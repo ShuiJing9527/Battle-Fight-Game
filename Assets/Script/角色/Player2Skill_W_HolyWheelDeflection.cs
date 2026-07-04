@@ -138,6 +138,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
     private RuneRuntimeState runeRuntimeState;
+    protected override int SkillIndex => 1;
 
     public override float CooldownSeconds => wCooldown;
     public override float ManaCost => manaCost;
@@ -169,7 +170,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         Cleanup();
         runeRuntimeState = ResolveRuneRuntimeState();
-        runeRuntimeState?.NotifySkillCastStarted(1);
+        PrepareRuneCastContext();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -182,6 +183,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             StopCoroutine(wSkillRoutine);
             wSkillRoutine = null;
         }
+
+        ResetRuneCastContext();
 
         for (int i = 0; i < activeWSwords.Count; i++)
         {
@@ -257,7 +260,11 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             currentShieldValue * Mathf.Max(0f, wCounterDamageFromShieldRatio)
             + blockedDamage * Mathf.Max(0f, wCounterDamageFromBlockedDamageRatio)
             + Mathf.Max(0f, wCounterFlatDamage);
-        counterDamage *= Mathf.Max(0f, wCounterFinalDamageMultiplier);
+        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        counterDamage *=
+            Mathf.Max(0f, wCounterFinalDamageMultiplier)
+            * Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier())
+            * manaMultiplier;
 
         Debug.Log($"[W Guard] Raw={clampedRaw:F2}, Blocked={blockedDamage:F2}, Taken={damageAfterReduction:F2}, Shield={currentShieldValue:F2}, Counter={counterDamage:F2}", this);
         ApplyWCounterDamage(incomingDamage, counterDamage);
@@ -524,8 +531,9 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float mixedDamage = Mathf.Max(0f, currentWOrbitBladeDamage) + Mathf.Max(0f, wOrbitStarBladeFlatDamage);
         float physicalRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladePhysicalSplitRatio);
         float specialRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladeSpecialSplitRatio);
-        float physicalFinalDamage = Mathf.Max(1f, (physicalRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier));
-        float specialFinalDamage = Mathf.Max(1f, (specialRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier));
+        float outgoingDamageMultiplier = Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier());
+        float physicalFinalDamage = Mathf.Max(1f, (physicalRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier) * outgoingDamageMultiplier);
+        float specialFinalDamage = Mathf.Max(1f, (specialRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier) * outgoingDamageMultiplier);
 
         if (combatHealth != null && combatHealth.gameObject != Owner.gameObject)
         {
@@ -1485,8 +1493,15 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         float maxHp = ResolveOwnerMaxHp();
-        float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier);
-        wAppliedShieldValue = baseShield;
+        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier * manaMultiplier);
+        float shieldRuneMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldGainMultiplier() : 1f;
+        float finalShield = baseShield * Mathf.Max(0f, shieldRuneMultiplier);
+        if (manaMultiplier > 1f)
+        {
+            LogManaRuneApplied("Player02 W", "Shield", Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier), finalShield);
+        }
+        wAppliedShieldValue = finalShield;
         combatHealth.SetShield(wAppliedShieldValue);
         Debug.Log($"[W Shield] Applied shield={wAppliedShieldValue:F2}, maxHp={maxHp:F2}, multiplier={wShieldMaxHpMultiplier:F2}, swordCount={currentSwordCount}", this);
     }

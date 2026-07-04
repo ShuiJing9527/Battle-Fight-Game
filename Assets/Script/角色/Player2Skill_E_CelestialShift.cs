@@ -101,6 +101,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     private readonly HashSet<int> hitEnemiesThisDash = new HashSet<int>();
     private RuneRuntimeState runeRuntimeState;
     private int currentDashHitCount;
+    protected override int SkillIndex => 2;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -118,7 +119,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
-        runeRuntimeState?.NotifySkillCastStarted(2);
+        PrepareRuneCastContext();
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -130,6 +131,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         isDashing = false;
         currentDashHitCount = 0;
         hitEnemiesThisDash.Clear();
+        ResetRuneCastContext();
 
         for (int i = 0; i < activeAfterimageGhosts.Count; i++)
         {
@@ -170,7 +172,12 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         hitEnemiesThisDash.Clear();
 
         float dashDurationSeconds = Mathf.Max(0.05f, dashDuration > 0f ? dashDuration : eRailDuration);
-        float dashDistanceValue = Mathf.Max(0f, dashDistance);
+        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.30f);
+        float dashDistanceValue = Mathf.Max(0f, dashDistance * manaMultiplier);
+        if (manaMultiplier > 1f)
+        {
+            LogManaRuneApplied("Player02 E", "DashDistance", dashDistance, dashDistanceValue);
+        }
         Vector3 dir = Owner != null ? Owner.FacingDirection : Vector3.forward;
         if (dir.sqrMagnitude < 0.0001f)
         {
@@ -365,8 +372,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
             Mathf.Max(0f, eSpecialBaseDamage)
             + attackerPhysicalAttack * Mathf.Max(0f, eSpecialFromPhysicalAttackScaling)
             + attackerSpecialAttack * Mathf.Max(0f, eSpecialFromSpecialAttackScaling);
-        float physicalFinal = Mathf.Max(1f, (physicalRaw - targetPhysicalDefense) * Mathf.Max(0f, ePhysicalDamageMultiplier));
-        float specialFinal = Mathf.Max(1f, (specialRaw - targetSpecialDefense) * Mathf.Max(0f, eSpecialDamageMultiplier));
+        float outgoingDamageMultiplier = Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier());
+        float physicalFinal = Mathf.Max(1f, (physicalRaw - targetPhysicalDefense) * Mathf.Max(0f, ePhysicalDamageMultiplier) * outgoingDamageMultiplier);
+        float specialFinal = Mathf.Max(1f, (specialRaw - targetSpecialDefense) * Mathf.Max(0f, eSpecialDamageMultiplier) * outgoingDamageMultiplier);
 
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
         float beforeHealth = ResolveCurrentHealth(combatHealth);

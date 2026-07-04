@@ -156,6 +156,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
     protected override void OnCastStarted()
     {
+        ResolvePlayerRuneRuntimeState();
         IsRunningBoost = true;
         SyncEStateConfig();
         BeginGroundSafetyLock();
@@ -243,7 +244,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         cachedOriginalMoveSpeed = resolvedBaseMoveSpeed;
-        cachedBoostedMoveSpeed = resolvedBaseMoveSpeed * Mathf.Max(0f, eMoveSpeedMultiplier);
+        float effectiveMoveSpeedMultiplier = ResolveEffectiveEMoveSpeedMultiplier();
+        cachedBoostedMoveSpeed = resolvedBaseMoveSpeed * effectiveMoveSpeedMultiplier;
         cachedMovement.moveSpeed = cachedBoostedMoveSpeed;
         WakePlayerRigidbody();
     }
@@ -777,6 +779,19 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         lastKnownStableMoveSpeed = currentMoveSpeed;
+    }
+
+    private float ResolveEffectiveEMoveSpeedMultiplier()
+    {
+        float beforeMultiplier = Mathf.Max(0f, eMoveSpeedMultiplier);
+        float boostAboveBase = Mathf.Max(0f, beforeMultiplier - 1f);
+        float effectiveMultiplier = 1f + boostAboveBase * ResolveManaRuneScaledMultiplier(0.25f);
+        if (effectiveMultiplier > beforeMultiplier)
+        {
+            LogManaRuneApplied("E", "MoveSpeedMultiplier", beforeMultiplier, effectiveMultiplier);
+        }
+
+        return effectiveMultiplier;
     }
 
     private void WakePlayerRigidbody()

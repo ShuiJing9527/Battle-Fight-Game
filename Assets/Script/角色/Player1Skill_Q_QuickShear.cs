@@ -244,7 +244,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         SyncQuickShearSkillConfig();
-        currentRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(SkillIndex) : -1;
+        runeRuntimeState = ResolvePlayerRuneRuntimeState();
+        currentRuneCastId = CurrentRuneCastId;
 
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
@@ -882,7 +883,16 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             rawDamage *= bank.SkillDamageMultiplier;
         }
 
+        rawDamage *= ResolveRuneOutgoingDamageMultiplier();
+
         rawDamage *= Mathf.Max(0f, quickShearFinalDamageMultiplier);
+        float manaRuneMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        if (manaRuneMultiplier > 1f)
+        {
+            float beforeManaRune = rawDamage;
+            rawDamage *= manaRuneMultiplier;
+            LogManaRuneApplied("Q", "Damage", beforeManaRune, rawDamage);
+        }
 
         float afterBaseCrit = BattleStatUtility.ApplyCriticalDamage(gameObject, rawDamage, out bool baseCritTriggered);
         bool extraCritTriggered = Random.value < Mathf.Clamp01(quickShearExtraCritChance);

@@ -159,6 +159,65 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         return true;
     }
 
+    public float TryConsumeAdditionalMana(float requestedAmount)
+    {
+        float amount = Mathf.Max(0f, requestedAmount);
+        if (amount <= 0f)
+        {
+            return 0f;
+        }
+
+        if (resourceBank != null)
+        {
+            float before = Mathf.Max(0f, resourceBank.currentEnergy);
+            float spendAmount = Mathf.Min(before, amount);
+            if (spendAmount <= 0f)
+            {
+                runtimeCurrentMana = resourceBank.currentEnergy;
+                return 0f;
+            }
+
+            if (!resourceBank.TrySpendEnergy(spendAmount))
+            {
+                runtimeCurrentMana = resourceBank.currentEnergy;
+                return 0f;
+            }
+
+            runtimeCurrentMana = resourceBank.currentEnergy;
+            return spendAmount;
+        }
+
+        float runtimeBefore = Mathf.Max(0f, runtimeCurrentMana);
+        float runtimeSpend = Mathf.Min(runtimeBefore, amount);
+        runtimeCurrentMana = Mathf.Max(0f, runtimeCurrentMana - runtimeSpend);
+        return runtimeSpend;
+    }
+
+    public void RefundSkillResource(int skillIndex)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return;
+        }
+
+        SkillCostCDData data = skillDatas[skillIndex];
+        float refundAmount = Mathf.Max(0f, data.manaCost);
+        if (refundAmount > 0f)
+        {
+            if (resourceBank != null)
+            {
+                resourceBank.currentEnergy = Mathf.Clamp(resourceBank.currentEnergy + refundAmount, 0f, resourceBank.maxEnergy);
+                runtimeCurrentMana = resourceBank.currentEnergy;
+            }
+            else
+            {
+                runtimeCurrentMana = Mathf.Clamp(runtimeCurrentMana + refundAmount, 0f, maxMana);
+            }
+        }
+
+        runtimeCurrentCD[skillIndex] = 0f;
+    }
+
     public float GetCurrentSkillCD(int idx)
     {
         if (!IsValidSkillIndex(idx))
