@@ -10,6 +10,9 @@ Shader "ShoreWave/Sand Fade URP"
         _Brightness ("Brightness", Range(0.0, 3.0)) = 1.0
         _TextureTiling ("Texture Tiling", Vector) = (1, 1, 0, 0)
         _EnableShoreFade ("Enable Shore Fade", Range(0.0, 1.0)) = 1.0
+        _CornerMode ("Corner Mode", Range(0.0, 1.0)) = 0.0
+        _CornerInner ("Corner Inner", Range(0.0, 1.0)) = 0.0
+        _CornerBlend ("Corner Blend", Range(0.0, 1.0)) = 0.45
 
         _FadeStart ("Fade Start", Range(-0.5, 1.5)) = 0.58
         _FadeWidth ("Fade Width", Range(0.01, 1.5)) = 0.36
@@ -87,6 +90,9 @@ Shader "ShoreWave/Sand Fade URP"
                 float _Brightness;
                 float4 _TextureTiling;
                 float _EnableShoreFade;
+                float _CornerMode;
+                float _CornerInner;
+                float _CornerBlend;
                 float _FadeStart;
                 float _FadeWidth;
                 float _FadeSoftness;
@@ -123,7 +129,17 @@ Shader "ShoreWave/Sand Fade URP"
                 float noise = SAMPLE_TEXTURE2D(_FadeNoiseTex, sampler_FadeNoiseTex, tiledUV * 0.8).r;
                 float shoreFadeEnabled = saturate(_EnableShoreFade);
 
-                float fadeAxis = lerp(input.uv.y, 1.0 - input.uv.y, saturate(_FadeReverse));
+                float linearFadeAxis = lerp(input.uv.y, 1.0 - input.uv.y, saturate(_FadeReverse));
+                float2 topRightEdgeDistance = saturate(float2(1.0 - input.uv.x, 1.0 - input.uv.y));
+                float outerCornerMetric = lerp(
+                    min(topRightEdgeDistance.x, topRightEdgeDistance.y),
+                    saturate(length(topRightEdgeDistance) * 0.70710678),
+                    saturate(_CornerBlend));
+                float innerCornerMetric = saturate(length(topRightEdgeDistance) * 0.70710678);
+                float outerCornerAxis = 1.0 - outerCornerMetric;
+                float innerCornerAxis = 1.0 - innerCornerMetric;
+                float cornerFadeAxis = lerp(outerCornerAxis, innerCornerAxis, saturate(_CornerInner));
+                float fadeAxis = lerp(linearFadeAxis, cornerFadeAxis, saturate(_CornerMode));
                 float fadeNoiseOffset = (noise - 0.5) * _FadeNoiseStrength;
                 float distortedFadeAxis = saturate(fadeAxis + fadeNoiseOffset);
 

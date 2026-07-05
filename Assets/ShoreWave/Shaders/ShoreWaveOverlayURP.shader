@@ -21,6 +21,9 @@ Shader "ShoreWave/Overlay URP"
         _FoamStrength ("Foam Strength", Range(0.0, 3.0)) = 1.1
         _FoamSoftness ("Foam Softness", Range(0.001, 0.5)) = 0.12
         _Tiling ("Tiling", Range(0.1, 8.0)) = 1.6
+        _CornerMode ("Corner Mode", Range(0.0, 1.0)) = 0.0
+        _CornerInner ("Corner Inner", Range(0.0, 1.0)) = 0.0
+        _CornerBlend ("Corner Blend", Range(0.0, 1.0)) = 0.45
         _TideOffset ("Tide Offset", Range(-2.0, 2.0)) = 0.0
         _TideAmplitude ("Tide Amplitude", Range(0.0, 1.0)) = 0.12
         _EdgeNoiseStrength ("Edge Noise Strength", Range(0.0, 1.0)) = 0.08
@@ -100,6 +103,9 @@ Shader "ShoreWave/Overlay URP"
                 float _FoamStrength;
                 float _FoamSoftness;
                 float _Tiling;
+                float _CornerMode;
+                float _CornerInner;
+                float _CornerBlend;
                 float _TideOffset;
                 float _TideAmplitude;
                 float _EdgeNoiseStrength;
@@ -191,7 +197,18 @@ Shader "ShoreWave/Overlay URP"
                 float waveBandSample = SAMPLE_TEXTURE2D(_WaveBandTex, sampler_WaveBandTex, float2(uv.x * 0.35, 0.5)).r;
                 float waveBandMask = lerp(1.0, waveBandSample, saturate(_WaveBandInfluence));
 
-                float distortedShore = uv.y + (edgeNoise - 0.5) * _EdgeNoiseStrength;
+                float linearShoreAxis = uv.y;
+                float2 topRightEdgeDistance = saturate(float2(1.0 - input.uv.x, 1.0 - input.uv.y));
+                float outerCornerMetric = lerp(
+                    min(topRightEdgeDistance.x, topRightEdgeDistance.y),
+                    saturate(length(topRightEdgeDistance) * 0.70710678),
+                    saturate(_CornerBlend));
+                float innerCornerMetric = saturate(length(topRightEdgeDistance) * 0.70710678);
+                float outerCornerAxis = 1.0 - outerCornerMetric;
+                float innerCornerAxis = 1.0 - innerCornerMetric;
+                float cornerShoreAxis = lerp(outerCornerAxis, innerCornerAxis, saturate(_CornerInner));
+                float shoreAxis = lerp(linearShoreAxis, cornerShoreAxis, saturate(_CornerMode));
+                float distortedShore = shoreAxis + (edgeNoise - 0.5) * _EdgeNoiseStrength;
 
                 float mainFront = LayerFront(baseFront + _MainWaveOffset, _MainWavePhase, _TideAmplitude * 0.18, timeValue);
                 float midFront = LayerFront(baseFront + _MidFoamOffset, _MidFoamPhase, _TideAmplitude * 0.28, timeValue);
