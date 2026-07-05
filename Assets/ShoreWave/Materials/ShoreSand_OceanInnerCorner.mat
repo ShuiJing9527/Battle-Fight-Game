@@ -56,11 +56,11 @@ Material:
     - _CornerInner: 1
     - _CornerMode: 1
     - _EnableShoreFade: 1
-    - _FadeNoiseStrength: 0.04
+    - _FadeNoiseStrength: 0.05
     - _FadeReverse: 0
-    - _FadeSoftness: 0.14
-    - _FadeStart: 0.14
-    - _FadeWidth: 0.38
+    - _FadeSoftness: 0.12
+    - _FadeStart: 0.5
+    - _FadeWidth: 0.5
     - _GrassBlendStrength: 0
     - _GrassBlendWidth: 0
     - _LightingStrength: 1

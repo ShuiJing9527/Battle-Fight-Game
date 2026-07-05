@@ -14,7 +14,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   timeFlowSpeed: 0.5
   timeFlowScale: 1
-  _currentTime: 7.5
+  _currentTime: 7
   isTimeFlow: 0
   timeOfDays:
   - {fileID: 11400000, guid: efc6fcc2cfc53e74b8da9bed3815def3, type: 2}
@@ -29,8 +29,8 @@ MonoBehaviour:
   - {fileID: 11400000, guid: d1dc95f67b33e9e41afb64a1d5c2fb63, type: 2}
   currentTimeOfDay: {fileID: 11400000, guid: 88803c82defc4c64db357631b362ccf5, type: 2}
   _dayOrNight: 0
-  todElapsedTimeRatio: 0.5
-  todElapsedTime: 0.5
+  todElapsedTimeRatio: 0
+  todElapsedTime: 0
   todFrameList:
   - name: Night2
     _time: 4
@@ -52,13 +52,13 @@ MonoBehaviour:
     _time: 19
   - name: Night1
     _time: 20
-  MainlightColor: {r: 0.93962264, g: 0.82524574, b: 0.32294047, a: 1}
-  MainlightIntensity: 6
-  MainlightDirection: {x: 0.22958696, y: 0.06151764, z: 0.25140184, w: 0.93824434}
+  MainlightColor: {r: 0.8792453, g: 0.8400804, b: 0.27040932, a: 1}
+  MainlightIntensity: 4
+  MainlightDirection: {x: 0.20906463, y: 0.0560187, z: 0.252684, w: 0.9430295}
   MainlightTiltAngle: {x: 0, y: 0, z: 30}
-  FogLightColor: {r: 0.47652787, g: 0.7883704, b: 0.5560488, a: 0.5}
-  FogLightIntensity: 6
-  HGCoefficient: 0.05
+  FogLightColor: {r: 0.8784314, g: 0.8392157, b: 0.27058825, a: 1}
+  FogLightIntensity: 5
+  HGCoefficient: 0.1
   IblBrdfLut: {fileID: 2800000, guid: 373b983f45125c042a202367c7f36bf4, type: 3}
   TimeOfDayData: {fileID: 11400000, guid: 31c67636ff6455949a6f1bde7f0025a3, type: 2}
   materials:

@@ -20,6 +20,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
+  m_LockedProperties: 
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -52,21 +53,21 @@ Material:
     - _FoamSoftness: 0.12
     - _FoamStrength: 0.9
     - _LightingStrength: 1
-    - _MainWaveOffset: 0.28
+    - _MainWaveOffset: 0.2
     - _MainWaveOpacity: 0.95
     - _MainWavePhase: 0
     - _MainWaveWidth: 0.03
     - _MidFoamOffset: 0.24
     - _MidFoamOpacity: 0.38
     - _MidFoamPhase: 1.5
-    - _MidFoamWidth: 0.06
+    - _MidFoamWidth: 0.03
     - _MinimumAmbient: 0.06
     - _OuterFoamOffset: 0.12
     - _OuterFoamOpacity: 0.16
     - _OuterFoamPhase: 3
-    - _OuterFoamWidth: 0.1
+    - _OuterFoamWidth: 0.05
     - _ReceiveShadows: 1
-    - _TideAmplitude: 0.18
+    - _TideAmplitude: 0.08
     - _TideOffset: 0.42
     - _TideSpeed: 1.1
     - _Tiling: 1.6

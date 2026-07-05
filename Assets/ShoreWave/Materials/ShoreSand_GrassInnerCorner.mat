@@ -20,6 +20,7 @@ Material:
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
+  m_LockedProperties: _GrassBlendWidth
   m_SavedProperties:
     serializedVersion: 3
     m_TexEnvs:
@@ -57,11 +58,11 @@ Material:
     - _EnableShoreFade: 1
     - _FadeNoiseStrength: 0.04
     - _FadeReverse: 0
-    - _FadeSoftness: 0.14
-    - _FadeStart: 0.16
-    - _FadeWidth: 0.34
-    - _GrassBlendStrength: 0.25
-    - _GrassBlendWidth: 0.48
+    - _FadeSoftness: 0.1
+    - _FadeStart: 0.4
+    - _FadeWidth: 0.22
+    - _GrassBlendStrength: 0.1
+    - _GrassBlendWidth: 0.2
     - _LightingStrength: 1
     - _Metallic: 0
     - _MinimumAmbient: 0.12

@@ -60,7 +60,7 @@ Material:
     - _FadeReverse: 0
     - _FadeSoftness: 0.12
     - _FadeStart: 0.22
-    - _FadeWidth: 0.82
+    - _FadeWidth: 0.5
     - _GrassBlendStrength: 0
     - _GrassBlendWidth: 0
     - _LightingStrength: 1
