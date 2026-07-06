@@ -6,7 +6,10 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
     [SerializeField] private SpriteRenderer targetRenderer;
     [SerializeField] private Sprite[] frames;
     [SerializeField, Min(0.01f)] private float lifetime = 0.16f;
+    [SerializeField, Min(1f)] private float frameRate = 24f;
     [SerializeField] private bool playOnEnable = true;
+    [SerializeField] private bool loop;
+    [SerializeField] private bool autoHideOnComplete = true;
     [SerializeField] private bool destroyOnComplete = true;
     [SerializeField] private bool fadeOut = true;
     [SerializeField] private Vector3 startScale = Vector3.one;
@@ -15,7 +18,6 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
     private float elapsed;
     private bool playing;
     private Color baseColor = Color.white;
-    private float scaleDirectionX = 1f;
 
     private void Awake()
     {
@@ -25,6 +27,7 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
 
     private void OnEnable()
     {
+        ApplyRendererVisibility(false);
         if (playOnEnable)
         {
             Play();
@@ -57,8 +60,15 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         ResolveRenderer();
         CacheBaseColor();
         elapsed = 0f;
+        if (targetRenderer == null || frames == null || frames.Length == 0)
+        {
+            playing = false;
+            ApplyRendererVisibility(false);
+            return;
+        }
+
         playing = true;
-        scaleDirectionX = transform.localScale.x < 0f ? -1f : 1f;
+        ApplyRendererVisibility(true);
         ApplyScale(0f);
         ApplyFrame(0f);
         ApplyAlpha(0f);
@@ -69,6 +79,36 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         lifetime = Mathf.Max(0.01f, value);
     }
 
+    public void SetFrames(Sprite[] value)
+    {
+        frames = value;
+        ResolveRenderer();
+        if (targetRenderer != null)
+        {
+            targetRenderer.sprite = frames != null && frames.Length > 0 ? frames[0] : null;
+        }
+    }
+
+    public void SetFrameRate(float value)
+    {
+        frameRate = Mathf.Max(1f, value);
+    }
+
+    public void SetPlayOnEnable(bool value)
+    {
+        playOnEnable = value;
+    }
+
+    public void SetLoop(bool value)
+    {
+        loop = value;
+    }
+
+    public void SetAutoHideOnComplete(bool value)
+    {
+        autoHideOnComplete = value;
+    }
+
     public void SetSortingOrder(int order)
     {
         ResolveRenderer();
@@ -76,6 +116,22 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         {
             targetRenderer.sortingOrder = order;
         }
+    }
+
+    public void SetSorting(string sortingLayerName, int order)
+    {
+        ResolveRenderer();
+        if (targetRenderer == null)
+        {
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(sortingLayerName))
+        {
+            targetRenderer.sortingLayerName = sortingLayerName;
+        }
+
+        targetRenderer.sortingOrder = order;
     }
 
     public void SetColor(Color color)
@@ -91,6 +147,12 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
     public void SetDestroyOnComplete(bool value)
     {
         destroyOnComplete = value;
+    }
+
+    public void SetScaleRange(Vector3 start, Vector3 end)
+    {
+        startScale = start;
+        endScale = end;
     }
 
     private void ResolveRenderer()
@@ -113,19 +175,29 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
     {
         if (targetRenderer == null || frames == null || frames.Length == 0)
         {
+            ApplyRendererVisibility(false);
             return;
         }
 
+        ApplyRendererVisibility(true);
         int lastIndex = Mathf.Max(0, frames.Length - 1);
-        int index = Mathf.Clamp(Mathf.FloorToInt(normalized * frames.Length), 0, lastIndex);
+        int index;
+        if (loop)
+        {
+            index = Mathf.FloorToInt(elapsed * Mathf.Max(1f, frameRate));
+            index = frames.Length > 0 ? index % frames.Length : 0;
+        }
+        else
+        {
+            index = Mathf.Clamp(Mathf.FloorToInt(elapsed * Mathf.Max(1f, frameRate)), 0, lastIndex);
+        }
+
         targetRenderer.sprite = frames[index];
     }
 
     private void ApplyScale(float normalized)
     {
-        Vector3 scale = Vector3.LerpUnclamped(startScale, endScale, normalized);
-        scale.x = Mathf.Abs(scale.x) * scaleDirectionX;
-        transform.localScale = scale;
+        transform.localScale = Vector3.LerpUnclamped(startScale, endScale, normalized);
     }
 
     private void ApplyAlpha(float normalized)
@@ -151,13 +223,35 @@ public class ScissorFrameEffectPlayer : MonoBehaviour
         ApplyScale(1f);
         ApplyAlpha(1f);
 
+        if (loop)
+        {
+            elapsed = 0f;
+            playing = true;
+            return;
+        }
+
         if (destroyOnComplete)
         {
             Destroy(gameObject);
         }
-        else
+        else if (autoHideOnComplete)
         {
+            ApplyRendererVisibility(false);
             gameObject.SetActive(false);
+        }
+    }
+
+    private void ApplyRendererVisibility(bool visible)
+    {
+        if (targetRenderer == null)
+        {
+            return;
+        }
+
+        targetRenderer.enabled = visible;
+        if (!visible)
+        {
+            targetRenderer.sprite = null;
         }
     }
 }

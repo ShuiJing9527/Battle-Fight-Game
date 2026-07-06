@@ -42,6 +42,22 @@ namespace UnderTheStars.GenerationMap
             return null;
         }
 
+        public void ClearFloorTileCell(int tilemapIndex, Vector2Int point)
+        {
+            if (floorTilemap == null || tilemapIndex < 0 || tilemapIndex >= floorTilemap.Length)
+            {
+                return;
+            }
+
+            Tilemap tilemap = floorTilemap[tilemapIndex];
+            if (tilemap == null)
+            {
+                return;
+            }
+
+            tilemap.SetTile(new Vector3Int(point.x, point.y, 0), null);
+        }
+
         private async UniTask PaintTile(HashSet<Vector2Int> points, Tilemap tilemap, TileBase tile)
         {
             int count = 0;
@@ -61,7 +77,52 @@ namespace UnderTheStars.GenerationMap
 
         public UniTask PaintFloorTile(HashSet<Vector2Int> points, int tileIndex)
         {
+            if (points == null || floorTilemap == null || floorTile == null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            if (tileIndex < 0 || tileIndex >= floorTilemap.Length || tileIndex >= floorTile.Length)
+            {
+                Debug.LogWarning($"[RandomMapPaintTilemap] Invalid tileIndex={tileIndex}. floorTilemapLength={(floorTilemap != null ? floorTilemap.Length : 0)} floorTileLength={(floorTile != null ? floorTile.Length : 0)}", this);
+                return UniTask.CompletedTask;
+            }
+
+            if (floorTilemap[tileIndex] == null || floorTile[tileIndex] == null)
+            {
+                Debug.LogWarning($"[RandomMapPaintTilemap] Missing tilemap or tile asset at index {tileIndex}.", this);
+                return UniTask.CompletedTask;
+            }
+
             return PaintTile(points, floorTilemap[tileIndex], floorTile[tileIndex]);
+        }
+
+        public UniTask PaintFloorTile(HashSet<Vector2Int> points, int tilemapIndex, int tileAssetIndex)
+        {
+            if (points == null || floorTilemap == null || floorTile == null)
+            {
+                return UniTask.CompletedTask;
+            }
+
+            if (tilemapIndex < 0 || tilemapIndex >= floorTilemap.Length)
+            {
+                Debug.LogWarning($"[RandomMapPaintTilemap] Invalid tilemapIndex={tilemapIndex}. floorTilemapLength={(floorTilemap != null ? floorTilemap.Length : 0)}", this);
+                return UniTask.CompletedTask;
+            }
+
+            if (tileAssetIndex < 0 || tileAssetIndex >= floorTile.Length)
+            {
+                Debug.LogWarning($"[RandomMapPaintTilemap] Invalid tileAssetIndex={tileAssetIndex}. floorTileLength={(floorTile != null ? floorTile.Length : 0)}", this);
+                return UniTask.CompletedTask;
+            }
+
+            if (floorTilemap[tilemapIndex] == null || floorTile[tileAssetIndex] == null)
+            {
+                Debug.LogWarning($"[RandomMapPaintTilemap] Missing tilemap or tile asset at tilemapIndex={tilemapIndex}, tileAssetIndex={tileAssetIndex}.", this);
+                return UniTask.CompletedTask;
+            }
+
+            return PaintTile(points, floorTilemap[tilemapIndex], floorTile[tileAssetIndex]);
         }
 
         public UniTask PaintWallTile(HashSet<Vector2Int> points)

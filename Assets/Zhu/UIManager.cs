@@ -3,17 +3,22 @@ using UnityEngine.SceneManagement;
 
 public class UIManager : MonoBehaviour
 {
-    // 拖拽赋值你的整个画布
     public Canvas mainCanvas;
+    [SerializeField] private string startSceneName = "\u8349\u539F";
 
-    // 开始游戏按钮点击事件
     public void StartGame()
     {
-        // 写你真实游戏场景名
-        SceneManager.LoadScene("GameScene");
+        SceneManager.LoadScene(startSceneName);
     }
 
-    // 退出游戏
+    public void SetStartSceneName(string sceneName)
+    {
+        if (!string.IsNullOrWhiteSpace(sceneName))
+        {
+            startSceneName = sceneName;
+        }
+    }
+
     public void ExitGame()
     {
         Application.Quit();

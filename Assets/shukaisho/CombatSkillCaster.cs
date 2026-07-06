@@ -122,8 +122,9 @@ public class CombatSkillCaster : MonoBehaviour
             return false;
         }
 
-        runeRuntimeState?.NotifySkillCastStarted(skillIndex);
-        ExecuteSkill(skill, skillIndex);
+        int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(skillIndex) : -1;
+        float manaRuneEffectStrength = runeRuntimeState != null ? runeRuntimeState.TriggerManaRuneCastEffect(skillIndex) : 0f;
+        ExecuteSkill(skill, skillIndex, runeCastId, manaRuneEffectStrength);
         return true;
     }
 
@@ -157,7 +158,7 @@ public class CombatSkillCaster : MonoBehaviour
         target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
     }
 
-    private void ExecuteSkill(BattleSkill skill, int skillIndex)
+    private void ExecuteSkill(BattleSkill skill, int skillIndex, int runeCastId, float manaRuneEffectStrength)
     {
         Transform point = attackPoint != null ? attackPoint : transform;
         float baseDamage = Mathf.Max(0f, skill.baseDamage);
@@ -167,6 +168,7 @@ public class CombatSkillCaster : MonoBehaviour
         }
 
         baseDamage *= runeRuntimeState != null ? runeRuntimeState.GetOutgoingDamageMultiplier(skillIndex) : 1f;
+        baseDamage *= 1f + Mathf.Clamp01(manaRuneEffectStrength) * 0.5f;
 
         for (int hit = 0; hit < Mathf.Max(1, skill.hitCount); hit++)
         {
@@ -184,7 +186,7 @@ public class CombatSkillCaster : MonoBehaviour
                 if (health != null && hitTargets.Add(health))
                 {
                     float resolvedDamage = baseDamage;
-                    resolvedDamage += runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(skillIndex) : 0f;
+                    resolvedDamage += runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(skillIndex, runeCastId) : 0f;
                     float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, resolvedDamage, out bool isCritical);
                     float beforeHealth = ResolveTargetCurrentHealth(health);
                     health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));

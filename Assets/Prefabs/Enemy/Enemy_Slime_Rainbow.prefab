@@ -108,6 +108,7 @@ GameObject:
   - component: {fileID: 8801316921577575015}
   - component: {fileID: 1144444444444444444}
   - component: {fileID: 8793765161300815962}
+  - component: {fileID: 7001000000000000004}
   - component: {fileID: 3277248092159834598}
   - component: {fileID: -3969033911346056612}
   m_Layer: 0
@@ -149,12 +150,15 @@ MonoBehaviour:
   playerTag: Player
   moveSpeed: 2.5
   stopDistance: 0.8
+  maxHorizontalMoveSpeed: 3
   faceMoveDirection: 0
   keepFlatRotation: 1
   enableEnemySoftAvoidance: 1
   enemySeparationRadius: 1.2
   enemySeparationWeight: 0.6
   enemySeparationMaxNeighbors: 8
+  maxVerticalTargetDifference: 1.5
+  maxVerticalVelocity: 4
   attackRange: 1.35
   attackHitRange: 1.6
   attackCooldown: 1.1
@@ -167,8 +171,14 @@ MonoBehaviour:
   meleeHitForwardOffset: 0
   closeHitRadius: 0
   meleeBodyContactRadius: 0.45
+  requireGroundedToAttack: 1
+  groundedProbeDistance: 0.2
+  maxVerticalAttackDifference: 0.75
+  maxHorizontalAttackDistance: 1.35
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugSpeedDiagnostics: 0
+  debugSpeedLogInterval: 1
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -266,6 +276,9 @@ MonoBehaviour:
   attackSquashAmount: 0.2
   attackStretchAmount: 0.22
   attackStopDistance: 0.7
+  allowAttackForwardLeap: 1
+  allowAttackVerticalLeap: 1
+  maxAttackLeapDistance: 0.65
   minimumVisibleAlpha: 0.92
   deathDuration: 0.65
   deathFadeTime: 0.45
@@ -344,7 +357,7 @@ MonoBehaviour:
   physicalDefense: 20
   specialAttack: 28
   specialDefense: 36
-  speed: 12
+  speed: 10
   luck: 8
 --- !u!114 &8793765161300815962
 MonoBehaviour:
@@ -368,6 +381,32 @@ MonoBehaviour:
   bossScale: 2.4
   applyScale: 1
   createFallbackLight: 1
+--- !u!114 &7001000000000000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88e6d39061144dfe9b8142287c87c8da, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EliteSlimeSplitOnDeath
+  splitCount: 2
+  splitScatterRadius: 1.2
+  bossCanSplit: 1
+  bossSplitCount: 2
+  bossSplitScatterRadius: 1.5
+  bossSplitChildRank: 1
+  bossSplitHealthRatio: 0.65
+  bossSplitAttackRatio: 0.75
+  bossSplitDefenseRatio: 0.7
+  bossSplitSpeedRatio: 1
+  bossSplitScaleRatio: 0.9
+  bossChildrenCanSplit: 0
+  finalBossCanSplit: 1
+  debugSplitLogs: 0
 --- !u!114 &3277248092159834598
 MonoBehaviour:
   m_ObjectHideFlags: 0

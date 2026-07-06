@@ -18,12 +18,26 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float physicalScaling = 0.8f;
     [HideInInspector]
     [SerializeField] private float specialScaling = 1.0f;
+    [Header("Q - 神圣星刃 / 伤害参数")]
+    [Tooltip("Q 物理段固定基础伤害。")]
+    [SerializeField, Min(0f)] private float qPhysicalBaseDamage = 5f;
+    [Tooltip("Q 物理段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qPhysicalFromPhysicalAttackScaling = 0.6f;
+    [Tooltip("Q 物理段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qPhysicalFromSpecialAttackScaling = 0f;
+    [Tooltip("Q 特殊段固定基础伤害。")]
+    [SerializeField, Min(0f)] private float qSpecialBaseDamage = 20f;
+    [Tooltip("Q 特殊段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qSpecialFromPhysicalAttackScaling = 0f;
+    [Tooltip("Q 特殊段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float qSpecialFromSpecialAttackScaling = 0.3f;
     [InspectorName("Q Star Fall Damage Radius")]
     [SerializeField] private float qStarFallDamageRadius = 0.8f;
     [InspectorName("Q Star Fall Enable Damage")]
     [SerializeField] private bool qStarFallEnableDamage = false;
     [InspectorName("Q Star Fall Damage Multiplier")]
-    [SerializeField] private float qStarFallDamageMultiplier = 1f;
+    [Tooltip("Q 星刃落地总伤害倍率，会乘在物理段与特殊段合并后的结果上。")]
+    [SerializeField, Min(0f)] private float qStarFallDamageMultiplier = 1f;
     [SerializeField] private bool qDamageDebugLog = false;
     [SerializeField] private bool debugCriticalLog = false;
 
@@ -229,6 +243,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
     private readonly List<GameObject> activeQBlades = new List<GameObject>();
     private int activeQWaveCount;
+    protected override int SkillIndex => 0;
     private Coroutine qCastRoutine;
     private RuneRuntimeState runeRuntimeState;
 
@@ -285,7 +300,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
         runeRuntimeState = debugRuneState;
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, 1f));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         if (debugThornCounter)
         {
@@ -317,8 +332,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
-        int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId));
+        PrepareRuneCastContext();
+        int runeCastId = CurrentRuneCastId;
+        float manaRuneDamageMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, manaRuneDamageMultiplier));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
     }
@@ -328,6 +345,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         StopAllCoroutines();
         qCastRoutine = null;
         activeQWaveCount = 0;
+        ResetRuneCastContext();
 
         for (int i = 0; i < activeQBlades.Count; i++)
         {
@@ -352,7 +370,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #endif
     }
 
-    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId)
+    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId, float manaRuneDamageMultiplier)
     {
         activeQWaveCount++;
         try
@@ -434,7 +452,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     waveBlades.Add(blade);
                     activeQBlades.Add(blade);
                     AccumulateDivineSealFromQBladeSpawn(1);
-                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId));
+                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId, manaRuneDamageMultiplier));
                 }
 
                 if (qStarFallSequentialDelay > 0f)
@@ -478,7 +496,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         return bladeRoot;
     }
 
-    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId)
+    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId, float manaRuneDamageMultiplier)
     {
         while (bladeRoot != null && Vector3.Distance(bladeRoot.transform.position, targetPos) > 0.05f)
         {
@@ -492,7 +510,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            ApplyQStarFallDamage(targetPos, runeCastId);
+            ApplyQStarFallDamage(targetPos, runeCastId, manaRuneDamageMultiplier);
 
             SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
@@ -504,7 +522,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void ApplyQStarFallDamage(Vector3 center, int runeCastId)
+    private void ApplyQStarFallDamage(Vector3 center, int runeCastId, float manaRuneDamageMultiplier)
     {
         if (qStarFallDamageRadius <= 0f)
         {
@@ -540,7 +558,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source);
+                float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source, manaRuneDamageMultiplier);
                 if (damageAmount <= 0f)
                 {
                     continue;
@@ -597,19 +615,33 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             : Mathf.Max(0f, health.currentHealth);
     }
 
-    private float ResolveQBladeDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source)
+    private float ResolveQBladeDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source, float manaRuneDamageMultiplier)
     {
         float attackerPhysicalAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.physicalAttack) : 0f;
         float attackerSpecialAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.specialAttack) : 0f;
         float targetPhysicalDefense = targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f;
         float targetSpecialDefense = targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f;
 
-        float physicalRaw = 5f + attackerPhysicalAttack * 0.6f;
-        float specialRaw = 20f + attackerSpecialAttack * 0.3f;
+        float physicalRaw =
+            Mathf.Max(0f, qPhysicalBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, qPhysicalFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, qPhysicalFromSpecialAttackScaling);
+        float specialRaw =
+            Mathf.Max(0f, qSpecialBaseDamage)
+            + attackerPhysicalAttack * Mathf.Max(0f, qSpecialFromPhysicalAttackScaling)
+            + attackerSpecialAttack * Mathf.Max(0f, qSpecialFromSpecialAttackScaling);
 
         float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
         float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
-        float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, qStarFallDamageMultiplier);
+        float finalDamage =
+            (physicalFinal + specialFinal)
+            * Mathf.Max(0f, qStarFallDamageMultiplier)
+            * Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier())
+            * manaRuneDamageMultiplier;
+        if (manaRuneDamageMultiplier > 1f)
+        {
+            LogManaRuneApplied("Player02 Q", "Damage", (physicalFinal + specialFinal) * Mathf.Max(0f, qStarFallDamageMultiplier), finalDamage);
+        }
 
         if (qDamageDebugLog)
         {

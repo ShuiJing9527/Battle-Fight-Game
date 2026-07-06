@@ -1,6 +1,8 @@
-﻿using UnityEngine;
-using UnityEngine.UI;
+using System.Collections;
 using TMPro;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public class SimpleLoadBar : MonoBehaviour
 {
@@ -8,58 +10,116 @@ public class SimpleLoadBar : MonoBehaviour
     public Image progressBar;
     public TextMeshProUGUI loadText;
     public GameObject loadBarRoot;
-    public GameObject blackMask;  // 全屏黑色背景
+    public GameObject blackMask;
 
     [Header("设置")]
-    public float loadTime = 3f;
-    public string gameSceneName = "GameScene";
+    public string gameSceneName = "\u8349\u539F";
+    [Min(0.1f)] public float progressSmoothSpeed = 1.5f;
 
-    private float timer;
     private bool isLoading;
+    private AsyncOperation loadOperation;
 
-    void Start()
+    private void Start()
     {
-        // 一开始全部隐藏
         if (loadBarRoot != null)
+        {
             loadBarRoot.SetActive(false);
+        }
+
         if (blackMask != null)
+        {
             blackMask.SetActive(false);
+        }
 
         isLoading = false;
-        timer = 0f;
+        loadOperation = null;
+
         if (progressBar != null)
-            progressBar.fillAmount = 0;
+        {
+            progressBar.fillAmount = 0f;
+        }
+
+        if (loadText != null)
+        {
+            loadText.text = "Loading 0%";
+        }
     }
 
-    // 开始游戏按钮绑定这个
     public void OnClickStartGame()
     {
-        // 点击后：显示黑背景 + 进度条
-        if (blackMask != null)
-            blackMask.SetActive(true);
-        if (loadBarRoot != null)
-            loadBarRoot.SetActive(true);
+        if (isLoading)
+        {
+            return;
+        }
 
-        isLoading = true;
-        timer = 0f;
-        progressBar.fillAmount = 0;
+        if (blackMask != null)
+        {
+            blackMask.SetActive(true);
+        }
+
+        if (loadBarRoot != null)
+        {
+            loadBarRoot.SetActive(true);
+        }
+
+        if (progressBar != null)
+        {
+            progressBar.fillAmount = 0f;
+        }
+
+        if (loadText != null)
+        {
+            loadText.text = "Loading 0%";
+        }
+
+        StartCoroutine(LoadSceneAsyncRoutine(gameSceneName));
     }
 
-    void Update()
+    private IEnumerator LoadSceneAsyncRoutine(string sceneName)
     {
-        if (!isLoading) return;
-
-        timer += Time.deltaTime;
-        float p = Mathf.Clamp01(timer / loadTime);
-        progressBar.fillAmount = p;
-
-        loadText.text = $"Loading {Mathf.Round(p * 100)}%";
-
-        // 加载完成跳转
-        if (p >= 1f)
+        if (string.IsNullOrWhiteSpace(sceneName))
         {
-            isLoading = false;
-            UnityEngine.SceneManagement.SceneManager.LoadScene(gameSceneName);
+            Debug.LogWarning("[SimpleLoadBar] gameSceneName is empty.", this);
+            yield break;
         }
+
+        isLoading = true;
+        loadOperation = SceneManager.LoadSceneAsync(sceneName);
+        if (loadOperation == null)
+        {
+            Debug.LogWarning($"[SimpleLoadBar] Failed to start async loading for scene '{sceneName}'.", this);
+            isLoading = false;
+            yield break;
+        }
+
+        loadOperation.allowSceneActivation = false;
+        float displayedProgress = 0f;
+        float speed = Mathf.Max(0.1f, progressSmoothSpeed);
+
+        while (!loadOperation.isDone)
+        {
+            float targetProgress = Mathf.Clamp01(loadOperation.progress / 0.9f);
+            displayedProgress = Mathf.MoveTowards(displayedProgress, targetProgress, Time.deltaTime * speed);
+
+            if (progressBar != null)
+            {
+                progressBar.fillAmount = displayedProgress;
+            }
+
+            if (loadText != null)
+            {
+                loadText.text = $"Loading {Mathf.RoundToInt(displayedProgress * 100f)}%";
+            }
+
+            if (loadOperation.progress >= 0.9f && displayedProgress >= 1f)
+            {
+                loadOperation.allowSceneActivation = true;
+            }
+
+            yield return null;
+        }
+
+        isLoading = false;
+        loadOperation = null;
     }
 }

@@ -112,62 +112,62 @@ public class RuneDefinition
         {
             case RuneType.Life:
                 rune.runeId = 101;
-                rune.runeName = "生命符文";
-                rune.description = "以生命为源泉的符文，强化体魄，并将生命力转化为回复、伤害与成长。";
-                rune.tier1Effect = "最大生命值提高 10%。";
-                rune.tier2Effect = "使用该技能时，回复自身最大生命值 1% 的 HP。";
-                rune.tier3Effect = "若该回复产生溢出治疗，则将溢出部分转化为永久护盾，上限为自身最大生命值的 50%。";
-                rune.tier4Effect = "该技能首次命中敌人时，额外造成自身最大生命值 1% 的伤害，每次释放最多触发 1 次。";
-                rune.tier5Effect = "击杀怪物时，额外获得 1 个生命属性魂和 1 个回复生命魂。";
-                rune.setBonusEffect = "1 件生命提高改为 50%；2 件回复改为 5%；3 件永久护盾上限改为最大生命值 100%；4 件首次命中额外伤害改为最大生命值 5%；5 件额外根据最大生命值为 HP 以外属性提供加成。";
+                rune.runeName = "Life Rune";
+                rune.description = "A rune born from life force. It strengthens the body and converts vitality into healing, damage, shields, and growth.";
+                rune.tier1Effect = "When you kill a monster, gain 1 Life Attribute Soul and 1 Life Recovery Soul.";
+                rune.tier2Effect = "When you cast a skill, restore HP equal to 5% of your max HP. This can trigger once per skill cast.";
+                rune.tier3Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 5% of your max HP. This can trigger once per skill cast.";
+                rune.tier4Effect = "If healing from Life Rune effects overheals you, the overflow is converted into permanent shield. Permanent shield does not decay over time and is capped at 100% of your max HP.";
+                rune.tier5Effect = "Max HP increased by 50%.";
+                rune.setBonusEffect = "Life Awakening. Gain all-stat bonuses based on max HP. Every 10 max HP counts as 1 Life Attribute. All stats except HP are increased by 10% of that Life Attribute value, rounded down.";
                 break;
 
             case RuneType.Shield:
                 rune.runeId = 102;
-                rune.runeName = "护盾符文";
-                rune.description = "守护意志凝结而成的符文，积蓄护盾并将护盾转化为更强的防御与攻击。";
-                rune.tier1Effect = "没有受到怪物伤害 3 秒后，获得自身最大生命值 15% 的护盾。";
-                rune.tier2Effect = "拥有护盾时，造成的伤害提高 25%。";
-                rune.tier3Effect = "获得的护盾值提高 100%。";
-                rune.tier4Effect = "该技能首次命中敌人时，额外造成当前护盾值 10% 的伤害，每次释放最多触发 1 次。";
-                rune.tier5Effect = "击杀怪物时，额外获得 1 个护盾魂。";
-                rune.setBonusEffect = "1 件护盾值改为最大生命值 50%；2 件伤害提高改为 50%；3 件护盾获得提高改为 200%；4 件首次命中额外伤害改为当前护盾值 25%；5 件每次击杀 Boss 使护盾效能永久提高 10%。";
+                rune.runeName = "Shield Rune";
+                rune.description = "A rune formed from protective will. It builds shields when you avoid damage and converts shield power into stronger defense and offense.";
+                rune.tier1Effect = "After not taking monster damage for 3 seconds, refill your current shield up to 50% of your max HP.";
+                rune.tier2Effect = "While you have a shield, your damage dealt is increased by 30%.";
+                rune.tier3Effect = "When you kill a monster, gain 1 Shield Soul.";
+                rune.tier4Effect = "Shield gained is increased by 100%.";
+                rune.tier5Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 15% of your current shield. This can trigger once per skill cast. This damage is affected by Shield Efficiency.";
+                rune.setBonusEffect = "Guardian Ascension. Shield cap is increased to 300% of your max HP. Each time you kill an elite monster or Boss, shield efficiency is permanently increased by 10%, up to 300%.";
                 break;
 
             case RuneType.Mana:
                 rune.runeId = 103;
-                rune.runeName = "魔力符文";
-                rune.description = "由纯粹魔力凝结而成的符文，扩张法力容量，强化魔力魂恢复，并将溢出的魔力转化为爆发。";
-                rune.tier1Effect = "最大法力值增加 150。";
-                rune.tier2Effect = "法力恢复速度提高 150%。";
-                rune.tier3Effect = "击杀怪物时，额外掉落 1 个魔力魂；魔力魂溢出恢复会转化为魔力充盈，上限为最大法力值的 100%。";
-                rune.tier4Effect = "该技能首次命中敌人时，额外消耗最多 100 点法力或魔力充盈，造成额外消耗值 ×3 的伤害。";
-                rune.tier5Effect = "最大法力转化为全属性加成 20%。";
-                rune.setBonusEffect = "1 件最大法力改为 400；2 件法力恢复改为 300%；3 件魔力魂恢复提高到 300%，魔力充盈上限改为最大法力值 200%；4 件额外消耗上限改为 200 且倍率改为 ×4；5 件每次击杀 Boss 使法力转换效能永久提高 10%。";
+                rune.runeName = "Mana Rune";
+                rune.description = "A rune condensed from pure mana. It expands mana capacity, strengthens Mana Soul recovery, and converts extra mana consumption into stronger skill effects and growth.";
+                rune.tier1Effect = "Max Mana increased by 200.";
+                rune.tier2Effect = "Mana regeneration speed increased by 150%.";
+                rune.tier3Effect = "When you kill a monster, an additional Mana Soul drops. If Mana Soul recovery overflows your mana, the overflow is converted into Mana Overflow. Mana Overflow is capped at 200% of your max mana.";
+                rune.tier4Effect = "When you cast a skill, additionally consume up to 20% of your max mana from Mana Overflow first, then normal mana. Based on the actual extra consumed ratio, that skill's core effect is strengthened up to its own configured cap. This can trigger once per skill cast.";
+                rune.tier5Effect = "Gain all-stat bonuses based on max mana. Every 10 max mana counts as 1 Mana Attribute. All stats except HP and MP are increased by 10% of that Mana Attribute value, affected by Mana Conversion Efficiency and rounded down.";
+                rune.setBonusEffect = "Mana Ascension. Mana Soul recovery becomes 400% of its original value, Mana Overflow cap is increased to 300% of max mana, and each elite monster or Boss kill permanently increases Mana Conversion Efficiency by 10%, up to 300%.";
                 break;
 
             case RuneType.Thorn:
                 rune.runeId = 104;
-                rune.runeName = "荆棘符文";
-                rune.description = "由痛苦与反击意志凝结而成的符文，降低承伤并把承受的攻击转化为反击力量。";
-                rune.tier1Effect = "受到的伤害降低 15%。";
-                rune.tier2Effect = "受到怪物攻击时，对攻击者造成自身全属性总和 15% 的荆棘伤害。";
-                rune.tier3Effect = "该技能首次造成伤害时，额外附加荆棘伤害 150% 的伤害，每次释放最多触发 1 次。";
-                rune.tier4Effect = "受到怪物攻击时，自动触发一次镶嵌技能的荆棘反击，无视冷却和消耗，但有 4 秒触发间隔。";
-                rune.tier5Effect = "荆棘伤害提高 100%。";
-                rune.setBonusEffect = "1 件减伤改为 35%；2 件荆棘伤害改为全属性总和 40%；3 件附加伤害改为荆棘伤害 300%；4 件触发间隔缩短到 2 秒；5 件每次击杀 Boss 使荆棘效能永久提高 15%。";
+                rune.runeName = "Thorn Rune";
+                rune.description = "A rune born from pain and the will to counterattack. It reduces incoming damage and converts attacks received into retaliatory power.";
+                rune.tier1Effect = "Monster damage taken is reduced by 25%.";
+                rune.tier2Effect = "When hit by a monster, deal Thorn damage to the attacker. Base Thorn damage is (10% of max HP + Physical Attack + Physical Defense + Special Attack + Special Defense + Speed + Luck) x 30%.";
+                rune.tier3Effect = "Thorn damage increased by 100%.";
+                rune.tier4Effect = "After casting a skill, the first time that skill deals damage, add bonus damage equal to 150% of your current Thorn damage. This can trigger once per skill cast.";
+                rune.tier5Effect = "When hit by a monster, automatically release Thorn Counter. Thorn Counter creates a thorn burst centered on you, damages enemies in range for 300% of your current Thorn damage, always includes the attacker, has its own cooldown, and does not trigger other auto-cast effects.";
+                rune.setBonusEffect = "Pain Backlash. Thorn damage is additionally increased by 100%, Thorn Counter cooldown is reduced to 2 seconds, and each elite monster or Boss kill permanently increases Thorn Efficiency by 10%, up to 300%.";
                 break;
 
             case RuneType.Luck:
                 rune.runeId = 105;
-                rune.runeName = "幸运符文";
-                rune.description = "由命运气息凝结而成的符文，提高魂的获取效率，并把偶然收益转化为长期成长。";
-                rune.tier1Effect = "幸运值提高 1。";
-                rune.tier2Effect = "怪物掉落属性魂时，有 20% 概率使该属性魂点数提高 1，最高不超过 5。";
-                rune.tier3Effect = "击杀怪物时，有 15% 概率额外掉落 1 个随机属性魂。";
-                rune.tier4Effect = "拾取任意魂时，有 10% 概率额外复制 1 个同类型魂，复制魂默认 1 点。";
-                rune.tier5Effect = "击杀 Boss 时，额外掉落 2 个随机属性魂。";
-                rune.setBonusEffect = "1 件幸运提高改为 3；2 件属性魂提点概率改为 35%；3 件额外属性魂概率改为 25%；4 件复制概率改为 25% 且复制魂点数改为 3；5 件每次击杀 Boss 使幸运效能永久提高 5%。";
+                rune.runeName = "Luck Rune";
+                rune.description = "A rune condensed from the breath of fate. It improves Soul acquisition efficiency and turns chance-based combat rewards into long-term growth.";
+                rune.tier1Effect = "Luck increased by 5.";
+                rune.tier2Effect = "When a monster drops an Attribute Soul, there is a 30% chance to increase that Soul's point value by 1, up to a maximum of 5.";
+                rune.tier3Effect = "When you kill a monster, there is a 25% chance to drop 1 additional random Attribute Soul.";
+                rune.tier4Effect = "When you pick up any Soul, there is a 20% chance to copy 1 Soul of the same type. The copied Soul has a fixed value of 2 points.";
+                rune.tier5Effect = "When you kill an elite monster or Boss, drop 5 additional random Attribute Souls.";
+                rune.setBonusEffect = "Fate's Favor. All Luck Rune probability effects have their base trigger rates multiplied by 1.5. Each elite monster or Boss kill permanently increases Luck Efficiency by 10%, up to 500%.";
                 break;
         }
 

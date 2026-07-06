@@ -27,7 +27,7 @@ public static class MonsterCombatAutoSetup
             identity.rank = forcedRank ?? ResolveRank(identity.species);
         }
 
-        identity.attackStyle = ResolveAttackStyle(identity.rank);
+        identity.attackStyle = ResolveAttackStyle(identity);
 
         SyncExistingStats(monster, identity);
         EnsureRuntimeComponents(monster);
@@ -49,8 +49,14 @@ public static class MonsterCombatAutoSetup
         return species == MonsterSpecies.RainbowSlime ? MonsterRank.Boss : MonsterRank.Normal;
     }
 
-    private static MonsterAttackStyle ResolveAttackStyle(MonsterRank rank)
+    private static MonsterAttackStyle ResolveAttackStyle(MonsterIdentity identity)
     {
+        if (identity != null && IsSlimeSpecies(identity.species))
+        {
+            return MonsterAttackStyle.Melee;
+        }
+
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
         if (rank == MonsterRank.Boss)
         {
             return MonsterAttackStyle.ElementalBoss;
@@ -82,22 +88,39 @@ public static class MonsterCombatAutoSetup
         float specialDefense = Mathf.Max(0f, stats.specialDefense);
         float speed = Mathf.Max(0.1f, stats.speed);
         float luck = Mathf.Max(0f, stats.luck);
-        float moveSpeed = ResolveMoveSpeed(identity, speed);
-        float range = 1.35f;
-        float hitRange = 1.6f;
-        float cooldown = 1.1f;
+        float range = 1.2f;
+        float hitRange = 1.25f;
+        float cooldown = 1.35f;
 
         if (identity.rank == MonsterRank.Elite)
         {
-            range = 5f;
-            hitRange = 6f;
-            cooldown = 1.6f;
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.35f;
+                hitRange = 1.45f;
+                cooldown = 1.45f;
+            }
+            else
+            {
+                range = 5f;
+                hitRange = 6f;
+                cooldown = 1.6f;
+            }
         }
         else if (identity.rank == MonsterRank.Boss)
         {
-            range = 8f;
-            hitRange = 8f;
-            cooldown = 2.2f;
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.6f;
+                hitRange = 1.8f;
+                cooldown = 1.5f;
+            }
+            else
+            {
+                range = 8f;
+                hitRange = 8f;
+                cooldown = 2.2f;
+            }
         }
 
         ApplyStatVariance(monster, ref maxHealth, ref physicalAttack, ref specialAttack, ref physicalDefense, ref specialDefense, ref speed);
@@ -135,9 +158,10 @@ public static class MonsterCombatAutoSetup
         EnemyController controller = monster.GetComponent<EnemyController>();
         if (controller != null)
         {
+            float baseMoveSpeed = controller.BaseMoveSpeed > 0f ? controller.BaseMoveSpeed : ResolveMoveSpeed(identity, speed);
             BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
             float attackPower = damageType == BattleDamageType.Physical ? physicalAttack : specialAttack;
-            controller.ConfigureRuntime(moveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
+            controller.ConfigureRuntime(baseMoveSpeed, 0.8f, range, hitRange, cooldown, attackPower, identity.attackStyle);
         }
     }
 
@@ -159,8 +183,15 @@ public static class MonsterCombatAutoSetup
 
     private static float ResolveMoveSpeed(MonsterIdentity identity, float statSpeed)
     {
+        if (statSpeed > 0f)
+        {
+            return Mathf.Max(0.1f, statSpeed);
+        }
+
         switch (identity.species)
         {
+            case MonsterSpecies.BlueSlime:
+                return 2.2f;
             case MonsterSpecies.GreenSlime:
                 return 2.9f;
             case MonsterSpecies.LavaSlime:
@@ -182,11 +213,25 @@ public static class MonsterCombatAutoSetup
         }
     }
 
+    private static bool IsSlimeSpecies(MonsterSpecies species)
+    {
+        return species == MonsterSpecies.BlueSlime ||
+               species == MonsterSpecies.GreenSlime ||
+               species == MonsterSpecies.LavaSlime ||
+               species == MonsterSpecies.PoisonSlime ||
+               species == MonsterSpecies.RainbowSlime;
+    }
+
     private static void EnsureRuntimeComponents(GameObject monster)
     {
         if (monster.GetComponent<WorldHealthBar>() == null)
         {
             monster.AddComponent<WorldHealthBar>();
+        }
+
+        if (monster.GetComponent<EliteSlimeSplitOnDeath>() == null)
+        {
+            monster.AddComponent<EliteSlimeSplitOnDeath>();
         }
     }
 

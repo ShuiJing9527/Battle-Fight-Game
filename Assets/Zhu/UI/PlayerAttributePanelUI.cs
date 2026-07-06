@@ -9,6 +9,70 @@ public class PlayerAttributePanelUI : MonoBehaviour
 {
     private static PlayerAttributePanelUI primaryInstance;
 
+    [System.Serializable]
+    private enum PreviewExtraVisualSortMode
+    {
+        KeepSource,
+        BehindCharacter,
+        InFrontOfCharacter
+    }
+
+    [System.Serializable]
+    private enum PreviewExtraVisualTransformMode
+    {
+        RelativeToSource,
+        ManualLocalToPreviewRoot
+    }
+
+    [System.Serializable]
+    private class PreviewExtraVisualBinding
+    {
+        public Transform source;
+        public string previewName;
+        public PreviewExtraVisualTransformMode transformMode = PreviewExtraVisualTransformMode.RelativeToSource;
+        public bool followPosition = true;
+        public bool followRotation = true;
+        public bool followScale = true;
+        public Vector3 localPositionOffset;
+        public Vector3 localEulerOffset;
+        public Vector3 localScaleMultiplier = Vector3.one;
+        public PreviewExtraVisualSortMode sortMode = PreviewExtraVisualSortMode.KeepSource;
+        public int sortingOrderOffset;
+        public float previewAlphaMultiplier = 1f;
+        public float previewColorIntensityMultiplier = 1f;
+        public bool overridePreviewColor = false;
+        public Color previewColorTint = Color.white;
+        public float previewEmissionMultiplier = 1f;
+        public bool keepMonoBehaviours = false;
+        public string[] keepMonoBehaviourTypeNames;
+        public bool usePreviewRotationDriver = false;
+        public Vector3 previewRotationSpeedEuler;
+    }
+
+    private sealed class PreviewExtraVisualRuntime
+    {
+        public PreviewExtraVisualBinding binding;
+        public Transform sourceCharacterRoot;
+        public Transform sourceVisualRoot;
+        public Transform previewVisualRoot;
+        public Transform previewTransform;
+        public int sourceCharacterMinSortingOrder;
+        public int sourceCharacterMaxSortingOrder;
+        public int previewCharacterMinSortingOrder;
+        public int previewCharacterMaxSortingOrder;
+        public int previewCharacterSortingLayerId;
+        public Vector3 initialLocalPosition;
+        public Quaternion initialLocalRotation;
+        public Vector3 initialLocalScale;
+        public float materialPreviewTime;
+        public readonly List<Material> timeDrivenMaterials = new List<Material>();
+        public bool warnedMissingRenderer;
+        public bool warnedMissingMaterial;
+        public bool warnedMissingShaderTimeProperty;
+        public bool loggedMaterialDiagnostics;
+        public Vector3 previewRotationEuler;
+    }
+
     private struct AttributeBaseSnapshot
     {
         public bool initialized;
@@ -55,6 +119,9 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private Vector3 player02WorldPreviewEuler = Vector3.zero;
     [SerializeField] private string player01PreviewIdleAnimationName = "Idle";
     [SerializeField] private string player02PreviewIdleAnimationName = "idle";
+    [Header("Extra Preview Visuals")]
+    [SerializeField] private List<PreviewExtraVisualBinding> player01ExtraPreviewVisuals = new List<PreviewExtraVisualBinding>();
+    [SerializeField] private List<PreviewExtraVisualBinding> player02ExtraPreviewVisuals = new List<PreviewExtraVisualBinding>();
     [Header("Legacy UI Preview Fallback")]
     [SerializeField] private GameObject player01PreviewPrefab;
     [SerializeField] private GameObject player02PreviewPrefab;
@@ -161,6 +228,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private string currentPreviewAnimationKey;
     private bool warnedMissingPreviewIdleAnimation;
     private int previewLayerIndex = -1;
+    private Transform previewExtraVisualRoot;
+    private readonly List<PreviewExtraVisualRuntime> previewExtraVisuals = new List<PreviewExtraVisualRuntime>();
     private readonly Dictionary<int, AttributeBaseSnapshot> attributeBaseSnapshots = new Dictionary<int, AttributeBaseSnapshot>();
 
     public bool IsPanelOpen => isVisible;
@@ -262,6 +331,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             nextRefreshTime = Time.unscaledTime + refreshInterval;
         }
 
+        UpdatePreviewExtraVisualsUnscaled(Time.unscaledDeltaTime);
         UpdatePreviewAnimationUnscaled(Time.unscaledDeltaTime);
     }
 
@@ -272,6 +342,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
+        SyncPreviewExtraVisualTransforms();
         RenderPreviewCameraIfNeeded();
     }
 
@@ -988,6 +1059,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             panelRoot.gameObject.SetActive(false);
         }
 
+        ClearPreviewInstance();
         SetPreviewVisible(false);
         isVisible = false;
         RestoreTimeScaleIfNeeded();
@@ -1016,6 +1088,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             panelRoot.gameObject.SetActive(false);
         }
 
+        ClearPreviewInstance();
         SetPreviewVisible(false);
     }
 
@@ -1430,7 +1503,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
         return preview != null
             ? preview.GetExtraSoulDropChanceForLuck(luck)
-            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.01f, 0f, 0.5f);
+            : Mathf.Max(0f, luck - 1f) * 0.025f;
     }
 
     private float ResolveExtraRuneDropChance(float luck)
@@ -1438,7 +1511,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         RuntimeLootDropOnDeath preview = ResolveLootDropPreview();
         return preview != null
             ? preview.GetExtraRuneDropChanceForLuck(luck)
-            : Mathf.Clamp(Mathf.Max(0f, luck) * 0.005f, 0f, 0.3f);
+            : Mathf.Max(0f, luck - 1f) * 0.03f;
     }
 
     private RuntimeLootDropOnDeath ResolveLootDropPreview()
@@ -1752,6 +1825,14 @@ public class PlayerAttributePanelUI : MonoBehaviour
             ApplyPreviewTransform(previewInstance.transform, useWorldPreview);
             if (useWorldPreview)
             {
+                RefreshPreviewExtraVisuals(forceRebuild: false);
+            }
+            else
+            {
+                ClearPreviewExtraVisualClones();
+            }
+            if (useWorldPreview)
+            {
                 PrepareWorldPreviewRenderChain(previewInstance);
             }
 
@@ -1780,6 +1861,14 @@ public class PlayerAttributePanelUI : MonoBehaviour
         previewInstance.name = targetPreviewPrefab.name + "_Preview";
         previewSkeletonAnimation = previewInstance.GetComponentInChildren<SkeletonAnimation>(true);
         ApplyPreviewTransform(previewInstance.transform, useWorldPreview);
+        if (useWorldPreview)
+        {
+            RefreshPreviewExtraVisuals(forceRebuild: true);
+        }
+        else
+        {
+            ClearPreviewExtraVisualClones();
+        }
         if (useWorldPreview)
         {
             PrepareWorldPreviewRenderChain(previewInstance);
@@ -1939,6 +2028,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void ClearPreviewInstance()
     {
+        ClearPreviewExtraVisualClones();
+
         if (previewInstance != null)
         {
             Destroy(previewInstance);
@@ -1947,7 +2038,1131 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         previewSkeletonAnimation = null;
         currentPreviewAnimationKey = null;
+        previewExtraVisualRoot = null;
         SetPreviewVisible(false);
+    }
+
+    private void RefreshPreviewExtraVisuals(bool forceRebuild)
+    {
+        if (previewInstance == null)
+        {
+            ClearPreviewExtraVisualClones();
+            return;
+        }
+
+        List<PreviewExtraVisualBinding> bindings = ResolveCurrentExtraPreviewVisualBindings();
+        if (bindings == null || bindings.Count == 0)
+        {
+            ClearPreviewExtraVisualClones();
+            return;
+        }
+
+        bool needsRebuild = forceRebuild ||
+                            previewExtraVisualRoot == null ||
+                            previewExtraVisualRoot.parent != previewInstance.transform ||
+                            previewExtraVisuals.Count != bindings.Count;
+
+        if (!needsRebuild)
+        {
+            for (int i = 0; i < previewExtraVisuals.Count; i++)
+            {
+                PreviewExtraVisualRuntime runtime = previewExtraVisuals[i];
+                if (runtime == null ||
+                    runtime.binding != bindings[i] ||
+                    runtime.previewTransform == null)
+                {
+                    needsRebuild = true;
+                    break;
+                }
+            }
+        }
+
+        if (needsRebuild)
+        {
+            RebuildPreviewExtraVisuals(bindings);
+        }
+
+        SyncPreviewExtraVisualTransforms();
+    }
+
+    private List<PreviewExtraVisualBinding> ResolveCurrentExtraPreviewVisualBindings()
+    {
+        switch (currentPreviewPlayerIndex)
+        {
+            case 1:
+                return player01ExtraPreviewVisuals;
+            case 2:
+                return player02ExtraPreviewVisuals;
+            default:
+                return null;
+        }
+    }
+
+    private void RebuildPreviewExtraVisuals(List<PreviewExtraVisualBinding> bindings)
+    {
+        ClearPreviewExtraVisualClones();
+        if (previewInstance == null || bindings == null || bindings.Count == 0)
+        {
+            return;
+        }
+
+        previewExtraVisualRoot = new GameObject("ExtraPreviewVisuals").transform;
+        previewExtraVisualRoot.SetParent(previewInstance.transform, false);
+        previewExtraVisualRoot.localPosition = Vector3.zero;
+        previewExtraVisualRoot.localRotation = Quaternion.identity;
+        previewExtraVisualRoot.localScale = Vector3.one;
+
+        for (int i = 0; i < bindings.Count; i++)
+        {
+            PreviewExtraVisualBinding binding = bindings[i];
+            if (binding == null || binding.source == null)
+            {
+                continue;
+            }
+
+            GameObject clone = Instantiate(binding.source.gameObject, previewExtraVisualRoot, false);
+            clone.name = string.IsNullOrWhiteSpace(binding.previewName) ? binding.source.name : binding.previewName;
+            ApplyPreviewLayer(clone);
+
+            previewExtraVisuals.Add(new PreviewExtraVisualRuntime
+            {
+                binding = binding,
+                sourceCharacterRoot = ResolvePreviewExtraSourceCharacterRoot(binding.source),
+                sourceVisualRoot = ResolvePreviewExtraSourceVisualRoot(binding.source),
+                previewVisualRoot = ResolvePreviewVisualRoot(),
+                previewTransform = clone.transform,
+                initialLocalPosition = clone.transform.localPosition,
+                initialLocalRotation = clone.transform.localRotation,
+                initialLocalScale = clone.transform.localScale
+            });
+
+            PreviewExtraVisualRuntime runtime = previewExtraVisuals[previewExtraVisuals.Count - 1];
+            CachePreviewExtraVisualSorting(runtime);
+            StripNonPreviewVisualComponents(clone.transform, runtime);
+            EnsurePreviewExtraVisualBehaviours(runtime);
+            RemapPreviewExtraVisualReferences(runtime);
+            ApplyPreviewExtraVisualSorting(runtime);
+        }
+    }
+
+    private void SyncPreviewExtraVisualTransforms()
+    {
+        for (int i = 0; i < previewExtraVisuals.Count; i++)
+        {
+            PreviewExtraVisualRuntime runtime = previewExtraVisuals[i];
+            if (runtime == null || runtime.binding == null || runtime.previewTransform == null || runtime.binding.source == null)
+            {
+                continue;
+            }
+
+            ApplyPreviewExtraVisualTransform(runtime);
+            ApplyPreviewLayer(runtime.previewTransform.gameObject);
+            ApplyPreviewExtraVisualSorting(runtime);
+        }
+    }
+
+    private void ApplyPreviewExtraVisualTransform(PreviewExtraVisualRuntime runtime)
+    {
+        PreviewExtraVisualBinding binding = runtime.binding;
+        Transform source = binding.source;
+        Transform sourceVisualRoot = runtime.sourceVisualRoot;
+        Transform previewVisualRoot = runtime.previewVisualRoot;
+        Transform previewTransform = runtime.previewTransform;
+        Transform previewParent = previewTransform.parent;
+        if (source == null || previewTransform == null || previewParent == null)
+        {
+            return;
+        }
+
+        Vector3 localPosition = runtime.initialLocalPosition;
+        Quaternion localRotation = runtime.initialLocalRotation;
+        Vector3 localScale = runtime.initialLocalScale;
+
+        if (binding.transformMode == PreviewExtraVisualTransformMode.RelativeToSource &&
+            sourceVisualRoot != null &&
+            previewVisualRoot != null)
+        {
+            Matrix4x4 sourceRelativeMatrix = sourceVisualRoot.worldToLocalMatrix * source.localToWorldMatrix;
+            Matrix4x4 previewWorldMatrix = previewVisualRoot.localToWorldMatrix * sourceRelativeMatrix;
+            Matrix4x4 previewLocalMatrix = previewParent.worldToLocalMatrix * previewWorldMatrix;
+            DecomposeMatrix(previewLocalMatrix, out localPosition, out localRotation, out localScale);
+        }
+        else if (binding.transformMode == PreviewExtraVisualTransformMode.RelativeToSource)
+        {
+            localPosition = source.localPosition;
+            localRotation = source.localRotation;
+            localScale = source.localScale;
+        }
+
+        if (binding.transformMode == PreviewExtraVisualTransformMode.ManualLocalToPreviewRoot)
+        {
+            previewTransform.localPosition = binding.localPositionOffset;
+            Quaternion manualRotation = Quaternion.Euler(binding.localEulerOffset);
+            if (binding.usePreviewRotationDriver)
+            {
+                manualRotation *= Quaternion.Euler(runtime.previewRotationEuler);
+            }
+
+            previewTransform.localRotation = manualRotation;
+            previewTransform.localScale = Vector3.Scale(runtime.initialLocalScale, binding.localScaleMultiplier);
+            return;
+        }
+
+        Vector3 positionBase = binding.followPosition ? localPosition : runtime.initialLocalPosition;
+        Quaternion rotationBase = binding.followRotation ? localRotation : runtime.initialLocalRotation;
+        Vector3 scaleBase = binding.followScale ? localScale : runtime.initialLocalScale;
+
+        previewTransform.localPosition = positionBase + binding.localPositionOffset;
+        previewTransform.localRotation = rotationBase * Quaternion.Euler(binding.localEulerOffset);
+        previewTransform.localScale = Vector3.Scale(scaleBase, binding.localScaleMultiplier);
+    }
+
+    private Transform ResolvePreviewExtraSourceCharacterRoot(Transform source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        if (cachedPlayer != null)
+        {
+            Transform playerRoot = cachedPlayer.transform;
+            if (source == playerRoot || source.IsChildOf(playerRoot))
+            {
+                return playerRoot;
+            }
+        }
+
+        return source.root;
+    }
+
+    private Transform ResolvePreviewExtraSourceVisualRoot(Transform source)
+    {
+        Transform sourceCharacterRoot = ResolvePreviewExtraSourceCharacterRoot(source);
+        if (sourceCharacterRoot == null)
+        {
+            return source != null ? source.root : null;
+        }
+
+        SkeletonAnimation sourceSkeleton = sourceCharacterRoot.GetComponentInChildren<SkeletonAnimation>(true);
+        if (sourceSkeleton != null)
+        {
+            return sourceSkeleton.transform;
+        }
+
+        Renderer renderer = sourceCharacterRoot.GetComponentInChildren<Renderer>(true);
+        if (renderer != null)
+        {
+            return renderer.transform;
+        }
+
+        return sourceCharacterRoot;
+    }
+
+    private Transform ResolvePreviewVisualRoot()
+    {
+        if (previewSkeletonAnimation != null)
+        {
+            return previewSkeletonAnimation.transform;
+        }
+
+        if (previewInstance == null)
+        {
+            return null;
+        }
+
+        SkeletonAnimation skeletonAnimation = previewInstance.GetComponentInChildren<SkeletonAnimation>(true);
+        if (skeletonAnimation != null)
+        {
+            return skeletonAnimation.transform;
+        }
+
+        Renderer renderer = previewInstance.GetComponentInChildren<Renderer>(true);
+        if (renderer != null)
+        {
+            return renderer.transform;
+        }
+
+        return previewInstance.transform;
+    }
+
+    private void ClearPreviewExtraVisualClones()
+    {
+        for (int i = 0; i < previewExtraVisuals.Count; i++)
+        {
+            PreviewExtraVisualRuntime runtime = previewExtraVisuals[i];
+            if (runtime != null && runtime.previewTransform != null)
+            {
+                Destroy(runtime.previewTransform.gameObject);
+            }
+        }
+
+        previewExtraVisuals.Clear();
+
+        if (previewExtraVisualRoot != null)
+        {
+            Destroy(previewExtraVisualRoot.gameObject);
+            previewExtraVisualRoot = null;
+        }
+    }
+
+    private void StripNonPreviewVisualComponents(Transform root, PreviewExtraVisualRuntime runtime)
+    {
+        if (root == null)
+        {
+            return;
+        }
+
+        Component[] components = root.GetComponents<Component>();
+        for (int i = 0; i < components.Length; i++)
+        {
+            Component component = components[i];
+            if (component == null || component is Transform)
+            {
+                continue;
+            }
+
+            if (IsAllowedPreviewVisualComponent(component, runtime))
+            {
+                continue;
+            }
+
+            Object.Destroy(component);
+        }
+
+        for (int i = 0; i < root.childCount; i++)
+        {
+            StripNonPreviewVisualComponents(root.GetChild(i), runtime);
+        }
+    }
+
+    private bool IsAllowedPreviewVisualComponent(Component component, PreviewExtraVisualRuntime runtime)
+    {
+        if (component is MonoBehaviour monoBehaviour)
+        {
+            return ShouldKeepPreviewExtraMonoBehaviour(monoBehaviour, runtime != null ? runtime.binding : null);
+        }
+
+        return component is SkeletonAnimation ||
+               component is SkeletonRenderer ||
+               component is SkeletonMecanim ||
+               component is Renderer ||
+               component is MeshFilter ||
+               component is ParticleSystem ||
+               component is ParticleSystemRenderer ||
+               component is TrailRenderer ||
+               component is LineRenderer ||
+               component is Animator ||
+               component is Animation;
+    }
+
+    private bool ShouldKeepPreviewExtraMonoBehaviour(MonoBehaviour monoBehaviour, PreviewExtraVisualBinding binding)
+    {
+        if (monoBehaviour == null)
+        {
+            return false;
+        }
+
+        if (binding != null &&
+            binding.usePreviewRotationDriver &&
+            monoBehaviour is Player2HaloRotateEffect)
+        {
+            return false;
+        }
+
+        if (binding != null && binding.keepMonoBehaviours)
+        {
+            return true;
+        }
+
+        string typeName = monoBehaviour.GetType().Name;
+        if (IsKnownPreviewSafeMonoBehaviourType(typeName))
+        {
+            return true;
+        }
+
+        if (binding == null || binding.keepMonoBehaviourTypeNames == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < binding.keepMonoBehaviourTypeNames.Length; i++)
+        {
+            string keepTypeName = binding.keepMonoBehaviourTypeNames[i];
+            if (string.IsNullOrWhiteSpace(keepTypeName))
+            {
+                continue;
+            }
+
+            if (string.Equals(typeName, keepTypeName, System.StringComparison.Ordinal) ||
+                string.Equals(monoBehaviour.GetType().FullName, keepTypeName, System.StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsKnownPreviewSafeMonoBehaviourType(string typeName)
+    {
+        return typeName == nameof(Player2HaloRotateEffect) ||
+               typeName == nameof(EyeFireHorizontalRotationController) ||
+               typeName == nameof(ForceRendererSortingOrder);
+    }
+
+    private void CachePreviewExtraVisualSorting(PreviewExtraVisualRuntime runtime)
+    {
+        if (runtime == null)
+        {
+            return;
+        }
+
+        Transform sourceCharacterRoot = runtime.sourceCharacterRoot;
+        Transform previewRoot = previewInstance != null ? previewInstance.transform : null;
+
+        GetSortingOrderRange(sourceCharacterRoot, null, out runtime.sourceCharacterMinSortingOrder, out runtime.sourceCharacterMaxSortingOrder, out _);
+        GetSortingOrderRange(previewRoot, runtime.previewTransform, out runtime.previewCharacterMinSortingOrder, out runtime.previewCharacterMaxSortingOrder, out runtime.previewCharacterSortingLayerId);
+    }
+
+    private static void GetSortingOrderRange(Transform root, Transform excludedSubtree, out int minOrder, out int maxOrder, out int primarySortingLayerId)
+    {
+        minOrder = 0;
+        maxOrder = 0;
+        primarySortingLayerId = 0;
+        if (root == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = root.GetComponentsInChildren<Renderer>(true);
+        bool found = false;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            if (excludedSubtree != null && renderer.transform.IsChildOf(excludedSubtree))
+            {
+                continue;
+            }
+
+            if (!found)
+            {
+                minOrder = renderer.sortingOrder;
+                maxOrder = renderer.sortingOrder;
+                primarySortingLayerId = renderer.sortingLayerID;
+                found = true;
+                continue;
+            }
+
+            minOrder = Mathf.Min(minOrder, renderer.sortingOrder);
+            maxOrder = Mathf.Max(maxOrder, renderer.sortingOrder);
+        }
+    }
+
+    private void ApplyPreviewExtraVisualSorting(PreviewExtraVisualRuntime runtime)
+    {
+        if (runtime == null || runtime.binding == null || runtime.previewTransform == null)
+        {
+            return;
+        }
+
+        Renderer[] renderers = runtime.previewTransform.GetComponentsInChildren<Renderer>(true);
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            int targetSortingLayerId = renderer.sortingLayerID;
+            int targetSortingOrder = renderer.sortingOrder;
+            switch (runtime.binding.sortMode)
+            {
+                case PreviewExtraVisualSortMode.BehindCharacter:
+                    targetSortingLayerId = runtime.previewCharacterSortingLayerId;
+                    targetSortingOrder = runtime.previewCharacterMinSortingOrder + runtime.binding.sortingOrderOffset;
+                    break;
+                case PreviewExtraVisualSortMode.InFrontOfCharacter:
+                    targetSortingLayerId = runtime.previewCharacterSortingLayerId;
+                    targetSortingOrder = runtime.previewCharacterMaxSortingOrder + runtime.binding.sortingOrderOffset;
+                    break;
+                default:
+                    ResolveSourceRendererSorting(runtime, renderer, out targetSortingLayerId, out targetSortingOrder);
+                    targetSortingOrder += runtime.binding.sortingOrderOffset;
+                    break;
+            }
+
+            renderer.sortingLayerID = targetSortingLayerId;
+            renderer.sortingOrder = targetSortingOrder;
+        }
+    }
+
+    private void ResolveSourceRendererSorting(PreviewExtraVisualRuntime runtime, Renderer previewRenderer, out int sortingLayerId, out int sortingOrder)
+    {
+        sortingLayerId = previewRenderer != null ? previewRenderer.sortingLayerID : 0;
+        sortingOrder = previewRenderer != null ? previewRenderer.sortingOrder : 0;
+        if (runtime == null || runtime.binding == null || runtime.binding.source == null || previewRenderer == null)
+        {
+            return;
+        }
+
+        string relativePath = GetRelativeTransformPath(runtime.previewTransform, previewRenderer.transform);
+        Transform sourceTransform = string.IsNullOrEmpty(relativePath)
+            ? runtime.binding.source
+            : runtime.binding.source.Find(relativePath);
+        if (sourceTransform == null)
+        {
+            return;
+        }
+
+        Renderer sourceRenderer = sourceTransform.GetComponent(previewRenderer.GetType()) as Renderer;
+        if (sourceRenderer == null)
+        {
+            sourceRenderer = sourceTransform.GetComponent<Renderer>();
+        }
+
+        if (sourceRenderer == null)
+        {
+            return;
+        }
+
+        sortingLayerId = sourceRenderer.sortingLayerID;
+        sortingOrder = sourceRenderer.sortingOrder;
+    }
+
+    private void RemapPreviewExtraVisualReferences(PreviewExtraVisualRuntime runtime)
+    {
+        if (runtime == null || runtime.previewTransform == null)
+        {
+            return;
+        }
+
+        runtime.timeDrivenMaterials.Clear();
+        ParticleSystem[] particleSystems = runtime.previewTransform.GetComponentsInChildren<ParticleSystem>(true);
+        for (int i = 0; i < particleSystems.Length; i++)
+        {
+            ParticleSystem particleSystem = particleSystems[i];
+            if (particleSystem == null)
+            {
+                continue;
+            }
+
+            ParticleSystem.MainModule main = particleSystem.main;
+            main.useUnscaledTime = true;
+            particleSystem.Play(true);
+        }
+
+        Renderer[] renderers = runtime.previewTransform.GetComponentsInChildren<Renderer>(true);
+        if (renderers == null || renderers.Length == 0)
+        {
+            if (!runtime.warnedMissingRenderer)
+            {
+                Debug.LogWarning("[PlayerAttributePanelUI] Extra preview visual has no renderer: " +
+                                 (runtime.binding != null && runtime.binding.source != null ? runtime.binding.source.name : "null"));
+                runtime.warnedMissingRenderer = true;
+            }
+        }
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null)
+            {
+                continue;
+            }
+
+            Material[] rendererMaterials = renderer.materials;
+            if (rendererMaterials == null || rendererMaterials.Length == 0)
+            {
+                if (!runtime.warnedMissingMaterial)
+                {
+                    Debug.LogWarning("[PlayerAttributePanelUI] Extra preview visual renderer is missing material: " + renderer.name, renderer);
+                    runtime.warnedMissingMaterial = true;
+                }
+
+                continue;
+            }
+
+            bool foundTimePropertyOnRenderer = false;
+            for (int m = 0; m < rendererMaterials.Length; m++)
+            {
+                Material material = rendererMaterials[m];
+                if (material == null)
+                {
+                    continue;
+                }
+
+                if (!runtime.loggedMaterialDiagnostics && ShouldLogPreviewMaterialDiagnostics(runtime, renderer))
+                {
+                    LogPreviewMaterialDiagnostics(runtime, renderer, material, m);
+                }
+
+                ApplyPreviewMaterialEnhancement(material, runtime.binding);
+
+                if (HasPreviewTimeProperty(material))
+                {
+                    runtime.timeDrivenMaterials.Add(material);
+                    foundTimePropertyOnRenderer = true;
+                }
+            }
+
+            if (!foundTimePropertyOnRenderer &&
+                currentPreviewPlayerIndex == 1 &&
+                !runtime.warnedMissingShaderTimeProperty)
+            {
+                Debug.LogWarning("[PlayerAttributePanelUI] Extra preview visual material has no exposed preview time property. " +
+                                 "If Player01 flame uses Shader Graph time animation, expose a float like _PreviewTime on the material and drive that in the graph.",
+                                 renderer);
+                runtime.warnedMissingShaderTimeProperty = true;
+            }
+        }
+
+        if (!runtime.loggedMaterialDiagnostics && ShouldLogPreviewMaterialDiagnostics(runtime, null))
+        {
+            runtime.loggedMaterialDiagnostics = true;
+        }
+
+        Animator[] animators = runtime.previewTransform.GetComponentsInChildren<Animator>(true);
+        for (int i = 0; i < animators.Length; i++)
+        {
+            if (animators[i] != null)
+            {
+                animators[i].updateMode = AnimatorUpdateMode.UnscaledTime;
+            }
+        }
+
+        MonoBehaviour[] behaviours = runtime.previewTransform.GetComponentsInChildren<MonoBehaviour>(true);
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            MonoBehaviour behaviour = behaviours[i];
+            if (behaviour == null)
+            {
+                continue;
+            }
+
+            if (behaviour is Player2HaloRotateEffect haloRotateEffect)
+            {
+                RemapHaloRotateEffect(haloRotateEffect, runtime);
+                continue;
+            }
+
+            if (behaviour is EyeFireHorizontalRotationController eyeFireController)
+            {
+                eyeFireController.Reinitialize();
+                continue;
+            }
+
+            if (behaviour is ForceRendererSortingOrder forceRendererSortingOrder)
+            {
+                InvokeIfExists(forceRendererSortingOrder, "OnEnable");
+            }
+        }
+    }
+
+    private void EnsurePreviewExtraVisualBehaviours(PreviewExtraVisualRuntime runtime)
+    {
+        if (runtime == null || runtime.binding == null || runtime.previewTransform == null)
+        {
+            return;
+        }
+
+        ApplyPreviewLayer(runtime.previewTransform.gameObject);
+    }
+
+    private void RemapHaloRotateEffect(Player2HaloRotateEffect haloRotateEffect, PreviewExtraVisualRuntime runtime)
+    {
+        if (haloRotateEffect == null)
+        {
+            return;
+        }
+
+        SetFieldValue(haloRotateEffect, "spineTarget", previewSkeletonAnimation);
+        SetFieldValue(haloRotateEffect, "unscaledTime", true);
+        SetFieldValue(haloRotateEffect, "followSpineFacingOffset", false);
+    }
+
+    private static void SetFieldValue(object target, string fieldName, object value)
+    {
+        if (target == null || string.IsNullOrEmpty(fieldName))
+        {
+            return;
+        }
+
+        System.Reflection.FieldInfo field = target.GetType().GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+        if (field == null)
+        {
+            return;
+        }
+
+        field.SetValue(target, value);
+    }
+
+    private static void InvokeIfExists(object target, string methodName)
+    {
+        if (target == null || string.IsNullOrEmpty(methodName))
+        {
+            return;
+        }
+
+        System.Reflection.MethodInfo method = target.GetType().GetMethod(methodName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+        if (method == null)
+        {
+            return;
+        }
+
+        method.Invoke(target, null);
+    }
+
+    private static void DecomposeMatrix(Matrix4x4 matrix, out Vector3 position, out Quaternion rotation, out Vector3 scale)
+    {
+        position = matrix.GetColumn(3);
+
+        Vector3 x = matrix.GetColumn(0);
+        Vector3 y = matrix.GetColumn(1);
+        Vector3 z = matrix.GetColumn(2);
+
+        scale = new Vector3(x.magnitude, y.magnitude, z.magnitude);
+
+        if (scale.x > 0f)
+        {
+            x /= scale.x;
+        }
+
+        if (scale.y > 0f)
+        {
+            y /= scale.y;
+        }
+
+        if (scale.z > 0f)
+        {
+            z /= scale.z;
+        }
+
+        rotation = Quaternion.LookRotation(z, y);
+    }
+
+    private static string GetRelativeTransformPath(Transform root, Transform target)
+    {
+        if (root == null || target == null)
+        {
+            return null;
+        }
+
+        if (root == target)
+        {
+            return string.Empty;
+        }
+
+        List<string> segments = new List<string>();
+        Transform current = target;
+        while (current != null && current != root)
+        {
+            segments.Add(current.name);
+            current = current.parent;
+        }
+
+        if (current != root)
+        {
+            return null;
+        }
+
+        segments.Reverse();
+        return string.Join("/", segments.ToArray());
+    }
+
+    private static readonly string[] PreviewTimePropertyCandidates =
+    {
+        "_PreviewTime",
+        "_UnscaledTime",
+        "_ManualTime",
+        "_CustomTime",
+        "_TimeValue",
+        "_TimeOffset"
+    };
+
+    private static readonly string[] PreviewAlphaPropertyCandidates =
+    {
+        "_Alpha",
+        "_BodyAlpha",
+        "_Opacity",
+        "_OpacityIntensity",
+        "_TintAlpha"
+    };
+
+    private static readonly string[] PreviewColorPropertyCandidates =
+    {
+        "_BaseColor",
+        "_Color",
+        "_EmissionColor",
+        "_TintColor",
+        "_MainColor",
+        "_GrayColor",
+        "_GreyColor",
+        "_BrightColor",
+        "_LightColor"
+    };
+
+    private static readonly string[] PreviewAlphaKeywordCandidates =
+    {
+        "alpha",
+        "opacity",
+        "bodyalpha",
+        "tintalpha"
+    };
+
+    private static readonly string[] PreviewIntensityKeywordCandidates =
+    {
+        "intensity",
+        "power",
+        "strength",
+        "emission"
+    };
+
+    private static readonly string[] PreviewBrightColorKeywordCandidates =
+    {
+        "bright",
+        "emission",
+        "light",
+        "highlight",
+        "亮色",
+        "亮"
+    };
+
+    private static readonly string[] PreviewGrayColorKeywordCandidates =
+    {
+        "gray",
+        "grey",
+        "灰色",
+        "灰"
+    };
+
+    private static readonly string[] PreviewGeneralColorKeywordCandidates =
+    {
+        "color",
+        "hdr",
+        "emission",
+        "bright",
+        "亮色",
+        "灰色"
+    };
+
+    private static bool HasPreviewTimeProperty(Material material)
+    {
+        if (material == null)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < PreviewTimePropertyCandidates.Length; i++)
+        {
+            if (material.HasProperty(PreviewTimePropertyCandidates[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static void ApplyPreviewTimeToMaterial(Material material, float previewTime)
+    {
+        if (material == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < PreviewTimePropertyCandidates.Length; i++)
+        {
+            string propertyName = PreviewTimePropertyCandidates[i];
+            if (!material.HasProperty(propertyName))
+            {
+                continue;
+            }
+
+            material.SetFloat(propertyName, previewTime);
+        }
+    }
+
+    private static void ApplyPreviewMaterialEnhancement(Material material, PreviewExtraVisualBinding binding)
+    {
+        if (material == null || binding == null)
+        {
+            return;
+        }
+
+        float alphaMultiplier = Mathf.Max(0f, binding.previewAlphaMultiplier);
+        float colorIntensityMultiplier = Mathf.Max(0f, binding.previewColorIntensityMultiplier);
+        float emissionMultiplier = Mathf.Max(0f, binding.previewEmissionMultiplier);
+
+        Shader shader = material.shader;
+        if (shader == null)
+        {
+            return;
+        }
+
+        bool handledPrimaryBrightColor = false;
+        bool handledPrimaryGrayColor = false;
+        bool handledPrimaryAlpha = false;
+
+        handledPrimaryBrightColor |= TryApplyPreviewColorToProperty(material, binding, "_Color", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, true, false, true);
+        handledPrimaryBrightColor |= TryApplyPreviewColorToProperty(material, binding, "_BrightColor", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, true, false, false);
+        handledPrimaryBrightColor |= TryApplyPreviewColorToProperty(material, binding, "_LightColor", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, true, false, false);
+        handledPrimaryBrightColor |= TryApplyPreviewColorToProperty(material, binding, "_EmissionColor", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, true, false, false);
+
+        handledPrimaryGrayColor |= TryApplyPreviewColorToProperty(material, binding, "_Color_1", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, false, true, true);
+        handledPrimaryGrayColor |= TryApplyPreviewColorToProperty(material, binding, "_GrayColor", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, false, true, false);
+        handledPrimaryGrayColor |= TryApplyPreviewColorToProperty(material, binding, "_GreyColor", alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, false, true, false);
+
+        handledPrimaryAlpha |= TryApplyPreviewFloatMultiplier(material, "_Alpha", alphaMultiplier);
+        handledPrimaryAlpha |= TryApplyPreviewFloatMultiplier(material, "_BodyAlpha", alphaMultiplier);
+        handledPrimaryAlpha |= TryApplyPreviewFloatMultiplier(material, "_Opacity", alphaMultiplier);
+        handledPrimaryAlpha |= TryApplyPreviewFloatMultiplier(material, "_TintAlpha", alphaMultiplier);
+
+        TryApplyPreviewFloatMultiplier(material, "_Intensity", colorIntensityMultiplier);
+        TryApplyPreviewFloatMultiplier(material, "_EmissionIntensity", colorIntensityMultiplier * emissionMultiplier);
+        TryApplyPreviewFloatMultiplier(material, "_Power", colorIntensityMultiplier);
+        TryApplyPreviewFloatMultiplier(material, "_Strength", colorIntensityMultiplier);
+    }
+
+    private static bool TryApplyPreviewColorToProperty(
+        Material material,
+        PreviewExtraVisualBinding binding,
+        string propertyName,
+        float alphaMultiplier,
+        float colorIntensityMultiplier,
+        float emissionMultiplier,
+        bool isBrightColor,
+        bool isGrayColor,
+        bool requireNonDefaultValue)
+    {
+        if (material == null || string.IsNullOrEmpty(propertyName) || !material.HasProperty(propertyName))
+        {
+            return false;
+        }
+
+        Color color = material.GetColor(propertyName);
+        if (requireNonDefaultValue && IsDefaultLikeColor(color))
+        {
+            return false;
+        }
+
+        material.SetColor(propertyName, BuildPreviewEnhancedColor(color, binding, alphaMultiplier, colorIntensityMultiplier, emissionMultiplier, isBrightColor, isGrayColor));
+        return true;
+    }
+
+    private static bool TryApplyPreviewFloatMultiplier(Material material, string propertyName, float multiplier)
+    {
+        if (material == null || string.IsNullOrEmpty(propertyName) || !material.HasProperty(propertyName))
+        {
+            return false;
+        }
+
+        material.SetFloat(propertyName, material.GetFloat(propertyName) * multiplier);
+        return true;
+    }
+
+    private static Color BuildPreviewEnhancedColor(
+        Color color,
+        PreviewExtraVisualBinding binding,
+        float alphaMultiplier,
+        float colorIntensityMultiplier,
+        float emissionMultiplier,
+        bool isBrightColor,
+        bool isGrayColor)
+    {
+        float rgbMultiplier = colorIntensityMultiplier;
+        if (isGrayColor)
+        {
+            rgbMultiplier = Mathf.Lerp(1f, colorIntensityMultiplier, 0.25f);
+        }
+
+        if (isBrightColor)
+        {
+            rgbMultiplier *= emissionMultiplier;
+        }
+
+        color.r *= rgbMultiplier;
+        color.g *= rgbMultiplier;
+        color.b *= rgbMultiplier;
+        color.a *= alphaMultiplier;
+
+        if (binding.overridePreviewColor)
+        {
+            Color targetTint = binding.previewColorTint;
+            float tintStrength = isBrightColor ? 0.95f : (isGrayColor ? 0.2f : 0.45f);
+            Color tinted = new Color(
+                color.r * targetTint.r,
+                color.g * targetTint.g,
+                color.b * targetTint.b,
+                color.a);
+            color = Color.Lerp(color, tinted, tintStrength);
+        }
+
+        return color;
+    }
+
+    private static bool IsDefaultLikeColor(Color color)
+    {
+        return Mathf.Approximately(color.r, 0f) &&
+               Mathf.Approximately(color.g, 0f) &&
+               Mathf.Approximately(color.b, 0f) &&
+               Mathf.Approximately(color.a, 0f);
+    }
+
+    private bool ShouldLogPreviewMaterialDiagnostics(PreviewExtraVisualRuntime runtime, Renderer renderer)
+    {
+        if (runtime == null || runtime.loggedMaterialDiagnostics || runtime.binding == null || runtime.binding.source == null)
+        {
+            return false;
+        }
+
+        if (currentPreviewPlayerIndex != 1)
+        {
+            return false;
+        }
+
+        string sourcePath = GetTransformPath(runtime.binding.source) ?? string.Empty;
+        if (sourcePath.Contains("\u706b\u7130"))
+        {
+            return renderer == null ||
+                   renderer.name.Contains("\u706b\u7130") ||
+                   renderer.name.Contains("Flame") ||
+                   renderer.name.Contains("Fire");
+        }
+
+        string sourceName = runtime.binding.source.name;
+        if (!sourceName.Contains("火焰") && !sourceName.Contains("Flame") && !sourceName.Contains("Fire"))
+        {
+            return false;
+        }
+
+        return renderer == null || renderer.name.Contains("火焰") || renderer.name.Contains("Flame") || renderer.name.Contains("Fire");
+    }
+
+    private void LogPreviewMaterialDiagnostics(PreviewExtraVisualRuntime runtime, Renderer renderer, Material material, int materialIndex)
+    {
+        if (runtime == null || material == null)
+        {
+            return;
+        }
+
+        Shader shader = material.shader;
+        if (shader == null)
+        {
+            return;
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder(512);
+        builder.AppendLine("[PlayerAttributePanelUI] Preview flame material diagnostics");
+        builder.AppendLine("source=" + (runtime.binding != null && runtime.binding.source != null ? GetTransformPath(runtime.binding.source) : "null"));
+        builder.AppendLine("renderer=" + (renderer != null ? renderer.name : "null"));
+        builder.AppendLine("materialIndex=" + materialIndex);
+        builder.AppendLine("material=" + material.name);
+        builder.AppendLine("shader=" + shader.name);
+
+        AppendMaterialFloatIfPresent(builder, material, "_Alpha", "Alpha");
+        AppendMaterialFloatIfPresent(builder, material, "_BodyAlpha", "BodyAlpha");
+        AppendMaterialFloatIfPresent(builder, material, "_Opacity", "Opacity");
+        AppendMaterialFloatIfPresent(builder, material, "_TintAlpha", "TintAlpha");
+        AppendMaterialFloatIfPresent(builder, material, "_PreviewTime", "PreviewTime");
+        AppendMaterialFloatIfPresent(builder, material, "_UnscaledTime", "UnscaledTime");
+        AppendMaterialFloatIfPresent(builder, material, "_ManualTime", "ManualTime");
+        AppendMaterialFloatIfPresent(builder, material, "_CustomTime", "CustomTime");
+        AppendMaterialFloatIfPresent(builder, material, "_Intensity", "Intensity");
+        AppendMaterialFloatIfPresent(builder, material, "_EmissionIntensity", "EmissionIntensity");
+        AppendMaterialFloatIfPresent(builder, material, "_Power", "Power");
+        AppendMaterialFloatIfPresent(builder, material, "_Strength", "Strength");
+
+        AppendMaterialColorIfPresent(builder, material, "_Color", "亮色Color/_Color");
+        AppendMaterialColorIfPresent(builder, material, "_Color_1", "灰色Color/_Color_1");
+        AppendMaterialColorIfPresent(builder, material, "_BaseColor", "BaseColor");
+        AppendMaterialColorIfPresent(builder, material, "_EmissionColor", "EmissionColor");
+        AppendMaterialColorIfPresent(builder, material, "_BrightColor", "BrightColor");
+        AppendMaterialColorIfPresent(builder, material, "_GrayColor", "GrayColor");
+        AppendMaterialColorIfPresent(builder, material, "_GreyColor", "GreyColor");
+
+        Debug.Log(builder.ToString(), renderer != null ? renderer : runtime.previewTransform);
+        runtime.loggedMaterialDiagnostics = true;
+    }
+
+    private static void AppendMaterialFloatIfPresent(System.Text.StringBuilder builder, Material material, string propertyName, string label)
+    {
+        if (builder == null || material == null || string.IsNullOrEmpty(propertyName) || !material.HasProperty(propertyName))
+        {
+            return;
+        }
+
+        builder.AppendLine("[Float] " + propertyName + " (" + label + ") = " + material.GetFloat(propertyName));
+    }
+
+    private static void AppendMaterialColorIfPresent(System.Text.StringBuilder builder, Material material, string propertyName, string label)
+    {
+        if (builder == null || material == null || string.IsNullOrEmpty(propertyName) || !material.HasProperty(propertyName))
+        {
+            return;
+        }
+
+        builder.AppendLine("[Color] " + propertyName + " (" + label + ") = " + material.GetColor(propertyName));
+    }
+
+    private static bool ShouldLogShaderProperty(string propertyName, string propertyDescription)
+    {
+        return MatchesAnyKeyword(propertyName, propertyDescription, PreviewAlphaKeywordCandidates) ||
+               MatchesAnyKeyword(propertyName, propertyDescription, PreviewIntensityKeywordCandidates) ||
+               MatchesAnyKeyword(propertyName, propertyDescription, PreviewGeneralColorKeywordCandidates);
+    }
+
+    private static bool MatchesAnyKeyword(string propertyName, string propertyDescription, string[] keywords)
+    {
+        if (keywords == null)
+        {
+            return false;
+        }
+
+        string name = propertyName ?? string.Empty;
+        string description = propertyDescription ?? string.Empty;
+        string loweredName = name.ToLowerInvariant();
+        string loweredDescription = description.ToLowerInvariant();
+        for (int i = 0; i < keywords.Length; i++)
+        {
+            string keyword = keywords[i];
+            if (string.IsNullOrWhiteSpace(keyword))
+            {
+                continue;
+            }
+
+            string loweredKeyword = keyword.ToLowerInvariant();
+            if (loweredName.Contains(loweredKeyword) || loweredDescription.Contains(loweredKeyword) ||
+                name.Contains(keyword) || description.Contains(keyword))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string GetShaderPropertyDescription(Shader shader, int propertyIndex)
+    {
+        if (shader == null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            return shader.GetPropertyDescription(propertyIndex);
+        }
+        catch
+        {
+            return string.Empty;
+        }
     }
 
     private Transform EnsureWorldPreviewRoot()
@@ -1977,6 +3192,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         EnsurePreviewRenderTexture();
         EnsurePreviewCamera();
         ApplyPreviewLayer(instance);
+        WarnIfPreviewLayerCannotRender(instance);
         ConfigurePreviewCamera();
 
         if (previewRawImage != null)
@@ -2028,8 +3244,13 @@ public class PlayerAttributePanelUI : MonoBehaviour
             Destroy(previewRenderTexture);
         }
 
-        previewRenderTexture = new RenderTexture(resolvedSize.x, resolvedSize.y, 16, RenderTextureFormat.ARGB32);
+        RenderTextureFormat preferredFormat = SystemInfo.SupportsRenderTextureFormat(RenderTextureFormat.ARGBHalf)
+            ? RenderTextureFormat.ARGBHalf
+            : RenderTextureFormat.ARGB32;
+        previewRenderTexture = new RenderTexture(resolvedSize.x, resolvedSize.y, 16, preferredFormat);
         previewRenderTexture.name = "PlayerAttributePreviewRT";
+        previewRenderTexture.useMipMap = false;
+        previewRenderTexture.autoGenerateMips = false;
         previewRenderTexture.Create();
     }
 
@@ -2057,6 +3278,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         previewCamera.backgroundColor = new Color(0f, 0f, 0f, 0f);
         previewCamera.nearClipPlane = 0.01f;
         previewCamera.farClipPlane = 100f;
+        previewCamera.allowHDR = true;
         previewCamera.targetTexture = previewRenderTexture;
         if (previewCameraWasCreatedAtRuntime)
         {
@@ -2070,6 +3292,21 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         previewLayerIndex = ResolvePreviewLayerIndex();
         previewCamera.cullingMask = 1 << previewLayerIndex;
+    }
+
+    private void WarnIfPreviewLayerCannotRender(GameObject instance)
+    {
+        if (instance == null || previewCamera == null)
+        {
+            return;
+        }
+
+        int layerIndex = ResolvePreviewLayerIndex();
+        if ((previewCamera.cullingMask & (1 << layerIndex)) == 0)
+        {
+            Debug.LogWarning("[PlayerAttributePanelUI] AttributePreviewCamera culling mask does not include preview layer '" +
+                             LayerMask.LayerToName(layerIndex) + "'.", previewCamera);
+        }
     }
 
     private Vector2 ResolvePreviewPanelSize()
@@ -2369,6 +3606,34 @@ public class PlayerAttributePanelUI : MonoBehaviour
         previewSkeletonAnimation.AnimationState.Update(deltaTime);
         previewSkeletonAnimation.AnimationState.Apply(previewSkeletonAnimation.Skeleton);
         previewSkeletonAnimation.Skeleton.UpdateWorldTransform();
+    }
+
+    private void UpdatePreviewExtraVisualsUnscaled(float deltaTime)
+    {
+        if (deltaTime <= 0f || !isVisible || previewExtraVisuals.Count == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < previewExtraVisuals.Count; i++)
+        {
+            PreviewExtraVisualRuntime runtime = previewExtraVisuals[i];
+            if (runtime == null)
+            {
+                continue;
+            }
+
+            if (runtime.binding != null && runtime.binding.usePreviewRotationDriver)
+            {
+                runtime.previewRotationEuler += runtime.binding.previewRotationSpeedEuler * deltaTime;
+            }
+
+            runtime.materialPreviewTime += deltaTime;
+            for (int m = 0; m < runtime.timeDrivenMaterials.Count; m++)
+            {
+                ApplyPreviewTimeToMaterial(runtime.timeDrivenMaterials[m], runtime.materialPreviewTime);
+            }
+        }
     }
 
     private void RenderPreviewCameraIfNeeded()

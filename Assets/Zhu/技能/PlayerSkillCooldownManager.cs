@@ -44,6 +44,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     private float runtimeCurrentMana;
     private float nextDebugManaLogTime;
     private CombatStats combatStats;
+    private RuneRuntimeState runeRuntimeState;
 
     private void Awake()
     {
@@ -53,6 +54,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         }
 
         combatStats = GetComponent<CombatStats>();
+        runeRuntimeState = GetComponent<RuneRuntimeState>();
         runtimeCurrentCD = new float[SkillCount];
 
         if (resourceBank != null)
@@ -146,8 +148,74 @@ public class PlayerSkillCooldownManager : MonoBehaviour
             runtimeCurrentMana -= data.manaCost;
         }
 
+        if (runeRuntimeState == null)
+        {
+            runeRuntimeState = GetComponent<RuneRuntimeState>();
+        }
+
+        runeRuntimeState?.PrepareManaBurstForSkillCast(skillIndex, data.manaCost);
+
         runtimeCurrentCD[skillIndex] = Mathf.Max(0f, data.maxCooldown * ResolveCooldownMultiplier());
         return true;
+    }
+
+    public float TryConsumeAdditionalMana(float requestedAmount)
+    {
+        float amount = Mathf.Max(0f, requestedAmount);
+        if (amount <= 0f)
+        {
+            return 0f;
+        }
+
+        if (resourceBank != null)
+        {
+            float before = Mathf.Max(0f, resourceBank.currentEnergy);
+            float spendAmount = Mathf.Min(before, amount);
+            if (spendAmount <= 0f)
+            {
+                runtimeCurrentMana = resourceBank.currentEnergy;
+                return 0f;
+            }
+
+            if (!resourceBank.TrySpendEnergy(spendAmount))
+            {
+                runtimeCurrentMana = resourceBank.currentEnergy;
+                return 0f;
+            }
+
+            runtimeCurrentMana = resourceBank.currentEnergy;
+            return spendAmount;
+        }
+
+        float runtimeBefore = Mathf.Max(0f, runtimeCurrentMana);
+        float runtimeSpend = Mathf.Min(runtimeBefore, amount);
+        runtimeCurrentMana = Mathf.Max(0f, runtimeCurrentMana - runtimeSpend);
+        return runtimeSpend;
+    }
+
+    public void RefundSkillResource(int skillIndex)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return;
+        }
+
+        SkillCostCDData data = skillDatas[skillIndex];
+        float refundAmount = Mathf.Max(0f, data.manaCost);
+        if (refundAmount > 0f)
+        {
+            if (resourceBank != null)
+            {
+                resourceBank.currentEnergy = Mathf.Clamp(resourceBank.currentEnergy + refundAmount, 0f, resourceBank.maxEnergy);
+                runtimeCurrentMana = resourceBank.currentEnergy;
+            }
+            else
+            {
+                runtimeCurrentMana = Mathf.Clamp(runtimeCurrentMana + refundAmount, 0f, maxMana);
+            }
+        }
+
+        runtimeCurrentCD[skillIndex] = 0f;
     }
 
     public float GetCurrentSkillCD(int idx)
@@ -178,6 +246,36 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         }
 
         return skillDatas[idx].manaCost;
+    }
+
+    public void OverrideSkillConfig(int skillIndex, float maxCooldown, float manaCost)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return;
+        }
+
+        SkillCostCDData data = skillDatas[skillIndex];
+        data.maxCooldown = Mathf.Max(0f, maxCooldown);
+        data.manaCost = Mathf.Max(0f, manaCost);
+        skillDatas[skillIndex] = data;
+    }
+
+    public float ReduceCurrentSkillCooldown(int skillIndex, float reductionSeconds)
+    {
+        if (!IsValidSkillIndex(skillIndex))
+        {
+            return 0f;
+        }
+
+        float clampedReduction = Mathf.Max(0f, reductionSeconds);
+        if (clampedReduction <= 0f)
+        {
+            return runtimeCurrentCD[skillIndex];
+        }
+
+        runtimeCurrentCD[skillIndex] = Mathf.Max(0f, runtimeCurrentCD[skillIndex] - clampedReduction);
+        return runtimeCurrentCD[skillIndex];
     }
 
     public float GetCurrentMana()

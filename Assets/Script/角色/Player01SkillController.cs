@@ -43,7 +43,10 @@ public class Player01SkillController : MonoBehaviour
     private int lastLocomotionLockLogFrame = -1;
     private bool skillFacingLocked;
     private int lockedFacingScaleX = 1;
+    private bool facingInputLocked;
+    private int facingInputLockedScaleX = 1;
     private bool skillMovementFrozen;
+    private bool movementInputLocked;
     private float frozenMoveSpeed = -1f;
     private int lastFacingLockLogFrame = -1;
     private bool manaRegenMatchedToPlayer02Standard;
@@ -128,6 +131,10 @@ public class Player01SkillController : MonoBehaviour
     {
         return cachedFacingScaleX;
     }
+
+    public bool IsFacingInputLocked => facingInputLocked;
+
+    public int LockedFacingScaleX => facingInputLockedScaleX;
 
     public void InitializeSkills()
     {
@@ -250,10 +257,15 @@ public class Player01SkillController : MonoBehaviour
 
     public void RestoreLocomotionAnimation(bool force = false)
     {
-        TryRestoreLocomotionAnimation("RestoreLocomotionAnimation", force);
+        TryRestoreLocomotionAnimation("RestoreLocomotionAnimation", force, false);
     }
 
-    private void TryRestoreLocomotionAnimation(string source, bool force)
+    public void RestoreLocomotionAnimationIgnoringSkillLock(bool force = false)
+    {
+        TryRestoreLocomotionAnimation("RestoreLocomotionAnimationIgnoringSkillLock", force, true);
+    }
+
+    private void TryRestoreLocomotionAnimation(string source, bool force, bool ignoreSkillAnimationLock = false)
     {
         bool allowLocomotionWhileRunningBoost =
             currentSkill is Player1Skill_E_BrokenDash eSkill && eSkill.IsRunningBoost;
@@ -264,7 +276,7 @@ public class Player01SkillController : MonoBehaviour
             return;
         }
 
-        if (IsSkillAnimationLocked())
+        if (!ignoreSkillAnimationLock && IsSkillAnimationLocked())
         {
             if (debugLog && lastLocomotionLockLogFrame != Time.frameCount)
             {
@@ -320,10 +332,15 @@ public class Player01SkillController : MonoBehaviour
 
     public bool TryPlayLockedSkillAnimation(string animationName, bool loop, float lockDuration)
     {
-        return TryPlayLockedSkillAnimation(animationName, loop, lockDuration, false, "Skill");
+        return PlayLockedSkillAnimationEntry(animationName, loop, lockDuration, false, "Skill") != null;
     }
 
     public bool TryPlayLockedSkillAnimation(string animationName, bool loop, float lockDuration, bool forceRestart, string source)
+    {
+        return PlayLockedSkillAnimationEntry(animationName, loop, lockDuration, forceRestart, source) != null;
+    }
+
+    public TrackEntry PlayLockedSkillAnimationEntry(string animationName, bool loop, float lockDuration, bool forceRestart, string source)
     {
         LockSkillAnimation(lockDuration);
 
@@ -331,19 +348,19 @@ public class Player01SkillController : MonoBehaviour
         if (spine == null || spine.Skeleton == null || spine.AnimationState == null)
         {
             Debug.LogWarning($"[{source}] Cannot play '{animationName}' because SkeletonAnimation is missing on {name}.", this);
-            return false;
+            return null;
         }
 
         if (string.IsNullOrWhiteSpace(animationName))
         {
             Debug.LogWarning($"[{source}] Cannot play empty animation name.", this);
-            return false;
+            return null;
         }
 
         if (spine.Skeleton.Data == null || spine.Skeleton.Data.FindAnimation(animationName) == null)
         {
             Debug.LogWarning($"[{source}] Missing Spine animation '{animationName}' on {name}.", this);
-            return false;
+            return null;
         }
 
         if (forceRestart)
@@ -355,7 +372,7 @@ public class Player01SkillController : MonoBehaviour
         if (entry == null)
         {
             Debug.LogWarning($"[{source}] Failed to play '{animationName}'.", this);
-            return false;
+            return null;
         }
 
         if (forceRestart)
@@ -365,7 +382,7 @@ public class Player01SkillController : MonoBehaviour
         }
 
         Debug.Log($"[{source}] AnimationName after set = {spine.AnimationName}", this);
-        return true;
+        return entry;
     }
 
     public void ClearSkillAnimationLock()
@@ -375,6 +392,52 @@ public class Player01SkillController : MonoBehaviour
         skillFacingLocked = false;
         lastFacingLockLogFrame = -1;
         RestoreMovementAfterSkillLock();
+    }
+
+    public void SetFacingInputLocked(bool locked, float facingSign, string reason = "Player01")
+    {
+        if (locked)
+        {
+            facingInputLocked = true;
+            facingInputLockedScaleX = facingSign >= 0f ? -1 : 1;
+            cachedFacingScaleX = facingInputLockedScaleX;
+            ApplyDisplayFixes(true);
+        }
+        else
+        {
+            facingInputLocked = false;
+        }
+
+        if (debugLog || debugSkillCooldownFlow)
+        {
+            Debug.Log($"[{reason}] facing lock {(locked ? "enabled" : "disabled")} sign={facingSign:F2} scaleX={(locked ? facingInputLockedScaleX : cachedFacingScaleX)}", this);
+        }
+    }
+
+    public void SetMovementInputLocked(bool locked, string logLabel = "Player01")
+    {
+        if (cachedMovement == null)
+        {
+            cachedMovement = GetComponent<PlayerMovement>();
+        }
+
+        bool changed = movementInputLocked != locked;
+        movementInputLocked = locked;
+        Debug.Log($"[Player01 Q Lock] SetMovementInputLocked({locked}) on {name}", this);
+        if (cachedMovement != null)
+        {
+            cachedMovement.SetMovementInputLocked(locked);
+        }
+
+        if (changed)
+        {
+            Debug.Log($"{logLabel}移动锁：{(locked ? "开启" : "关闭")}", this);
+        }
+    }
+
+    public bool IsMovementInputLocked()
+    {
+        return movementInputLocked;
     }
 
     private void CacheReferences()
@@ -505,6 +568,18 @@ public class Player01SkillController : MonoBehaviour
 
     private void ApplyFacingFromMovement()
     {
+        if (facingInputLocked)
+        {
+            cachedFacingScaleX = facingInputLockedScaleX;
+            if (debugLog && lastFacingLockLogFrame != Time.frameCount)
+            {
+                Debug.Log("[Facing] skipped because facing input locked", this);
+                lastFacingLockLogFrame = Time.frameCount;
+            }
+
+            return;
+        }
+
         if (IsSkillAnimationLocked() || skillFacingLocked)
         {
             cachedFacingScaleX = lockedFacingScaleX;
@@ -540,12 +615,12 @@ public class Player01SkillController : MonoBehaviour
         }
 
         float horizontal = 0f;
-        if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
+        if (Keyboard.current.leftArrowKey.isPressed)
         {
             horizontal -= 1f;
         }
 
-        if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
+        if (Keyboard.current.rightArrowKey.isPressed)
         {
             horizontal += 1f;
         }
@@ -631,6 +706,20 @@ public class Player01SkillController : MonoBehaviour
         skillMovementFrozen = false;
     }
 
+    private void OnDisable()
+    {
+        SetMovementInputLocked(false, "Player01 Q");
+        SetFacingInputLocked(false, cachedFacingScaleX < 0 ? 1f : -1f, "Player01");
+        ClearSkillAnimationLock();
+        currentSkill = null;
+    }
+
+    private void OnDestroy()
+    {
+        SetMovementInputLocked(false, "Player01 Q");
+        SetFacingInputLocked(false, cachedFacingScaleX < 0 ? 1f : -1f, "Player01");
+    }
+
     private void TryCastSkillFromInput(string keyLabel, Player01SkillBase skill)
     {
         if (debugSkillCooldownFlow)
@@ -645,14 +734,6 @@ public class Player01SkillController : MonoBehaviour
         }
 
         PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-        if (skillHud != null && skillHud.IsSkillOnCooldown(keyLabel))
-        {
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player01 {keyLabel} blocked by HUD cooldown", this);
-            }
-            return;
-        }
 
         if (currentSkill != null && currentSkill != skill)
         {
@@ -690,10 +771,64 @@ public class Player01SkillController : MonoBehaviour
         {
             if (debugSkillCooldownFlow)
             {
-                Debug.Log($"[SkillCD] Player01 {keyLabel} start HUD cooldown", this);
+                Debug.Log($"[SkillCD] Player01 {keyLabel} sync HUD cooldown from runtime", this);
             }
 
-            skillHud.StartSkillCooldown(keyLabel, ResolveHudCooldown(keyLabel));
+            SyncSkillHudCooldown(keyLabel, skillHud);
+        }
+    }
+
+    public void SyncSkillHudCooldown(string keyLabel)
+    {
+        PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+        if (skillHud == null)
+        {
+            return;
+        }
+
+        SyncSkillHudCooldown(keyLabel, skillHud);
+    }
+
+    private void SyncSkillHudCooldown(string keyLabel, PlayerSkillHUD skillHud)
+    {
+        if (skillHud == null)
+        {
+            return;
+        }
+
+        int skillIndex = ResolveSkillIndexFromKey(keyLabel);
+        PlayerSkillCooldownManager cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        if (cooldownManager != null && skillIndex >= 0)
+        {
+            skillHud.SyncSkillCooldown(
+                keyLabel,
+                cooldownManager.GetCurrentSkillCD(skillIndex),
+                cooldownManager.GetSkillMaxCD(skillIndex));
+            return;
+        }
+
+        skillHud.StartSkillCooldown(keyLabel, ResolveHudCooldown(keyLabel));
+    }
+
+    private static int ResolveSkillIndexFromKey(string keyLabel)
+    {
+        if (string.IsNullOrWhiteSpace(keyLabel))
+        {
+            return -1;
+        }
+
+        switch (keyLabel.Trim().ToUpperInvariant())
+        {
+            case "Q":
+                return 0;
+            case "W":
+                return 1;
+            case "E":
+                return 2;
+            case "R":
+                return 3;
+            default:
+                return -1;
         }
     }
 
@@ -805,6 +940,11 @@ public class Player01SkillController : MonoBehaviour
     public bool IsVeilBarrierActive()
     {
         return wSkill is Player1Skill_W_ThreadFlow w && w.IsDefending;
+    }
+
+    public bool ShouldIgnoreIncomingDamage(BattleDamage damage)
+    {
+        return eSkill is Player1Skill_E_BrokenDash e && e.IsImmuneToMonsterPhysicalDamage(damage);
     }
 
     public bool TryTriggerRuneCounterQ(CombatHealth attacker, bool suppressRuneCounterRecursion = true)

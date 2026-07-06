@@ -30,6 +30,9 @@ public class SlimeAnimationController : MonoBehaviour
     [SerializeField] private float attackSquashAmount = 0.2f;
     [SerializeField] private float attackStretchAmount = 0.22f;
     [SerializeField] private float attackStopDistance = 0.7f;
+    [SerializeField] private bool allowAttackForwardLeap = true;
+    [SerializeField] private bool allowAttackVerticalLeap = true;
+    [SerializeField] private float maxAttackLeapDistance = 0.65f;
 
     [Header("Visibility")]
     [SerializeField] private float minimumVisibleAlpha = 0.92f;
@@ -47,6 +50,17 @@ public class SlimeAnimationController : MonoBehaviour
 
     public event Action<Transform> OnAttackHit;
     public AttackHitEvent onAttackHit = new AttackHitEvent();
+    public bool IsAttacking => isAttacking;
+    public bool IsDying => isDying;
+    public float AttackWindup => Mathf.Max(0.01f, attackChargeTime);
+    public float AttackRecovery => Mathf.Max(0.01f, attackRecoverTime);
+    public float AttackAnimationDuration => Mathf.Max(0.01f, attackChargeTime) + Mathf.Max(0.01f, attackJumpTime) + Mathf.Max(0.01f, attackRecoverTime);
+    public string SelectedAttackClipName => "ProceduralJumpAttack";
+    public float SelectedAttackClipLength => AttackAnimationDuration;
+    public float AnimatorPlaybackSpeed => 1f;
+    public bool AllowAttackForwardLeap => allowAttackForwardLeap;
+    public bool AllowAttackVerticalLeap => allowAttackVerticalLeap;
+    public float MaxAttackLeapDistance => maxAttackLeapDistance;
 
     private CombatHealth combatHealth;
     private bool previousCombatDestroyOnDeath = true;
@@ -195,7 +209,13 @@ public class SlimeAnimationController : MonoBehaviour
         Vector3 flatToTarget = targetWorld - startWorld;
         flatToTarget.y = 0f;
         Vector3 jumpDirection = flatToTarget.sqrMagnitude > 0.001f ? flatToTarget.normalized : fallbackDirection;
-        float jumpDistance = Mathf.Max(0f, flatToTarget.magnitude - Mathf.Max(0f, attackStopDistance));
+        float jumpDistance = allowAttackForwardLeap
+            ? Mathf.Max(0f, flatToTarget.magnitude - Mathf.Max(0f, attackStopDistance))
+            : 0f;
+        if (maxAttackLeapDistance > 0f)
+        {
+            jumpDistance = Mathf.Min(jumpDistance, maxAttackLeapDistance);
+        }
         Vector3 endWorld = startWorld + jumpDirection * jumpDistance;
 
         bool hitRaised = false;
@@ -209,7 +229,9 @@ public class SlimeAnimationController : MonoBehaviour
         {
             float p = Mathf.Clamp01(t / jumpTime);
             Vector3 flatPos = Vector3.Lerp(startWorld, endWorld, p);
-            float arc = 4f * Mathf.Max(0f, attackJumpHeight) * p * (1f - p);
+            float arc = allowAttackVerticalLeap
+                ? 4f * Mathf.Max(0f, attackJumpHeight) * p * (1f - p)
+                : 0f;
             transform.position = new Vector3(flatPos.x, startWorld.y + arc, flatPos.z);
 
             float airStretch = Mathf.Sin(p * Mathf.PI);

@@ -30,6 +30,21 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float physicalScaling = 0.5f;
     [HideInInspector]
     [SerializeField] private float specialScaling = 1.3f;
+    [Header("R - 神眷剑涡 / 持续伤害参数")]
+    [Tooltip("R 漩涡持续伤害的物理段基础伤害。")]
+    [SerializeField, Min(0f)] private float rSwarmTickPhysicalBaseDamage = 4f;
+    [Tooltip("R 漩涡持续伤害的物理段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rSwarmTickPhysicalFromPhysicalAttackScaling = 0.45f;
+    [Tooltip("R 漩涡持续伤害的物理段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rSwarmTickPhysicalFromSpecialAttackScaling = 0f;
+    [Tooltip("R 漩涡持续伤害的特殊段基础伤害。")]
+    [SerializeField, Min(0f)] private float rSwarmTickSpecialBaseDamage = 15f;
+    [Tooltip("R 漩涡持续伤害的特殊段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rSwarmTickSpecialFromPhysicalAttackScaling = 0f;
+    [Tooltip("R 漩涡持续伤害的特殊段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rSwarmTickSpecialFromSpecialAttackScaling = 0.20f;
+    [Tooltip("R 漩涡持续伤害的最终倍率。")]
+    [SerializeField, Min(0f)] private float rSwarmTickDamageMultiplier = 1f;
 
     [Header("R - 神眷剑涡 / 视觉")]
     [SerializeField] private Vector3 rEffectScale = new Vector3(0.3f, 0.3f, 0.3f);
@@ -110,7 +125,21 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [HideInInspector]
     [SerializeField] private float rStarRainDamageRadius = 1.2f;
     [HideInInspector]
-    [SerializeField] private float rStarRainDamageMultiplier = 0.6f;
+    [FormerlySerializedAs("rStarRainDamageMultiplier")]
+    [SerializeField, Min(0f)] private float rStarRainImpactDamageMultiplier = 0.6f;
+    [Header("R - 神眷剑涡 / 落剑冲击伤害参数")]
+    [Tooltip("R 落剑冲击的物理段基础伤害。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactPhysicalBaseDamage = 4f;
+    [Tooltip("R 落剑冲击的物理段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactPhysicalFromPhysicalAttackScaling = 0.45f;
+    [Tooltip("R 落剑冲击的物理段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactPhysicalFromSpecialAttackScaling = 0f;
+    [Tooltip("R 落剑冲击的特殊段基础伤害。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactSpecialBaseDamage = 15f;
+    [Tooltip("R 落剑冲击的特殊段从物理攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactSpecialFromPhysicalAttackScaling = 0f;
+    [Tooltip("R 落剑冲击的特殊段从特殊攻击获得的倍率。")]
+    [SerializeField, Min(0f)] private float rStarRainImpactSpecialFromSpecialAttackScaling = 0.20f;
     [HideInInspector]
     [SerializeField] private bool rStarRainContinueAfterOrbit = true;
     [HideInInspector]
@@ -229,6 +258,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private int currentROverflowStarBladeCount;
     private int currentROverflowBonusDamage;
     private int remainingRVisibleStarBladeSpawnBudget;
+    protected override int SkillIndex => 3;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -273,6 +303,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         currentROverflowBonusDamage = 0;
         remainingRVisibleStarBladeSpawnBudget = 0;
         activeRuneCastId = -1;
+        ResetRuneCastContext();
         CleanupRSwarmVisuals();
         CleanupRStarRainVisuals();
         if (activeRSwarmRoot != null)
@@ -322,7 +353,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float finalDuration = ResolveFinalSwarmDuration(totalStarBladeCount);
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
-        activeRuneCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(3) : -1;
+        PrepareRuneCastContext();
+        activeRuneCastId = CurrentRuneCastId;
         if (rSwarmDebugLog)
         {
             Debug.Log(
@@ -1024,15 +1056,42 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 
     private void ApplyRSwarmTickDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, rSwarmDamageRadius, 1f);
+        ApplyRSwarmAreaDamage(
+            center,
+            rSwarmDamageRadius,
+            rSwarmTickPhysicalBaseDamage,
+            rSwarmTickPhysicalFromPhysicalAttackScaling,
+            rSwarmTickPhysicalFromSpecialAttackScaling,
+            rSwarmTickSpecialBaseDamage,
+            rSwarmTickSpecialFromPhysicalAttackScaling,
+            rSwarmTickSpecialFromSpecialAttackScaling,
+            rSwarmTickDamageMultiplier);
     }
 
     private void ApplyRSwarmImpactDamage(Vector3 center)
     {
-        ApplyRSwarmAreaDamage(center, Mathf.Max(0.01f, rStarRainDamageRadius), Mathf.Max(0f, rStarRainDamageMultiplier));
+        ApplyRSwarmAreaDamage(
+            center,
+            Mathf.Max(0.01f, rStarRainDamageRadius),
+            rStarRainImpactPhysicalBaseDamage,
+            rStarRainImpactPhysicalFromPhysicalAttackScaling,
+            rStarRainImpactPhysicalFromSpecialAttackScaling,
+            rStarRainImpactSpecialBaseDamage,
+            rStarRainImpactSpecialFromPhysicalAttackScaling,
+            rStarRainImpactSpecialFromSpecialAttackScaling,
+            rStarRainImpactDamageMultiplier);
     }
 
-    private void ApplyRSwarmAreaDamage(Vector3 center, float radius, float damageMultiplier)
+    private void ApplyRSwarmAreaDamage(
+        Vector3 center,
+        float radius,
+        float physicalBaseDamage,
+        float physicalFromPhysicalAttackScaling,
+        float physicalFromSpecialAttackScaling,
+        float specialBaseDamage,
+        float specialFromPhysicalAttackScaling,
+        float specialFromSpecialAttackScaling,
+        float damageMultiplier)
     {
         if (damageMultiplier <= 0f || radius <= 0f)
         {
@@ -1060,7 +1119,18 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
             if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
             {
-                float damageAmount = ResolveRHitDamage(attackerStats, combatHealth.stats, combatHealth, source, damageMultiplier);
+                float damageAmount = ResolveRHitDamage(
+                    attackerStats,
+                    combatHealth.stats,
+                    combatHealth,
+                    source,
+                    physicalBaseDamage,
+                    physicalFromPhysicalAttackScaling,
+                    physicalFromSpecialAttackScaling,
+                    specialBaseDamage,
+                    specialFromPhysicalAttackScaling,
+                    specialFromSpecialAttackScaling,
+                    damageMultiplier);
                 damageAmount += ConsumeRuneFirstHitBonusDamage();
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 if (debugCriticalLog)
@@ -1078,21 +1148,48 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
     }
 
-    private float ResolveRHitDamage(CombatStats attackerStats, CombatStats targetStats, CombatHealth targetHealth, GameObject source, float damageMultiplier)
+    private float ResolveRHitDamage(
+        CombatStats attackerStats,
+        CombatStats targetStats,
+        CombatHealth targetHealth,
+        GameObject source,
+        float physicalBaseDamage,
+        float physicalFromPhysicalAttackScaling,
+        float physicalFromSpecialAttackScaling,
+        float specialBaseDamage,
+        float specialFromPhysicalAttackScaling,
+        float specialFromSpecialAttackScaling,
+        float damageMultiplier)
     {
         float attackerPhysicalAttack = attackerStats != null ? attackerStats.physicalAttack : 0f;
         float attackerSpecialAttack = attackerStats != null ? attackerStats.specialAttack : 0f;
         float targetPhysicalDefense = targetStats != null ? targetStats.physicalDefense : 0f;
         float targetSpecialDefense = targetStats != null ? targetStats.specialDefense : 0f;
 
-        float physicalRaw = 4f + attackerPhysicalAttack * 0.45f;
-        float specialRaw = 15f + attackerSpecialAttack * 0.20f;
+        float physicalRaw =
+            Mathf.Max(0f, physicalBaseDamage)
+            + Mathf.Max(0f, attackerPhysicalAttack) * Mathf.Max(0f, physicalFromPhysicalAttackScaling)
+            + Mathf.Max(0f, attackerSpecialAttack) * Mathf.Max(0f, physicalFromSpecialAttackScaling);
+        float specialRaw =
+            Mathf.Max(0f, specialBaseDamage)
+            + Mathf.Max(0f, attackerPhysicalAttack) * Mathf.Max(0f, specialFromPhysicalAttackScaling)
+            + Mathf.Max(0f, attackerSpecialAttack) * Mathf.Max(0f, specialFromSpecialAttackScaling);
 
         float physicalFinal = Mathf.Max(1f, physicalRaw - targetPhysicalDefense);
         float specialFinal = Mathf.Max(1f, specialRaw - targetSpecialDefense);
 
-        float finalDamage = (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier);
+        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        float finalDamage =
+            (physicalFinal + specialFinal)
+            * Mathf.Max(0f, damageMultiplier)
+            * Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier())
+            * manaMultiplier;
         finalDamage += GetCurrentROverflowBonusDamage();
+
+        if (manaMultiplier > 1f)
+        {
+            LogManaRuneApplied("Player02 R", "Damage", physicalFinal + specialFinal, (physicalFinal + specialFinal) * Mathf.Max(0f, damageMultiplier) * manaMultiplier);
+        }
 
         if (rDamageDebugLog)
         {
@@ -1796,7 +1893,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         if (Approximately(rStarRainFallSpeed, 10f)) rStarRainFallSpeed = Owner.rStarRainFallSpeed;
         if (Approximately(rStarRainRandomDelay, 0.15f)) rStarRainRandomDelay = Owner.rStarRainRandomDelay;
         if (Approximately(rStarRainDamageRadius, 1.2f)) rStarRainDamageRadius = Owner.rStarRainDamageRadius;
-        if (Approximately(rStarRainDamageMultiplier, 0.6f)) rStarRainDamageMultiplier = Owner.rStarRainDamageMultiplier;
+        if (Approximately(rStarRainImpactDamageMultiplier, 0.6f)) rStarRainImpactDamageMultiplier = Owner.rStarRainDamageMultiplier;
         if (rStarRainContinueAfterOrbit) rStarRainContinueAfterOrbit = Owner.rStarRainContinueAfterOrbit;
         if (Approximately(rStarRainExtraDurationAfterOrbit, 0.6f)) rStarRainExtraDurationAfterOrbit = Owner.rStarRainExtraDurationAfterOrbit;
         if (Approximately(rStarRainEffectScale, new Vector3(0.3f, 0.3f, 0.3f))) rStarRainEffectScale = Owner.rStarRainEffectScale;

@@ -7,6 +7,7 @@ public class RunePickup : MonoBehaviour
     public bool destroyAfterPickup = true;
 
     private static bool warnedMissingSharedInventory;
+    private bool collected;
 
     public void SetRune(RuneDefinition newRune)
     {
@@ -21,6 +22,16 @@ public class RunePickup : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        string runeName = rune != null && !string.IsNullOrEmpty(rune.runeName) ? rune.runeName : (rune != null ? rune.runeType.ToString() : "null");
+        Debug.Log(
+            $"[RunePickup] frame={Time.frameCount}, pickup={name}, pickupId={GetInstanceID()}, rune={runeName}, by={(other != null ? other.name : "null")}, alreadyCollected={collected}",
+            this);
+
+        if (collected)
+        {
+            return;
+        }
+
         RuneInventory inventory = ResolveInventory(other);
 
         if (inventory == null || rune == null)
@@ -28,7 +39,17 @@ public class RunePickup : MonoBehaviour
             return;
         }
 
-        inventory.AddRune(rune);
+        collected = true;
+        Collider[] pickupColliders = GetComponentsInChildren<Collider>(true);
+        for (int i = 0; i < pickupColliders.Length; i++)
+        {
+            if (pickupColliders[i] != null)
+            {
+                pickupColliders[i].enabled = false;
+            }
+        }
+
+        inventory.AddRune(rune, "Pickup");
         if (destroyAfterPickup)
         {
             Destroy(gameObject);
