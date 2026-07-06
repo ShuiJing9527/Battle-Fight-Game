@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 4044097606900654339}
   - component: {fileID: 7011937315043430734}
   - component: {fileID: 1623876543519546103}
+  - component: {fileID: -5444988944454787694}
   m_Layer: 0
   m_Name: "\u9886\u57DF"
   m_TagString: Untagged
@@ -111,3 +112,19 @@ SphereCollider:
   serializedVersion: 3
   m_Radius: 0.5
   m_Center: {x: 0, y: 0, z: 0}
+--- !u!114 &-5444988944454787694
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5989580462670476894}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d10864ca5ad23044a9c9364857d5a888, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
+  appearSfx: {fileID: 0}
+  hitSfx: {fileID: 0}
+  hitTags: []
+  volume: 1
