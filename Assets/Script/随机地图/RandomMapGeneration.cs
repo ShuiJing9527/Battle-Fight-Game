@@ -40,6 +40,7 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private Transform shoreSandParent;
         [SerializeField] private float shoreSandHeightOffset = 0.02f;
         [SerializeField, Min(3)] private int shoreSandWidth = 5;
+        [SerializeField, Min(2)] private int minimumShoreSandFootprint = 2;
         [SerializeField] private bool debugShoreSandPlacements = false;
 
         [Header("区域大小与范围")]
@@ -61,6 +62,7 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private bool fillTinyWaterPockets = true;
         [SerializeField] private bool removeSingleTileSpikes = true;
         [SerializeField, Min(1)] private int cleanupIterations = 1;
+        [SerializeField, Min(1)] private int minimumTerrainFeatureWidth = 4;
 
         [Header("Legacy Area Types (migration only)")]
         [SerializeField] private bool useRegionAreaTypes = false;
@@ -623,6 +625,8 @@ namespace UnderTheStars.GenerationMap
                 ApplyLandShapeCleanup();
             }
 
+            NormalizeBaseTerrainMinimumWidth();
+
             HashSet<Vector2Int> rebuiltAllFloorPoints = RebuildAllFloorPoints();
             LogActualFloorBounds(originalBoundsByLayout, finalOffsetByLayout);
             return rebuiltAllFloorPoints;
@@ -806,6 +810,89 @@ namespace UnderTheStars.GenerationMap
             }
         }
 
+        private void NormalizeBaseTerrainMinimumWidth()
+        {
+            if (floorPoints == null || minimumTerrainFeatureWidth < 2)
+            {
+                return;
+            }
+
+            int iterationLimit = Mathf.Max(1, cleanupIterations * 3);
+            for (int iteration = 0; iteration < iterationLimit; iteration++)
+            {
+                HashSet<Vector2Int> allFloorPoints = RebuildAllFloorPoints();
+                if (allFloorPoints.Count == 0)
+                {
+                    return;
+                }
+
+                ActualFloorBoundsInfo bounds = CalculateActualFloorBounds(allFloorPoints);
+                if (!bounds.isValid)
+                {
+                    return;
+                }
+
+                HashSet<Vector2Int> pointsToFill = new HashSet<Vector2Int>();
+                HashSet<Vector2Int> pointsToRemove = new HashSet<Vector2Int>();
+
+                CollectNarrowLandFeatureChanges(allFloorPoints, bounds, pointsToFill, pointsToRemove);
+                CollectNarrowOceanFeatureFills(allFloorPoints, bounds, pointsToFill);
+
+                if (pointsToFill.Count == 0 && pointsToRemove.Count == 0)
+                {
+                    break;
+                }
+
+                ApplyFloorPointFills(pointsToFill);
+                ApplyFloorPointRemovals(pointsToRemove);
+            }
+        }
+
+        private void CollectNarrowLandFeatureChanges(
+            HashSet<Vector2Int> allFloorPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToFill,
+            HashSet<Vector2Int> pointsToRemove)
+        {
+            List<HashSet<Vector2Int>> narrowLandBranches = CollectNarrowTerrainBranches(
+                allFloorPoints,
+                candidate => IsTerrainCorePoint(candidate, allFloorPoints, minimumTerrainFeatureWidth));
+
+            for (int i = 0; i < narrowLandBranches.Count; i++)
+            {
+                HashSet<Vector2Int> branch = narrowLandBranches[i];
+                if (branch == null || branch.Count == 0 || ContainsProtectedConnectorPoint(branch))
+                {
+                    continue;
+                }
+
+                if (TryWidenBaseTerrainBranch(branch, allFloorPoints, bounds, out HashSet<Vector2Int> branchFills))
+                {
+                    pointsToFill.UnionWith(branchFills);
+                }
+                else
+                {
+                    pointsToRemove.UnionWith(branch);
+                }
+            }
+        }
+
+        private void CollectNarrowOceanFeatureFills(
+            HashSet<Vector2Int> allFloorPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToFill)
+        {
+            HashSet<Vector2Int> oceanPoints = BuildFiniteOceanPointSet(allFloorPoints, bounds, minimumTerrainFeatureWidth);
+            List<HashSet<Vector2Int>> narrowOceanBranches = CollectNarrowTerrainBranches(
+                oceanPoints,
+                candidate => IsFiniteOceanCorePoint(candidate, oceanPoints, bounds, minimumTerrainFeatureWidth));
+
+            for (int i = 0; i < narrowOceanBranches.Count; i++)
+            {
+                pointsToFill.UnionWith(narrowOceanBranches[i]);
+            }
+        }
+
         private void CollectTinyWaterPocketFills(HashSet<Vector2Int> allFloorPoints, HashSet<Vector2Int> pointsToFill)
         {
             foreach (Vector2Int floorPoint in allFloorPoints)
@@ -940,6 +1027,227 @@ namespace UnderTheStars.GenerationMap
             if (allFloorPoints.Contains(point + Vector2Int.down)) count++;
             if (allFloorPoints.Contains(point + Vector2Int.left)) count++;
             if (allFloorPoints.Contains(point + Vector2Int.right)) count++;
+            return count;
+        }
+
+        private bool TryWidenBaseTerrainBranch(
+            HashSet<Vector2Int> branchPoints,
+            HashSet<Vector2Int> allFloorPoints,
+            ActualFloorBoundsInfo bounds,
+            out HashSet<Vector2Int> branchFills)
+        {
+            branchFills = null;
+            Vector2Int[] offsets =
+            {
+                Vector2Int.left,
+                Vector2Int.right,
+                Vector2Int.up,
+                Vector2Int.down
+            };
+
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                if (!TryBuildBaseTerrainBranchWidening(branchPoints, allFloorPoints, bounds, offsets[i], out HashSet<Vector2Int> candidateFills))
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> widened = new HashSet<Vector2Int>(allFloorPoints);
+                widened.UnionWith(candidateFills);
+                if (!ComponentHasMinimumThickness(branchPoints, candidateFills, widened, minimumTerrainFeatureWidth))
+                {
+                    continue;
+                }
+
+                branchFills = candidateFills;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryBuildBaseTerrainBranchWidening(
+            HashSet<Vector2Int> branchPoints,
+            HashSet<Vector2Int> allFloorPoints,
+            ActualFloorBoundsInfo bounds,
+            Vector2Int offset,
+            out HashSet<Vector2Int> candidateFills)
+        {
+            candidateFills = new HashSet<Vector2Int>();
+            for (int layer = 1; layer < minimumTerrainFeatureWidth; layer++)
+            {
+                foreach (Vector2Int branchPoint in branchPoints)
+                {
+                    Vector2Int candidate = branchPoint + (offset * layer);
+                    if (branchPoints.Contains(candidate) || allFloorPoints.Contains(candidate) || candidateFills.Contains(candidate))
+                    {
+                        continue;
+                    }
+
+                    if (!IsPointInsideExpandedBounds(candidate, bounds, minimumTerrainFeatureWidth))
+                    {
+                        return false;
+                    }
+
+                    candidateFills.Add(candidate);
+                }
+            }
+
+            return candidateFills.Count > 0;
+        }
+
+        private bool ContainsProtectedConnectorPoint(HashSet<Vector2Int> points)
+        {
+            if (connectorFloorPoints == null || points == null)
+            {
+                return false;
+            }
+
+            foreach (Vector2Int point in points)
+            {
+                if (connectorFloorPoints.Contains(point))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool ComponentHasMinimumThickness(
+            HashSet<Vector2Int> branchPoints,
+            HashSet<Vector2Int> candidateFills,
+            HashSet<Vector2Int> resultPoints,
+            int minimumWidth)
+        {
+            foreach (Vector2Int point in branchPoints)
+            {
+                if (!HasMinimumTerrainThicknessOnBothAxes(point, resultPoints, minimumWidth))
+                {
+                    return false;
+                }
+            }
+
+            if (candidateFills != null)
+            {
+                foreach (Vector2Int point in candidateFills)
+                {
+                    if (!HasMinimumTerrainThicknessOnBothAxes(point, resultPoints, minimumWidth))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static HashSet<Vector2Int> BuildFiniteOceanPointSet(
+            HashSet<Vector2Int> allFloorPoints,
+            ActualFloorBoundsInfo bounds,
+            int padding)
+        {
+            HashSet<Vector2Int> oceanPoints = new HashSet<Vector2Int>();
+            if (!bounds.isValid)
+            {
+                return oceanPoints;
+            }
+
+            int minX = bounds.min.x - padding;
+            int maxX = bounds.max.x + padding;
+            int minY = bounds.min.y - padding;
+            int maxY = bounds.max.y + padding;
+
+            for (int x = minX; x <= maxX; x++)
+            {
+                for (int y = minY; y <= maxY; y++)
+                {
+                    Vector2Int point = new Vector2Int(x, y);
+                    if (!allFloorPoints.Contains(point))
+                    {
+                        oceanPoints.Add(point);
+                    }
+                }
+            }
+
+            return oceanPoints;
+        }
+
+        private static bool IsFiniteOceanCorePoint(
+            Vector2Int point,
+            HashSet<Vector2Int> oceanPoints,
+            ActualFloorBoundsInfo bounds,
+            int padding)
+        {
+            int minX = bounds.min.x - padding;
+            int maxX = bounds.max.x + padding;
+            int minY = bounds.min.y - padding;
+            int maxY = bounds.max.y + padding;
+
+            if (point.x == minX || point.x == maxX || point.y == minY || point.y == maxY)
+            {
+                return true;
+            }
+
+            return IsTerrainCorePoint(point, oceanPoints, padding);
+        }
+
+        private static bool IsTerrainCorePoint(Vector2Int point, HashSet<Vector2Int> points, int minimumWidth)
+        {
+            return HasMinimumTerrainThicknessOnBothAxes(point, points, minimumWidth) ||
+                   HasValidTwoDimensionalSupport(point, points, minimumWidth);
+        }
+
+        private static bool HasMinimumTerrainThicknessOnBothAxes(Vector2Int point, HashSet<Vector2Int> points, int minimumWidth)
+        {
+            if (points == null || !points.Contains(point))
+            {
+                return false;
+            }
+
+            return CountContiguousRunLength(point, Vector2Int.left, Vector2Int.right, points) >= minimumWidth &&
+                   CountContiguousRunLength(point, Vector2Int.down, Vector2Int.up, points) >= minimumWidth;
+        }
+
+        private static bool IsPointInsideExpandedBounds(Vector2Int point, ActualFloorBoundsInfo bounds, int padding)
+        {
+            if (!bounds.isValid)
+            {
+                return false;
+            }
+
+            return point.x >= bounds.min.x - padding &&
+                   point.x <= bounds.max.x + padding &&
+                   point.y >= bounds.min.y - padding &&
+                   point.y <= bounds.max.y + padding;
+        }
+
+        private static int CountContiguousRunLength(
+            Vector2Int origin,
+            Vector2Int negativeOffset,
+            Vector2Int positiveOffset,
+            HashSet<Vector2Int> points)
+        {
+            if (points == null || !points.Contains(origin))
+            {
+                return 0;
+            }
+
+            int count = 1;
+            Vector2Int cursor = origin + negativeOffset;
+            while (points.Contains(cursor))
+            {
+                count++;
+                cursor += negativeOffset;
+            }
+
+            cursor = origin + positiveOffset;
+            while (points.Contains(cursor))
+            {
+                count++;
+                cursor += positiveOffset;
+            }
+
             return count;
         }
 
@@ -1403,7 +1711,15 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
-            ApplyShoreSandBoundaryCleanup(placements, allLandPoints, areaByPoint);
+            HashSet<Vector2Int> changedPoints = new HashSet<Vector2Int>();
+            ApplyMinimumTwoTileCoastalWidth(placements, allLandPoints, areaByPoint, changedPoints);
+            ApplyShoreSandBoundaryCleanup(placements, allLandPoints, areaByPoint, changedPoints);
+            ResolveRemainingSingleTileCoastalGaps(placements, allLandPoints, areaByPoint, changedPoints);
+            NormalizeFinalShoreSandFootprint(placements, allLandPoints, areaByPoint, changedPoints);
+            ResolveRemainingSingleTileCoastalGaps(placements, allLandPoints, areaByPoint, changedPoints);
+            NormalizeFinalShoreSandFootprint(placements, allLandPoints, areaByPoint, changedPoints);
+            ReclassifyAffectedShoreSandPlacements(placements, allLandPoints, areaByPoint, changedPoints);
+            ApplyShortGrassBoundarySegmentFix(placements, allLandPoints, areaByPoint);
             ApplyFinalGrassBoundaryCorrection(placements, allLandPoints, areaByPoint);
             ApplyFinalCornerResolution(placements, allLandPoints, areaByPoint);
             ApplyGrassTransitionAdjacencyFix(placements);
@@ -1463,7 +1779,8 @@ namespace UnderTheStars.GenerationMap
         private void ApplyShoreSandBoundaryCleanup(
             List<ShoreSandPlacement> placements,
             HashSet<Vector2Int> allLandPoints,
-            Dictionary<Vector2Int, AreaType> areaByPoint)
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
         {
             if (placements == null || placements.Count == 0 || allLandPoints == null || areaByPoint == null)
             {
@@ -1524,6 +1841,7 @@ namespace UnderTheStars.GenerationMap
 
                 additions.Add(addedPlacement);
                 adjustedPoints.Add(point);
+                MarkChangedPoint(changedPoints, point);
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 LogShoreSandBoundaryCleanup(
@@ -1635,6 +1953,1038 @@ namespace UnderTheStars.GenerationMap
             }
 
             return true;
+        }
+
+        private void ApplyMinimumTwoTileCoastalWidth(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            if (placements == null || placements.Count == 0 || allLandPoints == null || areaByPoint == null)
+            {
+                return;
+            }
+
+            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints);
+            FillSingleTileGrassBottlenecks(placements, allLandPoints, areaByPoint, changedPoints);
+        }
+
+        private void NormalizeFinalShoreSandFootprint(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            if (placements == null || placements.Count == 0)
+            {
+                return;
+            }
+
+            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints);
+        }
+
+        private void EnsureMinimumShoreSandWidth(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            bool changed;
+            do
+            {
+                changed = false;
+
+                HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+                List<HashSet<Vector2Int>> oneTileWideBranches = CollectNarrowShoreBranches(shorePoints);
+
+                if (oneTileWideBranches.Count == 0)
+                {
+                    break;
+                }
+
+                List<ShoreSandPlacement> additions = new List<ShoreSandPlacement>();
+                HashSet<Vector2Int> removedPoints = new HashSet<Vector2Int>();
+                for (int i = 0; i < oneTileWideBranches.Count; i++)
+                {
+                    HashSet<Vector2Int> branch = oneTileWideBranches[i];
+                    if (branch == null || branch.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    if (TryWidenNarrowShoreBranch(
+                            branch,
+                            shorePoints,
+                            allLandPoints,
+                            areaByPoint,
+                            out List<ShoreSandPlacement> branchAdditions))
+                    {
+                        for (int addIndex = 0; addIndex < branchAdditions.Count; addIndex++)
+                        {
+                            ShoreSandPlacement supportPlacement = branchAdditions[addIndex];
+                            if (shorePoints.Add(supportPlacement.point))
+                            {
+                                additions.Add(supportPlacement);
+                                MarkChangedPoint(changedPoints, supportPlacement.point);
+                                changed = true;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        foreach (Vector2Int removedPoint in branch)
+                        {
+                            removedPoints.Add(removedPoint);
+                            MarkChangedPoint(changedPoints, removedPoint);
+                        }
+                    }
+                }
+
+                if (additions.Count > 0)
+                {
+                    placements.AddRange(additions);
+                }
+
+                if (removedPoints.Count > 0)
+                {
+                    int removedCount = placements.RemoveAll(placement => removedPoints.Contains(placement.point));
+                    changed |= removedCount > 0;
+                }
+            }
+            while (changed);
+        }
+
+        private void FillSingleTileGrassBottlenecks(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+            HashSet<Vector2Int> grassPoints = BuildGrassSupportPointSet(allLandPoints, areaByPoint, shorePoints);
+            List<Vector2Int> unsupportedGrassPoints = CollectUnsupportedPoints(grassPoints, minimumTerrainFeatureWidth);
+            if (unsupportedGrassPoints.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> addedPoints = new HashSet<Vector2Int>();
+            List<ShoreSandPlacement> additions = new List<ShoreSandPlacement>();
+            for (int i = 0; i < unsupportedGrassPoints.Count; i++)
+            {
+                Vector2Int point = unsupportedGrassPoints[i];
+                if (!IsSingleTileGrassBottleneck(point, shorePoints) &&
+                    HasValidTwoDimensionalSupport(point, grassPoints, minimumTerrainFeatureWidth))
+                {
+                    continue;
+                }
+
+                if (addedPoints.Contains(point))
+                {
+                    continue;
+                }
+
+                ShoreSandPlacement addedPlacement;
+                if (TryGetPreferredCoastalDirection(point, allLandPoints, out ShoreEdgeDirection seaDirection))
+                {
+                    addedPlacement = new ShoreSandPlacement(
+                        point,
+                        shoreSandOceanTransitionPrefab,
+                        seaDirection,
+                        true,
+                        true,
+                        false);
+                }
+                else
+                {
+                    addedPlacement = new ShoreSandPlacement(
+                        point,
+                        shoreSandNormalPrefab,
+                        ShoreEdgeDirection.Up,
+                        false,
+                        false,
+                        false);
+                }
+
+                additions.Add(addedPlacement);
+                addedPoints.Add(point);
+                MarkChangedPoint(changedPoints, point);
+            }
+
+            if (additions.Count > 0)
+            {
+                placements.AddRange(additions);
+            }
+        }
+
+        private void ResolveRemainingSingleTileCoastalGaps(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            if (placements == null || placements.Count == 0 || allLandPoints == null || areaByPoint == null)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+            List<ShoreSandPlacement> additions = new List<ShoreSandPlacement>();
+            HashSet<Vector2Int> pendingAdditions = new HashSet<Vector2Int>();
+
+            foreach (Vector2Int point in allLandPoints)
+            {
+                if (shorePoints.Contains(point) ||
+                    !IsGrassLandPoint(point, allLandPoints, areaByPoint))
+                {
+                    continue;
+                }
+
+                if (!HasDirectOceanAndGrassBridgeRisk(point, allLandPoints, shorePoints))
+                {
+                    continue;
+                }
+
+                if (TryCreateMinimumWidthShoreUnitFromGrassPoint(
+                        point,
+                        shorePoints,
+                        allLandPoints,
+                        areaByPoint,
+                        out List<ShoreSandPlacement> unitAdditions))
+                {
+                    for (int addIndex = 0; addIndex < unitAdditions.Count; addIndex++)
+                    {
+                        ShoreSandPlacement addition = unitAdditions[addIndex];
+                        if (pendingAdditions.Add(addition.point))
+                        {
+                            additions.Add(addition);
+                            MarkChangedPoint(changedPoints, addition.point);
+                        }
+                    }
+                }
+            }
+
+            if (additions.Count > 0)
+            {
+                placements.AddRange(additions);
+            }
+        }
+
+        private void ReclassifyAffectedShoreSandPlacements(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> changedPoints)
+        {
+            if (placements == null || placements.Count == 0 || changedPoints == null || changedPoints.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+            HashSet<Vector2Int> affectedPoints = ExpandChangedPointsToNeighborhood(changedPoints, shorePoints);
+            Dictionary<Vector2Int, int> indexByPoint = BuildPlacementIndexByPoint(placements);
+
+            foreach (Vector2Int point in affectedPoints)
+            {
+                if (!indexByPoint.TryGetValue(point, out int index))
+                {
+                    continue;
+                }
+
+                ShoreSandPlacement currentPlacement = placements[index];
+                List<ShoreEdgeDirection> realSeaDirs = CollectSeaEdgeDirections(point, allLandPoints);
+                CountOrdinaryGrassNeighborDirections(
+                    point,
+                    allLandPoints,
+                    areaByPoint,
+                    shorePoints,
+                    out List<ShoreEdgeDirection> realGrassDirs,
+                    out ShoreEdgeDirection singleGrassDirection);
+
+                if (realSeaDirs.Count > 0)
+                {
+                    ShoreEdgeDirection seaDirection = realSeaDirs[0];
+                    placements[index] = new ShoreSandPlacement(
+                        point,
+                        shoreSandOceanTransitionPrefab,
+                        seaDirection,
+                        true,
+                        true,
+                        false,
+                        currentPlacement.grassNeighborCount,
+                        currentPlacement.usedFixedPrioritySelection,
+                        currentPlacement.fromAdjacentTwoGrass);
+                    continue;
+                }
+
+                if (realGrassDirs.Count > 0)
+                {
+                    ShoreEdgeDirection grassDirection = singleGrassDirection;
+                    if (realGrassDirs.Count >= 2 &&
+                        TryResolveAdjacentTwoGrassPrimaryDirection(
+                            point,
+                            allLandPoints,
+                            shorePoints,
+                            realGrassDirs,
+                            out ShoreEdgeDirection resolvedGrassDirection,
+                            out _))
+                    {
+                        grassDirection = resolvedGrassDirection;
+                    }
+
+                    placements[index] = new ShoreSandPlacement(
+                        point,
+                        shoreSandGrassTransitionPrefab,
+                        grassDirection,
+                        false,
+                        false,
+                        true,
+                        realGrassDirs.Count);
+                    continue;
+                }
+
+                placements[index] = new ShoreSandPlacement(
+                    point,
+                    shoreSandNormalPrefab,
+                    currentPlacement.direction,
+                    false,
+                    false,
+                    false);
+            }
+        }
+
+        private void ApplyShortGrassBoundarySegmentFix(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            if (placements == null || placements.Count < 2)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+            Dictionary<Vector2Int, int> indexByPoint = BuildPlacementIndexByPoint(placements);
+            HashSet<Vector2Int> boundaryPoints = new HashSet<Vector2Int>();
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                Vector2Int point = placements[i].point;
+                List<ShoreEdgeDirection> seaDirs = CollectSeaEdgeDirections(point, allLandPoints);
+                CountOrdinaryGrassNeighborDirections(
+                    point,
+                    allLandPoints,
+                    areaByPoint,
+                    shorePoints,
+                    out List<ShoreEdgeDirection> grassDirs,
+                    out _);
+
+                if (seaDirs.Count == 0 && grassDirs.Count > 0)
+                {
+                    boundaryPoints.Add(point);
+                }
+            }
+
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            foreach (Vector2Int startPoint in boundaryPoints)
+            {
+                if (visited.Contains(startPoint))
+                {
+                    continue;
+                }
+
+                List<Vector2Int> component = new List<Vector2Int>();
+                Queue<Vector2Int> queue = new Queue<Vector2Int>();
+                queue.Enqueue(startPoint);
+                visited.Add(startPoint);
+
+                while (queue.Count > 0)
+                {
+                    Vector2Int current = queue.Dequeue();
+                    component.Add(current);
+
+                    TryEnqueueBoundaryNeighbor(current + Vector2Int.up, boundaryPoints, visited, queue);
+                    TryEnqueueBoundaryNeighbor(current + Vector2Int.down, boundaryPoints, visited, queue);
+                    TryEnqueueBoundaryNeighbor(current + Vector2Int.left, boundaryPoints, visited, queue);
+                    TryEnqueueBoundaryNeighbor(current + Vector2Int.right, boundaryPoints, visited, queue);
+                }
+
+                if (component.Count >= minimumShoreSandFootprint)
+                {
+                    continue;
+                }
+
+                for (int componentIndex = 0; componentIndex < component.Count; componentIndex++)
+                {
+                    Vector2Int point = component[componentIndex];
+                    if (!indexByPoint.TryGetValue(point, out int index))
+                    {
+                        continue;
+                    }
+
+                    CountOrdinaryGrassNeighborDirections(
+                        point,
+                        allLandPoints,
+                        areaByPoint,
+                        shorePoints,
+                        out List<ShoreEdgeDirection> grassDirs,
+                        out ShoreEdgeDirection singleGrassDirection);
+
+                    ShoreEdgeDirection grassDirection = singleGrassDirection;
+                    if (grassDirs.Count >= 2 &&
+                        TryResolveAdjacentTwoGrassPrimaryDirection(
+                            point,
+                            allLandPoints,
+                            shorePoints,
+                            grassDirs,
+                            out ShoreEdgeDirection resolvedGrassDirection,
+                            out _))
+                    {
+                        grassDirection = resolvedGrassDirection;
+                    }
+
+                    placements[index] = new ShoreSandPlacement(
+                        point,
+                        shoreSandGrassTransitionPrefab,
+                        grassDirection,
+                        false,
+                        false,
+                        true,
+                        grassDirs.Count);
+                }
+            }
+        }
+
+        private static HashSet<Vector2Int> BuildPlacementPointSet(List<ShoreSandPlacement> placements)
+        {
+            HashSet<Vector2Int> points = new HashSet<Vector2Int>();
+            if (placements == null)
+            {
+                return points;
+            }
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                points.Add(placements[i].point);
+            }
+
+            return points;
+        }
+
+        private static Dictionary<Vector2Int, int> BuildPlacementIndexByPoint(List<ShoreSandPlacement> placements)
+        {
+            Dictionary<Vector2Int, int> indexByPoint = new Dictionary<Vector2Int, int>();
+            if (placements == null)
+            {
+                return indexByPoint;
+            }
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                indexByPoint[placements[i].point] = i;
+            }
+
+            return indexByPoint;
+        }
+
+        private static bool IsSingleTileGrassBottleneck(Vector2Int point, HashSet<Vector2Int> shorePoints)
+        {
+            if (shorePoints == null)
+            {
+                return false;
+            }
+
+            bool blockedLeftRight =
+                shorePoints.Contains(point + Vector2Int.left) &&
+                shorePoints.Contains(point + Vector2Int.right);
+            bool blockedUpDown =
+                shorePoints.Contains(point + Vector2Int.up) &&
+                shorePoints.Contains(point + Vector2Int.down);
+
+            return blockedLeftRight || blockedUpDown;
+        }
+
+        private bool TryWidenNarrowShoreBranch(
+            HashSet<Vector2Int> branchPoints,
+            HashSet<Vector2Int> shorePoints,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            out List<ShoreSandPlacement> additions)
+        {
+            additions = null;
+            if (branchPoints == null || branchPoints.Count == 0 || shorePoints == null)
+            {
+                return false;
+            }
+
+            Vector2Int[] cardinalOffsets =
+            {
+                Vector2Int.left,
+                Vector2Int.right,
+                Vector2Int.up,
+                Vector2Int.down
+            };
+
+            for (int i = 0; i < cardinalOffsets.Length; i++)
+            {
+                if (!TryBuildWidenedBranchAdditions(
+                        branchPoints,
+                        cardinalOffsets[i],
+                        shorePoints,
+                        allLandPoints,
+                        areaByPoint,
+                        out List<Vector2Int> candidatePoints))
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> augmentedShorePoints = new HashSet<Vector2Int>(shorePoints);
+                for (int candidateIndex = 0; candidateIndex < candidatePoints.Count; candidateIndex++)
+                {
+                    augmentedShorePoints.Add(candidatePoints[candidateIndex]);
+                }
+
+                if (!BranchHasMinimumThickness(branchPoints, candidatePoints, augmentedShorePoints, minimumShoreSandFootprint))
+                {
+                    continue;
+                }
+
+                additions = new List<ShoreSandPlacement>(candidatePoints.Count);
+                for (int candidateIndex = 0; candidateIndex < candidatePoints.Count; candidateIndex++)
+                {
+                    additions.Add(CreateIntermediateShorePlacement(candidatePoints[candidateIndex], allLandPoints));
+                }
+
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryBuildWidenedBranchAdditions(
+            HashSet<Vector2Int> branchPoints,
+            Vector2Int offset,
+            HashSet<Vector2Int> shorePoints,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            out List<Vector2Int> candidatePoints)
+        {
+            candidatePoints = new List<Vector2Int>();
+            HashSet<Vector2Int> candidateSet = new HashSet<Vector2Int>();
+
+            for (int layer = 1; layer < minimumShoreSandFootprint; layer++)
+            {
+                foreach (Vector2Int branchPoint in branchPoints)
+                {
+                    Vector2Int candidatePoint = branchPoint + (offset * layer);
+                    if (branchPoints.Contains(candidatePoint) || shorePoints.Contains(candidatePoint) || candidateSet.Contains(candidatePoint))
+                    {
+                        continue;
+                    }
+
+                    if (!CanPromoteGrassPointToShore(candidatePoint, allLandPoints, areaByPoint, shorePoints))
+                    {
+                        return false;
+                    }
+
+                    if (candidateSet.Add(candidatePoint))
+                    {
+                        candidatePoints.Add(candidatePoint);
+                    }
+                }
+            }
+
+            return candidatePoints.Count > 0;
+        }
+
+        private bool TryCreateMinimumWidthShoreUnitFromGrassPoint(
+            Vector2Int point,
+            HashSet<Vector2Int> shorePoints,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            out List<ShoreSandPlacement> additions)
+        {
+            additions = null;
+            Vector2Int[] horizontalOffsets = { Vector2Int.left, Vector2Int.right };
+            Vector2Int[] verticalOffsets = { Vector2Int.up, Vector2Int.down };
+
+            for (int h = 0; h < horizontalOffsets.Length; h++)
+            {
+                for (int v = 0; v < verticalOffsets.Length; v++)
+                {
+                    List<Vector2Int> footprint = new List<Vector2Int>(minimumShoreSandFootprint * minimumShoreSandFootprint);
+                    for (int x = 0; x < minimumShoreSandFootprint; x++)
+                    {
+                        for (int y = 0; y < minimumShoreSandFootprint; y++)
+                        {
+                            footprint.Add(point + (horizontalOffsets[h] * x) + (verticalOffsets[v] * y));
+                        }
+                    }
+
+                    if (!AllPointsAreLand(footprint, allLandPoints))
+                    {
+                        continue;
+                    }
+
+                    List<Vector2Int> candidatePoints = new List<Vector2Int>();
+                    bool canUseFootprint = true;
+                    for (int i = 0; i < footprint.Count; i++)
+                    {
+                        Vector2Int footprintPoint = footprint[i];
+                        if (shorePoints.Contains(footprintPoint))
+                        {
+                            continue;
+                        }
+
+                        if (!CanPromoteGrassPointToShore(footprintPoint, allLandPoints, areaByPoint, shorePoints))
+                        {
+                            canUseFootprint = false;
+                            break;
+                        }
+
+                        candidatePoints.Add(footprintPoint);
+                    }
+
+                    if (!canUseFootprint || candidatePoints.Count == 0)
+                    {
+                        continue;
+                    }
+
+                    HashSet<Vector2Int> augmentedShorePoints = new HashSet<Vector2Int>(shorePoints);
+                    for (int i = 0; i < candidatePoints.Count; i++)
+                    {
+                        augmentedShorePoints.Add(candidatePoints[i]);
+                    }
+
+                    if (!BranchHasMinimumThickness(new HashSet<Vector2Int>(footprint), candidatePoints, augmentedShorePoints, minimumShoreSandFootprint))
+                    {
+                        continue;
+                    }
+
+                    additions = new List<ShoreSandPlacement>(candidatePoints.Count);
+                    for (int i = 0; i < candidatePoints.Count; i++)
+                    {
+                        additions.Add(CreateIntermediateShorePlacement(candidatePoints[i], allLandPoints));
+                    }
+
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool AllPointsAreLand(IList<Vector2Int> points, HashSet<Vector2Int> allLandPoints)
+        {
+            if (points == null || allLandPoints == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (!allLandPoints.Contains(points[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private ShoreSandPlacement CreateIntermediateShorePlacement(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints)
+        {
+            if (TryGetPreferredSeaEdgeDirection(point, allLandPoints, out ShoreEdgeDirection seaDirection))
+            {
+                return new ShoreSandPlacement(
+                    point,
+                    shoreSandOceanTransitionPrefab,
+                    seaDirection,
+                    true,
+                    true,
+                    false);
+            }
+
+            if (TryGetPreferredCoastalDirection(point, allLandPoints, out ShoreEdgeDirection coastalDirection))
+            {
+                return new ShoreSandPlacement(
+                    point,
+                    shoreSandGrassTransitionPrefab,
+                    GetOppositeDirection(coastalDirection),
+                    false,
+                    false,
+                    true);
+            }
+
+            return new ShoreSandPlacement(
+                point,
+                shoreSandNormalPrefab,
+                ShoreEdgeDirection.Up,
+                false,
+                false,
+                false);
+        }
+
+        private static bool BranchHasMinimumThickness(
+            HashSet<Vector2Int> branchPoints,
+            List<Vector2Int> candidatePoints,
+            HashSet<Vector2Int> augmentedShorePoints,
+            int minimumWidth)
+        {
+            foreach (Vector2Int point in branchPoints)
+            {
+                if (!HasMinimumShoreThicknessOnBothAxes(point, augmentedShorePoints, minimumWidth))
+                {
+                    return false;
+                }
+            }
+
+            if (candidatePoints != null)
+            {
+                for (int i = 0; i < candidatePoints.Count; i++)
+                {
+                    if (!HasMinimumShoreThicknessOnBothAxes(candidatePoints[i], augmentedShorePoints, minimumWidth))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private List<HashSet<Vector2Int>> CollectNarrowShoreBranches(HashSet<Vector2Int> shorePoints)
+        {
+            List<HashSet<Vector2Int>> branches = new List<HashSet<Vector2Int>>();
+            if (shorePoints == null || shorePoints.Count == 0)
+            {
+                return branches;
+            }
+
+            HashSet<Vector2Int> corePoints = BuildShoreCorePointSet(shorePoints);
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+
+            foreach (Vector2Int point in shorePoints)
+            {
+                if (corePoints.Contains(point) || visited.Contains(point))
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> branch = new HashSet<Vector2Int>();
+                Queue<Vector2Int> queue = new Queue<Vector2Int>();
+                queue.Enqueue(point);
+                visited.Add(point);
+
+                while (queue.Count > 0)
+                {
+                    Vector2Int current = queue.Dequeue();
+                    branch.Add(current);
+
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.up, shorePoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.down, shorePoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.left, shorePoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.right, shorePoints, corePoints, visited, queue);
+                }
+
+                if (branch.Count > 0)
+                {
+                    branches.Add(branch);
+                }
+            }
+
+            return branches;
+        }
+
+        private static List<HashSet<Vector2Int>> CollectNarrowTerrainBranches(
+            HashSet<Vector2Int> terrainPoints,
+            System.Func<Vector2Int, bool> isCorePoint)
+        {
+            List<HashSet<Vector2Int>> branches = new List<HashSet<Vector2Int>>();
+            if (terrainPoints == null || terrainPoints.Count == 0 || isCorePoint == null)
+            {
+                return branches;
+            }
+
+            HashSet<Vector2Int> corePoints = new HashSet<Vector2Int>();
+            foreach (Vector2Int point in terrainPoints)
+            {
+                if (isCorePoint(point))
+                {
+                    corePoints.Add(point);
+                }
+            }
+
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            foreach (Vector2Int point in terrainPoints)
+            {
+                if (corePoints.Contains(point) || visited.Contains(point))
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> branch = new HashSet<Vector2Int>();
+                Queue<Vector2Int> queue = new Queue<Vector2Int>();
+                queue.Enqueue(point);
+                visited.Add(point);
+
+                while (queue.Count > 0)
+                {
+                    Vector2Int current = queue.Dequeue();
+                    branch.Add(current);
+
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.up, terrainPoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.down, terrainPoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.left, terrainPoints, corePoints, visited, queue);
+                    TryEnqueueNonCoreNeighbor(current + Vector2Int.right, terrainPoints, corePoints, visited, queue);
+                }
+
+                if (branch.Count > 0)
+                {
+                    branches.Add(branch);
+                }
+            }
+
+            return branches;
+        }
+
+        private HashSet<Vector2Int> BuildShoreCorePointSet(HashSet<Vector2Int> shorePoints)
+        {
+            HashSet<Vector2Int> corePoints = new HashSet<Vector2Int>();
+            if (shorePoints == null)
+            {
+                return corePoints;
+            }
+
+            foreach (Vector2Int point in shorePoints)
+            {
+                if (HasMinimumShoreThicknessOnBothAxes(point, shorePoints, minimumShoreSandFootprint) ||
+                    HasValidTwoDimensionalSupport(point, shorePoints, minimumShoreSandFootprint))
+                {
+                    corePoints.Add(point);
+                }
+            }
+
+            return corePoints;
+        }
+
+        private static void TryEnqueueNonCoreNeighbor(
+            Vector2Int point,
+            HashSet<Vector2Int> shorePoints,
+            HashSet<Vector2Int> corePoints,
+            HashSet<Vector2Int> visited,
+            Queue<Vector2Int> queue)
+        {
+            if (!shorePoints.Contains(point) || corePoints.Contains(point) || visited.Contains(point))
+            {
+                return;
+            }
+
+            visited.Add(point);
+            queue.Enqueue(point);
+        }
+
+        private static void TryEnqueueBoundaryNeighbor(
+            Vector2Int point,
+            HashSet<Vector2Int> boundaryPoints,
+            HashSet<Vector2Int> visited,
+            Queue<Vector2Int> queue)
+        {
+            if (!boundaryPoints.Contains(point) || visited.Contains(point))
+            {
+                return;
+            }
+
+            visited.Add(point);
+            queue.Enqueue(point);
+        }
+
+        private static bool CanPromoteGrassPointToShore(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> shorePoints)
+        {
+            return !shorePoints.Contains(point) &&
+                   IsGrassLandPoint(point, allLandPoints, areaByPoint);
+        }
+
+        private static HashSet<Vector2Int> BuildGrassSupportPointSet(
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> shorePoints)
+        {
+            HashSet<Vector2Int> grassPoints = new HashSet<Vector2Int>();
+            if (allLandPoints == null || areaByPoint == null)
+            {
+                return grassPoints;
+            }
+
+            foreach (Vector2Int point in allLandPoints)
+            {
+                if (!shorePoints.Contains(point) &&
+                    areaByPoint.TryGetValue(point, out AreaType areaType) &&
+                    areaType == AreaType.Grass)
+                {
+                    grassPoints.Add(point);
+                }
+            }
+
+            return grassPoints;
+        }
+
+        private List<Vector2Int> CollectUnsupportedPoints(HashSet<Vector2Int> points, int minimumWidth)
+        {
+            List<Vector2Int> unsupportedPoints = new List<Vector2Int>();
+            if (points == null || points.Count == 0)
+            {
+                return unsupportedPoints;
+            }
+
+            foreach (Vector2Int point in points)
+            {
+                if (!HasValidTwoDimensionalSupport(point, points, minimumWidth))
+                {
+                    unsupportedPoints.Add(point);
+                }
+            }
+
+            return unsupportedPoints;
+        }
+
+        private static bool HasValidTwoDimensionalSupport(Vector2Int point, HashSet<Vector2Int> supportPoints, int minimumWidth)
+        {
+            if (supportPoints == null || !supportPoints.Contains(point))
+            {
+                return false;
+            }
+
+            for (int xStart = 0; xStart < minimumWidth; xStart++)
+            {
+                for (int yStart = 0; yStart < minimumWidth; yStart++)
+                {
+                    if (FormsSupportedSquareSupport(point, -xStart, -yStart, minimumWidth, supportPoints))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool HasMinimumShoreThicknessOnBothAxes(Vector2Int point, HashSet<Vector2Int> shorePoints, int minimumWidth)
+        {
+            if (shorePoints == null || !shorePoints.Contains(point))
+            {
+                return false;
+            }
+
+            return CountContiguousRunLength(point, Vector2Int.left, Vector2Int.right, shorePoints) >= minimumWidth &&
+                   CountContiguousRunLength(point, Vector2Int.down, Vector2Int.up, shorePoints) >= minimumWidth;
+        }
+
+        private static bool FormsSupportedSquareSupport(
+            Vector2Int anchorPoint,
+            int xStartOffset,
+            int yStartOffset,
+            int size,
+            HashSet<Vector2Int> supportPoints)
+        {
+            Vector2Int start = new Vector2Int(anchorPoint.x + xStartOffset, anchorPoint.y + yStartOffset);
+            for (int x = 0; x < size; x++)
+            {
+                for (int y = 0; y < size; y++)
+                {
+                    if (!supportPoints.Contains(new Vector2Int(start.x + x, start.y + y)))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            return true;
+        }
+
+        private static void MarkChangedPoint(HashSet<Vector2Int> changedPoints, Vector2Int point)
+        {
+            changedPoints?.Add(point);
+        }
+
+        private static HashSet<Vector2Int> ExpandChangedPointsToNeighborhood(
+            HashSet<Vector2Int> changedPoints,
+            HashSet<Vector2Int> shorePoints)
+        {
+            HashSet<Vector2Int> expanded = new HashSet<Vector2Int>();
+            if (changedPoints == null || changedPoints.Count == 0)
+            {
+                return expanded;
+            }
+
+            foreach (Vector2Int point in changedPoints)
+            {
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        Vector2Int neighbor = new Vector2Int(point.x + dx, point.y + dy);
+                        if (shorePoints.Contains(neighbor))
+                        {
+                            expanded.Add(neighbor);
+                        }
+                    }
+                }
+            }
+
+            return expanded;
+        }
+
+        private static bool HasDirectOceanAndGrassBridgeRisk(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            HashSet<Vector2Int> shorePoints)
+        {
+            if (shorePoints == null || shorePoints.Contains(point))
+            {
+                return false;
+            }
+
+            bool touchesOcean = !allLandPoints.Contains(point + Vector2Int.up) ||
+                                !allLandPoints.Contains(point + Vector2Int.down) ||
+                                !allLandPoints.Contains(point + Vector2Int.left) ||
+                                !allLandPoints.Contains(point + Vector2Int.right);
+
+            if (!touchesOcean)
+            {
+                return false;
+            }
+
+            int shoreNeighborCount = 0;
+            if (shorePoints.Contains(point + Vector2Int.up))
+            {
+                shoreNeighborCount++;
+            }
+
+            if (shorePoints.Contains(point + Vector2Int.down))
+            {
+                shoreNeighborCount++;
+            }
+
+            if (shorePoints.Contains(point + Vector2Int.left))
+            {
+                shoreNeighborCount++;
+            }
+
+            if (shorePoints.Contains(point + Vector2Int.right))
+            {
+                shoreNeighborCount++;
+            }
+
+            return shoreNeighborCount <= 1;
         }
 
         private static bool TryResolvePreferredDirectSeaPlacement(List<ShoreSandPlacement> candidates, out ShoreSandPlacement directSeaPlacement)
@@ -2584,10 +3934,25 @@ namespace UnderTheStars.GenerationMap
             Vector2Int neighborA = point + offsetA;
             Vector2Int neighborB = point + offsetB;
             Vector2Int diagonalPoint = point + offsetA + offsetB;
+            Vector2Int oppositeDiagonalPoint = point - offsetA - offsetB;
 
             if (!finalShoreSandPoints.Contains(neighborA) ||
                 !finalShoreSandPoints.Contains(neighborB) ||
                 !IsOrdinaryGrassPoint(diagonalPoint, allLandPoints, areaByPoint, finalShoreSandPoints))
+            {
+                return false;
+            }
+
+            CountOrdinaryGrassNeighborDirections(
+                point,
+                allLandPoints,
+                areaByPoint,
+                finalShoreSandPoints,
+                out List<ShoreEdgeDirection> directGrassDirections,
+                out _);
+
+            if (directGrassDirections.Count > 0 ||
+                IsOrdinaryGrassPoint(oppositeDiagonalPoint, allLandPoints, areaByPoint, finalShoreSandPoints))
             {
                 return false;
             }
