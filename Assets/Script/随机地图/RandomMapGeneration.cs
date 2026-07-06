@@ -42,6 +42,8 @@ namespace UnderTheStars.GenerationMap
         [SerializeField, Min(3)] private int shoreSandWidth = 5;
         [SerializeField, Min(2)] private int minimumShoreSandFootprint = 2;
         [SerializeField] private bool debugShoreSandPlacements = false;
+        [SerializeField] private bool debugShoreSandDecisionTrace = false;
+        [SerializeField] private Vector2Int debugShoreSandGridPoint;
 
         [Header("区域大小与范围")]
         [SerializeField] private Vector2Int regionSize;// Legacy serialized data for migration
@@ -1753,6 +1755,7 @@ namespace UnderTheStars.GenerationMap
 
                 GameObject instance = Instantiate(prefab, worldPosition, finalRotation, parent);
                 ApplyShoreSandDebugName(instance, placements[i], point);
+                TraceFinalShoreSandInstantiation(point, placements[i], prefab, finalYaw, instance);
                 if (placements[i].marksAsBeach)
                 {
                     generatedShoreSandPoints.Add(point);
@@ -1842,6 +1845,12 @@ namespace UnderTheStars.GenerationMap
                 additions.Add(addedPlacement);
                 adjustedPoints.Add(point);
                 MarkChangedPoint(changedPoints, point);
+                TraceShoreSandPlacement(
+                    point,
+                    "ApplyShoreSandBoundaryCleanup",
+                    "Grass",
+                    addedPlacement,
+                    $"Boundary cleanup addition. reason={reason} primaryDir={primaryDirection} secondaryDir={secondaryDirection}");
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 LogShoreSandBoundaryCleanup(
@@ -1934,6 +1943,12 @@ namespace UnderTheStars.GenerationMap
                 true,
                 true,
                 false));
+            TraceShoreSandPlacement(
+                outerPoint,
+                "TryBuildShoreSandStrip",
+                "None",
+                placements[0],
+                $"Initial strip layer=1 oceanDirection={oceanDirection} inwardDirection={grassDirection} shoreWidth={resolvedShoreSandWidth}");
 
             for (int layerIndex = 2; layerIndex <= resolvedShoreSandWidth; layerIndex++)
             {
@@ -1950,6 +1965,12 @@ namespace UnderTheStars.GenerationMap
                     false,
                     false,
                     layerIndex == resolvedShoreSandWidth));
+                TraceShoreSandPlacement(
+                    layerPoint,
+                    "TryBuildShoreSandStrip",
+                    "None",
+                    placements[placements.Count - 1],
+                    $"Initial strip layer={layerIndex} oceanDirection={oceanDirection} inwardDirection={grassDirection} shoreWidth={resolvedShoreSandWidth}");
             }
 
             return true;
@@ -1966,7 +1987,7 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
-            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints);
+            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints, "ApplyMinimumTwoTileCoastalWidth");
             FillSingleTileGrassBottlenecks(placements, allLandPoints, areaByPoint, changedPoints);
         }
 
@@ -1981,14 +2002,37 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
-            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints);
+            if (ShouldTraceShoreSandPoint(debugShoreSandGridPoint))
+            {
+                TraceShoreSandDecision(
+                    debugShoreSandGridPoint,
+                    "NormalizeFinalShoreSandFootprint",
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    $"Begin normalize. existsBefore={ContainsPlacementPoint(placements, debugShoreSandGridPoint)}",
+                    null);
+            }
+
+            EnsureMinimumShoreSandWidth(placements, allLandPoints, areaByPoint, changedPoints, "NormalizeFinalShoreSandFootprint");
+
+            if (ShouldTraceShoreSandPoint(debugShoreSandGridPoint))
+            {
+                TraceShoreSandDecision(
+                    debugShoreSandGridPoint,
+                    "NormalizeFinalShoreSandFootprint",
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    $"End normalize. existsAfter={ContainsPlacementPoint(placements, debugShoreSandGridPoint)}",
+                    null);
+            }
         }
 
         private void EnsureMinimumShoreSandWidth(
             List<ShoreSandPlacement> placements,
             HashSet<Vector2Int> allLandPoints,
             Dictionary<Vector2Int, AreaType> areaByPoint,
-            HashSet<Vector2Int> changedPoints)
+            HashSet<Vector2Int> changedPoints,
+            string traceStage = "EnsureMinimumShoreSandWidth")
         {
             bool changed;
             do
@@ -2028,6 +2072,12 @@ namespace UnderTheStars.GenerationMap
                                 additions.Add(supportPlacement);
                                 MarkChangedPoint(changedPoints, supportPlacement.point);
                                 changed = true;
+                                TraceShoreSandPlacement(
+                                    supportPlacement.point,
+                                    traceStage,
+                                    "None",
+                                    supportPlacement,
+                                    $"Added while widening narrow branch. branchSize={branch.Count} branchPoints={FormatPointCollection(branch)}");
                             }
                         }
                     }
@@ -2035,8 +2085,16 @@ namespace UnderTheStars.GenerationMap
                     {
                         foreach (Vector2Int removedPoint in branch)
                         {
+                            string oldType = GetPlacementTypeAtPoint(placements, removedPoint);
                             removedPoints.Add(removedPoint);
                             MarkChangedPoint(changedPoints, removedPoint);
+                            TraceShoreSandDecision(
+                                removedPoint,
+                                traceStage,
+                                oldType,
+                                "Removed",
+                                $"Removed as narrow shore branch. branchSize={branch.Count} branchPoints={FormatPointCollection(branch)}",
+                                null);
                         }
                     }
                 }
@@ -2110,6 +2168,12 @@ namespace UnderTheStars.GenerationMap
                 additions.Add(addedPlacement);
                 addedPoints.Add(point);
                 MarkChangedPoint(changedPoints, point);
+                TraceShoreSandPlacement(
+                    point,
+                    "ApplyMinimumTwoTileCoastalWidth",
+                    "Grass",
+                    addedPlacement,
+                    $"Filled unsupported grass bottleneck. singleTileBottleneck={IsSingleTileGrassBottleneck(point, shorePoints)} supports2D={HasValidTwoDimensionalSupport(point, grassPoints, minimumTerrainFeatureWidth)}");
             }
 
             if (additions.Count > 0)
@@ -2160,6 +2224,12 @@ namespace UnderTheStars.GenerationMap
                         {
                             additions.Add(addition);
                             MarkChangedPoint(changedPoints, addition.point);
+                            TraceShoreSandPlacement(
+                                addition.point,
+                                "ResolveRemainingSingleTileCoastalGaps",
+                                "Grass",
+                                addition,
+                                $"Added by coastal gap resolution from sourcePoint={point} bridgeRisk=true");
                         }
                     }
                 }
@@ -2177,14 +2247,43 @@ namespace UnderTheStars.GenerationMap
             Dictionary<Vector2Int, AreaType> areaByPoint,
             HashSet<Vector2Int> changedPoints)
         {
-            if (placements == null || placements.Count == 0 || changedPoints == null || changedPoints.Count == 0)
+            if (placements == null || placements.Count == 0)
             {
                 return;
             }
 
             HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
-            HashSet<Vector2Int> affectedPoints = ExpandChangedPointsToNeighborhood(changedPoints, shorePoints);
+            HashSet<Vector2Int> expandedAffectedPoints = ExpandChangedPointsToNeighborhood(changedPoints, shorePoints);
+            HashSet<Vector2Int> finalBoundaryPoints = CollectFinalShoreBoundaryReclassificationPoints(
+                placements,
+                allLandPoints,
+                areaByPoint,
+                shorePoints);
+            HashSet<Vector2Int> affectedPoints = new HashSet<Vector2Int>(expandedAffectedPoints);
+            affectedPoints.UnionWith(finalBoundaryPoints);
             Dictionary<Vector2Int, int> indexByPoint = BuildPlacementIndexByPoint(placements);
+
+            if (ShouldTraceShoreSandPoint(debugShoreSandGridPoint))
+            {
+                CountOrdinaryGrassNeighborDirections(
+                    debugShoreSandGridPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    shorePoints,
+                    out List<ShoreEdgeDirection> traceGrassDirs,
+                    out _);
+                List<ShoreEdgeDirection> traceSeaDirs = CollectSeaEdgeDirections(debugShoreSandGridPoint, allLandPoints);
+                List<ShoreEdgeDirection> traceDiagGrassDirs = CollectDiagonalOrdinaryGrassDirections(debugShoreSandGridPoint, allLandPoints, areaByPoint, shorePoints);
+                List<ShoreEdgeDirection> traceDiagSeaDirs = CollectDiagonalSeaDirections(debugShoreSandGridPoint, allLandPoints);
+                TraceShoreSandDecision(
+                    debugShoreSandGridPoint,
+                    "ReclassifyAffectedShoreSandPlacements",
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                    $"Current Placement Type={GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint)} changedPointsContains={changedPoints != null && changedPoints.Contains(debugShoreSandGridPoint)} expandedAffectedPointsContains={expandedAffectedPoints.Contains(debugShoreSandGridPoint)} finalBoundaryCandidateContains={finalBoundaryPoints.Contains(debugShoreSandGridPoint)} affectedPointsContains={affectedPoints.Contains(debugShoreSandGridPoint)} Skipped Reclassification={!affectedPoints.Contains(debugShoreSandGridPoint)} Skip Reason={(affectedPoints.Contains(debugShoreSandGridPoint) ? "None" : "Not in affected points")} orthogonalOcean={FormatDirectionList(traceSeaDirs)} orthogonalGrass={FormatDirectionList(traceGrassDirs)} diagonalOcean={FormatDirectionList(traceDiagSeaDirs)} diagonalGrass={FormatDirectionList(traceDiagGrassDirs)}",
+                    null);
+                TraceOrdinaryGrassNeighborStates(debugShoreSandGridPoint, allLandPoints, areaByPoint, shorePoints);
+            }
 
             foreach (Vector2Int point in affectedPoints)
             {
@@ -2206,7 +2305,7 @@ namespace UnderTheStars.GenerationMap
                 if (realSeaDirs.Count > 0)
                 {
                     ShoreEdgeDirection seaDirection = realSeaDirs[0];
-                    placements[index] = new ShoreSandPlacement(
+                    ShoreSandPlacement newPlacement = new ShoreSandPlacement(
                         point,
                         shoreSandOceanTransitionPrefab,
                         seaDirection,
@@ -2216,6 +2315,13 @@ namespace UnderTheStars.GenerationMap
                         currentPlacement.grassNeighborCount,
                         currentPlacement.usedFixedPrioritySelection,
                         currentPlacement.fromAdjacentTwoGrass);
+                    placements[index] = newPlacement;
+                    TraceShoreSandPlacement(
+                        point,
+                        "ReclassifyAffectedShoreSandPlacements",
+                        GetShoreSandPlacementDebugType(currentPlacement),
+                        newPlacement,
+                        $"Orthogonal ocean found: {FormatDirectionList(realSeaDirs)}");
                     continue;
                 }
 
@@ -2234,7 +2340,7 @@ namespace UnderTheStars.GenerationMap
                         grassDirection = resolvedGrassDirection;
                     }
 
-                    placements[index] = new ShoreSandPlacement(
+                    ShoreSandPlacement newPlacement = new ShoreSandPlacement(
                         point,
                         shoreSandGrassTransitionPrefab,
                         grassDirection,
@@ -2242,17 +2348,73 @@ namespace UnderTheStars.GenerationMap
                         false,
                         true,
                         realGrassDirs.Count);
+                    placements[index] = newPlacement;
+                    TraceShoreSandPlacement(
+                        point,
+                        "ReclassifyAffectedShoreSandPlacements",
+                        GetShoreSandPlacementDebugType(currentPlacement),
+                        newPlacement,
+                        $"Orthogonal grass found: {FormatDirectionList(realGrassDirs)} selectedGrassDirection={grassDirection}");
                     continue;
                 }
 
-                placements[index] = new ShoreSandPlacement(
+                ShoreSandPlacement normalPlacement = new ShoreSandPlacement(
                     point,
                     shoreSandNormalPrefab,
                     currentPlacement.direction,
                     false,
                     false,
                     false);
+                placements[index] = normalPlacement;
+                TraceShoreSandPlacement(
+                    point,
+                    "ReclassifyAffectedShoreSandPlacements",
+                    GetShoreSandPlacementDebugType(currentPlacement),
+                    normalPlacement,
+                    "No orthogonal ocean or ordinary grass neighbors after final state");
             }
+        }
+
+        private HashSet<Vector2Int> CollectFinalShoreBoundaryReclassificationPoints(
+            List<ShoreSandPlacement> placements,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> shorePoints)
+        {
+            HashSet<Vector2Int> points = new HashSet<Vector2Int>();
+            if (placements == null || allLandPoints == null || areaByPoint == null || shorePoints == null)
+            {
+                return points;
+            }
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                ShoreSandPlacement placement = placements[i];
+                Vector2Int point = placement.point;
+
+                List<ShoreEdgeDirection> seaDirs = CollectSeaEdgeDirections(point, allLandPoints);
+                CountOrdinaryGrassNeighborDirections(
+                    point,
+                    allLandPoints,
+                    areaByPoint,
+                    shorePoints,
+                    out List<ShoreEdgeDirection> grassDirs,
+                    out _);
+
+                bool isBoundaryCandidate = seaDirs.Count > 0 || grassDirs.Count > 0;
+                bool isCornerCandidate =
+                    IsOceanOuterCornerPlacement(placement) ||
+                    IsOceanInnerCornerPlacement(placement) ||
+                    IsGrassOuterCornerPlacement(placement) ||
+                    IsGrassInnerCornerPlacement(placement);
+
+                if (isBoundaryCandidate || isCornerCandidate)
+                {
+                    points.Add(point);
+                }
+            }
+
+            return points;
         }
 
         private void ApplyShortGrassBoundarySegmentFix(
@@ -2316,6 +2478,17 @@ namespace UnderTheStars.GenerationMap
                     continue;
                 }
 
+                if (ShouldTraceShoreSandPoint(debugShoreSandGridPoint) && component.Contains(debugShoreSandGridPoint))
+                {
+                    TraceShoreSandDecision(
+                        debugShoreSandGridPoint,
+                        "ApplyShortGrassBoundarySegmentFix",
+                        GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                        GetPlacementTypeAtPoint(placements, debugShoreSandGridPoint),
+                        $"Boundary segment includes point. segmentLength={component.Count} component={FormatPointCollection(component)}",
+                        null);
+                }
+
                 for (int componentIndex = 0; componentIndex < component.Count; componentIndex++)
                 {
                     Vector2Int point = component[componentIndex];
@@ -2345,7 +2518,8 @@ namespace UnderTheStars.GenerationMap
                         grassDirection = resolvedGrassDirection;
                     }
 
-                    placements[index] = new ShoreSandPlacement(
+                    string oldType = GetShoreSandPlacementDebugType(placements[index]);
+                    ShoreSandPlacement newPlacement = new ShoreSandPlacement(
                         point,
                         shoreSandGrassTransitionPrefab,
                         grassDirection,
@@ -2353,6 +2527,13 @@ namespace UnderTheStars.GenerationMap
                         false,
                         true,
                         grassDirs.Count);
+                    placements[index] = newPlacement;
+                    TraceShoreSandPlacement(
+                        point,
+                        "ApplyShortGrassBoundarySegmentFix",
+                        oldType,
+                        newPlacement,
+                        $"Forced short grass boundary segment to GrassTransition. segmentLength={component.Count} component={FormatPointCollection(component)} grassDirection={grassDirection} grassDirs={FormatDirectionList(grassDirs)}");
                 }
             }
         }
@@ -3563,6 +3744,14 @@ namespace UnderTheStars.GenerationMap
                     reason = "ocean-inner-disabled-safe-fallback";
                 }
 
+                ShoreSandPlacement finalPlacementForTrace = placements[i];
+                TraceShoreSandPlacement(
+                    finalPlacementForTrace.point,
+                    "ApplyFinalCornerResolution",
+                    fallbackType,
+                    finalPlacementForTrace,
+                    $"selectedCornerType={selectedCornerType} reason={reason} orthogonalOcean={FormatDirectionList(realSeaDirs)} orthogonalGrass={FormatDirectionList(realOrdinaryGrassDirs)} diagonalOcean={FormatDirectionList(CollectDiagonalSeaDirections(finalPlacementForTrace.point, allLandPoints))} diagonalGrass={FormatDirectionList(CollectDiagonalOrdinaryGrassDirections(finalPlacementForTrace.point, allLandPoints, areaByPoint, finalShoreSandPoints))}");
+
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 ShoreSandPlacement finalPlacement = placements[i];
                 LogCornerDecision(
@@ -3736,6 +3925,279 @@ namespace UnderTheStars.GenerationMap
             }
 
             return "ShoreSand_Normal";
+        }
+
+        private bool ShouldTraceShoreSandPoint(Vector2Int point)
+        {
+            return debugShoreSandDecisionTrace && point == debugShoreSandGridPoint;
+        }
+
+        private void TraceShoreSandDecision(
+            Vector2Int point,
+            string stage,
+            string oldType,
+            string newType,
+            string reason,
+            float? yaw)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!ShouldTraceShoreSandPoint(point))
+            {
+                return;
+            }
+
+            string yawText = yaw.HasValue ? NormalizeYaw(yaw.Value).ToString("F1") : "N/A";
+            Debug.Log(
+                $"[ShoreSand Trace]\nPoint: {point}\nStage: {stage}\nOld Type: {oldType}\nNew Type: {newType}\nReason: {reason}\nYaw: {yawText}",
+                this);
+#endif
+        }
+
+        private void TraceShoreSandPlacement(
+            Vector2Int point,
+            string stage,
+            string oldType,
+            ShoreSandPlacement placement,
+            string reason)
+        {
+            float yaw = placement.usesExplicitYaw
+                ? placement.explicitYaw
+                : placement.usesGrassTransitionDirectionMapping
+                    ? ResolveGrassTransitionYaw(placement.direction)
+                    : ResolveShoreSandYaw(placement.direction);
+            TraceShoreSandDecision(
+                point,
+                stage,
+                oldType,
+                GetShoreSandPlacementDebugType(placement),
+                reason,
+                yaw);
+        }
+
+        private void TraceFinalShoreSandInstantiation(
+            Vector2Int point,
+            ShoreSandPlacement placement,
+            GameObject prefab,
+            float finalYaw,
+            GameObject instance)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!ShouldTraceShoreSandPoint(point))
+            {
+                return;
+            }
+
+            Vector3 finalScale = instance != null ? instance.transform.localScale : Vector3.one;
+            bool mirrored = finalScale.x < 0f || finalScale.y < 0f || finalScale.z < 0f;
+            TraceShoreSandDecision(
+                point,
+                "InstantiateShoreSandPrefab",
+                GetShoreSandPlacementDebugType(placement),
+                GetShoreSandPlacementDebugType(placement),
+                $"Final prefabField={GetShoreSandPrefabFieldName(prefab)} finalScale={finalScale} mirrored={mirrored}",
+                finalYaw);
+#endif
+        }
+
+        private string GetShoreSandPrefabFieldName(GameObject prefab)
+        {
+            if (prefab == shoreSandNormalPrefab)
+            {
+                return nameof(shoreSandNormalPrefab);
+            }
+
+            if (prefab == shoreSandOceanTransitionPrefab)
+            {
+                return nameof(shoreSandOceanTransitionPrefab);
+            }
+
+            if (prefab == shoreSandGrassTransitionPrefab)
+            {
+                return nameof(shoreSandGrassTransitionPrefab);
+            }
+
+            if (prefab == shoreSandOceanOuterCornerPrefab)
+            {
+                return nameof(shoreSandOceanOuterCornerPrefab);
+            }
+
+            if (prefab == shoreSandOceanInnerCornerPrefab)
+            {
+                return nameof(shoreSandOceanInnerCornerPrefab);
+            }
+
+            if (prefab == shoreSandGrassOuterCornerPrefab)
+            {
+                return nameof(shoreSandGrassOuterCornerPrefab);
+            }
+
+            if (prefab == shoreSandGrassInnerCornerPrefab)
+            {
+                return nameof(shoreSandGrassInnerCornerPrefab);
+            }
+
+            return prefab != null ? prefab.name : "None";
+        }
+
+        private string GetPlacementTypeAtPoint(List<ShoreSandPlacement> placements, Vector2Int point)
+        {
+            if (placements == null)
+            {
+                return "None";
+            }
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                if (placements[i].point == point)
+                {
+                    return GetShoreSandPlacementDebugType(placements[i]);
+                }
+            }
+
+            return "None";
+        }
+
+        private bool ContainsPlacementPoint(List<ShoreSandPlacement> placements, Vector2Int point)
+        {
+            if (placements == null)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                if (placements[i].point == point)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private string FormatDirectionList(List<ShoreEdgeDirection> directions)
+        {
+            return directions == null || directions.Count == 0 ? "None" : string.Join(",", directions);
+        }
+
+        private string FormatPointCollection(IEnumerable<Vector2Int> points)
+        {
+            if (points == null)
+            {
+                return "None";
+            }
+
+            List<string> entries = new List<string>();
+            foreach (Vector2Int point in points)
+            {
+                entries.Add(point.ToString());
+            }
+
+            return entries.Count == 0 ? "None" : string.Join(",", entries);
+        }
+
+        private List<ShoreEdgeDirection> CollectDiagonalSeaDirections(Vector2Int point, HashSet<Vector2Int> allLandPoints)
+        {
+            List<ShoreEdgeDirection> directions = new List<ShoreEdgeDirection>(4);
+            if (allLandPoints == null)
+            {
+                return directions;
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.up + Vector2Int.left))
+            {
+                directions.Add(ShoreEdgeDirection.Left);
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.up + Vector2Int.right))
+            {
+                directions.Add(ShoreEdgeDirection.Right);
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.down + Vector2Int.left))
+            {
+                directions.Add(ShoreEdgeDirection.Down);
+            }
+
+            if (!allLandPoints.Contains(point + Vector2Int.down + Vector2Int.right))
+            {
+                directions.Add(ShoreEdgeDirection.Up);
+            }
+
+            return directions;
+        }
+
+        private List<ShoreEdgeDirection> CollectDiagonalOrdinaryGrassDirections(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> finalShoreSandPoints)
+        {
+            List<ShoreEdgeDirection> directions = new List<ShoreEdgeDirection>(4);
+
+            if (IsOrdinaryGrassNeighbor(point + Vector2Int.up + Vector2Int.left, allLandPoints, areaByPoint, finalShoreSandPoints))
+            {
+                directions.Add(ShoreEdgeDirection.Up);
+            }
+
+            if (IsOrdinaryGrassNeighbor(point + Vector2Int.up + Vector2Int.right, allLandPoints, areaByPoint, finalShoreSandPoints))
+            {
+                directions.Add(ShoreEdgeDirection.Right);
+            }
+
+            if (IsOrdinaryGrassNeighbor(point + Vector2Int.down + Vector2Int.left, allLandPoints, areaByPoint, finalShoreSandPoints))
+            {
+                directions.Add(ShoreEdgeDirection.Left);
+            }
+
+            if (IsOrdinaryGrassNeighbor(point + Vector2Int.down + Vector2Int.right, allLandPoints, areaByPoint, finalShoreSandPoints))
+            {
+                directions.Add(ShoreEdgeDirection.Down);
+            }
+
+            return directions;
+        }
+
+        private void TraceOrdinaryGrassNeighborStates(
+            Vector2Int point,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> shorePoints)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            if (!ShouldTraceShoreSandPoint(point))
+            {
+                return;
+            }
+
+            TraceSingleNeighborState("Up", point + Vector2Int.up, allLandPoints, areaByPoint, shorePoints);
+            TraceSingleNeighborState("Down", point + Vector2Int.down, allLandPoints, areaByPoint, shorePoints);
+            TraceSingleNeighborState("Left", point + Vector2Int.left, allLandPoints, areaByPoint, shorePoints);
+            TraceSingleNeighborState("Right", point + Vector2Int.right, allLandPoints, areaByPoint, shorePoints);
+#endif
+        }
+
+        private void TraceSingleNeighborState(
+            string label,
+            Vector2Int neighborPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> shorePoints)
+        {
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+            bool baseGrass = allLandPoints != null &&
+                             allLandPoints.Contains(neighborPoint) &&
+                             areaByPoint != null &&
+                             areaByPoint.TryGetValue(neighborPoint, out AreaType areaType) &&
+                             areaType == AreaType.Grass;
+            bool occupiedByShore = shorePoints != null && shorePoints.Contains(neighborPoint);
+            bool ordinaryGrass = IsOrdinaryGrassNeighbor(neighborPoint, allLandPoints, areaByPoint, shorePoints);
+            bool ocean = allLandPoints == null || !allLandPoints.Contains(neighborPoint);
+
+            Debug.Log(
+                $"[ShoreSand Trace Neighbor]\nReference Point: {debugShoreSandGridPoint}\nLabel: {label}\nPoint: {neighborPoint}\nBase Grass: {baseGrass}\nOccupied By ShoreSand: {occupiedByShore}\nOrdinary Grass: {ordinaryGrass}\nOcean: {ocean}",
+                this);
+#endif
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]
