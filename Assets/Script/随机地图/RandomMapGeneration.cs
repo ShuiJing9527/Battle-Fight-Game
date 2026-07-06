@@ -65,6 +65,8 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private bool removeSingleTileSpikes = true;
         [SerializeField, Min(1)] private int cleanupIterations = 1;
         [SerializeField, Min(1)] private int minimumTerrainFeatureWidth = 4;
+        [SerializeField] private bool enableShorelineMicroCleanup = true;
+        [SerializeField, Range(1, 2)] private int shorelineMicroCleanupSize = 2;
 
         [Header("Legacy Area Types (migration only)")]
         [SerializeField] private bool useRegionAreaTypes = false;
@@ -175,6 +177,26 @@ namespace UnderTheStars.GenerationMap
                 this.explicitYaw = explicitYaw;
                 this.hasSecondaryDirection = hasSecondaryDirection;
                 this.secondaryDirection = secondaryDirection;
+            }
+        }
+
+        private struct ShorelineJunctionFillCandidate
+        {
+            public Vector2Int point;
+            public int score;
+            public Vector2Int sourceBlockOrigin;
+            public string sourceKind;
+
+            public ShorelineJunctionFillCandidate(
+                Vector2Int point,
+                int score,
+                Vector2Int sourceBlockOrigin,
+                string sourceKind)
+            {
+                this.point = point;
+                this.score = score;
+                this.sourceBlockOrigin = sourceBlockOrigin;
+                this.sourceKind = sourceKind;
             }
         }
 
@@ -631,6 +653,11 @@ namespace UnderTheStars.GenerationMap
 
             NormalizeBaseTerrainMinimumWidth();
 
+            if (enableShorelineMicroCleanup)
+            {
+                ApplyShorelineMicroCleanup();
+            }
+
             HashSet<Vector2Int> rebuiltAllFloorPoints = RebuildAllFloorPoints();
             LogActualFloorBounds(originalBoundsByLayout, finalOffsetByLayout);
             return rebuiltAllFloorPoints;
@@ -850,6 +877,1049 @@ namespace UnderTheStars.GenerationMap
                 ApplyFloorPointFills(pointsToFill);
                 ApplyFloorPointRemovals(pointsToRemove);
             }
+        }
+
+        private void ApplyShorelineMicroCleanup()
+        {
+            if (floorPoints == null)
+            {
+                return;
+            }
+
+            int iterationCount = Mathf.Clamp(shorelineMicroCleanupSize, 1, 2);
+            for (int iteration = 0; iteration < iterationCount; iteration++)
+            {
+                HashSet<Vector2Int> allFloorPoints = RebuildAllFloorPoints();
+                if (allFloorPoints.Count == 0)
+                {
+                    return;
+                }
+
+                ActualFloorBoundsInfo bounds = CalculateActualFloorBounds(allFloorPoints);
+                if (!bounds.isValid)
+                {
+                    return;
+                }
+
+                HashSet<Vector2Int> shorelineWaterPoints = BuildFiniteOceanPointSet(
+                    allFloorPoints,
+                    bounds,
+                    Mathf.Max(1, shorelineMicroCleanupSize));
+
+                HashSet<Vector2Int> pointsToFill = new HashSet<Vector2Int>();
+                CollectShorelineSingleCellPocketFills(allFloorPoints, shorelineWaterPoints, bounds, pointsToFill);
+                if (shorelineMicroCleanupSize >= 2)
+                {
+                    CollectShorelineShortPocketFills(allFloorPoints, shorelineWaterPoints, bounds, pointsToFill);
+                }
+
+                if (pointsToFill.Count > 0)
+                {
+                    ApplyFloorPointFills(pointsToFill);
+                    allFloorPoints = RebuildAllFloorPoints();
+                    bounds = CalculateActualFloorBounds(allFloorPoints);
+                    shorelineWaterPoints = BuildFiniteOceanPointSet(
+                        allFloorPoints,
+                        bounds,
+                        Mathf.Max(1, shorelineMicroCleanupSize));
+                }
+
+                HashSet<Vector2Int> junctionPointsToFill = new HashSet<Vector2Int>();
+                CollectShorelineJunctionFixes(allFloorPoints, shorelineWaterPoints, bounds, junctionPointsToFill);
+                if (junctionPointsToFill.Count > 0)
+                {
+                    ApplyFloorPointFills(junctionPointsToFill);
+                    allFloorPoints = RebuildAllFloorPoints();
+                    bounds = CalculateActualFloorBounds(allFloorPoints);
+                    shorelineWaterPoints = BuildFiniteOceanPointSet(
+                        allFloorPoints,
+                        bounds,
+                        Mathf.Max(1, shorelineMicroCleanupSize));
+                }
+
+                HashSet<Vector2Int> pointsToRemove = new HashSet<Vector2Int>();
+                CollectShorelineSingleCellSpikeRemovals(allFloorPoints, shorelineWaterPoints, bounds, pointsToRemove);
+                if (shorelineMicroCleanupSize >= 2)
+                {
+                    CollectShorelineTwoCellSpikeRemovals(allFloorPoints, shorelineWaterPoints, bounds, pointsToRemove);
+                }
+
+                if (pointsToRemove.Count > 0)
+                {
+                    ApplyFloorPointRemovals(pointsToRemove);
+                }
+
+                LogShorelineMicroCleanupIteration(iteration, pointsToFill, junctionPointsToFill, pointsToRemove);
+
+                if (pointsToFill.Count == 0 && junctionPointsToFill.Count == 0 && pointsToRemove.Count == 0)
+                {
+                    break;
+                }
+            }
+        }
+
+        private void CollectShorelineJunctionFixes(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToFill)
+        {
+            Dictionary<Vector2Int, ShorelineJunctionFillCandidate> candidateByPoint =
+                new Dictionary<Vector2Int, ShorelineJunctionFillCandidate>();
+
+            CollectDiagonalSaddleJunctionCandidates(
+                floorPointsSnapshot,
+                shorelineWaterPoints,
+                bounds,
+                candidateByPoint);
+            CollectShortStepJunctionCandidates(
+                floorPointsSnapshot,
+                shorelineWaterPoints,
+                bounds,
+                candidateByPoint);
+
+            if (candidateByPoint.Count == 0)
+            {
+                return;
+            }
+
+            List<ShorelineJunctionFillCandidate> orderedCandidates =
+                new List<ShorelineJunctionFillCandidate>(candidateByPoint.Values);
+            orderedCandidates.Sort((lhs, rhs) =>
+            {
+                int scoreCompare = rhs.score.CompareTo(lhs.score);
+                return scoreCompare != 0
+                    ? scoreCompare
+                    : ComparePointOrder(lhs.point, rhs.point);
+            });
+
+            HashSet<Vector2Int> simulatedFloorPoints = new HashSet<Vector2Int>(floorPointsSnapshot);
+            HashSet<Vector2Int> simulatedWaterPoints = new HashSet<Vector2Int>(shorelineWaterPoints);
+
+            for (int i = 0; i < orderedCandidates.Count; i++)
+            {
+                ShorelineJunctionFillCandidate candidate = orderedCandidates[i];
+                if (pointsToFill.Contains(candidate.point))
+                {
+                    continue;
+                }
+
+                if (!CanSafelyFillShorelineJunctionPoint(candidate.point, simulatedFloorPoints, simulatedWaterPoints, bounds))
+                {
+                    LogShorelineJunctionCandidateRejected(candidate, "InsufficientOrthogonalSupport");
+                    continue;
+                }
+
+                bool matchesDiagonalSaddle = MatchesDiagonalSaddlePatternAtPoint(
+                    candidate.point,
+                    simulatedFloorPoints,
+                    simulatedWaterPoints,
+                    out _);
+                bool matchesStepJunction = MatchesShortStepJunctionPatternAtPoint(
+                    candidate.point,
+                    simulatedFloorPoints,
+                    simulatedWaterPoints,
+                    out _,
+                    out _);
+
+                if (!matchesDiagonalSaddle && !matchesStepJunction)
+                {
+                    LogShorelineJunctionCandidateRejected(candidate, "CandidateConflict");
+                    continue;
+                }
+
+                pointsToFill.Add(candidate.point);
+                simulatedFloorPoints.Add(candidate.point);
+                simulatedWaterPoints.Remove(candidate.point);
+                LogShorelineJunctionCandidateAccepted(candidate);
+            }
+        }
+
+        private void CollectDiagonalSaddleJunctionCandidates(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            Dictionary<Vector2Int, ShorelineJunctionFillCandidate> candidateByPoint)
+        {
+            if (!bounds.isValid)
+            {
+                return;
+            }
+
+            for (int x = bounds.min.x - 1; x <= bounds.max.x; x++)
+            {
+                for (int y = bounds.min.y - 1; y <= bounds.max.y; y++)
+                {
+                    Vector2Int origin = new Vector2Int(x, y);
+                    Vector2Int bottomLeft = origin;
+                    Vector2Int bottomRight = origin + Vector2Int.right;
+                    Vector2Int topLeft = origin + Vector2Int.up;
+                    Vector2Int topRight = origin + Vector2Int.up + Vector2Int.right;
+
+                    bool bottomLeftLand = floorPointsSnapshot.Contains(bottomLeft);
+                    bool bottomRightLand = floorPointsSnapshot.Contains(bottomRight);
+                    bool topLeftLand = floorPointsSnapshot.Contains(topLeft);
+                    bool topRightLand = floorPointsSnapshot.Contains(topRight);
+
+                    int landCount = (bottomLeftLand ? 1 : 0) +
+                                    (bottomRightLand ? 1 : 0) +
+                                    (topLeftLand ? 1 : 0) +
+                                    (topRightLand ? 1 : 0);
+                    if (landCount != 2)
+                    {
+                        continue;
+                    }
+
+                    if (bottomLeftLand && topRightLand && !bottomRightLand && !topLeftLand)
+                    {
+                        TryRegisterShorelineJunctionCandidate(
+                            bottomRight,
+                            origin,
+                            "DiagonalSaddle",
+                            floorPointsSnapshot,
+                            shorelineWaterPoints,
+                            bounds,
+                            candidateByPoint);
+                        TryRegisterShorelineJunctionCandidate(
+                            topLeft,
+                            origin,
+                            "DiagonalSaddle",
+                            floorPointsSnapshot,
+                            shorelineWaterPoints,
+                            bounds,
+                            candidateByPoint);
+                    }
+                    else if (!bottomLeftLand && bottomRightLand && topLeftLand && !topRightLand)
+                    {
+                        TryRegisterShorelineJunctionCandidate(
+                            bottomLeft,
+                            origin,
+                            "DiagonalSaddle",
+                            floorPointsSnapshot,
+                            shorelineWaterPoints,
+                            bounds,
+                            candidateByPoint);
+                        TryRegisterShorelineJunctionCandidate(
+                            topRight,
+                            origin,
+                            "DiagonalSaddle",
+                            floorPointsSnapshot,
+                            shorelineWaterPoints,
+                            bounds,
+                            candidateByPoint);
+                    }
+                }
+            }
+        }
+
+        private void CollectShortStepJunctionCandidates(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            Dictionary<Vector2Int, ShorelineJunctionFillCandidate> candidateByPoint)
+        {
+            foreach (Vector2Int waterPoint in shorelineWaterPoints)
+            {
+                if (floorPointsSnapshot.Contains(waterPoint) ||
+                    !IsPointInsideExpandedBounds(waterPoint, bounds, shorelineMicroCleanupSize))
+                {
+                    continue;
+                }
+
+                if (!MatchesShortStepJunctionPatternAtPoint(
+                        waterPoint,
+                        floorPointsSnapshot,
+                        shorelineWaterPoints,
+                        out _,
+                        out string rejectionReason))
+                {
+                    if (rejectionReason == "OpensIntoLargeWater" || rejectionReason == "LongStep")
+                    {
+                        LogShorelineJunctionCandidateRejected(
+                            new ShorelineJunctionFillCandidate(waterPoint, 0, waterPoint, "StepJunction"),
+                            rejectionReason);
+                    }
+
+                    continue;
+                }
+
+                TryRegisterShorelineJunctionCandidate(
+                    waterPoint,
+                    waterPoint,
+                    "StepJunction",
+                    floorPointsSnapshot,
+                    shorelineWaterPoints,
+                    bounds,
+                    candidateByPoint);
+            }
+        }
+
+        private void TryRegisterShorelineJunctionCandidate(
+            Vector2Int candidatePoint,
+            Vector2Int sourceBlockOrigin,
+            string sourceKind,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            Dictionary<Vector2Int, ShorelineJunctionFillCandidate> candidateByPoint)
+        {
+            if (!CanSafelyFillShorelineJunctionPoint(candidatePoint, floorPointsSnapshot, shorelineWaterPoints, bounds))
+            {
+                return;
+            }
+
+            int candidateScore = ScoreShorelineJunctionFillCandidate(
+                candidatePoint,
+                floorPointsSnapshot,
+                shorelineWaterPoints);
+            if (candidateScore <= 0)
+            {
+                return;
+            }
+
+            ShorelineJunctionFillCandidate candidate = new ShorelineJunctionFillCandidate(
+                candidatePoint,
+                candidateScore,
+                sourceBlockOrigin,
+                sourceKind);
+
+            if (!candidateByPoint.TryGetValue(candidatePoint, out ShorelineJunctionFillCandidate existingCandidate) ||
+                candidateScore > existingCandidate.score ||
+                (candidateScore == existingCandidate.score &&
+                 ComparePointOrder(candidate.sourceBlockOrigin, existingCandidate.sourceBlockOrigin) < 0))
+            {
+                candidateByPoint[candidatePoint] = candidate;
+            }
+        }
+
+        private void CollectShorelineSingleCellPocketFills(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToFill)
+        {
+            foreach (Vector2Int waterPoint in shorelineWaterPoints)
+            {
+                if (floorPointsSnapshot.Contains(waterPoint) ||
+                    pointsToFill.Contains(waterPoint) ||
+                    !IsPointInsideExpandedBounds(waterPoint, bounds, shorelineMicroCleanupSize))
+                {
+                    continue;
+                }
+
+                int orthogonalLandNeighborCount = CountOrthogonalLandNeighbors(waterPoint, floorPointsSnapshot);
+                if (orthogonalLandNeighborCount < 3)
+                {
+                    continue;
+                }
+
+                if (CountOrthogonalWaterNeighbors(waterPoint, shorelineWaterPoints) > 1)
+                {
+                    continue;
+                }
+
+                pointsToFill.Add(waterPoint);
+                LogShorelineMicroCleanupDecision("Fill", waterPoint, "OceanSingleStep");
+            }
+        }
+
+        private void CollectShorelineShortPocketFills(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToFill)
+        {
+            Vector2Int[] forwardOffsets =
+            {
+                Vector2Int.right,
+                Vector2Int.up
+            };
+
+            foreach (Vector2Int waterPoint in shorelineWaterPoints)
+            {
+                if (floorPointsSnapshot.Contains(waterPoint) ||
+                    !IsPointInsideExpandedBounds(waterPoint, bounds, shorelineMicroCleanupSize))
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < forwardOffsets.Length; i++)
+                {
+                    Vector2Int secondPoint = waterPoint + forwardOffsets[i];
+                    if (floorPointsSnapshot.Contains(secondPoint) ||
+                        !shorelineWaterPoints.Contains(secondPoint) ||
+                        !IsPointInsideExpandedBounds(secondPoint, bounds, shorelineMicroCleanupSize))
+                    {
+                        continue;
+                    }
+
+                    Vector2Int beforePoint = waterPoint - forwardOffsets[i];
+                    Vector2Int afterPoint = secondPoint + forwardOffsets[i];
+                    if (shorelineWaterPoints.Contains(beforePoint) || shorelineWaterPoints.Contains(afterPoint))
+                    {
+                        continue;
+                    }
+
+                    HashSet<Vector2Int> component = new HashSet<Vector2Int> { waterPoint, secondPoint };
+                    if (!IsShortShorelinePocketComponent(component, floorPointsSnapshot, shorelineWaterPoints))
+                    {
+                        continue;
+                    }
+
+                    foreach (Vector2Int componentPoint in component)
+                    {
+                        if (!pointsToFill.Contains(componentPoint))
+                        {
+                            pointsToFill.Add(componentPoint);
+                            LogShorelineMicroCleanupDecision("Fill", componentPoint, "ShortCornerRun");
+                        }
+                    }
+                }
+            }
+        }
+
+        private void CollectShorelineSingleCellSpikeRemovals(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToRemove)
+        {
+            foreach (Vector2Int landPoint in floorPointsSnapshot)
+            {
+                if (!IsPointInsideExpandedBounds(landPoint, bounds, shorelineMicroCleanupSize) ||
+                    pointsToRemove.Contains(landPoint) ||
+                    (connectorFloorPoints != null && connectorFloorPoints.Contains(landPoint)))
+                {
+                    continue;
+                }
+
+                if (CountOrthogonalWaterNeighbors(landPoint, shorelineWaterPoints) < 3)
+                {
+                    continue;
+                }
+
+                List<Vector2Int> landNeighbors = GetOrthogonalLandNeighbors(landPoint, floorPointsSnapshot, null);
+                if (landNeighbors.Count != 1)
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> removalCandidate = new HashSet<Vector2Int> { landPoint };
+                if (!CanSafelyRemoveLandPoints(floorPointsSnapshot, removalCandidate))
+                {
+                    LogShorelineMicroCleanupDecision("SkipRemove", landPoint, "possible-mainland-connector");
+                    continue;
+                }
+
+                pointsToRemove.Add(landPoint);
+                LogShorelineMicroCleanupDecision("Remove", landPoint, "GrassSingleStep");
+            }
+        }
+
+        private void CollectShorelineTwoCellSpikeRemovals(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds,
+            HashSet<Vector2Int> pointsToRemove)
+        {
+            foreach (Vector2Int endPoint in floorPointsSnapshot)
+            {
+                if (!IsPointInsideExpandedBounds(endPoint, bounds, shorelineMicroCleanupSize) ||
+                    pointsToRemove.Contains(endPoint) ||
+                    (connectorFloorPoints != null && connectorFloorPoints.Contains(endPoint)))
+                {
+                    continue;
+                }
+
+                if (CountOrthogonalWaterNeighbors(endPoint, shorelineWaterPoints) < 3)
+                {
+                    continue;
+                }
+
+                List<Vector2Int> endPointLandNeighbors = GetOrthogonalLandNeighbors(endPoint, floorPointsSnapshot, null);
+                if (endPointLandNeighbors.Count != 1)
+                {
+                    continue;
+                }
+
+                Vector2Int rootPoint = endPointLandNeighbors[0];
+                if (pointsToRemove.Contains(rootPoint) ||
+                    (connectorFloorPoints != null && connectorFloorPoints.Contains(rootPoint)))
+                {
+                    continue;
+                }
+
+                List<Vector2Int> rootLandNeighbors = GetOrthogonalLandNeighbors(rootPoint, floorPointsSnapshot, null);
+                if (rootLandNeighbors.Count != 2 || CountOrthogonalWaterNeighbors(rootPoint, shorelineWaterPoints) < 2)
+                {
+                    continue;
+                }
+
+                Vector2Int directionFromRootToEnd = endPoint - rootPoint;
+                Vector2Int inlandPoint = rootPoint - directionFromRootToEnd;
+                if (!floorPointsSnapshot.Contains(inlandPoint))
+                {
+                    continue;
+                }
+
+                HashSet<Vector2Int> removalCandidate = new HashSet<Vector2Int> { endPoint, rootPoint };
+                if (!CanSafelyRemoveLandPoints(floorPointsSnapshot, removalCandidate))
+                {
+                    LogShorelineMicroCleanupDecision("SkipRemove", endPoint, "two-cell-spike-may-disconnect");
+                    continue;
+                }
+
+                pointsToRemove.Add(endPoint);
+                pointsToRemove.Add(rootPoint);
+                LogShorelineMicroCleanupDecision("Remove", endPoint, "GrassSingleStep");
+                LogShorelineMicroCleanupDecision("Remove", rootPoint, "GrassSingleStep");
+            }
+        }
+
+        private int ScoreShorelineJunctionFillCandidate(
+            Vector2Int candidate,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints)
+        {
+            if (floorPointsSnapshot.Contains(candidate))
+            {
+                return int.MinValue;
+            }
+
+            int orthogonalLandNeighborCount = CountOrthogonalLandNeighbors(candidate, floorPointsSnapshot);
+            if (orthogonalLandNeighborCount < 2)
+            {
+                return int.MinValue;
+            }
+
+            int score = orthogonalLandNeighborCount * 10;
+            score += CountDiagonalLandNeighbors(candidate, floorPointsSnapshot) * 3;
+
+            if (DoesJunctionFillBridgeDiagonalLand(candidate, floorPointsSnapshot))
+            {
+                score += 18;
+            }
+
+            HashSet<Vector2Int> filledFloorPoints = new HashSet<Vector2Int>(floorPointsSnapshot)
+            {
+                candidate
+            };
+            if (HasValidTwoDimensionalSupport(candidate, filledFloorPoints, 2))
+            {
+                score += 20;
+            }
+
+            if (CountCoastalOrthogonalLandNeighbors(candidate, floorPointsSnapshot, shorelineWaterPoints) >= 2)
+            {
+                score += 8;
+            }
+
+            int localWaterDensity = CountLocalWaterCells(candidate, shorelineWaterPoints, 1);
+            if (localWaterDensity >= 6)
+            {
+                score -= 6;
+            }
+
+            return score;
+        }
+
+        private bool CanSafelyFillShorelineJunctionPoint(
+            Vector2Int candidate,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            ActualFloorBoundsInfo bounds)
+        {
+            if (floorPointsSnapshot.Contains(candidate) ||
+                !shorelineWaterPoints.Contains(candidate) ||
+                !IsPointInsideExpandedBounds(candidate, bounds, shorelineMicroCleanupSize))
+            {
+                return false;
+            }
+
+            int orthogonalLandNeighborCount = CountOrthogonalLandNeighbors(candidate, floorPointsSnapshot);
+            if (orthogonalLandNeighborCount < 2)
+            {
+                return false;
+            }
+
+            int orthogonalWaterNeighborCount = CountOrthogonalWaterNeighbors(candidate, shorelineWaterPoints);
+            if (orthogonalWaterNeighborCount > 2)
+            {
+                return false;
+            }
+
+            if (CountCoastalOrthogonalLandNeighbors(candidate, floorPointsSnapshot, shorelineWaterPoints) < 2)
+            {
+                return false;
+            }
+
+            HashSet<Vector2Int> filledFloorPoints = new HashSet<Vector2Int>(floorPointsSnapshot)
+            {
+                candidate
+            };
+
+            if (HasValidTwoDimensionalSupport(candidate, filledFloorPoints, 2))
+            {
+                return true;
+            }
+
+            List<Vector2Int> orthogonalLandNeighbors = GetOrthogonalLandNeighbors(candidate, floorPointsSnapshot, null);
+            for (int i = 0; i < orthogonalLandNeighbors.Count; i++)
+            {
+                if (HasValidTwoDimensionalSupport(orthogonalLandNeighbors[i], filledFloorPoints, 2))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool MatchesDiagonalSaddlePatternAtPoint(
+            Vector2Int candidate,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            out Vector2Int sourceBlockOrigin)
+        {
+            Vector2Int[] blockOffsets =
+            {
+                Vector2Int.zero,
+                Vector2Int.left,
+                Vector2Int.down,
+                Vector2Int.left + Vector2Int.down
+            };
+
+            for (int i = 0; i < blockOffsets.Length; i++)
+            {
+                Vector2Int origin = candidate + blockOffsets[i];
+                Vector2Int bottomLeft = origin;
+                Vector2Int bottomRight = origin + Vector2Int.right;
+                Vector2Int topLeft = origin + Vector2Int.up;
+                Vector2Int topRight = origin + Vector2Int.up + Vector2Int.right;
+
+                bool bottomLeftLand = floorPointsSnapshot.Contains(bottomLeft);
+                bool bottomRightLand = floorPointsSnapshot.Contains(bottomRight);
+                bool topLeftLand = floorPointsSnapshot.Contains(topLeft);
+                bool topRightLand = floorPointsSnapshot.Contains(topRight);
+
+                int landCount = (bottomLeftLand ? 1 : 0) +
+                                (bottomRightLand ? 1 : 0) +
+                                (topLeftLand ? 1 : 0) +
+                                (topRightLand ? 1 : 0);
+                if (landCount != 2)
+                {
+                    continue;
+                }
+
+                bool matchesPrimaryDiagonal =
+                    bottomLeftLand && topRightLand &&
+                    shorelineWaterPoints.Contains(bottomRight) &&
+                    shorelineWaterPoints.Contains(topLeft) &&
+                    (candidate == bottomRight || candidate == topLeft);
+                bool matchesSecondaryDiagonal =
+                    bottomRightLand && topLeftLand &&
+                    shorelineWaterPoints.Contains(bottomLeft) &&
+                    shorelineWaterPoints.Contains(topRight) &&
+                    (candidate == bottomLeft || candidate == topRight);
+
+                if (matchesPrimaryDiagonal || matchesSecondaryDiagonal)
+                {
+                    sourceBlockOrigin = origin;
+                    return true;
+                }
+            }
+
+            sourceBlockOrigin = candidate;
+            return false;
+        }
+
+        private bool MatchesShortStepJunctionPatternAtPoint(
+            Vector2Int candidate,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            out Vector2Int sourceBlockOrigin,
+            out string rejectionReason)
+        {
+            if (floorPointsSnapshot.Contains(candidate))
+            {
+                sourceBlockOrigin = candidate;
+                rejectionReason = "CandidateConflict";
+                return false;
+            }
+
+            if (CountOrthogonalLandNeighbors(candidate, floorPointsSnapshot) != 2 ||
+                CountOrthogonalWaterNeighbors(candidate, shorelineWaterPoints) != 2)
+            {
+                sourceBlockOrigin = candidate;
+                rejectionReason = "InsufficientOrthogonalSupport";
+                return false;
+            }
+
+            Vector2Int[] stepOffsets =
+            {
+                Vector2Int.zero,
+                Vector2Int.left,
+                Vector2Int.down,
+                Vector2Int.left + Vector2Int.down
+            };
+
+            for (int i = 0; i < stepOffsets.Length; i++)
+            {
+                Vector2Int origin = candidate + stepOffsets[i];
+                Vector2Int bottomLeft = origin;
+                Vector2Int bottomRight = origin + Vector2Int.right;
+                Vector2Int topLeft = origin + Vector2Int.up;
+                Vector2Int topRight = origin + Vector2Int.up + Vector2Int.right;
+
+                bool bottomLeftLand = floorPointsSnapshot.Contains(bottomLeft);
+                bool bottomRightLand = floorPointsSnapshot.Contains(bottomRight);
+                bool topLeftLand = floorPointsSnapshot.Contains(topLeft);
+                bool topRightLand = floorPointsSnapshot.Contains(topRight);
+
+                int landCount = (bottomLeftLand ? 1 : 0) +
+                                (bottomRightLand ? 1 : 0) +
+                                (topLeftLand ? 1 : 0) +
+                                (topRightLand ? 1 : 0);
+                if (landCount != 3)
+                {
+                    continue;
+                }
+
+                if (candidate != bottomLeft &&
+                    candidate != bottomRight &&
+                    candidate != topLeft &&
+                    candidate != topRight)
+                {
+                    continue;
+                }
+
+                if (CountLocalWaterCells(candidate, shorelineWaterPoints, 1) > 6)
+                {
+                    sourceBlockOrigin = origin;
+                    rejectionReason = "OpensIntoLargeWater";
+                    return false;
+                }
+
+                sourceBlockOrigin = origin;
+                rejectionReason = null;
+                return true;
+            }
+
+            sourceBlockOrigin = candidate;
+            rejectionReason = "LongStep";
+            return false;
+        }
+
+        private static int CountOrthogonalWaterNeighbors(Vector2Int point, HashSet<Vector2Int> shorelineWaterPoints)
+        {
+            int count = 0;
+            if (shorelineWaterPoints.Contains(point + Vector2Int.up)) count++;
+            if (shorelineWaterPoints.Contains(point + Vector2Int.down)) count++;
+            if (shorelineWaterPoints.Contains(point + Vector2Int.left)) count++;
+            if (shorelineWaterPoints.Contains(point + Vector2Int.right)) count++;
+            return count;
+        }
+
+        private static List<Vector2Int> GetOrthogonalLandNeighbors(
+            Vector2Int point,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> excludedPoints)
+        {
+            List<Vector2Int> neighbors = new List<Vector2Int>(4);
+            Vector2Int[] offsets =
+            {
+                Vector2Int.up,
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left
+            };
+
+            for (int i = 0; i < offsets.Length; i++)
+            {
+                Vector2Int neighbor = point + offsets[i];
+                if (!floorPointsSnapshot.Contains(neighbor))
+                {
+                    continue;
+                }
+
+                if (excludedPoints != null && excludedPoints.Contains(neighbor))
+                {
+                    continue;
+                }
+
+                neighbors.Add(neighbor);
+            }
+
+            return neighbors;
+        }
+
+        private static int CountDiagonalLandNeighbors(Vector2Int point, HashSet<Vector2Int> floorPointsSnapshot)
+        {
+            int count = 0;
+            if (floorPointsSnapshot.Contains(point + Vector2Int.up + Vector2Int.left)) count++;
+            if (floorPointsSnapshot.Contains(point + Vector2Int.up + Vector2Int.right)) count++;
+            if (floorPointsSnapshot.Contains(point + Vector2Int.down + Vector2Int.left)) count++;
+            if (floorPointsSnapshot.Contains(point + Vector2Int.down + Vector2Int.right)) count++;
+            return count;
+        }
+
+        private static int CountCoastalOrthogonalLandNeighbors(
+            Vector2Int point,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints)
+        {
+            int count = 0;
+            List<Vector2Int> orthogonalLandNeighbors = GetOrthogonalLandNeighbors(point, floorPointsSnapshot, null);
+            for (int i = 0; i < orthogonalLandNeighbors.Count; i++)
+            {
+                if (TouchesSpecificWaterSet(orthogonalLandNeighbors[i], shorelineWaterPoints))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private static int CountLocalWaterCells(
+            Vector2Int point,
+            HashSet<Vector2Int> shorelineWaterPoints,
+            int radius)
+        {
+            int count = 0;
+            for (int x = -radius; x <= radius; x++)
+            {
+                for (int y = -radius; y <= radius; y++)
+                {
+                    if (shorelineWaterPoints.Contains(new Vector2Int(point.x + x, point.y + y)))
+                    {
+                        count++;
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private static bool DoesJunctionFillBridgeDiagonalLand(
+            Vector2Int candidate,
+            HashSet<Vector2Int> floorPointsSnapshot)
+        {
+            bool upLeftLand = floorPointsSnapshot.Contains(candidate + Vector2Int.up) &&
+                              floorPointsSnapshot.Contains(candidate + Vector2Int.left);
+            bool upRightLand = floorPointsSnapshot.Contains(candidate + Vector2Int.up) &&
+                               floorPointsSnapshot.Contains(candidate + Vector2Int.right);
+            bool downRightLand = floorPointsSnapshot.Contains(candidate + Vector2Int.down) &&
+                                 floorPointsSnapshot.Contains(candidate + Vector2Int.right);
+            bool downLeftLand = floorPointsSnapshot.Contains(candidate + Vector2Int.down) &&
+                                floorPointsSnapshot.Contains(candidate + Vector2Int.left);
+
+            return upLeftLand || upRightLand || downRightLand || downLeftLand;
+        }
+
+        private static int CountUniqueOrthogonalLandNeighborsForComponent(
+            HashSet<Vector2Int> component,
+            HashSet<Vector2Int> floorPointsSnapshot)
+        {
+            HashSet<Vector2Int> neighbors = new HashSet<Vector2Int>();
+            foreach (Vector2Int point in component)
+            {
+                List<Vector2Int> pointNeighbors = GetOrthogonalLandNeighbors(point, floorPointsSnapshot, component);
+                for (int i = 0; i < pointNeighbors.Count; i++)
+                {
+                    neighbors.Add(pointNeighbors[i]);
+                }
+            }
+
+            return neighbors.Count;
+        }
+
+        private static int CountOrthogonalWaterNeighborsForComponent(
+            HashSet<Vector2Int> component,
+            HashSet<Vector2Int> shorelineWaterPoints)
+        {
+            HashSet<Vector2Int> neighboringWaterPoints = new HashSet<Vector2Int>();
+            Vector2Int[] offsets =
+            {
+                Vector2Int.up,
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left
+            };
+
+            foreach (Vector2Int point in component)
+            {
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    Vector2Int neighbor = point + offsets[i];
+                    if (component.Contains(neighbor) || !shorelineWaterPoints.Contains(neighbor))
+                    {
+                        continue;
+                    }
+
+                    neighboringWaterPoints.Add(neighbor);
+                }
+            }
+
+            return neighboringWaterPoints.Count;
+        }
+
+        private static bool IsShortShorelinePocketComponent(
+            HashSet<Vector2Int> component,
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> shorelineWaterPoints)
+        {
+            foreach (Vector2Int point in component)
+            {
+                if (CountOrthogonalLandNeighbors(point, floorPointsSnapshot) < 2)
+                {
+                    return false;
+                }
+            }
+
+            return CountUniqueOrthogonalLandNeighborsForComponent(component, floorPointsSnapshot) >= 4 &&
+                   CountOrthogonalWaterNeighborsForComponent(component, shorelineWaterPoints) <= 2;
+        }
+
+        private bool CanSafelyRemoveLandPoints(
+            HashSet<Vector2Int> floorPointsSnapshot,
+            HashSet<Vector2Int> removalPoints)
+        {
+            if (removalPoints == null || removalPoints.Count == 0)
+            {
+                return true;
+            }
+
+            if (connectorFloorPoints != null)
+            {
+                foreach (Vector2Int removalPoint in removalPoints)
+                {
+                    if (connectorFloorPoints.Contains(removalPoint))
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            HashSet<Vector2Int> neighboringLandPoints = new HashSet<Vector2Int>();
+            foreach (Vector2Int removalPoint in removalPoints)
+            {
+                List<Vector2Int> neighbors = GetOrthogonalLandNeighbors(removalPoint, floorPointsSnapshot, removalPoints);
+                for (int i = 0; i < neighbors.Count; i++)
+                {
+                    neighboringLandPoints.Add(neighbors[i]);
+                }
+            }
+
+            if (neighboringLandPoints.Count <= 1)
+            {
+                return true;
+            }
+
+            List<Vector2Int> orderedNeighboringLandPoints = new List<Vector2Int>(neighboringLandPoints);
+            orderedNeighboringLandPoints.Sort(ComparePointOrder);
+
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            Queue<Vector2Int> openSet = new Queue<Vector2Int>();
+            Vector2Int startPoint = orderedNeighboringLandPoints[0];
+            openSet.Enqueue(startPoint);
+            visited.Add(startPoint);
+
+            Vector2Int[] offsets =
+            {
+                Vector2Int.up,
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left
+            };
+
+            while (openSet.Count > 0)
+            {
+                Vector2Int currentPoint = openSet.Dequeue();
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    Vector2Int neighbor = currentPoint + offsets[i];
+                    if (visited.Contains(neighbor) ||
+                        removalPoints.Contains(neighbor) ||
+                        !floorPointsSnapshot.Contains(neighbor))
+                    {
+                        continue;
+                    }
+
+                    visited.Add(neighbor);
+                    openSet.Enqueue(neighbor);
+                }
+            }
+
+            for (int i = 1; i < orderedNeighboringLandPoints.Count; i++)
+            {
+                if (!visited.Contains(orderedNeighboringLandPoints[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogShorelineMicroCleanupIteration(
+            int iteration,
+            HashSet<Vector2Int> pointsToFill,
+            HashSet<Vector2Int> junctionPointsToFill,
+            HashSet<Vector2Int> pointsToRemove)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.BoundaryCleanup] iteration={iteration + 1} pocketFillCount={pointsToFill.Count} junctionFillCount={junctionPointsToFill.Count} removeCount={pointsToRemove.Count}",
+                this);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogShorelineMicroCleanupDecision(string action, Vector2Int point, string reason)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.BoundaryCleanup] action={action} point={point} reason={reason}",
+                this);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogShorelineJunctionCandidateAccepted(ShorelineJunctionFillCandidate candidate)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.BoundaryCleanup] junctionAction=Accept point={candidate.point} sourceKind={candidate.sourceKind} sourceBlockOrigin={candidate.sourceBlockOrigin} score={candidate.score}",
+                this);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogShorelineJunctionCandidateRejected(ShorelineJunctionFillCandidate candidate, string reason)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.BoundaryCleanup] junctionAction=Reject point={candidate.point} sourceKind={candidate.sourceKind} sourceBlockOrigin={candidate.sourceBlockOrigin} score={candidate.score} reason={reason}",
+                this);
         }
 
         private void CollectNarrowLandFeatureChanges(
