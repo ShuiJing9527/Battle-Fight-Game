@@ -1434,7 +1434,7 @@ MonoBehaviour:
   effectPower: 1.35
   animationName: ATK1
   debugLog: 1
-  manaCostPercent: 0.31
+  baseManaCost: 60
   useSpineAnimationEvents: 0
   thrustVfxEventName: R_ThrustVfx
   thrustHitEventName: R_ThrustHit

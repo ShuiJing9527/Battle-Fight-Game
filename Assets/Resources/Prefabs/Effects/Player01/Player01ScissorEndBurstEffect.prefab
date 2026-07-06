@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3039504028386278727}
   - component: {fileID: 5631639409175261293}
   - component: {fileID: 3452768298564656582}
+  - component: {fileID: -2608691732273992504}
   m_Layer: 0
   m_Name: Player01ScissorEndBurstEffect
   m_TagString: Untagged
@@ -110,8 +111,27 @@ MonoBehaviour:
   - {fileID: 21300000, guid: 68eb3ccdf5c0ee84eb330415e6a60cc5, type: 3}
   - {fileID: 21300000, guid: 362a86a63a007ff49a7845b647a94a0b, type: 3}
   lifetime: 0.28
+  frameRate: 24
   playOnEnable: 1
+  loop: 0
+  autoHideOnComplete: 1
   destroyOnComplete: 1
   fadeOut: 1
   startScale: {x: 1, y: 1, z: 1}
   endScale: {x: 1, y: 1, z: 1}
+--- !u!114 &-2608691732273992504
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8335468127871354634}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b4cb8704f32692c4c808374aeff8ab93, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AnimationSFXEvent
+  attackSfx: {fileID: 8300000, guid: 94f4d267d23246944aa72fbd0208792c, type: 3}
+  footstepSfx: {fileID: 0}
+  specialSfx: {fileID: 0}
+  volume: 1
