@@ -42,6 +42,7 @@ namespace UnderTheStars.GenerationMap
         [SerializeField, Min(3)] private int shoreSandWidth = 5;
         [SerializeField, Min(2)] private int minimumShoreSandFootprint = 2;
         [SerializeField] private bool debugShoreSandPlacements = false;
+        [SerializeField] private bool enableShoreClassificationDebugLogs = false;
         [SerializeField] private bool debugShoreSandDecisionTrace = false;
         [SerializeField] private Vector2Int debugShoreSandGridPoint;
 
@@ -88,6 +89,7 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int> currentExteriorOceanPoints;
         private HashSet<Vector2Int> currentShoreWaterPoints;
         private int currentEnclosedWaterPointCount;
+        private int shoreClassificationDebugBatchCounter;
         private bool hasLoggedMissingShoreSandPrefabWarning;
         private ActiveRegionLayout[] activeRegionLayouts;
         private int activeRegionColumns;
@@ -178,6 +180,22 @@ namespace UnderTheStars.GenerationMap
                 this.hasSecondaryDirection = hasSecondaryDirection;
                 this.secondaryDirection = secondaryDirection;
             }
+        }
+
+        private struct ShoreSandClassificationSnapshot
+        {
+            public Vector2Int point;
+            public int depth;
+            public int maxDepth;
+            public string prefabType;
+            public List<ShoreEdgeDirection> ordinaryGrassDirections;
+            public int ordinaryGrassNeighborCount;
+            public List<ShoreEdgeDirection> seaDirections;
+            public ShoreEdgeDirection direction;
+            public bool usesExplicitYaw;
+            public float explicitYaw;
+            public bool isConnector;
+            public bool touchesShoreWater;
         }
 
         private struct ShorelineJunctionFillCandidate
@@ -1922,6 +1940,66 @@ namespace UnderTheStars.GenerationMap
                 this);
         }
 
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogGrassSideSpurDecision(
+            string action,
+            Vector2Int tipPoint,
+            Vector2Int basePoint,
+            Vector2Int axisOffset,
+            HashSet<Vector2Int> branchPoints,
+            string reason)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            string branchPointText = branchPoints == null || branchPoints.Count == 0
+                ? "None"
+                : FormatPointCollection(branchPoints);
+
+            Debug.Log(
+                $"[ShoreSand.GrassSideSpur] action={action} tip={tipPoint} base={basePoint} axis={axisOffset} branchLength={(branchPoints == null ? 0 : branchPoints.Count)} points={branchPointText} reason={reason}",
+                this);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogTargetedFixDecision(
+            Vector2Int point,
+            int depth,
+            int maxDepth,
+            string action,
+            string reason)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.TargetedFix] point={point} depth={depth} maxDepth={maxDepth} action={action} reason={reason}",
+                this);
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogTargetedFixAction(
+            Vector2Int point,
+            string action,
+            string reason)
+        {
+            if (!debugShoreSandPlacements)
+            {
+                return;
+            }
+
+            Debug.Log(
+                $"[ShoreSand.TargetedFix] point={point} action={action} reason={reason}",
+                this);
+        }
+
         private void CollectNarrowLandFeatureChanges(
             HashSet<Vector2Int> allFloorPoints,
             ActualFloorBoundsInfo bounds,
@@ -2765,6 +2843,15 @@ namespace UnderTheStars.GenerationMap
             }
 #endif
 
+            if (enableShorelineMicroCleanup)
+            {
+                RemoveShortSingleWidthGrassSideShoreSpurs(
+                    shoreDepthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    Mathf.Max(0, shoreSandWidth - 1));
+            }
+
             List<ShoreSandPlacement> placements = BuildShoreSandPlacementsFromDepthMap(
                 shoreDepthByPoint,
                 allLandPoints,
@@ -2775,9 +2862,59 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
+            int shoreClassificationDebugBatchId = 0;
+            Dictionary<Vector2Int, ShoreSandClassificationSnapshot> previousClassificationSnapshots = null;
+            if (enableShoreClassificationDebugLogs)
+            {
+                shoreClassificationDebugBatchId = ++shoreClassificationDebugBatchCounter;
+                previousClassificationSnapshots = LogSuspiciousShoreClassificationPlacements(
+                    shoreClassificationDebugBatchId,
+                    "BuildShoreSandPlacementsFromDepthMap",
+                    placements,
+                    shoreDepthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    null);
+            }
+
             ApplyShortGrassBoundarySegmentFix(placements, allLandPoints, areaByPoint);
+            if (enableShoreClassificationDebugLogs)
+            {
+                previousClassificationSnapshots = LogSuspiciousShoreClassificationPlacements(
+                    shoreClassificationDebugBatchId,
+                    "ApplyShortGrassBoundarySegmentFix",
+                    placements,
+                    shoreDepthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    previousClassificationSnapshots);
+            }
+
             ApplyFinalGrassBoundaryCorrection(placements, allLandPoints, areaByPoint);
+            if (enableShoreClassificationDebugLogs)
+            {
+                previousClassificationSnapshots = LogSuspiciousShoreClassificationPlacements(
+                    shoreClassificationDebugBatchId,
+                    "ApplyFinalGrassBoundaryCorrection",
+                    placements,
+                    shoreDepthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    previousClassificationSnapshots);
+            }
+
             ApplyFinalCornerResolution(placements, allLandPoints, areaByPoint);
+            if (enableShoreClassificationDebugLogs)
+            {
+                previousClassificationSnapshots = LogSuspiciousShoreClassificationPlacements(
+                    shoreClassificationDebugBatchId,
+                    "ApplyFinalCornerResolution",
+                    placements,
+                    shoreDepthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    previousClassificationSnapshots);
+            }
 
             Transform parent = ResolveGeneratedShoreSandParent();
             generatedShoreSandPoints = new HashSet<Vector2Int>(placements.Count);
@@ -3013,6 +3150,593 @@ namespace UnderTheStars.GenerationMap
             }
 
             return depthByPoint;
+        }
+
+        private void RemoveShortSingleWidthGrassSideShoreSpurs(
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int maxDepth)
+        {
+            if (depthByPoint == null ||
+                depthByPoint.Count == 0 ||
+                allLandPoints == null ||
+                areaByPoint == null ||
+                maxDepth <= 0)
+            {
+                return;
+            }
+
+            List<Vector2Int> orderedMaxDepthPoints = new List<Vector2Int>();
+            foreach (KeyValuePair<Vector2Int, int> kvp in depthByPoint)
+            {
+                if (kvp.Value == maxDepth)
+                {
+                    orderedMaxDepthPoints.Add(kvp.Key);
+                }
+            }
+
+            orderedMaxDepthPoints.Sort(ComparePointOrder);
+
+            List<GrassSideSpurCandidate> spurCandidates = new List<GrassSideSpurCandidate>();
+            HashSet<Vector2Int> proposedRemovalPoints = new HashSet<Vector2Int>();
+
+            for (int i = 0; i < orderedMaxDepthPoints.Count; i++)
+            {
+                Vector2Int tipPoint = orderedMaxDepthPoints[i];
+                if (proposedRemovalPoints.Contains(tipPoint))
+                {
+                    continue;
+                }
+
+                TryCollectSingleWidthGrassSideSpur(
+                    tipPoint,
+                    Vector2Int.up,
+                    Vector2Int.down,
+                    Vector2Int.left,
+                    Vector2Int.right,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    spurCandidates,
+                    proposedRemovalPoints);
+                TryCollectSingleWidthGrassSideSpur(
+                    tipPoint,
+                    Vector2Int.down,
+                    Vector2Int.up,
+                    Vector2Int.left,
+                    Vector2Int.right,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    spurCandidates,
+                    proposedRemovalPoints);
+                TryCollectSingleWidthGrassSideSpur(
+                    tipPoint,
+                    Vector2Int.left,
+                    Vector2Int.right,
+                    Vector2Int.up,
+                    Vector2Int.down,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    spurCandidates,
+                    proposedRemovalPoints);
+                TryCollectSingleWidthGrassSideSpur(
+                    tipPoint,
+                    Vector2Int.right,
+                    Vector2Int.left,
+                    Vector2Int.up,
+                    Vector2Int.down,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    spurCandidates,
+                    proposedRemovalPoints);
+            }
+
+            HashSet<Vector2Int> removedPoints = new HashSet<Vector2Int>();
+            for (int i = 0; i < spurCandidates.Count; i++)
+            {
+                GrassSideSpurCandidate spurCandidate = spurCandidates[i];
+                HashSet<Vector2Int> spurPoints = spurCandidate.branchPoints;
+                bool overlapsRemovedPoints = false;
+                foreach (Vector2Int spurPoint in spurPoints)
+                {
+                    if (removedPoints.Contains(spurPoint))
+                    {
+                        overlapsRemovedPoints = true;
+                        break;
+                    }
+                }
+
+                if (overlapsRemovedPoints)
+                {
+                    LogGrassSideSpurDecision("Skip", spurCandidate.tipPoint, spurCandidate.basePoint, spurCandidate.axisOffset, spurPoints, "CandidateConflict");
+                    continue;
+                }
+
+                if (WouldDisconnectMaxDepthSpurBranch(depthByPoint, spurPoints, maxDepth))
+                {
+                    LogGrassSideSpurDecision("Skip", spurCandidate.tipPoint, spurCandidate.basePoint, spurCandidate.axisOffset, spurPoints, "WouldDisconnectShore");
+                    continue;
+                }
+
+                foreach (Vector2Int spurPoint in spurPoints)
+                {
+                    depthByPoint.Remove(spurPoint);
+                    removedPoints.Add(spurPoint);
+                }
+
+                LogGrassSideSpurDecision("Remove", spurCandidate.tipPoint, spurCandidate.basePoint, spurCandidate.axisOffset, spurPoints, "ShortSingleWidthGrassSideSpur");
+            }
+        }
+
+        private struct GrassSideSpurCandidate
+        {
+            public Vector2Int tipPoint;
+            public Vector2Int basePoint;
+            public Vector2Int axisOffset;
+            public HashSet<Vector2Int> branchPoints;
+
+            public GrassSideSpurCandidate(
+                Vector2Int tipPoint,
+                Vector2Int basePoint,
+                Vector2Int axisOffset,
+                HashSet<Vector2Int> branchPoints)
+            {
+                this.tipPoint = tipPoint;
+                this.basePoint = basePoint;
+                this.axisOffset = axisOffset;
+                this.branchPoints = branchPoints;
+            }
+        }
+
+        private void TryCollectSingleWidthGrassSideSpur(
+            Vector2Int tipPoint,
+            Vector2Int forwardOffset,
+            Vector2Int inwardOffset,
+            Vector2Int sideOffsetA,
+            Vector2Int sideOffsetB,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int maxDepth,
+            List<GrassSideSpurCandidate> spurCandidates,
+            HashSet<Vector2Int> proposedRemovalPoints)
+        {
+            if (!TryBuildSingleWidthGrassSideSpur(
+                    tipPoint,
+                    forwardOffset,
+                    inwardOffset,
+                    sideOffsetA,
+                    sideOffsetB,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    out HashSet<Vector2Int> spurPoints,
+                    out Vector2Int basePoint,
+                    out string reason))
+            {
+                if (!string.IsNullOrEmpty(reason))
+                {
+                    LogGrassSideSpurDecision("Skip", tipPoint, basePoint, forwardOffset, spurPoints, reason);
+                }
+
+                return;
+            }
+
+            foreach (Vector2Int spurPoint in spurPoints)
+            {
+                if (proposedRemovalPoints.Contains(spurPoint))
+                {
+                    LogGrassSideSpurDecision("Skip", tipPoint, basePoint, forwardOffset, spurPoints, "CandidateConflict");
+                    return;
+                }
+            }
+
+            spurCandidates.Add(new GrassSideSpurCandidate(tipPoint, basePoint, forwardOffset, spurPoints));
+            foreach (Vector2Int spurPoint in spurPoints)
+            {
+                proposedRemovalPoints.Add(spurPoint);
+            }
+        }
+
+        private bool TryBuildSingleWidthGrassSideSpur(
+            Vector2Int tipPoint,
+            Vector2Int forwardOffset,
+            Vector2Int inwardOffset,
+            Vector2Int sideOffsetA,
+            Vector2Int sideOffsetB,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int maxDepth,
+            out HashSet<Vector2Int> spurPoints,
+            out Vector2Int basePoint,
+            out string reason)
+        {
+            spurPoints = new HashSet<Vector2Int>();
+            basePoint = tipPoint;
+            reason = null;
+
+            if (!IsSingleWidthGrassSideSpurPoint(
+                    tipPoint,
+                    sideOffsetA,
+                    sideOffsetB,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    out string validationReason))
+            {
+                reason = validationReason;
+                return false;
+            }
+
+            if (!IsOrdinaryGrassSidePoint(tipPoint + forwardOffset, depthByPoint, allLandPoints, areaByPoint))
+            {
+                reason = "NotOrdinaryGrassOnBothSides";
+                return false;
+            }
+
+            Vector2Int currentPoint = tipPoint;
+            for (int branchLength = 0; branchLength < 2; branchLength++)
+            {
+                spurPoints.Add(currentPoint);
+                Vector2Int nextPoint = currentPoint + inwardOffset;
+                if (IsSingleWidthGrassSideSpurPoint(
+                        nextPoint,
+                        sideOffsetA,
+                        sideOffsetB,
+                        depthByPoint,
+                        allLandPoints,
+                        areaByPoint,
+                        maxDepth,
+                        out _))
+                {
+                    currentPoint = nextPoint;
+                    continue;
+                }
+
+                basePoint = nextPoint;
+                break;
+            }
+
+            if (spurPoints.Count > 2)
+            {
+                reason = "LengthTooLong";
+                return false;
+            }
+
+            if (IsSingleWidthGrassSideSpurPoint(
+                    currentPoint + inwardOffset,
+                    sideOffsetA,
+                    sideOffsetB,
+                    depthByPoint,
+                    allLandPoints,
+                    areaByPoint,
+                    maxDepth,
+                    out _))
+            {
+                reason = "LengthTooLong";
+                return false;
+            }
+
+            if (!IsDepthPoint(basePoint, depthByPoint, maxDepth))
+            {
+                if (TryBuildSingleMaxDepthTerminalTipWithIntermediateBase(
+                        tipPoint,
+                        forwardOffset,
+                        inwardOffset,
+                        sideOffsetA,
+                        sideOffsetB,
+                        depthByPoint,
+                        allLandPoints,
+                        areaByPoint,
+                        maxDepth,
+                        spurPoints,
+                        out basePoint))
+                {
+                    return true;
+                }
+
+                if (TryGetDepth(basePoint, depthByPoint, out int baseDepth) && baseDepth != maxDepth)
+                {
+                    reason = "ContainsIntermediateDepth";
+                }
+                else
+                {
+                    reason = "NoBroadBase";
+                }
+
+                return false;
+            }
+
+            if (!HasBroadMaxDepthBase(basePoint, sideOffsetA, sideOffsetB, depthByPoint, maxDepth))
+            {
+                reason = "NoBroadBase";
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool TryBuildSingleMaxDepthTerminalTipWithIntermediateBase(
+            Vector2Int tipPoint,
+            Vector2Int forwardOffset,
+            Vector2Int inwardOffset,
+            Vector2Int sideOffsetA,
+            Vector2Int sideOffsetB,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int maxDepth,
+            HashSet<Vector2Int> spurPoints,
+            out Vector2Int basePoint)
+        {
+            basePoint = tipPoint + inwardOffset;
+
+            if (spurPoints == null || spurPoints.Count != 1 || maxDepth <= 0)
+            {
+                return false;
+            }
+
+            if (!depthByPoint.TryGetValue(tipPoint, out int tipDepth) ||
+                tipDepth != maxDepth ||
+                !depthByPoint.TryGetValue(basePoint, out int baseDepth) ||
+                baseDepth != maxDepth - 1)
+            {
+                return false;
+            }
+
+            if ((connectorFloorPoints != null && connectorFloorPoints.Contains(tipPoint)) ||
+                TouchesSpecificWaterSet(tipPoint, currentShoreWaterPoints))
+            {
+                return false;
+            }
+
+            if (!IsOrdinaryGrassSidePoint(tipPoint + forwardOffset, depthByPoint, allLandPoints, areaByPoint) ||
+                !IsOrdinaryGrassSidePoint(tipPoint + sideOffsetA, depthByPoint, allLandPoints, areaByPoint) ||
+                !IsOrdinaryGrassSidePoint(tipPoint + sideOffsetB, depthByPoint, allLandPoints, areaByPoint))
+            {
+                return false;
+            }
+
+            int shoreNeighborCount = 0;
+            Vector2Int[] cardinalOffsets =
+            {
+                Vector2Int.up,
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left
+            };
+
+            for (int i = 0; i < cardinalOffsets.Length; i++)
+            {
+                Vector2Int neighbor = tipPoint + cardinalOffsets[i];
+                if (!depthByPoint.ContainsKey(neighbor))
+                {
+                    continue;
+                }
+
+                shoreNeighborCount++;
+                if (neighbor != basePoint)
+                {
+                    return false;
+                }
+            }
+
+            if (shoreNeighborCount != 1)
+            {
+                return false;
+            }
+
+            LogTargetedFixDecision(
+                tipPoint,
+                tipDepth,
+                maxDepth,
+                "remove-single-max-depth-tip",
+                "base-is-maxDepth-minus-one");
+
+            return true;
+        }
+
+        private bool IsSingleWidthGrassSideSpurPoint(
+            Vector2Int point,
+            Vector2Int sideOffsetA,
+            Vector2Int sideOffsetB,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int maxDepth,
+            out string reason)
+        {
+            reason = null;
+
+            if (!IsDepthPoint(point, depthByPoint, maxDepth))
+            {
+                if (TryGetDepth(point, depthByPoint, out int depth) && depth != maxDepth)
+                {
+                    reason = "ContainsIntermediateDepth";
+                }
+
+                return false;
+            }
+
+            if (TouchesSpecificWaterSet(point, currentShoreWaterPoints))
+            {
+                reason = "TouchesWater";
+                return false;
+            }
+
+            if (connectorFloorPoints != null && connectorFloorPoints.Contains(point))
+            {
+                reason = "WouldDisconnectShore";
+                return false;
+            }
+
+            if (!IsOrdinaryGrassSidePoint(point + sideOffsetA, depthByPoint, allLandPoints, areaByPoint) ||
+                !IsOrdinaryGrassSidePoint(point + sideOffsetB, depthByPoint, allLandPoints, areaByPoint))
+            {
+                reason = "NotOrdinaryGrassOnBothSides";
+                return false;
+            }
+
+            return true;
+        }
+
+        private bool HasBroadMaxDepthBase(
+            Vector2Int basePoint,
+            Vector2Int sideOffsetA,
+            Vector2Int sideOffsetB,
+            Dictionary<Vector2Int, int> depthByPoint,
+            int maxDepth)
+        {
+            if (!IsDepthPoint(basePoint, depthByPoint, maxDepth))
+            {
+                return false;
+            }
+
+            if (IsDepthPoint(basePoint + sideOffsetA, depthByPoint, maxDepth) &&
+                IsDepthPoint(basePoint + sideOffsetB, depthByPoint, maxDepth))
+            {
+                return true;
+            }
+
+            return HasStableMaxDepthSquareSupport(basePoint, depthByPoint, maxDepth);
+        }
+
+        private static bool HasStableMaxDepthSquareSupport(
+            Vector2Int point,
+            Dictionary<Vector2Int, int> depthByPoint,
+            int maxDepth)
+        {
+            Vector2Int[] startOffsets =
+            {
+                Vector2Int.zero,
+                Vector2Int.left,
+                Vector2Int.down,
+                Vector2Int.left + Vector2Int.down
+            };
+
+            for (int i = 0; i < startOffsets.Length; i++)
+            {
+                Vector2Int start = point + startOffsets[i];
+                if (IsDepthPoint(start, depthByPoint, maxDepth) &&
+                    IsDepthPoint(start + Vector2Int.right, depthByPoint, maxDepth) &&
+                    IsDepthPoint(start + Vector2Int.up, depthByPoint, maxDepth) &&
+                    IsDepthPoint(start + Vector2Int.right + Vector2Int.up, depthByPoint, maxDepth))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool WouldDisconnectMaxDepthSpurBranch(
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> branchPoints,
+            int maxDepth)
+        {
+            HashSet<Vector2Int> neighboringMaxDepthPoints = new HashSet<Vector2Int>();
+            Vector2Int[] offsets =
+            {
+                Vector2Int.up,
+                Vector2Int.right,
+                Vector2Int.down,
+                Vector2Int.left
+            };
+
+            foreach (Vector2Int branchPoint in branchPoints)
+            {
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    Vector2Int neighbor = branchPoint + offsets[i];
+                    if (branchPoints.Contains(neighbor) || !IsDepthPoint(neighbor, depthByPoint, maxDepth))
+                    {
+                        continue;
+                    }
+
+                    neighboringMaxDepthPoints.Add(neighbor);
+                }
+            }
+
+            if (neighboringMaxDepthPoints.Count <= 1)
+            {
+                return false;
+            }
+
+            List<Vector2Int> orderedNeighboringPoints = new List<Vector2Int>(neighboringMaxDepthPoints);
+            orderedNeighboringPoints.Sort(ComparePointOrder);
+
+            HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
+            Queue<Vector2Int> queue = new Queue<Vector2Int>();
+            queue.Enqueue(orderedNeighboringPoints[0]);
+            visited.Add(orderedNeighboringPoints[0]);
+
+            while (queue.Count > 0)
+            {
+                Vector2Int currentPoint = queue.Dequeue();
+                for (int i = 0; i < offsets.Length; i++)
+                {
+                    Vector2Int neighbor = currentPoint + offsets[i];
+                    if (visited.Contains(neighbor) ||
+                        branchPoints.Contains(neighbor) ||
+                        !IsDepthPoint(neighbor, depthByPoint, maxDepth))
+                    {
+                        continue;
+                    }
+
+                    visited.Add(neighbor);
+                    queue.Enqueue(neighbor);
+                }
+            }
+
+            for (int i = 1; i < orderedNeighboringPoints.Count; i++)
+            {
+                if (!visited.Contains(orderedNeighboringPoints[i]))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private static bool IsOrdinaryGrassSidePoint(
+            Vector2Int point,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            return !depthByPoint.ContainsKey(point) &&
+                   IsGrassLandPoint(point, allLandPoints, areaByPoint);
+        }
+
+        private static bool IsDepthPoint(
+            Vector2Int point,
+            Dictionary<Vector2Int, int> depthByPoint,
+            int targetDepth)
+        {
+            return depthByPoint != null &&
+                   depthByPoint.TryGetValue(point, out int depth) &&
+                   depth == targetDepth;
+        }
+
+        private static bool TryGetDepth(
+            Vector2Int point,
+            Dictionary<Vector2Int, int> depthByPoint,
+            out int depth)
+        {
+            depth = 0;
+            return depthByPoint != null && depthByPoint.TryGetValue(point, out depth);
         }
 
         private List<ShoreSandPlacement> BuildShoreSandPlacementsFromDepthMap(
@@ -5096,6 +5820,10 @@ namespace UnderTheStars.GenerationMap
                     selectedCornerDirs = new List<ShoreEdgeDirection> { grassInnerPrimaryDir, grassInnerSecondaryDir };
                     selectedCornerRotationY = grassInnerYaw;
                     reason = "grass-inner-diagonal-grass-two-shore-neighbors";
+                    LogTargetedFixAction(
+                        placement.point,
+                        "allow-grass-inner-corner",
+                        "reverted-overbroad-diagonal-only-guard");
                 }
                 else if (realSeaDirs.Count == 0 &&
                          shoreSandGrassOuterCornerPrefab != null &&
@@ -5437,6 +6165,158 @@ namespace UnderTheStars.GenerationMap
             }
 
             return "None";
+        }
+
+        private Dictionary<Vector2Int, ShoreSandClassificationSnapshot> LogSuspiciousShoreClassificationPlacements(
+            int batchId,
+            string stageName,
+            List<ShoreSandPlacement> placements,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            Dictionary<Vector2Int, ShoreSandClassificationSnapshot> previousSnapshots)
+        {
+            Dictionary<Vector2Int, ShoreSandClassificationSnapshot> currentSnapshots =
+                CaptureShoreSandClassificationSnapshots(placements, depthByPoint, allLandPoints, areaByPoint);
+
+            if (!enableShoreClassificationDebugLogs)
+            {
+                return currentSnapshots;
+            }
+
+            List<Vector2Int> orderedPoints = new List<Vector2Int>(currentSnapshots.Keys);
+            orderedPoints.Sort(ComparePointOrder);
+
+            for (int i = 0; i < orderedPoints.Count; i++)
+            {
+                Vector2Int point = orderedPoints[i];
+                ShoreSandClassificationSnapshot currentSnapshot = currentSnapshots[point];
+                ShoreSandClassificationSnapshot previousSnapshot = default;
+
+                bool hasPreviousSnapshot =
+                    previousSnapshots != null &&
+                    previousSnapshots.TryGetValue(point, out previousSnapshot);
+
+                bool changedPrefab = hasPreviousSnapshot &&
+                                     currentSnapshot.prefabType != previousSnapshot.prefabType;
+                bool changedDirectionOrYaw = hasPreviousSnapshot &&
+                                             (currentSnapshot.direction != previousSnapshot.direction ||
+                                              currentSnapshot.usesExplicitYaw != previousSnapshot.usesExplicitYaw ||
+                                              NormalizeYaw(currentSnapshot.explicitYaw) != NormalizeYaw(previousSnapshot.explicitYaw));
+
+                bool isOppositeGrassPair = IsOppositeGrassPair(currentSnapshot.ordinaryGrassDirections);
+                bool currentGrassTransitionSuspicious =
+                    currentSnapshot.prefabType == "ShoreSand_GrassTransition" &&
+                    currentSnapshot.ordinaryGrassNeighborCount != 1;
+                bool hasThreeOrMoreGrassNeighbors = currentSnapshot.ordinaryGrassNeighborCount >= 3;
+                bool changedFromNormalToGrassTransition = hasPreviousSnapshot &&
+                                                          previousSnapshot.prefabType == "ShoreSand_Normal" &&
+                                                          currentSnapshot.prefabType == "ShoreSand_GrassTransition";
+
+                bool shouldLog =
+                    currentGrassTransitionSuspicious ||
+                    isOppositeGrassPair ||
+                    hasThreeOrMoreGrassNeighbors ||
+                    changedFromNormalToGrassTransition ||
+                    changedDirectionOrYaw;
+
+                if (!shouldLog)
+                {
+                    continue;
+                }
+
+                LogShoreSandClassificationSnapshot(
+                    batchId,
+                    stageName,
+                    currentSnapshot,
+                    hasPreviousSnapshot ? (ShoreSandClassificationSnapshot?)previousSnapshot : null,
+                    changedPrefab,
+                    changedDirectionOrYaw);
+            }
+
+            return currentSnapshots;
+        }
+
+        private Dictionary<Vector2Int, ShoreSandClassificationSnapshot> CaptureShoreSandClassificationSnapshots(
+            List<ShoreSandPlacement> placements,
+            Dictionary<Vector2Int, int> depthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            Dictionary<Vector2Int, ShoreSandClassificationSnapshot> snapshots =
+                new Dictionary<Vector2Int, ShoreSandClassificationSnapshot>();
+
+            if (placements == null || depthByPoint == null || allLandPoints == null || areaByPoint == null)
+            {
+                return snapshots;
+            }
+
+            HashSet<Vector2Int> shorePoints = BuildPlacementPointSet(placements);
+            int maxDepth = Mathf.Max(0, shoreSandWidth - 1);
+
+            for (int i = 0; i < placements.Count; i++)
+            {
+                ShoreSandPlacement placement = placements[i];
+                int grassNeighborCount = CountOrdinaryGrassNeighborDirections(
+                    placement.point,
+                    allLandPoints,
+                    areaByPoint,
+                    shorePoints,
+                    out List<ShoreEdgeDirection> ordinaryGrassDirections,
+                    out _);
+                List<ShoreEdgeDirection> seaDirections = CollectSeaEdgeDirections(placement.point, allLandPoints);
+
+                snapshots[placement.point] = new ShoreSandClassificationSnapshot
+                {
+                    point = placement.point,
+                    depth = depthByPoint.TryGetValue(placement.point, out int depth) ? depth : -1,
+                    maxDepth = maxDepth,
+                    prefabType = GetShoreSandPlacementDebugType(placement),
+                    ordinaryGrassDirections = ordinaryGrassDirections,
+                    ordinaryGrassNeighborCount = grassNeighborCount,
+                    seaDirections = seaDirections,
+                    direction = placement.direction,
+                    usesExplicitYaw = placement.usesExplicitYaw,
+                    explicitYaw = placement.usesExplicitYaw ? NormalizeYaw(placement.explicitYaw) : 0f,
+                    isConnector = connectorFloorPoints != null && connectorFloorPoints.Contains(placement.point),
+                    touchesShoreWater = TouchesSpecificWaterSet(placement.point, currentShoreWaterPoints)
+                };
+            }
+
+            return snapshots;
+        }
+
+        [System.Diagnostics.Conditional("UNITY_EDITOR")]
+        [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+        private void LogShoreSandClassificationSnapshot(
+            int batchId,
+            string stageName,
+            ShoreSandClassificationSnapshot currentSnapshot,
+            ShoreSandClassificationSnapshot? previousSnapshot,
+            bool changedPrefab,
+            bool changedDirectionOrYaw)
+        {
+            if (!enableShoreClassificationDebugLogs)
+            {
+                return;
+            }
+
+            string previousPrefabType = previousSnapshot.HasValue
+                ? previousSnapshot.Value.prefabType
+                : "None";
+            string previousDirection = previousSnapshot.HasValue
+                ? previousSnapshot.Value.direction.ToString()
+                : "None";
+            string previousExplicitYaw = previousSnapshot.HasValue && previousSnapshot.Value.usesExplicitYaw
+                ? NormalizeYaw(previousSnapshot.Value.explicitYaw).ToString("F1")
+                : "N/A";
+            string currentExplicitYaw = currentSnapshot.usesExplicitYaw
+                ? NormalizeYaw(currentSnapshot.explicitYaw).ToString("F1")
+                : "N/A";
+
+            Debug.Log(
+                $"[ShoreSand.ClassificationDebug] batch={batchId} stage={stageName} point={currentSnapshot.point} depth={currentSnapshot.depth} maxDepth={currentSnapshot.maxDepth} prefab={currentSnapshot.prefabType} previousPrefab={previousPrefabType} ordinaryGrassDirs={FormatDirectionList(currentSnapshot.ordinaryGrassDirections)} grassNeighborCount={currentSnapshot.ordinaryGrassNeighborCount} seaDirs={FormatDirectionList(currentSnapshot.seaDirections)} direction={currentSnapshot.direction} previousDirection={previousDirection} explicitYaw={currentExplicitYaw} previousExplicitYaw={previousExplicitYaw} isConnector={currentSnapshot.isConnector} touchesShoreWater={currentSnapshot.touchesShoreWater} changedPrefab={changedPrefab} changedDirectionOrYaw={changedDirectionOrYaw}",
+                this);
         }
 
         private bool ContainsPlacementPoint(List<ShoreSandPlacement> placements, Vector2Int point)
