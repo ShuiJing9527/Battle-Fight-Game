@@ -5,7 +5,7 @@ using UnityEngine;
 [CustomEditor(typeof(RandomMapGeneration), true)]
 public class RandomMapGenerationEditor : Editor
 {
-    RandomMapGeneration generator;
+    private RandomMapGeneration generator;
 
     private void Awake()
     {
@@ -14,7 +14,13 @@ public class RandomMapGenerationEditor : Editor
 
     public override void OnInspectorGUI()
     {
-        base.OnInspectorGUI();
+        serializedObject.Update();
+        DrawPropertiesExcluding(serializedObject, "m_Script");
+        serializedObject.ApplyModifiedProperties();
+        if (target == null)
+        {
+            return;
+        }
 
         if (GUILayout.Button("生成地图"))
         {

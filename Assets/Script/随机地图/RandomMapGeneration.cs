@@ -1,4 +1,5 @@
 ﻿using Cysharp.Threading.Tasks;
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Tilemaps;
@@ -66,6 +67,7 @@ namespace UnderTheStars.GenerationMap
 
         [Header("地图生成开关")]
         [SerializeField] private List<MapRegionGenerateOption> regionGenerateOptions = new List<MapRegionGenerateOption>();
+        [System.NonSerialized] private List<MapRegionGenerateOption> runtimeRegionGenerateOptions;
         [SerializeField, Min(1)] private int regionsPerRow = 3;
         [SerializeField] private Vector2Int regionSpacing = new Vector2Int(12, 12);
         [SerializeField] private Vector2 defaultRegionSizeMultiplier = Vector2.one;
@@ -118,6 +120,9 @@ namespace UnderTheStars.GenerationMap
         private int currentGenerateMapDebugId;
         private int playerSpawnedGenerationId = -1;
         private bool isGenerateMapDebugInProgress;
+        private int shoreGenerationInvocationCount;
+        private bool hasCompletedFirstShoreGeneration;
+        private readonly HashSet<Vector2Int> diagnosticKnownShorePoints = new HashSet<Vector2Int>();
         private const string GeneratedShoreSandRootName = "Generated Shore Sand";
         private const string GeneratedPropsRootName = "PropsRoot";
         private const string GeneratedWallColliderRootName = "Merged Wall Colliders";
@@ -347,6 +352,26 @@ namespace UnderTheStars.GenerationMap
             }
         }
 
+        private struct ShoreGenerationCompleteStats
+        {
+            public int totalCandidateCount;
+            public int totalGeneratedCount;
+            public int generatedShoreSandPointsCount;
+            public int instantiatedObjectCount;
+            public string generationStartTime;
+            public string generationEndTime;
+            public long elapsedMilliseconds;
+            public bool completedBeforePlayerSpawn;
+            public bool completedBeforeEnemySpawn;
+        }
+
+        private struct PlayerPositionDiagnostic
+        {
+            public Vector3 worldPosition;
+            public Vector2Int gridPoint;
+            public bool hasPlayer;
+        }
+
         private void Start()
         {
             GenerateMap();
@@ -425,7 +450,7 @@ namespace UnderTheStars.GenerationMap
                     return;
                 }
 
-                GenerateShoreSand();
+                await GenerateShoreSandAsync(generationId);
 
                 if (!IsGenerationStillCurrent(generationId))
                 {
@@ -475,8 +500,10 @@ namespace UnderTheStars.GenerationMap
 
         private async UniTask GeneraterWallPointsAsync(HashSet<Vector2Int> checkAllFloor)
         {
+            int beforeCount = wallColliderPoints != null ? wallColliderPoints.Count : 0;
             wallColliderPoints = new HashSet<Vector2Int>();
             wallColliderPoints = RandomMapGenerationAlgorithms.GenraterWallPoints(checkAllFloor);
+            LogMapDataMutation(nameof(wallColliderPoints), beforeCount, wallColliderPoints != null ? wallColliderPoints.Count : 0, nameof(GeneraterWallPointsAsync));
             await UniTask.NextFrame();
         }
 
@@ -890,8 +917,12 @@ namespace UnderTheStars.GenerationMap
         /// <summary> Generate floor points. </summary>
         private HashSet<Vector2Int> GeneraterFloorPoints(BoundsInt[,] regionPoints)
         {
+            int previousFloorCount = GetTotalPointCount(floorPoints);
+            int previousPropsCount = GetTotalPointCount(propsPoints);
             floorPoints = new HashSet<Vector2Int>[activeRegionColumns, activeRegionRows];
             propsPoints = new HashSet<Vector2Int>[activeRegionColumns, activeRegionRows];
+            LogMapDataMutation(nameof(floorPoints), previousFloorCount, GetTotalPointCount(floorPoints), nameof(GeneraterFloorPoints));
+            LogMapDataMutation(nameof(propsPoints), previousPropsCount, GetTotalPointCount(propsPoints), nameof(GeneraterFloorPoints));
 
             Vector2Int[,] regionCenters = new Vector2Int[activeRegionColumns, activeRegionRows];
 
@@ -920,7 +951,9 @@ namespace UnderTheStars.GenerationMap
                     var region = regionPoints[i, j];
                     var center = region.center;
 
+                    int previousRegionFloorCount = floorPoints[i, j].Count;
                     floorPoints[i, j] = RandomMapGenerationAlgorithms.GenraterFloorPoints(regionPoints[i, j], checkFloor, maplterations, mapSize);
+                    LogMapDataMutation($"{nameof(floorPoints)}[{i},{j}]", previousRegionFloorCount, floorPoints[i, j] != null ? floorPoints[i, j].Count : 0, nameof(GeneraterFloorPoints));
                     propsPoints[i, j].UnionWith(floorPoints[i, j]);
                     regionCenters[i, j] = (Vector2Int)Vector3Int.RoundToInt(center);
                 }
@@ -2404,6 +2437,7 @@ namespace UnderTheStars.GenerationMap
 
         private void ApplyFloorPointFills(HashSet<Vector2Int> pointsToFill)
         {
+            int beforeFloorCount = GetTotalPointCount(floorPoints);
             foreach (Vector2Int point in pointsToFill)
             {
                 if (TryResolveOwningRegionForFilledPoint(point, out int ownerGridX, out int ownerGridY))
@@ -2412,6 +2446,8 @@ namespace UnderTheStars.GenerationMap
                     propsPoints[ownerGridX, ownerGridY]?.Add(point);
                 }
             }
+
+            LogMapDataMutation(nameof(floorPoints), beforeFloorCount, GetTotalPointCount(floorPoints), nameof(ApplyFloorPointFills));
         }
 
         private void ApplyFloorPointRemovals(HashSet<Vector2Int> pointsToRemove)
@@ -2421,6 +2457,7 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
+            int beforeFloorCount = GetTotalPointCount(floorPoints);
             for (int x = 0; x < floorPoints.GetLength(0); x++)
             {
                 for (int y = 0; y < floorPoints.GetLength(1); y++)
@@ -2438,6 +2475,8 @@ namespace UnderTheStars.GenerationMap
                     }
                 }
             }
+
+            LogMapDataMutation(nameof(floorPoints), beforeFloorCount, GetTotalPointCount(floorPoints), nameof(ApplyFloorPointRemovals));
         }
 
         private bool TryResolveOwningRegionForFilledPoint(Vector2Int point, out int ownerGridX, out int ownerGridY)
@@ -2891,13 +2930,21 @@ namespace UnderTheStars.GenerationMap
         /// <summary> Clear cached point sets. </summary>
         private void InitMapData()
         {
+            LogMapDataMutation(nameof(floorPoints), GetTotalPointCount(floorPoints), 0, nameof(InitMapData));
             floorPoints = null;
+            LogMapDataMutation(nameof(propsPoints), GetTotalPointCount(propsPoints), 0, nameof(InitMapData));
             propsPoints = null;
+            LogMapDataMutation(nameof(wallColliderPoints), wallColliderPoints != null ? wallColliderPoints.Count : 0, 0, nameof(InitMapData));
             wallColliderPoints = null;
+            LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(InitMapData));
             generatedShoreSandPoints = null;
+            LogMapDataMutation(nameof(connectorFloorPoints), connectorFloorPoints != null ? connectorFloorPoints.Count : 0, 0, nameof(InitMapData));
             connectorFloorPoints = new HashSet<Vector2Int>();
+            LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(InitMapData));
             currentExteriorOceanPoints = null;
+            LogMapDataMutation(nameof(currentShoreWaterPoints), currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0, 0, nameof(InitMapData));
             currentShoreWaterPoints = null;
+            LogMapDataMutation(nameof(currentFinalWalkablePoints), currentFinalWalkablePoints != null ? currentFinalWalkablePoints.Count : 0, 0, nameof(InitMapData));
             currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
@@ -2926,6 +2973,12 @@ namespace UnderTheStars.GenerationMap
 
         private void EnsureRegionGenerateOptions()
         {
+            if (Application.isPlaying)
+            {
+                EnsureRuntimeRegionGenerateOptions();
+                return;
+            }
+
             if (regionGenerateOptions != null && regionGenerateOptions.Count > 0)
             {
                 return;
@@ -2961,14 +3014,94 @@ namespace UnderTheStars.GenerationMap
             }
         }
 
+        private void EnsureRuntimeRegionGenerateOptions()
+        {
+            if (runtimeRegionGenerateOptions != null && runtimeRegionGenerateOptions.Count > 0)
+            {
+                return;
+            }
+
+            runtimeRegionGenerateOptions = new List<MapRegionGenerateOption>();
+
+            if (regionGenerateOptions != null && regionGenerateOptions.Count > 0)
+            {
+                for (int i = 0; i < regionGenerateOptions.Count; i++)
+                {
+                    runtimeRegionGenerateOptions.Add(CloneRegionGenerateOption(regionGenerateOptions[i], i));
+                }
+
+                return;
+            }
+
+            int legacyCount = Mathf.Max(1, Mathf.Max(regionAreaTypes != null ? regionAreaTypes.Length : 0, Mathf.Max(1, regionSize.x * regionSize.y)));
+            for (int i = 0; i < legacyCount; i++)
+            {
+                AreaType areaType = AreaType.NoSpawn;
+                if (useRegionAreaTypes && regionAreaTypes != null && i < regionAreaTypes.Length)
+                {
+                    areaType = regionAreaTypes[i];
+                }
+                else if (forestRegionIndices != null && forestRegionIndices.Contains(i))
+                {
+                    areaType = AreaType.Forest;
+                }
+                else if (grassRegionIndices != null && grassRegionIndices.Contains(i))
+                {
+                    areaType = AreaType.Grass;
+                }
+
+                bool enabledByDefault = areaType == AreaType.Grass || areaType == AreaType.Forest;
+                runtimeRegionGenerateOptions.Add(new MapRegionGenerateOption
+                {
+                    displayName = $"Region {i}",
+                    generateThisRegion = enabledByDefault,
+                    paintSlotIndex = i,
+                    areaType = areaType,
+                    sizeMultiplier = defaultRegionSizeMultiplier
+                });
+            }
+        }
+
+        private static MapRegionGenerateOption CloneRegionGenerateOption(MapRegionGenerateOption source, int fallbackIndex)
+        {
+            if (source == null)
+            {
+                return new MapRegionGenerateOption
+                {
+                    displayName = $"Region {fallbackIndex}",
+                    generateThisRegion = false,
+                    paintSlotIndex = fallbackIndex,
+                    areaType = AreaType.NoSpawn,
+                    sizeMultiplier = Vector2.one
+                };
+            }
+
+            return new MapRegionGenerateOption
+            {
+                displayName = source.displayName,
+                generateThisRegion = source.generateThisRegion,
+                paintSlotIndex = source.paintSlotIndex,
+                areaType = source.areaType,
+                sizeMultiplier = source.sizeMultiplier
+            };
+        }
+
         private ActiveRegionLayout[] BuildActiveRegionLayouts()
         {
+            if (Application.isPlaying)
+            {
+                runtimeRegionGenerateOptions = null;
+            }
+
             EnsureRegionGenerateOptions();
 
+            List<MapRegionGenerateOption> regionOptions = Application.isPlaying
+                ? (runtimeRegionGenerateOptions ?? new List<MapRegionGenerateOption>())
+                : regionGenerateOptions;
             List<MapRegionGenerateOption> enabledOptions = new List<MapRegionGenerateOption>();
-            for (int i = 0; i < regionGenerateOptions.Count; i++)
+            for (int i = 0; i < regionOptions.Count; i++)
             {
-                MapRegionGenerateOption option = regionGenerateOptions[i];
+                MapRegionGenerateOption option = regionOptions[i];
                 if (option != null && option.generateThisRegion)
                 {
                     enabledOptions.Add(option);
@@ -3081,12 +3214,241 @@ namespace UnderTheStars.GenerationMap
             return 0;
         }
 
-        private void GenerateShoreSand()
+        private PlayerPositionDiagnostic GetCurrentPlayerPositionDiagnostic()
         {
+            PlayerPositionDiagnostic result = new PlayerPositionDiagnostic
+            {
+                worldPosition = Vector3.zero,
+                gridPoint = Vector2Int.zero,
+                hasPlayer = false
+            };
+
+            Transform playerTransform = null;
+            Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+            if (bootstrap != null)
+            {
+                playerTransform = bootstrap.CurrentPlayerTransform != null
+                    ? bootstrap.CurrentPlayerTransform
+                    : (bootstrap.PartyLeader != null ? bootstrap.PartyLeader.transform : null);
+            }
+
+            if (playerTransform == null && player != null)
+            {
+                playerTransform = player.transform;
+            }
+
+            if (playerTransform == null)
+            {
+                return result;
+            }
+
+            result.hasPlayer = true;
+            result.worldPosition = playerTransform.position;
+
+            Tilemap referenceTilemap = paintTilemap != null ? paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex()) : null;
+            if (referenceTilemap != null)
+            {
+                Vector3Int cell = referenceTilemap.WorldToCell(playerTransform.position);
+                result.gridPoint = new Vector2Int(cell.x, cell.y);
+            }
+
+            return result;
+        }
+
+        private int CountCurrentGrassPoints()
+        {
+            if (floorPoints == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int x = 0; x < floorPoints.GetLength(0); x++)
+            {
+                for (int y = 0; y < floorPoints.GetLength(1); y++)
+                {
+                    HashSet<Vector2Int> regionPointSet = floorPoints[x, y];
+                    if (regionPointSet == null || ResolveRegionAreaType(x, y) != AreaType.Grass)
+                    {
+                        continue;
+                    }
+
+                    foreach (Vector2Int point in regionPointSet)
+                    {
+                        if (generatedShoreSandPoints == null || !generatedShoreSandPoints.Contains(point))
+                        {
+                            count++;
+                        }
+                    }
+                }
+            }
+
+            return count;
+        }
+
+        private int CountCurrentWaterPoints()
+        {
+            HashSet<Vector2Int> combined = new HashSet<Vector2Int>();
+            if (currentExteriorOceanPoints != null)
+            {
+                combined.UnionWith(currentExteriorOceanPoints);
+            }
+
+            if (currentShoreWaterPoints != null)
+            {
+                combined.UnionWith(currentShoreWaterPoints);
+            }
+
+            return combined.Count;
+        }
+
+        private static int GetTotalPointCount(HashSet<Vector2Int>[,] pointGrid)
+        {
+            if (pointGrid == null)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int x = 0; x < pointGrid.GetLength(0); x++)
+            {
+                for (int y = 0; y < pointGrid.GetLength(1); y++)
+                {
+                    count += pointGrid[x, y] != null ? pointGrid[x, y].Count : 0;
+                }
+            }
+
+            return count;
+        }
+
+        private string ResolvePointClassificationLabel(Vector2Int point, Dictionary<Vector2Int, AreaType> areaByPoint)
+        {
+            if (generatedShoreSandPoints != null && generatedShoreSandPoints.Contains(point))
+            {
+                return AreaType.Beach.ToString();
+            }
+
+            if (areaByPoint != null && areaByPoint.TryGetValue(point, out AreaType areaType))
+            {
+                return areaType.ToString();
+            }
+
+            if (currentShoreWaterPoints != null && currentShoreWaterPoints.Contains(point))
+            {
+                return AreaType.Water.ToString();
+            }
+
+            if (currentExteriorOceanPoints != null && currentExteriorOceanPoints.Contains(point))
+            {
+                return "Water";
+            }
+
+            return "Other";
+        }
+
+        private void LogMapDataMutation(string collectionName, int beforeCount, int afterCount, string currentMethod)
+        {
+            Debug.Log(
+                $"[RandomMap.MapDataMutation] collectionName={collectionName} beforeCount={beforeCount} afterCount={afterCount} " +
+                $"currentMethod={currentMethod} frameCount={Time.frameCount} hasCompletedFirstShoreGeneration={hasCompletedFirstShoreGeneration} " +
+                $"stackTrace={Environment.StackTrace}",
+                this);
+        }
+
+        private void LogShoreGenerationBegin(int generationId, int invocationIndex)
+        {
+            PlayerPositionDiagnostic playerDiagnostic = GetCurrentPlayerPositionDiagnostic();
+            Debug.Log(
+                $"[RandomMap.ShoreGenerationBegin] frameCount={Time.frameCount} generationId={generationId} callCount={invocationIndex} " +
+                $"playerWorldPosition={(playerDiagnostic.hasPlayer ? playerDiagnostic.worldPosition.ToString() : "unavailable")} " +
+                $"playerGridPoint={(playerDiagnostic.hasPlayer ? playerDiagnostic.gridPoint.ToString() : "unavailable")} " +
+                $"currentGrassCount={CountCurrentGrassPoints()} currentWaterCount={CountCurrentWaterPoints()} " +
+                $"currentShoreCount={(generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0)} " +
+                $"stackTrace={Environment.StackTrace}",
+                this);
+        }
+
+        private void LogGrassChangedToShore(
+            Vector2Int point,
+            string beforeClassification,
+            string afterClassification,
+            string methodName)
+        {
+            PlayerPositionDiagnostic playerDiagnostic = GetCurrentPlayerPositionDiagnostic();
+            Debug.Log(
+                $"[RandomMap.GrassChangedToShore] gridPoint={point} beforeClassification={beforeClassification} afterClassification={afterClassification} " +
+                $"methodName={methodName} frameCount={Time.frameCount} playerGridPoint={(playerDiagnostic.hasPlayer ? playerDiagnostic.gridPoint.ToString() : "unavailable")} " +
+                $"stackTrace={Environment.StackTrace}",
+                this);
+        }
+
+        private void LogLateShoreCreated(
+            int invocationIndex,
+            Vector2Int point,
+            Vector3 worldPosition,
+            string previousClassification)
+        {
+            PlayerPositionDiagnostic playerDiagnostic = GetCurrentPlayerPositionDiagnostic();
+            float distanceInTiles = playerDiagnostic.hasPlayer
+                ? Vector2.Distance((Vector2)playerDiagnostic.gridPoint, (Vector2)point)
+                : -1f;
+
+            Debug.Log(
+                $"[RandomMap.LateShoreCreated] frameCount={Time.frameCount} gridPoint={point} worldPosition={worldPosition} " +
+                $"previousClassification={previousClassification} distanceFromPlayerInTiles={distanceInTiles:F2} " +
+                $"shoreGenerationCallIndex={invocationIndex} stackTrace={Environment.StackTrace}",
+                this);
+        }
+
+        private UniTask GenerateShoreSandAsync(int generationId)
+        {
+            DateTimeOffset generationStartTimeUtc = DateTimeOffset.UtcNow;
+            double generationStartRealtime = Time.realtimeSinceStartupAsDouble;
+            int currentShoreGenerationInvocationIndex = ++shoreGenerationInvocationCount;
+            ShoreGenerationCompleteStats completionStats = new ShoreGenerationCompleteStats
+            {
+                generationStartTime = generationStartTimeUtc.ToString("O"),
+                completedBeforePlayerSpawn = true,
+                completedBeforeEnemySpawn = true
+            };
+
+            LogShoreGenerationBegin(generationId, currentShoreGenerationInvocationIndex);
+
+            UniTask CompleteAndLog()
+            {
+                DateTimeOffset generationEndTimeUtc = DateTimeOffset.UtcNow;
+                completionStats.generationEndTime = generationEndTimeUtc.ToString("O");
+                completionStats.elapsedMilliseconds = Math.Max(
+                    0L,
+                    (long)Math.Round((Time.realtimeSinceStartupAsDouble - generationStartRealtime) * 1000d));
+
+                Debug.Log(
+                    $"[RandomMap.ShoreGenerationComplete] generationId={generationId} " +
+                    $"totalCandidateCount={completionStats.totalCandidateCount} totalGeneratedCount={completionStats.totalGeneratedCount} " +
+                    $"generatedShoreSandPointsCount={completionStats.generatedShoreSandPointsCount} instantiatedObjectCount={completionStats.instantiatedObjectCount} " +
+                    $"generationStartTime={completionStats.generationStartTime} generationEndTime={completionStats.generationEndTime} " +
+                    $"elapsedMilliseconds={completionStats.elapsedMilliseconds} completedBeforePlayerSpawn={completionStats.completedBeforePlayerSpawn} " +
+                    $"completedBeforeEnemySpawn={completionStats.completedBeforeEnemySpawn}",
+                    this);
+
+                if (generatedShoreSandPoints != null)
+                {
+                    diagnosticKnownShorePoints.UnionWith(generatedShoreSandPoints);
+                }
+
+                hasCompletedFirstShoreGeneration = true;
+
+                return UniTask.CompletedTask;
+            }
+
+            LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             generatedShoreSandPoints = null;
             ClearGeneratedShoreSandInstances();
+            LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             currentExteriorOceanPoints = null;
+            LogMapDataMutation(nameof(currentShoreWaterPoints), currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             currentShoreWaterPoints = null;
+            LogMapDataMutation(nameof(currentFinalWalkablePoints), currentFinalWalkablePoints != null ? currentFinalWalkablePoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
@@ -3097,7 +3459,7 @@ namespace UnderTheStars.GenerationMap
 
             if (!enableShoreSand)
             {
-                return;
+                return CompleteAndLog();
             }
 
             if (!HasAllShoreSandPrefabsAssigned())
@@ -3108,18 +3470,18 @@ namespace UnderTheStars.GenerationMap
                     hasLoggedMissingShoreSandPrefabWarning = true;
                 }
 
-                return;
+                return CompleteAndLog();
             }
 
             if (paintTilemap == null || floorPoints == null)
             {
-                return;
+                return CompleteAndLog();
             }
 
             Tilemap referenceTilemap = paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex());
             if (referenceTilemap == null)
             {
-                return;
+                return CompleteAndLog();
             }
 
             Dictionary<Vector2Int, AreaType> areaByPoint = new Dictionary<Vector2Int, AreaType>();
@@ -3127,14 +3489,14 @@ namespace UnderTheStars.GenerationMap
             HashSet<Vector2Int> allLandPoints = CollectLandPointMetadata(areaByPoint, tilemapIndexByPoint);
             if (allLandPoints.Count == 0)
             {
-                return;
+                return CompleteAndLog();
             }
 
             currentShoreLandBounds = CalculatePointBounds(allLandPoints);
             currentExteriorOceanPoints = CollectExteriorOceanPoints(allLandPoints);
             if (currentShoreWaterPoints == null || currentShoreWaterPoints.Count == 0)
             {
-                return;
+                return CompleteAndLog();
             }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -3152,9 +3514,10 @@ namespace UnderTheStars.GenerationMap
                 out int coastalSeedCount,
                 out int exteriorCoastalSeedCount,
                 out int enclosedWaterCoastalSeedCount);
+            completionStats.totalCandidateCount = shoreDepthByPoint.Count;
             if (shoreDepthByPoint.Count == 0)
             {
-                return;
+                return CompleteAndLog();
             }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -3186,10 +3549,11 @@ namespace UnderTheStars.GenerationMap
                 shoreDepthByPoint,
                 allLandPoints,
                 areaByPoint);
+            completionStats.totalGeneratedCount = placements.Count;
 
             if (placements.Count == 0)
             {
-                return;
+                return CompleteAndLog();
             }
 
             int shoreClassificationDebugBatchId = 0;
@@ -3247,7 +3611,9 @@ namespace UnderTheStars.GenerationMap
             }
 
             Transform parent = ResolveGeneratedShoreSandParent();
+            int previousGeneratedShoreCount = generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0;
             generatedShoreSandPoints = new HashSet<Vector2Int>(placements.Count);
+            LogMapDataMutation(nameof(generatedShoreSandPoints), previousGeneratedShoreCount, generatedShoreSandPoints.Count, nameof(GenerateShoreSandAsync));
 
             for (int i = 0; i < placements.Count; i++)
             {
@@ -3259,6 +3625,12 @@ namespace UnderTheStars.GenerationMap
 
                 if (placements[i].replacesGrassTile)
                 {
+                    string previousClassification = ResolvePointClassificationLabel(point, areaByPoint);
+                    if (previousClassification == AreaType.Grass.ToString())
+                    {
+                        LogGrassChangedToShore(point, previousClassification, AreaType.Beach.ToString(), nameof(GenerateShoreSandAsync));
+                    }
+
                     paintTilemap.ClearFloorTileCell(tilemapIndex, point);
                 }
 
@@ -3272,13 +3644,27 @@ namespace UnderTheStars.GenerationMap
                     ? ResolveGrassTransitionYaw(placements[i].direction)
                     : ResolveShoreSandYaw(placements[i].direction);
                 Quaternion finalRotation = Quaternion.Euler(0f, finalYaw, 0f);
+                string previousClassificationBeforeInstantiation = ResolvePointClassificationLabel(point, areaByPoint);
 
                 GameObject instance = Instantiate(prefab, worldPosition, finalRotation, parent);
                 ApplyShoreSandDebugName(instance, placements[i], point);
                 TraceFinalShoreSandInstantiation(point, placements[i], prefab, finalYaw, instance);
                 if (placements[i].marksAsBeach)
                 {
-                    generatedShoreSandPoints.Add(point);
+                    if (previousClassificationBeforeInstantiation == AreaType.Grass.ToString() && !placements[i].replacesGrassTile)
+                    {
+                        LogGrassChangedToShore(point, previousClassificationBeforeInstantiation, AreaType.Beach.ToString(), nameof(GenerateShoreSandAsync));
+                    }
+
+                    bool wasAdded = generatedShoreSandPoints.Add(point);
+                    if (wasAdded && hasCompletedFirstShoreGeneration && diagnosticKnownShorePoints.Add(point))
+                    {
+                        LogLateShoreCreated(
+                            currentShoreGenerationInvocationIndex,
+                            point,
+                            worldPosition,
+                            previousClassificationBeforeInstantiation);
+                    }
                 }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -3291,7 +3677,10 @@ namespace UnderTheStars.GenerationMap
 #endif
             }
 
+            completionStats.generatedShoreSandPointsCount = generatedShoreSandPoints.Count;
+            completionStats.instantiatedObjectCount = parent != null ? parent.childCount : 0;
             RefreshFinalShoreWaterState(allLandPoints);
+            return CompleteAndLog();
         }
 
         private bool HasAllShoreSandPrefabsAssigned()
@@ -3304,7 +3693,9 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int> CollectExteriorOceanPoints(HashSet<Vector2Int> allLandPoints)
         {
             HashSet<Vector2Int> exteriorOceanPoints = new HashSet<Vector2Int>();
+            int previousShoreWaterCount = currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0;
             currentShoreWaterPoints = new HashSet<Vector2Int>();
+            LogMapDataMutation(nameof(currentShoreWaterPoints), previousShoreWaterCount, currentShoreWaterPoints.Count, nameof(CollectExteriorOceanPoints));
             currentEnclosedWaterPointCount = 0;
 
             if (allLandPoints == null || allLandPoints.Count == 0)
@@ -3385,6 +3776,8 @@ namespace UnderTheStars.GenerationMap
             }
 
             currentEnclosedWaterPointCount = enclosedCount;
+            LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, exteriorOceanPoints.Count, nameof(CollectExteriorOceanPoints));
+            LogMapDataMutation(nameof(currentShoreWaterPoints), previousShoreWaterCount, currentShoreWaterPoints.Count, nameof(CollectExteriorOceanPoints));
             return exteriorOceanPoints;
         }
 
@@ -3405,23 +3798,35 @@ namespace UnderTheStars.GenerationMap
         private void RefreshFinalShoreWaterState(HashSet<Vector2Int> allLandPoints)
         {
             HashSet<Vector2Int> finalWalkablePoints = BuildFinalWalkablePointSet(allLandPoints);
+            int previousFinalWalkableCount = currentFinalWalkablePoints != null ? currentFinalWalkablePoints.Count : 0;
             currentFinalWalkablePoints = new HashSet<Vector2Int>(finalWalkablePoints);
+            LogMapDataMutation(nameof(currentFinalWalkablePoints), previousFinalWalkableCount, currentFinalWalkablePoints.Count, nameof(RefreshFinalShoreWaterState));
             if (finalWalkablePoints.Count == 0)
             {
+                int previousExteriorOceanCount = currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0;
+                int previousShoreWaterCount = currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0;
                 currentExteriorOceanPoints = new HashSet<Vector2Int>();
                 currentShoreWaterPoints = new HashSet<Vector2Int>();
+                LogMapDataMutation(nameof(currentExteriorOceanPoints), previousExteriorOceanCount, currentExteriorOceanPoints.Count, nameof(RefreshFinalShoreWaterState));
+                LogMapDataMutation(nameof(currentShoreWaterPoints), previousShoreWaterCount, currentShoreWaterPoints.Count, nameof(RefreshFinalShoreWaterState));
                 currentShoreLandBounds = null;
                 currentEnclosedWaterPointCount = 0;
                 return;
             }
 
             currentShoreLandBounds = CalculatePointBounds(finalWalkablePoints);
+            int previousExteriorOceanCountBeforeCollect = currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0;
             currentExteriorOceanPoints = CollectExteriorOceanPoints(finalWalkablePoints);
+            LogMapDataMutation(nameof(currentExteriorOceanPoints), previousExteriorOceanCountBeforeCollect, currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, nameof(RefreshFinalShoreWaterState));
 
             if (generatedShoreSandPoints != null && generatedShoreSandPoints.Count > 0)
             {
+                int shoreWaterBeforeExcept = currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0;
+                int exteriorBeforeExcept = currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0;
                 currentShoreWaterPoints.ExceptWith(generatedShoreSandPoints);
                 currentExteriorOceanPoints.ExceptWith(generatedShoreSandPoints);
+                LogMapDataMutation(nameof(currentShoreWaterPoints), shoreWaterBeforeExcept, currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0, nameof(RefreshFinalShoreWaterState));
+                LogMapDataMutation(nameof(currentExteriorOceanPoints), exteriorBeforeExcept, currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, nameof(RefreshFinalShoreWaterState));
             }
         }
 
@@ -9953,13 +10358,21 @@ namespace UnderTheStars.GenerationMap
 
             deletedGeneratedShoreSandRoot = ClearGeneratedShoreSandInstances();
 
+            LogMapDataMutation(nameof(floorPoints), GetTotalPointCount(floorPoints), 0, nameof(ClearGeneratedMap));
             floorPoints = null;
+            LogMapDataMutation(nameof(propsPoints), GetTotalPointCount(propsPoints), 0, nameof(ClearGeneratedMap));
             propsPoints = null;
+            LogMapDataMutation(nameof(wallColliderPoints), wallColliderPoints != null ? wallColliderPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             wallColliderPoints = null;
+            LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             generatedShoreSandPoints = null;
+            LogMapDataMutation(nameof(connectorFloorPoints), connectorFloorPoints != null ? connectorFloorPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             connectorFloorPoints = null;
+            LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             currentExteriorOceanPoints = null;
+            LogMapDataMutation(nameof(currentShoreWaterPoints), currentShoreWaterPoints != null ? currentShoreWaterPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             currentShoreWaterPoints = null;
+            LogMapDataMutation(nameof(currentFinalWalkablePoints), currentFinalWalkablePoints != null ? currentFinalWalkablePoints.Count : 0, 0, nameof(ClearGeneratedMap));
             currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
@@ -9973,6 +10386,9 @@ namespace UnderTheStars.GenerationMap
             activeRegionRows = 0;
             player = null;
             playerSpawnedGenerationId = -1;
+            shoreGenerationInvocationCount = 0;
+            hasCompletedFirstShoreGeneration = false;
+            diagnosticKnownShorePoints.Clear();
 
             int deletedGeneratedObjectCount = shoreSandChildCount + propsChildCount + wallColliderChildCount + (deletedGeneratedShoreSandRoot ? 1 : 0);
             Debug.Log(
