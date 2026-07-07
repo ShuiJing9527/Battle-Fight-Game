@@ -1,27 +1,32 @@
-using UnityEngine;
+﻿using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement - Base Speed")]
-    [Tooltip("角色普通移动的基础速度。Player01 与 Player02 可分别在各自实例上单独调整。")]
+    [Tooltip("隗定牡譎ｮ騾夂ｧｻ蜉ｨ逧・渕遑騾溷ｺｦ縲１layer01 荳・Player02 蜿ｯ蛻・悪蝨ｨ蜷・・螳樔ｾ倶ｸ雁黒迢ｬ隹・紛縲・")]
     [InspectorName("baseMoveSpeed")]
     public float moveSpeed = 5f;
-    [Tooltip("基础移动速度的额外缩放。默认 1 表示保持原始基础速度。")]
+
+    [Tooltip("蝓ｺ遑遘ｻ蜉ｨ騾溷ｺｦ逧・｢晏､也ｼｩ謾ｾ縲るｻ倩ｮ､ 1 陦ｨ遉ｺ菫晄戟蜴溷ｧ句渕遑騾溷ｺｦ縲・")]
     [SerializeField, Min(0f)] private float playerBaseMoveSpeedScale = 1.0f;
-    [Tooltip("SPD 每超过 1 点时，对普通移动速度提供的比例加成。默认 0.0075 与旧公式一致。")]
+
+    [Tooltip("SPD 豈剰ｶ・ｿ・1 轤ｹ譌ｶ・悟ｯｹ譎ｮ騾夂ｧｻ蜉ｨ騾溷ｺｦ謠蝉ｾ帷噪豈比ｾ句刈謌舌るｻ倩ｮ､ 0.0075 荳取立蜈ｬ蠑丈ｸ閾ｴ縲・")]
     [SerializeField, Min(0f)] private float speedStatMoveRatio = 0.0075f;
-    [Tooltip("普通移动的最终速度硬上限。只影响走路/跑步，不影响技能位移。")]
+
+    [Tooltip("譎ｮ騾夂ｧｻ蜉ｨ逧・怙扈磯溷ｺｦ遑ｬ荳企剞縲ょ宵蠖ｱ蜩崎ｵｰ霍ｯ/霍第ｭ･・御ｸ榊ｽｱ蜩肴橿閭ｽ菴咲ｧｻ縲・")]
     [SerializeField, Min(0f)] private float maxActualMoveSpeed = 30f;
+
     public Rigidbody rb;
+
     [Header("Debug")]
     [SerializeField] private bool debugSpeedDiagnostics = false;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
+
     private CombatStats combatStats;
     private Player01SkillController player01SkillController;
     private float nextSpeedDiagnosticTime;
     private bool movementInputLocked;
-    private bool loggedMovementBlocked;
 
     public float RawResolvedMoveSpeed { get; private set; }
     public float ActualMoveSpeed { get; private set; }
@@ -32,15 +37,21 @@ public class PlayerMovement : MonoBehaviour
 
     private void Awake()
     {
-        if (rb == null) rb = GetComponent<Rigidbody>();
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
         combatStats = GetComponent<CombatStats>();
         player01SkillController = GetComponent<Player01SkillController>();
-        Debug.Log($"[PlayerMovement] active on {name}, controller={player01SkillController}", this);
     }
 
     private void FixedUpdate()
     {
-        if (rb == null) return;
+        if (rb == null)
+        {
+            return;
+        }
 
         Vector2 input = Vector2.zero;
         if (Keyboard.current != null)
@@ -60,24 +71,14 @@ public class PlayerMovement : MonoBehaviour
         float scaledBaseMoveSpeed = moveSpeed * Mathf.Max(0f, playerBaseMoveSpeedScale);
         float moveMultiplierFromSpeed = 1f + Mathf.Max(0f, statsSpeed - 1f) * Mathf.Max(0f, speedStatMoveRatio);
         float speedStatBonus = Mathf.Max(0f, statsSpeed - 1f) * scaledBaseMoveSpeed * Mathf.Max(0f, speedStatMoveRatio);
+
         RawResolvedMoveSpeed = (scaledBaseMoveSpeed + speedStatBonus) * Mathf.Max(0f, externalMoveMultiplier);
         float resolvedMoveSpeedCap = Mathf.Max(0f, maxActualMoveSpeed);
         ExcessMoveSpeed = Mathf.Max(0f, RawResolvedMoveSpeed - resolvedMoveSpeedCap);
         ActualMoveSpeed = Mathf.Min(Mathf.Max(0f, RawResolvedMoveSpeed), resolvedMoveSpeedCap);
+
         bool isLockedByController = player01SkillController != null && player01SkillController.IsMovementInputLocked();
         bool shouldBlockInputMovement = movementInputLocked || isLockedByController;
-        if (shouldBlockInputMovement)
-        {
-            if (!loggedMovementBlocked)
-            {
-                Debug.Log($"[PlayerMovement] movement input blocked on {name}", this);
-                loggedMovementBlocked = true;
-            }
-        }
-        else
-        {
-            loggedMovementBlocked = false;
-        }
 
         if (!shouldBlockInputMovement)
         {
@@ -102,11 +103,6 @@ public class PlayerMovement : MonoBehaviour
         if (locked && rb != null)
         {
             rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
-            loggedMovementBlocked = false;
-        }
-        else if (!locked)
-        {
-            loggedMovementBlocked = false;
         }
     }
 
@@ -121,5 +117,19 @@ public class PlayerMovement : MonoBehaviour
         RawResolvedMoveSpeed = 0f;
         ActualMoveSpeed = 0f;
         ExcessMoveSpeed = 0f;
+    }
+
+    public static void LogVelocityWrite(
+        Component context,
+        string writerScript,
+        string writerMethod,
+        Rigidbody targetRb,
+        Vector3 velocityBefore,
+        Vector3 velocityAfter,
+        string reason,
+        string skillState,
+        string switchState,
+        string spawnState)
+    {
     }
 }

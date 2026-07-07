@@ -693,7 +693,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
         cachedRigidbodyConstraints = cachedRigidbody.constraints;
         cachedRigidbody.constraints = cachedRigidbodyConstraints | RigidbodyConstraints.FreezePositionY;
-        cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+        Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        cachedRigidbody.linearVelocity = velocityAfterWrite;
+        PlayerMovement.LogVelocityWrite(
+            this,
+            nameof(Player1Skill_E_BrokenDash),
+            nameof(BeginGroundSafetyLock),
+            cachedRigidbody,
+            velocityBeforeWrite,
+            velocityAfterWrite,
+            "begin-ground-safety-lock",
+            "broken-dash-ground-lock",
+            "none",
+            "runtime");
         cachedRigidbody.angularVelocity = Vector3.zero;
     }
 
@@ -713,7 +726,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
         if (cachedRigidbody != null)
         {
-            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+            Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            cachedRigidbody.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player1Skill_E_BrokenDash),
+                nameof(EnforceGroundSafetyLock),
+                cachedRigidbody,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "enforce-ground-safety-lock",
+                "broken-dash-ground-lock",
+                "none",
+                "runtime");
         }
     }
 
@@ -729,7 +755,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         if (cachedRigidbody != null)
         {
             cachedRigidbody.constraints = cachedRigidbodyConstraints;
-            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+            Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            cachedRigidbody.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player1Skill_E_BrokenDash),
+                nameof(EndGroundSafetyLock),
+                cachedRigidbody,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "end-ground-safety-lock",
+                "broken-dash-ground-lock",
+                "none",
+                "runtime");
         }
 
         hasGroundSafetyLock = false;

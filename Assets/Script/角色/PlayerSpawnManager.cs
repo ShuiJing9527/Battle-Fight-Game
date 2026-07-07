@@ -169,14 +169,40 @@ public class PlayerSpawnManager : MonoBehaviour
         Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                player != null ? player.GetComponent<PlayerMovement>() : null,
+                nameof(PlayerSpawnManager),
+                nameof(ResetMotion),
+                rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "spawn-reset-motion-root-rigidbody",
+                "none",
+                "none",
+                "spawn-reset");
             rb.angularVelocity = Vector3.zero;
         }
 
         PlayerMovement movement = player.GetComponentInChildren<PlayerMovement>();
         if (movement != null && movement.rb != null)
         {
-            movement.rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = movement.rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            movement.rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                movement,
+                nameof(PlayerSpawnManager),
+                nameof(ResetMotion),
+                movement.rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "spawn-reset-motion-player-movement-rigidbody",
+                "none",
+                "none",
+                "spawn-reset");
             movement.rb.angularVelocity = Vector3.zero;
         }
     }

@@ -1458,7 +1458,20 @@ public class Player2PrototypeController : MonoBehaviour
         if (rb != null)
         {
             rb.position = worldPosition;
-            rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player2PrototypeController),
+                nameof(MoveRootToGroundPosition),
+                rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "move-root-to-ground-position",
+                "MoveRootToGroundPosition",
+                "none",
+                enableSpawnUnstuck ? "spawn-unstuck-enabled" : "spawn-unstuck-disabled");
             rb.angularVelocity = Vector3.zero;
             rb.WakeUp();
         }

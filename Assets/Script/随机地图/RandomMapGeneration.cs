@@ -102,6 +102,7 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int> connectorFloorPoints;// Protected connector points
         private HashSet<Vector2Int> currentExteriorOceanPoints;
         private HashSet<Vector2Int> currentShoreWaterPoints;
+        private HashSet<Vector2Int> currentFinalWalkablePoints;
         private BoundsInt? currentShoreLandBounds;
         private Dictionary<Vector2Int, int> currentLocalMaximumDepthByPoint;
         private List<ShoreEdgeDirection> currentDirectionalWideBeachDirections;
@@ -416,7 +417,6 @@ namespace UnderTheStars.GenerationMap
                     paintTasks.Add(PaintActiveRegionTilemap(activeRegionLayouts[i]));
                 }
 
-                paintTasks.Add(PanintWallTilemap());
                 await UniTask.WhenAll(paintTasks);
 
                 if (!IsGenerationStillCurrent(generationId))
@@ -433,7 +433,9 @@ namespace UnderTheStars.GenerationMap
                     return;
                 }
 
+                RebuildFinalWaterAndWallState();
                 SpawnPropsOnFloor();
+                await PanintWallTilemap();
 
                 if (Application.isPlaying)
                 {
@@ -465,7 +467,10 @@ namespace UnderTheStars.GenerationMap
 
         private UniTask PanintWallTilemap()
         {
-            return paintTilemap.PaintWallTile(wallColliderPoints);
+            return paintTilemap.PaintWallTile(
+                wallColliderPoints,
+                currentFinalWalkablePoints,
+                generatedShoreSandPoints);
         }
 
         private async UniTask GeneraterWallPointsAsync(HashSet<Vector2Int> checkAllFloor)
@@ -617,16 +622,43 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
+            PlayerMovement targetMovement = spawnTarget.GetComponent<PlayerMovement>();
+
             Rigidbody targetRb = spawnTarget.GetComponent<Rigidbody>();
             if (targetRb != null)
             {
-                targetRb.linearVelocity = Vector3.zero;
+                Vector3 velocityBeforeWrite = targetRb.linearVelocity;
+                Vector3 velocityAfterWrite = Vector3.zero;
+                targetRb.linearVelocity = velocityAfterWrite;
+                PlayerMovement.LogVelocityWrite(
+                    targetMovement != null ? targetMovement : spawnTarget.GetComponent<PlayerMovement>(),
+                    nameof(RandomMapGeneration),
+                    nameof(PlacePlayerOnMap),
+                    targetRb,
+                    velocityBeforeWrite,
+                    velocityAfterWrite,
+                    "place-player-on-map-root-rigidbody-reset",
+                    "none",
+                    "none",
+                    "map-spawn");
             }
 
-            PlayerMovement targetMovement = spawnTarget.GetComponent<PlayerMovement>();
             if (targetMovement != null && targetMovement.rb != null)
             {
-                targetMovement.rb.linearVelocity = Vector3.zero;
+                Vector3 velocityBeforeWrite = targetMovement.rb.linearVelocity;
+                Vector3 velocityAfterWrite = Vector3.zero;
+                targetMovement.rb.linearVelocity = velocityAfterWrite;
+                PlayerMovement.LogVelocityWrite(
+                    targetMovement,
+                    nameof(RandomMapGeneration),
+                    nameof(PlacePlayerOnMap),
+                    targetMovement.rb,
+                    velocityBeforeWrite,
+                    velocityAfterWrite,
+                    "place-player-on-map-player-movement-rigidbody-reset",
+                    "none",
+                    "none",
+                    "map-spawn");
             }
 
             Vector3 spawnBasePosition = worldSpawnPos;
@@ -649,6 +681,57 @@ namespace UnderTheStars.GenerationMap
         public int GetCurrentGenerateMapDebugId()
         {
             return currentGenerateMapDebugId;
+        }
+
+        public bool TryGetMovementDebugInfo(
+            Vector3 worldPosition,
+            out Vector2Int gridPoint,
+            out AreaType areaType,
+            out bool inFloorPoints,
+            out bool inGeneratedShoreSandPoints,
+            out bool inFinalWalkablePoints)
+        {
+            gridPoint = Vector2Int.zero;
+            areaType = AreaType.NoSpawn;
+            inFloorPoints = false;
+            inGeneratedShoreSandPoints = false;
+            inFinalWalkablePoints = false;
+
+            Tilemap refTilemap = paintTilemap != null ? paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex()) : null;
+            if (refTilemap == null)
+            {
+                return false;
+            }
+
+            Vector3Int cell = refTilemap.WorldToCell(worldPosition);
+            gridPoint = new Vector2Int(cell.x, cell.y);
+
+            Dictionary<Vector2Int, AreaType> areaByPoint = BuildPointAreaTypes();
+            if (areaByPoint.TryGetValue(gridPoint, out AreaType resolvedAreaType))
+            {
+                areaType = resolvedAreaType;
+            }
+
+            if (floorPoints != null)
+            {
+                for (int x = 0; x < floorPoints.GetLength(0); x++)
+                {
+                    for (int y = 0; y < floorPoints.GetLength(1); y++)
+                    {
+                        HashSet<Vector2Int> regionPoints = floorPoints[x, y];
+                        if (regionPoints != null && regionPoints.Contains(gridPoint))
+                        {
+                            inFloorPoints = true;
+                            x = floorPoints.GetLength(0);
+                            break;
+                        }
+                    }
+                }
+            }
+
+            inGeneratedShoreSandPoints = generatedShoreSandPoints != null && generatedShoreSandPoints.Contains(gridPoint);
+            inFinalWalkablePoints = currentFinalWalkablePoints != null && currentFinalWalkablePoints.Contains(gridPoint);
+            return true;
         }
 
         public bool TryGetRandomSafeSpawnWorldPosition(out Vector3 worldPosition, out Vector2Int spawnCoord)
@@ -2815,6 +2898,7 @@ namespace UnderTheStars.GenerationMap
             connectorFloorPoints = new HashSet<Vector2Int>();
             currentExteriorOceanPoints = null;
             currentShoreWaterPoints = null;
+            currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
             currentDirectionalWideBeachDirections = null;
@@ -3003,6 +3087,7 @@ namespace UnderTheStars.GenerationMap
             ClearGeneratedShoreSandInstances();
             currentExteriorOceanPoints = null;
             currentShoreWaterPoints = null;
+            currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
             currentDirectionalWideBeachDirections = null;
@@ -3205,6 +3290,8 @@ namespace UnderTheStars.GenerationMap
                 }
 #endif
             }
+
+            RefreshFinalShoreWaterState(allLandPoints);
         }
 
         private bool HasAllShoreSandPrefabsAssigned()
@@ -3299,6 +3386,106 @@ namespace UnderTheStars.GenerationMap
 
             currentEnclosedWaterPointCount = enclosedCount;
             return exteriorOceanPoints;
+        }
+
+        private void RebuildFinalWaterAndWallState()
+        {
+            Dictionary<Vector2Int, AreaType> areaByPoint = new Dictionary<Vector2Int, AreaType>();
+            Dictionary<Vector2Int, int> tilemapIndexByPoint = new Dictionary<Vector2Int, int>();
+            HashSet<Vector2Int> allLandPoints = CollectLandPointMetadata(areaByPoint, tilemapIndexByPoint);
+            if (allLandPoints.Count == 0)
+            {
+                return;
+            }
+
+            RefreshFinalShoreWaterState(allLandPoints);
+            FilterWallColliderPointsUsingFinalShoreState(allLandPoints);
+        }
+
+        private void RefreshFinalShoreWaterState(HashSet<Vector2Int> allLandPoints)
+        {
+            HashSet<Vector2Int> finalWalkablePoints = BuildFinalWalkablePointSet(allLandPoints);
+            currentFinalWalkablePoints = new HashSet<Vector2Int>(finalWalkablePoints);
+            if (finalWalkablePoints.Count == 0)
+            {
+                currentExteriorOceanPoints = new HashSet<Vector2Int>();
+                currentShoreWaterPoints = new HashSet<Vector2Int>();
+                currentShoreLandBounds = null;
+                currentEnclosedWaterPointCount = 0;
+                return;
+            }
+
+            currentShoreLandBounds = CalculatePointBounds(finalWalkablePoints);
+            currentExteriorOceanPoints = CollectExteriorOceanPoints(finalWalkablePoints);
+
+            if (generatedShoreSandPoints != null && generatedShoreSandPoints.Count > 0)
+            {
+                currentShoreWaterPoints.ExceptWith(generatedShoreSandPoints);
+                currentExteriorOceanPoints.ExceptWith(generatedShoreSandPoints);
+            }
+        }
+
+        private HashSet<Vector2Int> BuildFinalWalkablePointSet(HashSet<Vector2Int> allLandPoints)
+        {
+            HashSet<Vector2Int> finalWalkablePoints = allLandPoints != null
+                ? new HashSet<Vector2Int>(allLandPoints)
+                : new HashSet<Vector2Int>();
+
+            if (generatedShoreSandPoints != null && generatedShoreSandPoints.Count > 0)
+            {
+                finalWalkablePoints.UnionWith(generatedShoreSandPoints);
+            }
+
+            return finalWalkablePoints;
+        }
+
+        private void FilterWallColliderPointsUsingFinalShoreState(HashSet<Vector2Int> allLandPoints)
+        {
+            if (wallColliderPoints == null || wallColliderPoints.Count == 0)
+            {
+                Debug.Log(
+                    $"[RandomMap.Clear] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
+                    "wallFilterSkipped=True reason=no-wall-candidates",
+                    this);
+                return;
+            }
+
+            HashSet<Vector2Int> finalWalkablePoints = BuildFinalWalkablePointSet(allLandPoints);
+            HashSet<Vector2Int> trueBlockedWaterPoints = new HashSet<Vector2Int>();
+            if (currentShoreWaterPoints != null)
+            {
+                trueBlockedWaterPoints.UnionWith(currentShoreWaterPoints);
+            }
+
+            if (generatedShoreSandPoints != null && generatedShoreSandPoints.Count > 0)
+            {
+                trueBlockedWaterPoints.ExceptWith(generatedShoreSandPoints);
+            }
+
+            int beforeCount = wallColliderPoints.Count;
+            HashSet<Vector2Int> filteredWallPoints = new HashSet<Vector2Int>();
+            foreach (Vector2Int candidate in wallColliderPoints)
+            {
+                if (!trueBlockedWaterPoints.Contains(candidate))
+                {
+                    continue;
+                }
+
+                int adjacentWalkableCount = CountAdjacentPoints(candidate, finalWalkablePoints);
+                int adjacentBlockedWaterCount = CountAdjacentPoints(candidate, trueBlockedWaterPoints);
+                bool keepWall = adjacentWalkableCount > 0 && adjacentBlockedWaterCount > 0;
+                if (keepWall)
+                {
+                    filteredWallPoints.Add(candidate);
+                }
+            }
+
+            wallColliderPoints = filteredWallPoints;
+
+            Debug.Log(
+                $"[RandomMap.GenerateCall] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
+                $"wallPointSemantic=candidate-blocked-cells wallFilterBefore={beforeCount} wallFilterAfter={wallColliderPoints.Count}",
+                this);
         }
 
         private Dictionary<Vector2Int, int> BuildInwardShoreDepthMap(
@@ -6197,6 +6384,21 @@ namespace UnderTheStars.GenerationMap
         {
             return point.x >= minX && point.x <= maxX &&
                    point.y >= minY && point.y <= maxY;
+        }
+
+        private static int CountAdjacentPoints(Vector2Int point, HashSet<Vector2Int> points)
+        {
+            if (points == null || points.Count == 0)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            if (points.Contains(point + Vector2Int.up)) count++;
+            if (points.Contains(point + Vector2Int.right)) count++;
+            if (points.Contains(point + Vector2Int.down)) count++;
+            if (points.Contains(point + Vector2Int.left)) count++;
+            return count;
         }
 
         private void ApplyShoreSandBoundaryCleanup(
@@ -9758,6 +9960,7 @@ namespace UnderTheStars.GenerationMap
             connectorFloorPoints = null;
             currentExteriorOceanPoints = null;
             currentShoreWaterPoints = null;
+            currentFinalWalkablePoints = null;
             currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
             currentDirectionalWideBeachDirections = null;
