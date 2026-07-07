@@ -112,6 +112,17 @@ namespace UnderTheStars.GenerationMap
         private int currentDirectionalWideBeachCallIndex;
         private int currentEnclosedWaterPointCount;
         private int shoreClassificationDebugBatchCounter;
+        private HashSet<Vector2Int> currentBaseShorePoints;
+        private Dictionary<Vector2Int, int> currentBaseShoreDepthByPoint;
+        private HashSet<Vector2Int> currentMainBeachPoints;
+        private HashSet<Vector2Int> currentSecondaryBeachPoints;
+        private BeachLayoutDirection currentMainBeachLayoutDirection;
+        private List<BeachLayoutDirection> currentSecondaryBeachLayoutDirections;
+        private int currentMainBeachPointCount;
+        private int currentSecondaryBeachPointCount;
+        private int currentSecondaryBeachRegionCount;
+        private string currentResolvedMainBeachDirectionLabel;
+        private string currentMainBeachFailureReason;
         private bool hasLoggedMissingShoreSandPrefabWarning;
         private ActiveRegionLayout[] activeRegionLayouts;
         private int activeRegionColumns;
@@ -133,6 +144,18 @@ namespace UnderTheStars.GenerationMap
             Down,
             Left,
             Right
+        }
+
+        private enum BeachLayoutDirection
+        {
+            Up,
+            Down,
+            Left,
+            Right,
+            UpLeft,
+            UpRight,
+            DownLeft,
+            DownRight
         }
 
         private struct ActiveRegionLayout
@@ -2952,6 +2975,17 @@ namespace UnderTheStars.GenerationMap
             currentDirectionalWideBeachBatchId = 0;
             currentDirectionalWideBeachCallIndex = 0;
             currentEnclosedWaterPointCount = 0;
+            currentBaseShorePoints = null;
+            currentBaseShoreDepthByPoint = null;
+            currentMainBeachPoints = null;
+            currentSecondaryBeachPoints = null;
+            currentMainBeachLayoutDirection = BeachLayoutDirection.Up;
+            currentSecondaryBeachLayoutDirections = null;
+            currentMainBeachPointCount = 0;
+            currentSecondaryBeachPointCount = 0;
+            currentSecondaryBeachRegionCount = 0;
+            currentResolvedMainBeachDirectionLabel = "None";
+            currentMainBeachFailureReason = "not-generated";
             shoreClassificationDebugBatchCounter = 0;
             activeRegionLayouts = null;
             activeRegionColumns = 0;
@@ -3456,6 +3490,17 @@ namespace UnderTheStars.GenerationMap
             currentDirectionalWideBeachBatchId = ++shoreClassificationDebugBatchCounter;
             currentDirectionalWideBeachCallIndex = 0;
             currentEnclosedWaterPointCount = 0;
+            currentBaseShorePoints = null;
+            currentBaseShoreDepthByPoint = null;
+            currentMainBeachPoints = null;
+            currentSecondaryBeachPoints = null;
+            currentMainBeachLayoutDirection = BeachLayoutDirection.Up;
+            currentSecondaryBeachLayoutDirections = null;
+            currentMainBeachPointCount = 0;
+            currentSecondaryBeachPointCount = 0;
+            currentSecondaryBeachRegionCount = 0;
+            currentResolvedMainBeachDirectionLabel = "None";
+            currentMainBeachFailureReason = "not-generated";
 
             if (!enableShoreSand)
             {
@@ -3529,12 +3574,6 @@ namespace UnderTheStars.GenerationMap
             }
 #endif
 
-            currentLocalMaximumDepthByPoint = BuildLocalMaximumDepthByPoint(
-                allLandPoints,
-                areaByPoint,
-                shoreDepthByPoint,
-                out _);
-
             if (enableShorelineMicroCleanup)
             {
                 RemoveShortSingleWidthGrassSideShoreSpurs(
@@ -3542,8 +3581,17 @@ namespace UnderTheStars.GenerationMap
                     allLandPoints,
                     areaByPoint,
                     Mathf.Max(0, shoreSandWidth - 1),
-                    currentLocalMaximumDepthByPoint);
+                    null);
             }
+
+            currentBaseShorePoints = new HashSet<Vector2Int>(shoreDepthByPoint.Keys);
+            currentBaseShoreDepthByPoint = new Dictionary<Vector2Int, int>(shoreDepthByPoint);
+
+            currentLocalMaximumDepthByPoint = BuildLocalMaximumDepthByPoint(
+                allLandPoints,
+                areaByPoint,
+                shoreDepthByPoint,
+                out _);
 
             List<ShoreSandPlacement> placements = BuildShoreSandPlacementsFromDepthMap(
                 shoreDepthByPoint,
@@ -3609,6 +3657,36 @@ namespace UnderTheStars.GenerationMap
                     areaByPoint,
                     previousClassificationSnapshots);
             }
+
+            RestrictPlacementsToAllowedBeachScope(placements);
+
+            EnsureBaseShorePointsIncludedInPlacements(
+                placements,
+                shoreDepthByPoint,
+                allLandPoints,
+                areaByPoint,
+                Mathf.Max(0, shoreSandWidth - 1));
+
+            HashSet<Vector2Int> finalShorePlacementPoints = BuildPlacementPointSet(placements);
+            HashSet<Vector2Int> allowedBeachPoints = BuildAllowedBeachPointSet();
+            int ordinaryExpandedPointCount = 0;
+            foreach (Vector2Int point in finalShorePlacementPoints)
+            {
+                if (!allowedBeachPoints.Contains(point))
+                {
+                    ordinaryExpandedPointCount++;
+                }
+            }
+            string secondaryDirections = currentSecondaryBeachLayoutDirections != null && currentSecondaryBeachLayoutDirections.Count > 0
+                ? string.Join(",", currentSecondaryBeachLayoutDirections)
+                : "None";
+            Debug.Log(
+                $"[RandomMap.BeachLayout] generationId={currentGenerateMapDebugId} mainDirection={currentResolvedMainBeachDirectionLabel} " +
+                $"mainBeachFailureReason={currentMainBeachFailureReason} baseShoreCount={(currentBaseShorePoints != null ? currentBaseShorePoints.Count : 0)} " +
+                $"ordinaryExpandedPointCount={ordinaryExpandedPointCount} mainBeachPointCount={currentMainBeachPointCount} secondaryBeachRegionCount={currentSecondaryBeachRegionCount} " +
+                $"secondaryBeachPointCount={currentSecondaryBeachPointCount} secondaryDirections={secondaryDirections} " +
+                $"finalShorePointCount={finalShorePlacementPoints.Count}",
+                this);
 
             Transform parent = ResolveGeneratedShoreSandParent();
             int previousGeneratedShoreCount = generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0;
@@ -4014,6 +4092,15 @@ namespace UnderTheStars.GenerationMap
                 localMaximumDepthByPoint[point] = baseMaxDepth;
             }
 
+            currentMainBeachPointCount = 0;
+            currentSecondaryBeachPointCount = 0;
+            currentSecondaryBeachRegionCount = 0;
+            currentSecondaryBeachLayoutDirections = new List<BeachLayoutDirection>();
+            currentMainBeachPoints = new HashSet<Vector2Int>();
+            currentSecondaryBeachPoints = new HashSet<Vector2Int>();
+            currentResolvedMainBeachDirectionLabel = "None";
+            currentMainBeachFailureReason = "not-attempted";
+
             HashSet<Vector2Int> ordinaryGrassPoints = CollectBudgetDirectionalOrdinaryGrassPoints(
                 allLandPoints,
                 areaByPoint,
@@ -4065,25 +4152,42 @@ namespace UnderTheStars.GenerationMap
             int rejectedCandidateCount = 0;
             string stoppedReason = "completed";
 
-            ShoreEdgeDirection mainDirection = SelectBudgetDirectionalMainDirection();
-            currentDirectionalWideBeachDirections.Add(mainDirection);
-
             int actualMainBeachArea = 0;
             int selectedMainSegmentLength = 0;
-            int mainRejectedCount;
-            DirectionalWideBeachCandidateDiagnostics mainCandidateDiagnostics;
-            if (TrySelectBudgetDirectionalSegment(
-                    mainDirection,
-                    allLandPoints,
-                    areaByPoint,
-                    shoreDepthByPoint,
-                    ordinaryGrassPoints,
-                    usedShorelinePoints,
-                    baseMaxDepth,
-                    out DirectionalWideBeachSegment mainSegment,
-                    out mainRejectedCount,
-                    out mainCandidateDiagnostics))
+            int mainAchievedDepth = 0;
+            List<BeachLayoutDirection> mainDirectionAttemptOrder = BuildShuffledBeachLayoutDirections();
+            currentMainBeachFailureReason = "no-safe-main-segment";
+            for (int i = 0; i < mainDirectionAttemptOrder.Count; i++)
             {
+                BeachLayoutDirection attemptedDirection = mainDirectionAttemptOrder[i];
+                int mainRejectedCount;
+                DirectionalWideBeachCandidateDiagnostics mainCandidateDiagnostics;
+                int candidateSegmentCount;
+                int bestSegmentLength;
+                if (!TrySelectBudgetDirectionalSegmentForLayout(
+                        attemptedDirection,
+                        allLandPoints,
+                        areaByPoint,
+                        shoreDepthByPoint,
+                        ordinaryGrassPoints,
+                        usedShorelinePoints,
+                        baseMaxDepth,
+                        out DirectionalWideBeachSegment mainSegment,
+                        out ShoreEdgeDirection mainCardinalDirection,
+                        out mainRejectedCount,
+                        out mainCandidateDiagnostics,
+                        out candidateSegmentCount,
+                        out bestSegmentLength))
+                {
+                    rejectedCandidateCount += mainRejectedCount;
+                    currentMainBeachFailureReason = "no-safe-main-segment";
+                    Debug.Log(
+                        $"[RandomMap.MainBeachAttempt] direction={attemptedDirection} candidateSegmentCount={candidateSegmentCount} " +
+                        $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount=0 failureReason={currentMainBeachFailureReason}",
+                        this);
+                    continue;
+                }
+
                 rejectedCandidateCount += mainRejectedCount;
                 DirectionalWideBeachBuildResult mainResult = BuildBudgetDirectionalBeachFromSegment(
                     mainSegment,
@@ -4098,43 +4202,60 @@ namespace UnderTheStars.GenerationMap
                     directionalBeachPoints,
                     baseMaxDepth,
                     true);
+
+                int generatedNewPointCount = mainResult.actualArea;
+                string failureReason = generatedNewPointCount > 0
+                    ? "success"
+                    : mainResult.stoppedReason;
+                Debug.Log(
+                    $"[RandomMap.MainBeachAttempt] direction={attemptedDirection} candidateSegmentCount={candidateSegmentCount} " +
+                    $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount={generatedNewPointCount} failureReason={failureReason}",
+                    this);
+
+                if (generatedNewPointCount <= 0)
+                {
+                    currentMainBeachFailureReason = failureReason;
+                    continue;
+                }
+
+                currentMainBeachLayoutDirection = attemptedDirection;
+                currentResolvedMainBeachDirectionLabel = attemptedDirection.ToString();
+                currentMainBeachFailureReason = "success";
+                currentDirectionalWideBeachDirections.Add(mainCardinalDirection);
                 actualMainBeachArea = mainResult.actualArea;
+                currentMainBeachPoints = mainResult.addedPoints != null
+                    ? new HashSet<Vector2Int>(mainResult.addedPoints)
+                    : new HashSet<Vector2Int>();
+                mainAchievedDepth = mainResult.achievedDepth;
                 selectedMainSegmentLength = mainSegment.orderedPoints == null ? 0 : mainSegment.orderedPoints.Count;
                 usedShorelinePoints.UnionWith(mainResult.shorelinePoints);
                 stoppedReason = mainResult.stoppedReason;
+                break;
             }
-            else
-            {
-                rejectedCandidateCount += mainRejectedCount;
-                stoppedReason = "no-safe-main-segment";
-            }
-
-            LogDirectionalWideBeachCandidateSummary(mainCandidateDiagnostics);
 
             int actualSecondaryBeachArea = 0;
             int selectedSecondaryBeachCount = 0;
             int remainingBudget = Mathf.Max(0, targetDirectionalBeachArea - actualMainBeachArea);
             int requestedSecondaryCount = directionalSecondaryBeachMaxCount > 0
-                ? UnityEngine.Random.Range(0, directionalSecondaryBeachMaxCount + 1)
+                ? UnityEngine.Random.Range(0, Mathf.Min(3, directionalSecondaryBeachMaxCount) + 1)
                 : 0;
+            BeachLayoutDirection secondarySelectionAnchor = actualMainBeachArea > 0
+                ? currentMainBeachLayoutDirection
+                : mainDirectionAttemptOrder.Count > 0 ? mainDirectionAttemptOrder[0] : BeachLayoutDirection.Up;
+            List<BeachLayoutDirection> secondaryDirectionOrder = SelectSecondaryBeachLayoutDirections(secondarySelectionAnchor, requestedSecondaryCount);
 
-            if (actualMainBeachArea > 0 && remainingBudget > 0 && requestedSecondaryCount > 0)
+            if (actualMainBeachArea > 0 && remainingBudget > 0 && secondaryDirectionOrder.Count > 0)
             {
-                int secondaryRejectedCount;
-                List<DirectionalWideBeachSegment> secondaryCandidates = CollectBudgetDirectionalSecondarySegments(
-                    mainDirection,
-                    allLandPoints,
-                    areaByPoint,
-                    shoreDepthByPoint,
-                    ordinaryGrassPoints,
-                    usedShorelinePoints,
-                    baseMaxDepth,
-                    out secondaryRejectedCount);
-                rejectedCandidateCount += secondaryRejectedCount;
-
-                for (int i = 0; i < secondaryCandidates.Count && selectedSecondaryBeachCount < requestedSecondaryCount && remainingBudget > 0; i++)
+                for (int i = 0; i < secondaryDirectionOrder.Count && selectedSecondaryBeachCount < requestedSecondaryCount && remainingBudget > 0; i++)
                 {
-                    int secondaryBudgetCap = Mathf.Max(1, Mathf.FloorToInt(remainingBudget * 0.6f));
+                    int maximumAllowedSecondaryArea = Mathf.Max(0, Mathf.FloorToInt(actualMainBeachArea / 1.5f));
+                    int remainingSecondaryAllowance = Mathf.Max(0, maximumAllowedSecondaryArea - actualSecondaryBeachArea);
+                    if (remainingSecondaryAllowance <= 0)
+                    {
+                        break;
+                    }
+
+                    int secondaryBudgetCap = Mathf.Max(1, Mathf.FloorToInt(remainingBudget * 0.45f));
                     int secondaryBudget = Mathf.Min(
                         remainingBudget,
                         Mathf.Min(
@@ -4142,6 +4263,8 @@ namespace UnderTheStars.GenerationMap
                                 ? Mathf.CeilToInt((float)secondaryBeachTargetArea / Mathf.Max(1, requestedSecondaryCount))
                                 : secondaryBudgetCap),
                             secondaryBudgetCap));
+                    secondaryBudget = Mathf.Min(secondaryBudget, Mathf.Max(1, actualMainBeachArea - 1));
+                    secondaryBudget = Mathf.Min(secondaryBudget, remainingSecondaryAllowance);
                     if (secondaryBudget <= 0)
                     {
                         break;
@@ -4150,10 +4273,41 @@ namespace UnderTheStars.GenerationMap
                     int secondaryMinimumDepth = Mathf.Max(1, directionalWideBeachMinimumDepth - 2);
                     int secondaryMaximumDepth = Mathf.Max(
                         secondaryMinimumDepth,
-                        Mathf.Min(directionalWideBeachMaximumDepth - 2, directionalWideBeachMinimumDepth + 1));
+                        Mathf.Min(
+                            Mathf.Max(secondaryMinimumDepth, mainAchievedDepth - 1),
+                            Mathf.Min(directionalWideBeachMaximumDepth - 2, directionalWideBeachMinimumDepth + 1)));
+
+                    int secondaryRejectedCount;
+                    DirectionalWideBeachCandidateDiagnostics secondaryDiagnostics;
+                    if (!TrySelectBudgetDirectionalSegmentForLayout(
+                            secondaryDirectionOrder[i],
+                            allLandPoints,
+                            areaByPoint,
+                            shoreDepthByPoint,
+                            ordinaryGrassPoints,
+                            usedShorelinePoints,
+                            baseMaxDepth,
+                            out DirectionalWideBeachSegment secondarySegment,
+                            out ShoreEdgeDirection secondaryCardinalDirection,
+                            out secondaryRejectedCount,
+                            out secondaryDiagnostics,
+                            out _,
+                            out _))
+                    {
+                        rejectedCandidateCount += secondaryRejectedCount;
+                        continue;
+                    }
+
+                    rejectedCandidateCount += secondaryRejectedCount;
+                    if (selectedMainSegmentLength > 0 &&
+                        secondarySegment.orderedPoints != null &&
+                        secondarySegment.orderedPoints.Count >= selectedMainSegmentLength)
+                    {
+                        continue;
+                    }
 
                     DirectionalWideBeachBuildResult secondaryResult = BuildBudgetDirectionalBeachFromSegment(
-                        secondaryCandidates[i],
+                        secondarySegment,
                         secondaryBudget,
                         secondaryMinimumDepth,
                         secondaryMaximumDepth,
@@ -4171,6 +4325,12 @@ namespace UnderTheStars.GenerationMap
                     }
 
                     actualSecondaryBeachArea += secondaryResult.actualArea;
+                    if (secondaryResult.addedPoints != null)
+                    {
+                        currentSecondaryBeachPoints.UnionWith(secondaryResult.addedPoints);
+                    }
+                    currentDirectionalWideBeachDirections.Add(secondaryCardinalDirection);
+                    currentSecondaryBeachLayoutDirections.Add(secondaryDirectionOrder[i]);
                     usedShorelinePoints.UnionWith(secondaryResult.shorelinePoints);
                     remainingBudget = Mathf.Max(0, remainingBudget - secondaryResult.actualArea);
                     selectedSecondaryBeachCount++;
@@ -4179,6 +4339,9 @@ namespace UnderTheStars.GenerationMap
             }
 
             affectedPointCount = directionalBeachPoints.Count;
+            currentMainBeachPointCount = actualMainBeachArea;
+            currentSecondaryBeachPointCount = actualSecondaryBeachArea;
+            currentSecondaryBeachRegionCount = selectedSecondaryBeachCount;
             float achievedGrassRatio = baseOrdinaryGrassPointCount > 0
                 ? (float)(actualMainBeachArea + actualSecondaryBeachArea) / baseOrdinaryGrassPointCount
                 : 0f;
@@ -4187,7 +4350,7 @@ namespace UnderTheStars.GenerationMap
                 currentDirectionalWideBeachBatchId,
                 "Overall",
                 currentDirectionalWideBeachCallIndex,
-                mainDirection.ToString(),
+                actualMainBeachArea > 0 ? currentResolvedMainBeachDirectionLabel : "None",
                 baseOrdinaryGrassPointCount,
                 targetDirectionalBeachArea,
                 mainBeachTargetArea,
@@ -4976,13 +5139,78 @@ namespace UnderTheStars.GenerationMap
             return ordinaryGrassPoints;
         }
 
-        private ShoreEdgeDirection SelectBudgetDirectionalMainDirection()
+        private BeachLayoutDirection SelectBudgetDirectionalMainDirection()
         {
-            return (ShoreEdgeDirection)UnityEngine.Random.Range(0, 4);
+            return (BeachLayoutDirection)UnityEngine.Random.Range(0, 8);
         }
 
-        private bool TrySelectBudgetDirectionalSegment(
-            ShoreEdgeDirection selectedDirection,
+        private List<BeachLayoutDirection> BuildShuffledBeachLayoutDirections()
+        {
+            List<BeachLayoutDirection> directions = new List<BeachLayoutDirection>
+            {
+                BeachLayoutDirection.Up,
+                BeachLayoutDirection.Down,
+                BeachLayoutDirection.Left,
+                BeachLayoutDirection.Right,
+                BeachLayoutDirection.UpLeft,
+                BeachLayoutDirection.UpRight,
+                BeachLayoutDirection.DownLeft,
+                BeachLayoutDirection.DownRight
+            };
+
+            for (int i = directions.Count - 1; i > 0; i--)
+            {
+                int swapIndex = UnityEngine.Random.Range(0, i + 1);
+                BeachLayoutDirection temp = directions[i];
+                directions[i] = directions[swapIndex];
+                directions[swapIndex] = temp;
+            }
+
+            return directions;
+        }
+
+        private List<BeachLayoutDirection> SelectSecondaryBeachLayoutDirections(
+            BeachLayoutDirection mainDirection,
+            int requestedCount)
+        {
+            List<BeachLayoutDirection> selectedDirections = new List<BeachLayoutDirection>();
+            if (requestedCount <= 0)
+            {
+                return selectedDirections;
+            }
+
+            List<BeachLayoutDirection> candidates = new List<BeachLayoutDirection>
+            {
+                BeachLayoutDirection.Up,
+                BeachLayoutDirection.Down,
+                BeachLayoutDirection.Left,
+                BeachLayoutDirection.Right,
+                BeachLayoutDirection.UpLeft,
+                BeachLayoutDirection.UpRight,
+                BeachLayoutDirection.DownLeft,
+                BeachLayoutDirection.DownRight
+            };
+            candidates.Remove(mainDirection);
+
+            for (int i = candidates.Count - 1; i > 0; i--)
+            {
+                int swapIndex = UnityEngine.Random.Range(0, i + 1);
+                BeachLayoutDirection temp = candidates[i];
+                candidates[i] = candidates[swapIndex];
+                candidates[swapIndex] = temp;
+            }
+
+            int count = Mathf.Min(requestedCount, candidates.Count);
+            for (int i = 0; i < count; i++)
+            {
+                selectedDirections.Add(candidates[i]);
+            }
+
+            return selectedDirections;
+        }
+
+        private bool TrySelectBudgetDirectionalSegmentForLayout(
+            BeachLayoutDirection selectedLayoutDirection,
             HashSet<Vector2Int> allLandPoints,
             Dictionary<Vector2Int, AreaType> areaByPoint,
             Dictionary<Vector2Int, int> shoreDepthByPoint,
@@ -4990,29 +5218,89 @@ namespace UnderTheStars.GenerationMap
             HashSet<Vector2Int> excludedShorelinePoints,
             int baseMaxDepth,
             out DirectionalWideBeachSegment bestSegment,
+            out ShoreEdgeDirection selectedCardinalDirection,
             out int rejectedCandidateCount,
-            out DirectionalWideBeachCandidateDiagnostics diagnostics)
+            out DirectionalWideBeachCandidateDiagnostics diagnostics,
+            out int candidateSegmentCount,
+            out int bestSegmentLength)
         {
             bestSegment = default;
+            selectedCardinalDirection = ShoreEdgeDirection.Up;
             rejectedCandidateCount = 0;
             diagnostics = default;
-            List<DirectionalWideBeachSegment> candidates = CollectBudgetDirectionalSegments(
-                selectedDirection,
-                allLandPoints,
-                areaByPoint,
-                shoreDepthByPoint,
-                ordinaryGrassPoints,
-                excludedShorelinePoints,
-                baseMaxDepth,
-                out rejectedCandidateCount,
-                out diagnostics);
-            if (candidates.Count == 0)
+            candidateSegmentCount = 0;
+            bestSegmentLength = 0;
+            ShoreEdgeDirection[] preferredDirections = GetPreferredCardinalDirections(selectedLayoutDirection);
+            float bestScore = float.MinValue;
+            bool found = false;
+
+            for (int i = 0; i < preferredDirections.Length; i++)
             {
-                return false;
+                List<DirectionalWideBeachSegment> candidates = CollectBudgetDirectionalSegments(
+                    preferredDirections[i],
+                    allLandPoints,
+                    areaByPoint,
+                    shoreDepthByPoint,
+                    ordinaryGrassPoints,
+                    excludedShorelinePoints,
+                    baseMaxDepth,
+                    out int directionRejectedCount,
+                    out DirectionalWideBeachCandidateDiagnostics directionDiagnostics);
+                rejectedCandidateCount += directionRejectedCount;
+                directionDiagnostics.phase = preferredDirections.Length > 1
+                    ? $"Layout-{selectedLayoutDirection}-{preferredDirections[i]}"
+                    : "Main";
+                LogDirectionalWideBeachCandidateSummary(directionDiagnostics);
+                candidateSegmentCount += directionDiagnostics.acceptedSegmentCount;
+
+                if (candidates.Count == 0)
+                {
+                    if (!found)
+                    {
+                        diagnostics = directionDiagnostics;
+                    }
+
+                    continue;
+                }
+
+                DirectionalWideBeachSegment candidate = candidates[0];
+                if (!found || candidate.score > bestScore)
+                {
+                    found = true;
+                    bestScore = candidate.score;
+                    bestSegment = candidate;
+                    bestSegmentLength = candidate.orderedPoints != null ? candidate.orderedPoints.Count : 0;
+                    selectedCardinalDirection = preferredDirections[i];
+                    diagnostics = directionDiagnostics;
+                }
             }
 
-            bestSegment = candidates[0];
-            return true;
+            return found;
+        }
+
+        private ShoreEdgeDirection[] GetPreferredCardinalDirections(BeachLayoutDirection direction)
+        {
+            switch (direction)
+            {
+                case BeachLayoutDirection.Up:
+                    return new[] { ShoreEdgeDirection.Up };
+                case BeachLayoutDirection.Down:
+                    return new[] { ShoreEdgeDirection.Down };
+                case BeachLayoutDirection.Left:
+                    return new[] { ShoreEdgeDirection.Left };
+                case BeachLayoutDirection.Right:
+                    return new[] { ShoreEdgeDirection.Right };
+                case BeachLayoutDirection.UpLeft:
+                    return new[] { ShoreEdgeDirection.Up, ShoreEdgeDirection.Left };
+                case BeachLayoutDirection.UpRight:
+                    return new[] { ShoreEdgeDirection.Up, ShoreEdgeDirection.Right };
+                case BeachLayoutDirection.DownLeft:
+                    return new[] { ShoreEdgeDirection.Down, ShoreEdgeDirection.Left };
+                case BeachLayoutDirection.DownRight:
+                    return new[] { ShoreEdgeDirection.Down, ShoreEdgeDirection.Right };
+                default:
+                    return new[] { ShoreEdgeDirection.Up };
+            }
         }
 
         private List<DirectionalWideBeachSegment> CollectBudgetDirectionalSecondarySegments(
@@ -6656,79 +6944,16 @@ namespace UnderTheStars.GenerationMap
             for (int i = 0; i < orderedPoints.Count; i++)
             {
                 Vector2Int point = orderedPoints[i];
-                int depth = shoreDepthByPoint[point];
-                int localMaximumDepth = GetLocalMaximumDepthForPoint(point, currentLocalMaximumDepthByPoint, baseMaxDepth);
-                ShoreSandPlacement placement;
-
-                if (depth == 0)
-                {
-                    if (!TryGetPreferredCoastalDirection(point, allLandPoints, out ShoreEdgeDirection oceanDirection))
-                    {
-                        continue;
-                    }
-
-                    placement = new ShoreSandPlacement(
+                if (!TryBuildShoreSandPlacementForPoint(
                         point,
-                        shoreSandOceanTransitionPrefab,
-                        oceanDirection,
-                        true,
-                        true,
-                        false);
-                }
-                else
+                        shoreDepthByPoint,
+                        allLandPoints,
+                        areaByPoint,
+                        finalShoreSandPoints,
+                        baseMaxDepth,
+                        out ShoreSandPlacement placement))
                 {
-                    List<ShoreEdgeDirection> grassNeighborDirections = new List<ShoreEdgeDirection>(4);
-                    ShoreEdgeDirection singleGrassDirection = ShoreEdgeDirection.Up;
-                    int grassNeighborCount = 0;
-                    bool isLocalGrassBoundary = depth >= localMaximumDepth;
-
-                    if (isLocalGrassBoundary)
-                    {
-                        grassNeighborCount = CountOrdinaryGrassNeighborDirections(
-                            point,
-                            allLandPoints,
-                            areaByPoint,
-                            finalShoreSandPoints,
-                            out grassNeighborDirections,
-                            out singleGrassDirection);
-                    }
-
-                    bool useGrassTransition = isLocalGrassBoundary && grassNeighborCount > 0;
-
-                    if (useGrassTransition)
-                    {
-                        ShoreEdgeDirection grassDirection = singleGrassDirection;
-                        if (IsAdjacentGrassPair(grassNeighborDirections) &&
-                            TryResolveAdjacentTwoGrassPrimaryDirection(
-                                point,
-                                allLandPoints,
-                                finalShoreSandPoints,
-                                grassNeighborDirections,
-                                out ShoreEdgeDirection resolvedGrassDirection,
-                                out _))
-                        {
-                            grassDirection = resolvedGrassDirection;
-                        }
-
-                        placement = new ShoreSandPlacement(
-                            point,
-                            shoreSandGrassTransitionPrefab,
-                            grassDirection,
-                            false,
-                            false,
-                            true,
-                            grassNeighborCount);
-                    }
-                    else
-                    {
-                        placement = new ShoreSandPlacement(
-                            point,
-                            shoreSandNormalPrefab,
-                            ShoreEdgeDirection.Up,
-                            false,
-                            false,
-                            false);
-                    }
+                    continue;
                 }
 
                 placements.Add(placement);
@@ -6736,14 +6961,207 @@ namespace UnderTheStars.GenerationMap
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (debugShoreSandPlacements)
                 {
+                    int placementDepth = shoreDepthByPoint[point];
+                    int placementLocalMaximumDepth = GetLocalMaximumDepthForPoint(point, currentLocalMaximumDepthByPoint, baseMaxDepth);
                     Debug.Log(
-                        $"[ShoreSand.DepthPlacement] point={point} depth={depth} localMaxDepth={localMaximumDepth} prefabType={GetShoreSandPlacementDebugType(placement)}",
+                        $"[ShoreSand.DepthPlacement] point={point} depth={placementDepth} localMaxDepth={placementLocalMaximumDepth} prefabType={GetShoreSandPlacementDebugType(placement)}",
                         this);
                 }
 #endif
             }
 
             return placements;
+        }
+
+        private bool TryBuildShoreSandPlacementForPoint(
+            Vector2Int point,
+            Dictionary<Vector2Int, int> shoreDepthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            HashSet<Vector2Int> finalShoreSandPoints,
+            int baseMaxDepth,
+            out ShoreSandPlacement placement)
+        {
+            placement = default;
+            if (shoreDepthByPoint == null || !shoreDepthByPoint.TryGetValue(point, out int depth))
+            {
+                return false;
+            }
+
+            int localMaximumDepth = GetLocalMaximumDepthForPoint(point, currentLocalMaximumDepthByPoint, baseMaxDepth);
+            if (depth == 0)
+            {
+                if (!TryGetPreferredCoastalDirection(point, allLandPoints, out ShoreEdgeDirection oceanDirection))
+                {
+                    return false;
+                }
+
+                placement = new ShoreSandPlacement(
+                    point,
+                    shoreSandOceanTransitionPrefab,
+                    oceanDirection,
+                    true,
+                    true,
+                    false);
+                return true;
+            }
+
+            List<ShoreEdgeDirection> grassNeighborDirections = new List<ShoreEdgeDirection>(4);
+            ShoreEdgeDirection singleGrassDirection = ShoreEdgeDirection.Up;
+            int grassNeighborCount = 0;
+            bool isLocalGrassBoundary = depth >= localMaximumDepth;
+
+            if (isLocalGrassBoundary)
+            {
+                grassNeighborCount = CountOrdinaryGrassNeighborDirections(
+                    point,
+                    allLandPoints,
+                    areaByPoint,
+                    finalShoreSandPoints,
+                    out grassNeighborDirections,
+                    out singleGrassDirection);
+            }
+
+            bool useGrassTransition = isLocalGrassBoundary && grassNeighborCount > 0;
+            if (useGrassTransition)
+            {
+                ShoreEdgeDirection grassDirection = singleGrassDirection;
+                if (IsAdjacentGrassPair(grassNeighborDirections) &&
+                    TryResolveAdjacentTwoGrassPrimaryDirection(
+                        point,
+                        allLandPoints,
+                        finalShoreSandPoints,
+                        grassNeighborDirections,
+                        out ShoreEdgeDirection resolvedGrassDirection,
+                        out _))
+                {
+                    grassDirection = resolvedGrassDirection;
+                }
+
+                placement = new ShoreSandPlacement(
+                    point,
+                    shoreSandGrassTransitionPrefab,
+                    grassDirection,
+                    false,
+                    false,
+                    true,
+                    grassNeighborCount);
+                return true;
+            }
+
+            placement = new ShoreSandPlacement(
+                point,
+                shoreSandNormalPrefab,
+                ShoreEdgeDirection.Up,
+                false,
+                false,
+                false);
+            return true;
+        }
+
+        private void EnsureBaseShorePointsIncludedInPlacements(
+            List<ShoreSandPlacement> placements,
+            Dictionary<Vector2Int, int> shoreDepthByPoint,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            int baseMaxDepth)
+        {
+            if (placements == null || currentBaseShorePoints == null || currentBaseShorePoints.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> finalShorePoints = BuildPlacementPointSet(placements);
+
+            if (currentBaseShoreDepthByPoint != null)
+            {
+                foreach (KeyValuePair<Vector2Int, int> kvp in currentBaseShoreDepthByPoint)
+                {
+                    if (!shoreDepthByPoint.ContainsKey(kvp.Key))
+                    {
+                        shoreDepthByPoint[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+
+            foreach (Vector2Int basePoint in currentBaseShorePoints)
+            {
+                if (finalShorePoints.Contains(basePoint))
+                {
+                    continue;
+                }
+
+                if (TryBuildShoreSandPlacementForPoint(
+                        basePoint,
+                        shoreDepthByPoint,
+                        allLandPoints,
+                        areaByPoint,
+                        finalShorePoints,
+                        baseMaxDepth,
+                        out ShoreSandPlacement restoredPlacement))
+                {
+                    placements.Add(restoredPlacement);
+                    finalShorePoints.Add(basePoint);
+                }
+            }
+
+            List<string> missingSamples = new List<string>();
+            int missingBaseShoreCount = 0;
+            foreach (Vector2Int basePoint in currentBaseShorePoints)
+            {
+                if (finalShorePoints.Contains(basePoint))
+                {
+                    continue;
+                }
+
+                missingBaseShoreCount++;
+                if (missingSamples.Count < 10)
+                {
+                    missingSamples.Add(basePoint.ToString());
+                }
+            }
+
+            Debug.Log(
+                $"[RandomMap.BaseShoreIntegrity] baseShoreCount={currentBaseShorePoints.Count} finalShoreCount={finalShorePoints.Count} " +
+                $"missingBaseShoreCount={missingBaseShoreCount} missingSamplePoints={(missingSamples.Count > 0 ? string.Join(",", missingSamples) : "None")}",
+                this);
+        }
+
+        private HashSet<Vector2Int> BuildAllowedBeachPointSet()
+        {
+            HashSet<Vector2Int> allowedPoints = new HashSet<Vector2Int>();
+            if (currentBaseShorePoints != null)
+            {
+                allowedPoints.UnionWith(currentBaseShorePoints);
+            }
+
+            if (currentMainBeachPoints != null)
+            {
+                allowedPoints.UnionWith(currentMainBeachPoints);
+            }
+
+            if (currentSecondaryBeachPoints != null)
+            {
+                allowedPoints.UnionWith(currentSecondaryBeachPoints);
+            }
+
+            return allowedPoints;
+        }
+
+        private void RestrictPlacementsToAllowedBeachScope(List<ShoreSandPlacement> placements)
+        {
+            if (placements == null || placements.Count == 0)
+            {
+                return;
+            }
+
+            HashSet<Vector2Int> allowedPoints = BuildAllowedBeachPointSet();
+            if (allowedPoints.Count == 0)
+            {
+                return;
+            }
+
+            placements.RemoveAll(placement => !allowedPoints.Contains(placement.point));
         }
 
         private bool TouchesExteriorOcean(Vector2Int point)

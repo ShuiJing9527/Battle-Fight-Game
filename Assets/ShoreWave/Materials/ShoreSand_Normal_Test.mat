@@ -16,7 +16,7 @@ Material:
   m_LightmapFlags: 4
   m_EnableInstancingVariants: 0
   m_DoubleSidedGI: 0
-  m_CustomRenderQueue: -1
+  m_CustomRenderQueue: 3100
   stringTagMap: {}
   disabledShaderPasses:
   - MOTIONVECTORS
@@ -52,6 +52,9 @@ Material:
     m_Floats:
     - _AlphaMultiplier: 1
     - _Brightness: 1.2
+    - _CornerBlend: 0.45
+    - _CornerInner: 0
+    - _CornerMode: 0
     - _EnableShoreFade: 0
     - _FadeNoiseStrength: 0.05
     - _FadeReverse: 0
@@ -68,6 +71,7 @@ Material:
     - _Smoothness: 0.5
     - _WetSandStrength: 0.12
     m_Colors:
+    - _GrassBlendColor: {r: 0.86, g: 0.8399999, b: 0.68, a: 1}
     - _SandTint: {r: 1, g: 1, b: 1, a: 1}
     - _TextureTiling: {r: 1, g: 1, b: 0, a: 0}
     - _WetSandColor: {r: 0.72, g: 0.66, b: 0.52, a: 1}
