@@ -102,15 +102,24 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int> connectorFloorPoints;// Protected connector points
         private HashSet<Vector2Int> currentExteriorOceanPoints;
         private HashSet<Vector2Int> currentShoreWaterPoints;
+        private BoundsInt? currentShoreLandBounds;
         private Dictionary<Vector2Int, int> currentLocalMaximumDepthByPoint;
         private List<ShoreEdgeDirection> currentDirectionalWideBeachDirections;
+        private int currentDirectionalWideBeachBatchId;
+        private int currentDirectionalWideBeachCallIndex;
         private int currentEnclosedWaterPointCount;
         private int shoreClassificationDebugBatchCounter;
         private bool hasLoggedMissingShoreSandPrefabWarning;
         private ActiveRegionLayout[] activeRegionLayouts;
         private int activeRegionColumns;
         private int activeRegionRows;
+        private static int generateMapDebugCallSequence;
+        private int currentGenerateMapDebugId;
+        private int playerSpawnedGenerationId = -1;
+        private bool isGenerateMapDebugInProgress;
         private const string GeneratedShoreSandRootName = "Generated Shore Sand";
+        private const string GeneratedPropsRootName = "PropsRoot";
+        private const string GeneratedWallColliderRootName = "Merged Wall Colliders";
 
         private enum ShoreEdgeDirection
         {
@@ -238,6 +247,85 @@ namespace UnderTheStars.GenerationMap
             public int achievedDepth;
         }
 
+        private struct DirectionalWideBeachRejectedSegmentInfo
+        {
+            public string reason;
+            public int length;
+            public Vector2Int startPoint;
+            public Vector2Int endPoint;
+            public float curvatureRatio;
+            public int averageInlandSupport;
+            public int exteriorOceanContactCount;
+            public int branchPointCount;
+            public int nearEnclosedWaterCount;
+        }
+
+        private struct DirectionalWideBeachCandidateDiagnostics
+        {
+            public int batchId;
+            public string phase;
+            public int callIndex;
+            public ShoreEdgeDirection selectedDirection;
+            public int sourcePointCount;
+            public int rejectedDepthNotZero;
+            public int rejectedNotOrdinaryShoreCandidate;
+            public int rejectedSelectedDirectionPosition;
+            public int rejectedLegacyDirectionalFilter;
+            public int rejectedExcludedOrUsed;
+            public int rejectedMissingAreaEntry;
+            public int rejectedMissingImmediateOrdinaryGrassSupport;
+            public int rejectedUnhandledBranch;
+            public int rawCandidatePointCount;
+            public int candidateCountBeforeEnclosedFilter;
+            public int connectedComponentCount;
+            public int componentCountCardinalOnly;
+            public int componentCountWithRestrictedDiagonal;
+            public int longestCardinalComponentLength;
+            public int longestRestrictedDiagonalComponentLength;
+            public int acceptedSegmentCount;
+            public int accountedPointCount;
+            public int unaccountedPointCount;
+            public bool pipelineInvariantValid;
+            public int rejectedTooShort;
+            public int rejectedBranch;
+            public int rejectedClosedLoop;
+            public int rejectedPathOrder;
+            public int rejectedCurvature;
+            public int rejectedInlandSupport;
+            public int rejectedDirectCardinalEnclosedWater;
+            public int rejectedDiagonalOnlyEnclosedWater;
+            public int rejectedExteriorAndEnclosedConflict;
+            public int rejectedDirectionalMismatch;
+            public int rejectedNoAnyExteriorOceanContact;
+            public int rejectedDuplicateOrOverlap;
+            public int rejectedUnknown;
+            public List<DirectionalWideBeachRejectedSegmentInfo> topRejectedSegments;
+            public List<string> unaccountedPointSamples;
+
+            public int TotalRejectedCount =>
+                rejectedTooShort +
+                rejectedBranch +
+                rejectedClosedLoop +
+                rejectedPathOrder +
+                rejectedCurvature +
+                rejectedInlandSupport +
+                rejectedDepthNotZero +
+                rejectedNotOrdinaryShoreCandidate +
+                rejectedDirectCardinalEnclosedWater +
+                rejectedDiagonalOnlyEnclosedWater +
+                rejectedExteriorAndEnclosedConflict +
+                rejectedDirectionalMismatch +
+                rejectedNoAnyExteriorOceanContact +
+                rejectedDuplicateOrOverlap +
+                rejectedSelectedDirectionPosition +
+                rejectedLegacyDirectionalFilter +
+                rejectedExcludedOrUsed +
+                rejectedMissingAreaEntry +
+                rejectedMissingImmediateOrdinaryGrassSupport +
+                rejectedUnhandledBranch +
+                rejectedUnknown;
+        }
+
         private struct ShorelineJunctionFillCandidate
         {
             public Vector2Int point;
@@ -274,35 +362,105 @@ namespace UnderTheStars.GenerationMap
 
         public async void GenerateMap()
         {
-            ResetMapData();
-
-            activeRegionLayouts = BuildActiveRegionLayouts();
-            if (activeRegionLayouts == null || activeRegionLayouts.Length == 0)
+            if (isGenerateMapDebugInProgress)
             {
-                Debug.LogWarning("[RandomMapGeneration] No enabled regions are configured. Please enable at least one region in regionGenerateOptions.", this);
+                Debug.LogWarning(
+                    $"[RandomMap.GenerateCall] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
+                    "accepted=False skipped reason=already-generating",
+                    this);
                 return;
             }
 
-            var regionPoints = InitMapRegion();
-            var checkAllFloor = GeneraterFloorPoints(regionPoints);
-            checkAllFloor = PostProcessActiveRegionFloors(checkAllFloor);
-            var generateWallPointsTask = GeneraterWallPointsAsync(checkAllFloor);
-            await UniTask.WhenAny(generateWallPointsTask);
-            PanintWallTilemap().Forget();
+            currentGenerateMapDebugId = ++generateMapDebugCallSequence;
+            int generationId = currentGenerateMapDebugId;
+            Debug.Log(
+                $"[RandomMap.GenerateCall] generationId={generationId} isPlaying={Application.isPlaying} " +
+                $"accepted=True frameCount={Time.frameCount} scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}",
+                this);
 
-            List<UniTask> paintTasks = new List<UniTask>(activeRegionLayouts.Length);
-            for (int i = 0; i < activeRegionLayouts.Length; i++)
+            isGenerateMapDebugInProgress = true;
+
+            try
             {
-                paintTasks.Add(PaintActiveRegionTilemap(activeRegionLayouts[i]));
+                ClearGeneratedMap();
+
+                if (!IsGenerationStillCurrent(generationId))
+                {
+                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-clear", this);
+                    return;
+                }
+
+                ResetMapData();
+
+                activeRegionLayouts = BuildActiveRegionLayouts();
+                if (activeRegionLayouts == null || activeRegionLayouts.Length == 0)
+                {
+                    Debug.LogWarning("[RandomMapGeneration] No enabled regions are configured. Please enable at least one region in regionGenerateOptions.", this);
+                    return;
+                }
+
+                var regionPoints = InitMapRegion();
+                var checkAllFloor = GeneraterFloorPoints(regionPoints);
+                checkAllFloor = PostProcessActiveRegionFloors(checkAllFloor);
+                await GeneraterWallPointsAsync(checkAllFloor);
+
+                if (!IsGenerationStillCurrent(generationId))
+                {
+                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-wall-points", this);
+                    return;
+                }
+
+                List<UniTask> paintTasks = new List<UniTask>(activeRegionLayouts.Length);
+                for (int i = 0; i < activeRegionLayouts.Length; i++)
+                {
+                    paintTasks.Add(PaintActiveRegionTilemap(activeRegionLayouts[i]));
+                }
+
+                paintTasks.Add(PanintWallTilemap());
+                await UniTask.WhenAll(paintTasks);
+
+                if (!IsGenerationStillCurrent(generationId))
+                {
+                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-paint", this);
+                    return;
+                }
+
+                GenerateShoreSand();
+
+                if (!IsGenerationStillCurrent(generationId))
+                {
+                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-shore", this);
+                    return;
+                }
+
+                SpawnPropsOnFloor();
+
+                if (Application.isPlaying)
+                {
+                    bool alreadySpawned = playerSpawnedGenerationId == generationId;
+                    Debug.Log(
+                        $"[PlayerSpawn] generationId={generationId} isPlaying={Application.isPlaying} " +
+                        $"alreadySpawnedThisGeneration={alreadySpawned}",
+                        this);
+
+                    if (!alreadySpawned)
+                    {
+                        playerSpawnedGenerationId = generationId;
+                        PlacePlayerOnMap();
+                    }
+                }
+                else
+                {
+                    Debug.Log(
+                        $"[PlayerSpawn] generationId={generationId} isPlaying={Application.isPlaying} " +
+                        "skipped=True reason=not-playing alreadySpawnedThisGeneration=False",
+                        this);
+                }
             }
-
-            await UniTask.WhenAll(paintTasks);
-
-            GenerateShoreSand();
-
-            // Place player
-            SpawnPropsOnFloor();
-            PlacePlayerOnMap();
+            finally
+            {
+                isGenerateMapDebugInProgress = false;
+            }
         }
 
         private UniTask PanintWallTilemap()
@@ -421,7 +579,23 @@ namespace UnderTheStars.GenerationMap
 
         private void PlacePlayerOnMap()
         {
-            if (floorPoints == null) return;
+            if (!Application.isPlaying)
+            {
+                Debug.Log(
+                    $"[PlayerSpawn] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
+                    $"skipped=True reason=not-playing alreadySpawnedThisGeneration={playerSpawnedGenerationId == currentGenerateMapDebugId}",
+                    this);
+                return;
+            }
+
+            if (floorPoints == null)
+            {
+                Debug.LogWarning(
+                    $"[PlayerSpawn] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
+                    "skipped=True reason=no-floor-points",
+                    this);
+                return;
+            }
 
             PlayerSpawnManager spawnManager = FindObjectOfType<PlayerSpawnManager>();
             if (spawnManager != null && spawnManager.SpawnPartyAtRandomSafePoint(this))
@@ -470,6 +644,11 @@ namespace UnderTheStars.GenerationMap
         public void SetPlayer(PlayerMovement playerMovement)
         {
             player = playerMovement;
+        }
+
+        public int GetCurrentGenerateMapDebugId()
+        {
+            return currentGenerateMapDebugId;
         }
 
         public bool TryGetRandomSafeSpawnWorldPosition(out Vector3 worldPosition, out Vector2Int spawnCoord)
@@ -2634,6 +2813,19 @@ namespace UnderTheStars.GenerationMap
             wallColliderPoints = null;
             generatedShoreSandPoints = null;
             connectorFloorPoints = new HashSet<Vector2Int>();
+            currentExteriorOceanPoints = null;
+            currentShoreWaterPoints = null;
+            currentShoreLandBounds = null;
+            currentLocalMaximumDepthByPoint = null;
+            currentDirectionalWideBeachDirections = null;
+            currentDirectionalWideBeachBatchId = 0;
+            currentDirectionalWideBeachCallIndex = 0;
+            currentEnclosedWaterPointCount = 0;
+            shoreClassificationDebugBatchCounter = 0;
+            activeRegionLayouts = null;
+            activeRegionColumns = 0;
+            activeRegionRows = 0;
+            player = null;
             hasLoggedMissingShoreSandPrefabWarning = false;
         }
 
@@ -2811,8 +3003,11 @@ namespace UnderTheStars.GenerationMap
             ClearGeneratedShoreSandInstances();
             currentExteriorOceanPoints = null;
             currentShoreWaterPoints = null;
+            currentShoreLandBounds = null;
             currentLocalMaximumDepthByPoint = null;
             currentDirectionalWideBeachDirections = null;
+            currentDirectionalWideBeachBatchId = ++shoreClassificationDebugBatchCounter;
+            currentDirectionalWideBeachCallIndex = 0;
             currentEnclosedWaterPointCount = 0;
 
             if (!enableShoreSand)
@@ -2850,6 +3045,7 @@ namespace UnderTheStars.GenerationMap
                 return;
             }
 
+            currentShoreLandBounds = CalculatePointBounds(allLandPoints);
             currentExteriorOceanPoints = CollectExteriorOceanPoints(allLandPoints);
             if (currentShoreWaterPoints == null || currentShoreWaterPoints.Count == 0)
             {
@@ -3240,7 +3436,22 @@ namespace UnderTheStars.GenerationMap
                 directionalWideBeachMaximumDepth <= 0 ||
                 targetDirectionalBeachArea <= 0)
             {
+                LogDirectionalWideBeachCandidateSummary(new DirectionalWideBeachCandidateDiagnostics
+                {
+                    batchId = currentDirectionalWideBeachBatchId,
+                    phase = "Main",
+                    callIndex = 0,
+                    selectedDirection = ShoreEdgeDirection.Up,
+                    rawCandidatePointCount = 0,
+                    connectedComponentCount = 0,
+                    acceptedSegmentCount = 0,
+                    topRejectedSegments = new List<DirectionalWideBeachRejectedSegmentInfo>(),
+                    unaccountedPointSamples = new List<string>()
+                });
                 LogDirectionalWideBeachBudgetSummary(
+                    currentDirectionalWideBeachBatchId,
+                    "Overall",
+                    0,
                     "None",
                     baseOrdinaryGrassPointCount,
                     targetDirectionalBeachArea,
@@ -3268,6 +3479,7 @@ namespace UnderTheStars.GenerationMap
             int actualMainBeachArea = 0;
             int selectedMainSegmentLength = 0;
             int mainRejectedCount;
+            DirectionalWideBeachCandidateDiagnostics mainCandidateDiagnostics;
             if (TrySelectBudgetDirectionalSegment(
                     mainDirection,
                     allLandPoints,
@@ -3277,7 +3489,8 @@ namespace UnderTheStars.GenerationMap
                     usedShorelinePoints,
                     baseMaxDepth,
                     out DirectionalWideBeachSegment mainSegment,
-                    out mainRejectedCount))
+                    out mainRejectedCount,
+                    out mainCandidateDiagnostics))
             {
                 rejectedCandidateCount += mainRejectedCount;
                 DirectionalWideBeachBuildResult mainResult = BuildBudgetDirectionalBeachFromSegment(
@@ -3303,6 +3516,8 @@ namespace UnderTheStars.GenerationMap
                 rejectedCandidateCount += mainRejectedCount;
                 stoppedReason = "no-safe-main-segment";
             }
+
+            LogDirectionalWideBeachCandidateSummary(mainCandidateDiagnostics);
 
             int actualSecondaryBeachArea = 0;
             int selectedSecondaryBeachCount = 0;
@@ -3377,6 +3592,9 @@ namespace UnderTheStars.GenerationMap
                 : 0f;
 
             LogDirectionalWideBeachBudgetSummary(
+                currentDirectionalWideBeachBatchId,
+                "Overall",
+                currentDirectionalWideBeachCallIndex,
                 mainDirection.ToString(),
                 baseOrdinaryGrassPointCount,
                 targetDirectionalBeachArea,
@@ -3468,7 +3686,12 @@ namespace UnderTheStars.GenerationMap
                 return false;
             }
 
-            List<List<Vector2Int>> rawSegments = SplitIntoConnectedDirectionalWideBeachSegments(candidatePoints);
+            List<List<Vector2Int>> rawSegments = SplitIntoConnectedDirectionalWideBeachSegments(
+                candidatePoints,
+                allLandPoints,
+                areaByPoint,
+                shoreDepthByPoint,
+                true);
             bool foundSegment = false;
             float bestScore = float.MinValue;
 
@@ -3480,7 +3703,9 @@ namespace UnderTheStars.GenerationMap
                         allLandPoints,
                         areaByPoint,
                         baseMaxDepth,
-                        out DirectionalWideBeachSegment segment))
+                        out DirectionalWideBeachSegment segment,
+                        out _,
+                        out _))
                 {
                     rejectedSegmentCount++;
                     continue;
@@ -3518,8 +3743,8 @@ namespace UnderTheStars.GenerationMap
             {
                 if (kvp.Value != 0 ||
                     !IsGrassLandPoint(kvp.Key, allLandPoints, areaByPoint) ||
-                    TouchesEnclosedWater(kvp.Key) ||
-                    !IsSpecificWaterAdjacentInDirection(kvp.Key, selectedDirection, currentExteriorOceanPoints))
+                    HasDirectCardinalEnclosedWaterNeighbor(kvp.Key) ||
+                    !HasAnyCardinalExteriorOceanNeighbor(kvp.Key))
                 {
                     continue;
                 }
@@ -3530,7 +3755,12 @@ namespace UnderTheStars.GenerationMap
             return candidatePoints;
         }
 
-        private List<List<Vector2Int>> SplitIntoConnectedDirectionalWideBeachSegments(HashSet<Vector2Int> candidatePoints)
+        private List<List<Vector2Int>> SplitIntoConnectedDirectionalWideBeachSegments(
+            HashSet<Vector2Int> candidatePoints,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            Dictionary<Vector2Int, int> shoreDepthByPoint,
+            bool allowRestrictedDiagonal)
         {
             List<List<Vector2Int>> segments = new List<List<Vector2Int>>();
             if (candidatePoints == null || candidatePoints.Count == 0)
@@ -3539,14 +3769,6 @@ namespace UnderTheStars.GenerationMap
             }
 
             HashSet<Vector2Int> visited = new HashSet<Vector2Int>();
-            Vector2Int[] offsets =
-            {
-                Vector2Int.up,
-                Vector2Int.right,
-                Vector2Int.down,
-                Vector2Int.left
-            };
-
             List<Vector2Int> orderedCandidates = new List<Vector2Int>(candidatePoints);
             orderedCandidates.Sort(ComparePointOrder);
 
@@ -3567,10 +3789,19 @@ namespace UnderTheStars.GenerationMap
                     Vector2Int current = queue.Dequeue();
                     segment.Add(current);
 
-                    for (int offsetIndex = 0; offsetIndex < offsets.Length; offsetIndex++)
+                    for (int candidateIndex = 0; candidateIndex < orderedCandidates.Count; candidateIndex++)
                     {
-                        Vector2Int neighbor = current + offsets[offsetIndex];
-                        if (!candidatePoints.Contains(neighbor) || !visited.Add(neighbor))
+                        Vector2Int neighbor = orderedCandidates[candidateIndex];
+                        if (!candidatePoints.Contains(neighbor) ||
+                            !AreDirectionalBeachShorelinePointsConnected(
+                                current,
+                                neighbor,
+                                candidatePoints,
+                                allLandPoints,
+                                areaByPoint,
+                                shoreDepthByPoint,
+                                allowRestrictedDiagonal) ||
+                            !visited.Add(neighbor))
                         {
                             continue;
                         }
@@ -3592,21 +3823,28 @@ namespace UnderTheStars.GenerationMap
             HashSet<Vector2Int> allLandPoints,
             Dictionary<Vector2Int, AreaType> areaByPoint,
             int baseMaxDepth,
-            out DirectionalWideBeachSegment segment)
+            out DirectionalWideBeachSegment segment,
+            out string rejectedReason,
+            out DirectionalWideBeachRejectedSegmentInfo rejectedInfo)
         {
             segment = default;
+            rejectedReason = null;
+            rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(rawSegmentPoints, selectedDirection, 0f, 0, 0, 0);
             if (rawSegmentPoints == null || rawSegmentPoints.Count < directionalWideBeachMinimumSegmentLength)
             {
+                rejectedReason = "too-short";
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
             HashSet<Vector2Int> segmentPointSet = new HashSet<Vector2Int>(rawSegmentPoints);
             Dictionary<Vector2Int, List<Vector2Int>> neighborsByPoint =
-                BuildDirectionalWideBeachNeighborMap(segmentPointSet);
+                BuildDirectionalWideBeachNeighborMap(segmentPointSet, allLandPoints, areaByPoint, true);
 
             int endpointCount = 0;
             Vector2Int startPoint = rawSegmentPoints[0];
             bool hasBranch = false;
+            int branchPointCount = 0;
             foreach (KeyValuePair<Vector2Int, List<Vector2Int>> kvp in neighborsByPoint)
             {
                 int degree = kvp.Value.Count;
@@ -3621,11 +3859,23 @@ namespace UnderTheStars.GenerationMap
                 else if (degree > 2)
                 {
                     hasBranch = true;
+                    branchPointCount++;
                 }
             }
 
-            if (hasBranch || endpointCount != 2)
+            if (hasBranch)
             {
+                rejectedReason = "branch-detected";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(rawSegmentPoints, selectedDirection, 0f, 0, 0, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
+                return false;
+            }
+
+            if (endpointCount != 2)
+            {
+                rejectedReason = endpointCount == 0 ? "closed-loop" : "unknown";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(rawSegmentPoints, selectedDirection, 0f, 0, 0, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
@@ -3633,6 +3883,9 @@ namespace UnderTheStars.GenerationMap
             if (orderedPoints.Count != rawSegmentPoints.Count ||
                 orderedPoints.Count < directionalWideBeachMinimumSegmentLength)
             {
+                rejectedReason = "path-order-failed";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(orderedPoints.Count > 0 ? orderedPoints : rawSegmentPoints, selectedDirection, 0f, 0, 0, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
@@ -3652,6 +3905,9 @@ namespace UnderTheStars.GenerationMap
                 : (float)turnCount / (orderedPoints.Count - 2);
             if (curvatureRatio > directionalWideBeachCurvatureTolerance)
             {
+                rejectedReason = "curvature-too-high";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(orderedPoints, selectedDirection, curvatureRatio, 0, 0, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
@@ -3685,12 +3941,18 @@ namespace UnderTheStars.GenerationMap
             int averageSupport = orderedPoints.Count == 0 ? 0 : Mathf.RoundToInt((float)totalSupport / orderedPoints.Count);
             if (averageSupport < minimumDesiredSupport || supportRatio < 0.6f)
             {
+                rejectedReason = "insufficient-inland-support";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(orderedPoints, selectedDirection, curvatureRatio, averageSupport, nearbyEnclosedWaterCount, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
             float orientationScore = EvaluateDirectionalWideBeachSegmentOrientationScore(orderedPoints, selectedDirection);
             if (orientationScore < 0.45f)
             {
+                rejectedReason = "direction-score-too-low";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(orderedPoints, selectedDirection, curvatureRatio, averageSupport, nearbyEnclosedWaterCount, branchPointCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
@@ -3721,7 +3983,11 @@ namespace UnderTheStars.GenerationMap
             return true;
         }
 
-        private Dictionary<Vector2Int, List<Vector2Int>> BuildDirectionalWideBeachNeighborMap(HashSet<Vector2Int> points)
+        private Dictionary<Vector2Int, List<Vector2Int>> BuildDirectionalWideBeachNeighborMap(
+            HashSet<Vector2Int> points,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            bool allowRestrictedDiagonal)
         {
             Dictionary<Vector2Int, List<Vector2Int>> neighborsByPoint =
                 new Dictionary<Vector2Int, List<Vector2Int>>();
@@ -3730,21 +3996,19 @@ namespace UnderTheStars.GenerationMap
                 return neighborsByPoint;
             }
 
-            Vector2Int[] offsets =
-            {
-                Vector2Int.up,
-                Vector2Int.right,
-                Vector2Int.down,
-                Vector2Int.left
-            };
-
             foreach (Vector2Int point in points)
             {
-                List<Vector2Int> neighbors = new List<Vector2Int>(2);
-                for (int i = 0; i < offsets.Length; i++)
+                List<Vector2Int> neighbors = new List<Vector2Int>(4);
+                foreach (Vector2Int neighbor in points)
                 {
-                    Vector2Int neighbor = point + offsets[i];
-                    if (points.Contains(neighbor))
+                    if (AreDirectionalBeachShorelinePointsConnected(
+                            point,
+                            neighbor,
+                            points,
+                            allLandPoints,
+                            areaByPoint,
+                            null,
+                            allowRestrictedDiagonal))
                     {
                         neighbors.Add(neighbor);
                     }
@@ -3853,7 +4117,91 @@ namespace UnderTheStars.GenerationMap
             bool prefersHorizontal = selectedDirection == ShoreEdgeDirection.Up || selectedDirection == ShoreEdgeDirection.Down;
             float tangentSpan = prefersHorizontal ? horizontalSpan : verticalSpan;
             float normalSpan = prefersHorizontal ? verticalSpan : horizontalSpan;
-            return tangentSpan / Mathf.Max(1f, tangentSpan + normalSpan);
+            float shapeScore = tangentSpan / Mathf.Max(1f, tangentSpan + normalSpan);
+
+            float averageX = 0f;
+            float averageY = 0f;
+            float outwardX = 0f;
+            float outwardY = 0f;
+            int outwardSamples = 0;
+
+            for (int i = 0; i < orderedPoints.Count; i++)
+            {
+                Vector2Int point = orderedPoints[i];
+                averageX += point.x;
+                averageY += point.y;
+
+                if (currentExteriorOceanPoints != null && currentExteriorOceanPoints.Count > 0)
+                {
+                    if (currentExteriorOceanPoints.Contains(point + Vector2Int.up))
+                    {
+                        outwardY += 1f;
+                        outwardSamples++;
+                    }
+
+                    if (currentExteriorOceanPoints.Contains(point + Vector2Int.right))
+                    {
+                        outwardX += 1f;
+                        outwardSamples++;
+                    }
+
+                    if (currentExteriorOceanPoints.Contains(point + Vector2Int.down))
+                    {
+                        outwardY -= 1f;
+                        outwardSamples++;
+                    }
+
+                    if (currentExteriorOceanPoints.Contains(point + Vector2Int.left))
+                    {
+                        outwardX -= 1f;
+                        outwardSamples++;
+                    }
+                }
+            }
+
+            averageX /= orderedPoints.Count;
+            averageY /= orderedPoints.Count;
+
+            float centerScore = 0.5f;
+            if (currentShoreLandBounds.HasValue)
+            {
+                BoundsInt bounds = currentShoreLandBounds.Value;
+                float centerX = bounds.xMin + (bounds.size.x - 1) * 0.5f;
+                float centerY = bounds.yMin + (bounds.size.y - 1) * 0.5f;
+                float extentX = Mathf.Max(1f, (bounds.size.x - 1) * 0.5f);
+                float extentY = Mathf.Max(1f, (bounds.size.y - 1) * 0.5f);
+                float normalizedX = Mathf.Clamp((averageX - centerX) / extentX, -1f, 1f);
+                float normalizedY = Mathf.Clamp((averageY - centerY) / extentY, -1f, 1f);
+
+                switch (selectedDirection)
+                {
+                    case ShoreEdgeDirection.Up:
+                        centerScore = Mathf.InverseLerp(-1f, 1f, normalizedY);
+                        break;
+                    case ShoreEdgeDirection.Down:
+                        centerScore = Mathf.InverseLerp(1f, -1f, normalizedY);
+                        break;
+                    case ShoreEdgeDirection.Left:
+                        centerScore = Mathf.InverseLerp(1f, -1f, normalizedX);
+                        break;
+                    case ShoreEdgeDirection.Right:
+                        centerScore = Mathf.InverseLerp(-1f, 1f, normalizedX);
+                        break;
+                }
+            }
+
+            float normalScore = 0.5f;
+            if (outwardSamples > 0)
+            {
+                float invMagnitude = 1f / Mathf.Max(0.0001f, Mathf.Sqrt((outwardX * outwardX) + (outwardY * outwardY)));
+                float normalizedOutwardX = outwardX * invMagnitude;
+                float normalizedOutwardY = outwardY * invMagnitude;
+                Vector2 targetNormal = GetDirectionalWideBeachNormal(selectedDirection);
+                float dot = Mathf.Clamp((normalizedOutwardX * targetNormal.x) + (normalizedOutwardY * targetNormal.y), -1f, 1f);
+                normalScore = Mathf.InverseLerp(-1f, 1f, dot);
+            }
+
+            return (shapeScore * 0.45f) + (centerScore * 0.2f) + (normalScore * 0.35f);
         }
 
         private bool HasNearbyEnclosedWater(Vector2Int point, int radius)
@@ -4050,10 +4398,12 @@ namespace UnderTheStars.GenerationMap
             HashSet<Vector2Int> excludedShorelinePoints,
             int baseMaxDepth,
             out DirectionalWideBeachSegment bestSegment,
-            out int rejectedCandidateCount)
+            out int rejectedCandidateCount,
+            out DirectionalWideBeachCandidateDiagnostics diagnostics)
         {
             bestSegment = default;
             rejectedCandidateCount = 0;
+            diagnostics = default;
             List<DirectionalWideBeachSegment> candidates = CollectBudgetDirectionalSegments(
                 selectedDirection,
                 allLandPoints,
@@ -4062,7 +4412,8 @@ namespace UnderTheStars.GenerationMap
                 ordinaryGrassPoints,
                 excludedShorelinePoints,
                 baseMaxDepth,
-                out rejectedCandidateCount);
+                out rejectedCandidateCount,
+                out diagnostics);
             if (candidates.Count == 0)
             {
                 return false;
@@ -4102,8 +4453,11 @@ namespace UnderTheStars.GenerationMap
                     ordinaryGrassPoints,
                     excludedShorelinePoints,
                     baseMaxDepth,
-                    out int directionRejectedCount);
+                    out int directionRejectedCount,
+                    out DirectionalWideBeachCandidateDiagnostics directionDiagnostics);
                 rejectedCandidateCount += directionRejectedCount;
+                directionDiagnostics.phase = $"Secondary{i + 1}";
+                LogDirectionalWideBeachCandidateSummary(directionDiagnostics);
                 candidates.AddRange(directionCandidates);
             }
 
@@ -4119,9 +4473,19 @@ namespace UnderTheStars.GenerationMap
             HashSet<Vector2Int> ordinaryGrassPoints,
             HashSet<Vector2Int> excludedShorelinePoints,
             int baseMaxDepth,
-            out int rejectedCandidateCount)
+            out int rejectedCandidateCount,
+            out DirectionalWideBeachCandidateDiagnostics diagnostics)
         {
             rejectedCandidateCount = 0;
+            diagnostics = new DirectionalWideBeachCandidateDiagnostics
+            {
+                batchId = currentDirectionalWideBeachBatchId,
+                phase = "Main",
+                callIndex = ++currentDirectionalWideBeachCallIndex,
+                selectedDirection = selectedDirection,
+                topRejectedSegments = new List<DirectionalWideBeachRejectedSegmentInfo>(),
+                unaccountedPointSamples = new List<string>()
+            };
             List<DirectionalWideBeachSegment> segments = new List<DirectionalWideBeachSegment>();
             HashSet<Vector2Int> candidatePoints = CollectBudgetDirectionalCandidateShorelinePoints(
                 selectedDirection,
@@ -4129,13 +4493,21 @@ namespace UnderTheStars.GenerationMap
                 areaByPoint,
                 shoreDepthByPoint,
                 ordinaryGrassPoints,
-                excludedShorelinePoints);
+                excludedShorelinePoints,
+                ref diagnostics);
+            diagnostics.rawCandidatePointCount = candidatePoints.Count;
             if (candidatePoints.Count == 0)
             {
                 return segments;
             }
 
-            List<List<Vector2Int>> rawSegments = SplitIntoConnectedDirectionalWideBeachSegments(candidatePoints);
+            List<List<Vector2Int>> rawSegments = SplitIntoConnectedDirectionalWideBeachSegments(
+                candidatePoints,
+                allLandPoints,
+                areaByPoint,
+                shoreDepthByPoint,
+                true);
+            diagnostics.connectedComponentCount = rawSegments.Count;
             for (int i = 0; i < rawSegments.Count; i++)
             {
                 if (!TryBuildBudgetDirectionalSegment(
@@ -4145,15 +4517,20 @@ namespace UnderTheStars.GenerationMap
                         areaByPoint,
                         ordinaryGrassPoints,
                         baseMaxDepth,
-                        out DirectionalWideBeachSegment segment))
+                        out DirectionalWideBeachSegment segment,
+                        out string rejectedReason,
+                        out DirectionalWideBeachRejectedSegmentInfo rejectedInfo))
                 {
                     rejectedCandidateCount++;
+                    IncrementDirectionalWideBeachRejectedReason(ref diagnostics, rejectedReason);
+                    TrackRejectedDirectionalWideBeachSegment(ref diagnostics, rejectedInfo);
                     continue;
                 }
 
                 segments.Add(segment);
             }
 
+            diagnostics.acceptedSegmentCount = segments.Count;
             segments.Sort((lhs, rhs) => rhs.score.CompareTo(lhs.score));
             return segments;
         }
@@ -4164,7 +4541,8 @@ namespace UnderTheStars.GenerationMap
             Dictionary<Vector2Int, AreaType> areaByPoint,
             Dictionary<Vector2Int, int> shoreDepthByPoint,
             HashSet<Vector2Int> ordinaryGrassPoints,
-            HashSet<Vector2Int> excludedShorelinePoints)
+            HashSet<Vector2Int> excludedShorelinePoints,
+            ref DirectionalWideBeachCandidateDiagnostics diagnostics)
         {
             HashSet<Vector2Int> candidatePoints = new HashSet<Vector2Int>();
             if (shoreDepthByPoint == null || currentExteriorOceanPoints == null || currentExteriorOceanPoints.Count == 0)
@@ -4172,28 +4550,102 @@ namespace UnderTheStars.GenerationMap
                 return candidatePoints;
             }
 
-            int baseMaxDepth = Mathf.Max(0, shoreSandWidth - 1);
-            Vector2Int inwardOffset = GetOppositeCardinalOffset(selectedDirection);
-
             foreach (KeyValuePair<Vector2Int, int> kvp in shoreDepthByPoint)
             {
-                if (kvp.Value != 0 ||
-                    !IsGrassLandPoint(kvp.Key, allLandPoints, areaByPoint) ||
-                    (excludedShorelinePoints != null && excludedShorelinePoints.Contains(kvp.Key)) ||
-                    TouchesEnclosedWater(kvp.Key) ||
-                    !IsSpecificWaterAdjacentInDirection(kvp.Key, selectedDirection, currentExteriorOceanPoints))
+                diagnostics.sourcePointCount++;
+
+                if (kvp.Value != 0)
                 {
+                    diagnostics.rejectedDepthNotZero++;
                     continue;
                 }
 
-                Vector2Int firstOrdinaryGrassPoint = kvp.Key + inwardOffset * (baseMaxDepth + 1);
-                if (ordinaryGrassPoints != null && !ordinaryGrassPoints.Contains(firstOrdinaryGrassPoint))
+                if (areaByPoint == null || !areaByPoint.ContainsKey(kvp.Key))
                 {
+                    diagnostics.rejectedMissingAreaEntry++;
                     continue;
                 }
 
-                candidatePoints.Add(kvp.Key);
+                if (!IsGrassLandPoint(kvp.Key, allLandPoints, areaByPoint))
+                {
+                    diagnostics.rejectedNotOrdinaryShoreCandidate++;
+                    continue;
+                }
+
+                if (excludedShorelinePoints != null && excludedShorelinePoints.Contains(kvp.Key))
+                {
+                    diagnostics.rejectedExcludedOrUsed++;
+                    continue;
+                }
+
+                bool touchesExteriorOcean = HasAnyCardinalExteriorOceanNeighbor(kvp.Key);
+                bool directCardinalEnclosedWater = HasDirectCardinalEnclosedWaterNeighbor(kvp.Key);
+                bool diagonalOnlyEnclosedWater = !directCardinalEnclosedWater && HasDiagonalOnlyEnclosedWaterNeighbor(kvp.Key);
+
+                if (directCardinalEnclosedWater && touchesExteriorOcean)
+                {
+                    diagnostics.rejectedExteriorAndEnclosedConflict++;
+                    continue;
+                }
+
+                if (directCardinalEnclosedWater)
+                {
+                    diagnostics.rejectedDirectCardinalEnclosedWater++;
+                    continue;
+                }
+
+                if (diagonalOnlyEnclosedWater)
+                {
+                    diagnostics.rejectedDiagonalOnlyEnclosedWater++;
+                    continue;
+                }
+
+                if (!touchesExteriorOcean)
+                {
+                    diagnostics.rejectedNoAnyExteriorOceanContact++;
+                    continue;
+                }
+
+                if (!candidatePoints.Add(kvp.Key))
+                {
+                    diagnostics.rejectedUnhandledBranch++;
+                    if (diagnostics.unaccountedPointSamples != null && diagnostics.unaccountedPointSamples.Count < 10)
+                    {
+                        diagnostics.unaccountedPointSamples.Add($"point={kvp.Key} branch=hashset-add-failed");
+                    }
+                    continue;
+                }
             }
+
+            List<List<Vector2Int>> cardinalSegments = SplitIntoConnectedDirectionalWideBeachSegments(
+                candidatePoints,
+                allLandPoints,
+                areaByPoint,
+                shoreDepthByPoint,
+                false);
+            diagnostics.componentCountCardinalOnly = cardinalSegments.Count;
+            diagnostics.longestCardinalComponentLength = GetLongestDirectionalWideBeachComponentLength(cardinalSegments);
+
+            List<List<Vector2Int>> restrictedDiagonalSegments = SplitIntoConnectedDirectionalWideBeachSegments(
+                candidatePoints,
+                allLandPoints,
+                areaByPoint,
+                shoreDepthByPoint,
+                true);
+            diagnostics.componentCountWithRestrictedDiagonal = restrictedDiagonalSegments.Count;
+            diagnostics.longestRestrictedDiagonalComponentLength = GetLongestDirectionalWideBeachComponentLength(restrictedDiagonalSegments);
+            diagnostics.rawCandidatePointCount = candidatePoints.Count;
+            diagnostics.candidateCountBeforeEnclosedFilter =
+                diagnostics.sourcePointCount -
+                diagnostics.rejectedDepthNotZero -
+                diagnostics.rejectedNotOrdinaryShoreCandidate -
+                diagnostics.rejectedExcludedOrUsed -
+                diagnostics.rejectedMissingAreaEntry -
+                diagnostics.rejectedSelectedDirectionPosition -
+                diagnostics.rejectedLegacyDirectionalFilter;
+            diagnostics.accountedPointCount = diagnostics.TotalRejectedCount + diagnostics.rawCandidatePointCount;
+            diagnostics.unaccountedPointCount = diagnostics.sourcePointCount - diagnostics.accountedPointCount;
+            diagnostics.pipelineInvariantValid = diagnostics.unaccountedPointCount == 0;
 
             return candidatePoints;
         }
@@ -4205,16 +4657,22 @@ namespace UnderTheStars.GenerationMap
             Dictionary<Vector2Int, AreaType> areaByPoint,
             HashSet<Vector2Int> ordinaryGrassPoints,
             int baseMaxDepth,
-            out DirectionalWideBeachSegment segment)
+            out DirectionalWideBeachSegment segment,
+            out string rejectedReason,
+            out DirectionalWideBeachRejectedSegmentInfo rejectedInfo)
         {
             segment = default;
+            rejectedReason = null;
+            rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(rawSegmentPoints, selectedDirection, 0f, 0, 0, 0);
             if (!TryBuildDirectionalWideBeachSegment(
                     selectedDirection,
                     rawSegmentPoints,
                     allLandPoints,
                     areaByPoint,
                     baseMaxDepth,
-                    out segment))
+                    out segment,
+                    out rejectedReason,
+                    out rejectedInfo))
             {
                 return false;
             }
@@ -4244,12 +4702,290 @@ namespace UnderTheStars.GenerationMap
             float supportRatio = segment.orderedPoints.Count == 0 ? 0f : (float)supportedPointCount / segment.orderedPoints.Count;
             if (averageSupport < minimumDesiredSupport || supportRatio < 0.6f)
             {
+                rejectedReason = "insufficient-inland-support";
+                rejectedInfo = CreateDirectionalWideBeachRejectedSegmentInfo(
+                    segment.orderedPoints,
+                    selectedDirection,
+                    segment.curvatureRatio,
+                    averageSupport,
+                    0,
+                    segment.nearbyEnclosedWaterCount);
+                rejectedInfo.reason = rejectedReason;
                 return false;
             }
 
             segment.averageInlandSupport = averageSupport;
             segment.score += (averageSupport * 1.25f) + (supportRatio * 10f);
             return true;
+        }
+
+        private void IncrementDirectionalWideBeachRejectedReason(
+            ref DirectionalWideBeachCandidateDiagnostics diagnostics,
+            string rejectedReason)
+        {
+            switch (rejectedReason)
+            {
+                case "too-short":
+                    diagnostics.rejectedTooShort++;
+                    break;
+                case "branch-detected":
+                    diagnostics.rejectedBranch++;
+                    break;
+                case "closed-loop":
+                    diagnostics.rejectedClosedLoop++;
+                    break;
+                case "path-order-failed":
+                    diagnostics.rejectedPathOrder++;
+                    break;
+                case "curvature-too-high":
+                    diagnostics.rejectedCurvature++;
+                    break;
+                case "insufficient-inland-support":
+                    diagnostics.rejectedInlandSupport++;
+                    break;
+                case "near-enclosed-water":
+                    diagnostics.rejectedDiagonalOnlyEnclosedWater++;
+                    break;
+                case "direction-score-too-low":
+                    diagnostics.rejectedDirectionalMismatch++;
+                    break;
+                case "no-exterior-ocean-contact":
+                    diagnostics.rejectedNoAnyExteriorOceanContact++;
+                    break;
+                case "duplicate-or-overlap":
+                    diagnostics.rejectedDuplicateOrOverlap++;
+                    break;
+                default:
+                    diagnostics.rejectedUnknown++;
+                    break;
+            }
+        }
+
+        private void TrackRejectedDirectionalWideBeachSegment(
+            ref DirectionalWideBeachCandidateDiagnostics diagnostics,
+            DirectionalWideBeachRejectedSegmentInfo rejectedInfo)
+        {
+            if (diagnostics.topRejectedSegments == null)
+            {
+                diagnostics.topRejectedSegments = new List<DirectionalWideBeachRejectedSegmentInfo>();
+            }
+
+            rejectedInfo.reason = string.IsNullOrEmpty(rejectedInfo.reason) ? "unknown" : rejectedInfo.reason;
+            diagnostics.topRejectedSegments.Add(rejectedInfo);
+            diagnostics.topRejectedSegments.Sort((lhs, rhs) => rhs.length.CompareTo(lhs.length));
+            if (diagnostics.topRejectedSegments.Count > 5)
+            {
+                diagnostics.topRejectedSegments.RemoveRange(5, diagnostics.topRejectedSegments.Count - 5);
+            }
+        }
+
+        private DirectionalWideBeachRejectedSegmentInfo CreateDirectionalWideBeachRejectedSegmentInfo(
+            List<Vector2Int> points,
+            ShoreEdgeDirection selectedDirection,
+            float curvatureRatio,
+            int averageInlandSupport,
+            int nearEnclosedWaterCount,
+            int branchPointCount)
+        {
+            return new DirectionalWideBeachRejectedSegmentInfo
+            {
+                reason = "unknown",
+                length = points == null ? 0 : points.Count,
+                startPoint = points != null && points.Count > 0 ? points[0] : Vector2Int.zero,
+                endPoint = points != null && points.Count > 0 ? points[points.Count - 1] : Vector2Int.zero,
+                curvatureRatio = curvatureRatio,
+                averageInlandSupport = averageInlandSupport,
+                exteriorOceanContactCount = CountDirectionalWideBeachExteriorOceanContacts(points, selectedDirection),
+                branchPointCount = branchPointCount,
+                nearEnclosedWaterCount = nearEnclosedWaterCount > 0 ? nearEnclosedWaterCount : CountDirectionalWideBeachNearbyEnclosedWater(points)
+            };
+        }
+
+        private int CountDirectionalWideBeachExteriorOceanContacts(
+            List<Vector2Int> points,
+            ShoreEdgeDirection selectedDirection)
+        {
+            if (points == null || points.Count == 0 || currentExteriorOceanPoints == null || currentExteriorOceanPoints.Count == 0)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (IsSpecificWaterAdjacentInDirection(points[i], selectedDirection, currentExteriorOceanPoints))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int CountDirectionalWideBeachNearbyEnclosedWater(List<Vector2Int> points)
+        {
+            if (points == null || points.Count == 0)
+            {
+                return 0;
+            }
+
+            int count = 0;
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (HasNearbyEnclosedWater(points[i], 2))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        private int GetLongestDirectionalWideBeachComponentLength(List<List<Vector2Int>> components)
+        {
+            if (components == null || components.Count == 0)
+            {
+                return 0;
+            }
+
+            int longest = 0;
+            for (int i = 0; i < components.Count; i++)
+            {
+                if (components[i] != null && components[i].Count > longest)
+                {
+                    longest = components[i].Count;
+                }
+            }
+
+            return longest;
+        }
+
+        private bool HasDirectCardinalEnclosedWaterNeighbor(Vector2Int point)
+        {
+            return currentShoreWaterPoints != null &&
+                   currentShoreWaterPoints.Count > 0 &&
+                   (IsEnclosedWaterPoint(point + Vector2Int.up) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.right) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.down) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.left));
+        }
+
+        private bool HasDiagonalOnlyEnclosedWaterNeighbor(Vector2Int point)
+        {
+            return currentShoreWaterPoints != null &&
+                   currentShoreWaterPoints.Count > 0 &&
+                   (IsEnclosedWaterPoint(point + Vector2Int.up + Vector2Int.left) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.up + Vector2Int.right) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.down + Vector2Int.left) ||
+                    IsEnclosedWaterPoint(point + Vector2Int.down + Vector2Int.right));
+        }
+
+        private bool IsEnclosedWaterPoint(Vector2Int point)
+        {
+            return currentShoreWaterPoints != null &&
+                   currentShoreWaterPoints.Contains(point) &&
+                   (currentExteriorOceanPoints == null || !currentExteriorOceanPoints.Contains(point));
+        }
+
+        private bool AreDirectionalBeachShorelinePointsConnected(
+            Vector2Int a,
+            Vector2Int b,
+            HashSet<Vector2Int> candidatePoints,
+            HashSet<Vector2Int> allLandPoints,
+            Dictionary<Vector2Int, AreaType> areaByPoint,
+            Dictionary<Vector2Int, int> shoreDepthByPoint,
+            bool allowRestrictedDiagonal)
+        {
+            if (a == b || candidatePoints == null || !candidatePoints.Contains(a) || !candidatePoints.Contains(b))
+            {
+                return false;
+            }
+
+            int deltaX = Mathf.Abs(a.x - b.x);
+            int deltaY = Mathf.Abs(a.y - b.y);
+            int chebyshevDistance = Mathf.Max(deltaX, deltaY);
+            if (chebyshevDistance != 1)
+            {
+                return false;
+            }
+
+            if ((deltaX + deltaY) == 1)
+            {
+                return true;
+            }
+
+            if (!allowRestrictedDiagonal)
+            {
+                return false;
+            }
+
+            if ((shoreDepthByPoint != null && ((!shoreDepthByPoint.TryGetValue(a, out int aDepth) || aDepth != 0) || (!shoreDepthByPoint.TryGetValue(b, out int bDepth) || bDepth != 0))) ||
+                !HasAnyCardinalExteriorOceanNeighbor(a) ||
+                !HasAnyCardinalExteriorOceanNeighbor(b))
+            {
+                return false;
+            }
+
+            Vector2Int bridgeA = new Vector2Int(a.x, b.y);
+            Vector2Int bridgeB = new Vector2Int(b.x, a.y);
+            if (IsEnclosedWaterPoint(bridgeA) || IsEnclosedWaterPoint(bridgeB))
+            {
+                return false;
+            }
+
+            bool bridgeAOrdinaryGrass = IsGrassLandPoint(bridgeA, allLandPoints, areaByPoint) && !candidatePoints.Contains(bridgeA);
+            bool bridgeBOrdinaryGrass = IsGrassLandPoint(bridgeB, allLandPoints, areaByPoint) && !candidatePoints.Contains(bridgeB);
+            if (bridgeAOrdinaryGrass || bridgeBOrdinaryGrass)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private static BoundsInt CalculatePointBounds(HashSet<Vector2Int> points)
+        {
+            if (points == null || points.Count == 0)
+            {
+                return new BoundsInt(Vector3Int.zero, Vector3Int.zero);
+            }
+
+            int minX = int.MaxValue;
+            int maxX = int.MinValue;
+            int minY = int.MaxValue;
+            int maxY = int.MinValue;
+
+            foreach (Vector2Int point in points)
+            {
+                if (point.x < minX) minX = point.x;
+                if (point.x > maxX) maxX = point.x;
+                if (point.y < minY) minY = point.y;
+                if (point.y > maxY) maxY = point.y;
+            }
+
+            return new BoundsInt(
+                new Vector3Int(minX, minY, 0),
+                new Vector3Int((maxX - minX) + 1, (maxY - minY) + 1, 1));
+        }
+
+        private bool HasAnyCardinalExteriorOceanNeighbor(Vector2Int point)
+        {
+            return TouchesSpecificWaterSet(point, currentExteriorOceanPoints);
+        }
+
+        private static Vector2 GetDirectionalWideBeachNormal(ShoreEdgeDirection selectedDirection)
+        {
+            switch (selectedDirection)
+            {
+                case ShoreEdgeDirection.Up:
+                    return Vector2.up;
+                case ShoreEdgeDirection.Down:
+                    return Vector2.down;
+                case ShoreEdgeDirection.Left:
+                    return Vector2.left;
+                default:
+                    return Vector2.right;
+            }
         }
 
         private int CountBudgetDirectionalInlandSupport(
@@ -4611,6 +5347,9 @@ namespace UnderTheStars.GenerationMap
         }
 
         private void LogDirectionalWideBeachBudgetSummary(
+            int batchId,
+            string phase,
+            int callIndex,
             string selectedMainDirection,
             int baseOrdinaryGrassPointCount,
             int targetBeachArea,
@@ -4626,8 +5365,46 @@ namespace UnderTheStars.GenerationMap
             string stoppedReason)
         {
             Debug.Log(
-                $"[ShoreSand.DirectionalWideBeach] selectedMainDirection={selectedMainDirection} baseOrdinaryGrassPointCount={baseOrdinaryGrassPointCount} targetBeachArea={targetBeachArea} mainBeachTargetArea={mainBeachTargetArea} actualMainBeachArea={actualMainBeachArea} secondaryBeachTargetArea={secondaryBeachTargetArea} actualSecondaryBeachArea={actualSecondaryBeachArea} totalActualDirectionalBeachArea={totalActualDirectionalBeachArea} achievedGrassRatio={achievedGrassRatio:F3} selectedMainSegmentLength={selectedMainSegmentLength} selectedSecondaryBeachCount={selectedSecondaryBeachCount} rejectedCandidateCount={rejectedCandidateCount} stoppedReason={stoppedReason}",
+                $"[ShoreSand.DirectionalWideBeach] batch={batchId} phase={phase} callIndex={callIndex} selectedMainDirection={selectedMainDirection} baseOrdinaryGrassPointCount={baseOrdinaryGrassPointCount} targetBeachArea={targetBeachArea} mainBeachTargetArea={mainBeachTargetArea} actualMainBeachArea={actualMainBeachArea} secondaryBeachTargetArea={secondaryBeachTargetArea} actualSecondaryBeachArea={actualSecondaryBeachArea} totalActualDirectionalBeachArea={totalActualDirectionalBeachArea} achievedGrassRatio={achievedGrassRatio:F3} selectedMainSegmentLength={selectedMainSegmentLength} selectedSecondaryBeachCount={selectedSecondaryBeachCount} rejectedCandidateCount={rejectedCandidateCount} stoppedReason={stoppedReason}",
                 this);
+        }
+
+        private void LogDirectionalWideBeachCandidateSummary(DirectionalWideBeachCandidateDiagnostics diagnostics)
+        {
+            Debug.Log(
+                $"[ShoreSand.DirectionalWideBeach.CandidatePipeline] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} sourcePointCount={diagnostics.sourcePointCount} rejectedDepthNotZero={diagnostics.rejectedDepthNotZero} rejectedNotOrdinaryShoreCandidate={diagnostics.rejectedNotOrdinaryShoreCandidate} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} rejectedSelectedDirectionPosition={diagnostics.rejectedSelectedDirectionPosition} rejectedLegacyDirectionalFilter={diagnostics.rejectedLegacyDirectionalFilter} rejectedExcludedOrUsed={diagnostics.rejectedExcludedOrUsed} rejectedMissingAreaEntry={diagnostics.rejectedMissingAreaEntry} rejectedMissingImmediateOrdinaryGrassSupport={diagnostics.rejectedMissingImmediateOrdinaryGrassSupport} rejectedUnhandledBranch={diagnostics.rejectedUnhandledBranch} acceptedCandidatePointCount={diagnostics.rawCandidatePointCount} accountedPointCount={diagnostics.accountedPointCount} unaccountedPointCount={diagnostics.unaccountedPointCount} pipelineInvariantValid={diagnostics.pipelineInvariantValid}",
+                this);
+
+            Debug.Log(
+                $"[ShoreSand.DirectionalWideBeach.CandidateSummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} selectedDirection={diagnostics.selectedDirection} rawCandidatePointCount={diagnostics.rawCandidatePointCount} connectedComponentCount={diagnostics.connectedComponentCount} acceptedSegmentCount={diagnostics.acceptedSegmentCount} rejectedTooShort={diagnostics.rejectedTooShort} rejectedBranch={diagnostics.rejectedBranch} rejectedClosedLoop={diagnostics.rejectedClosedLoop} rejectedPathOrder={diagnostics.rejectedPathOrder} rejectedCurvature={diagnostics.rejectedCurvature} rejectedInlandSupport={diagnostics.rejectedInlandSupport} rejectedDirectionalMismatch={diagnostics.rejectedDirectionalMismatch} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDuplicateOrOverlap={diagnostics.rejectedDuplicateOrOverlap} rejectedOther={diagnostics.rejectedUnknown}",
+                this);
+
+            Debug.Log(
+                $"[ShoreSand.DirectionalWideBeach.ConnectivitySummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} candidateCountBeforeEnclosedFilter={diagnostics.candidateCountBeforeEnclosedFilter} candidateCountBeforeEnclosedFilterMeaning=source-rejectedDepthNotZero-rejectedNotOrdinaryShoreCandidate-rejectedExcludedOrUsed-rejectedMissingAreaEntry-rejectedSelectedDirectionPosition-rejectedLegacyDirectionalFilter rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} componentCountCardinalOnly={diagnostics.componentCountCardinalOnly} componentCountWithRestrictedDiagonal={diagnostics.componentCountWithRestrictedDiagonal} longestCardinalComponentLength={diagnostics.longestCardinalComponentLength} longestRestrictedDiagonalComponentLength={diagnostics.longestRestrictedDiagonalComponentLength}",
+                this);
+
+            if (diagnostics.unaccountedPointSamples != null)
+            {
+                for (int i = 0; i < diagnostics.unaccountedPointSamples.Count && i < 10; i++)
+                {
+                    Debug.Log(
+                        $"[ShoreSand.DirectionalWideBeach.UnaccountedPoint] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} {diagnostics.unaccountedPointSamples[i]}",
+                        this);
+                }
+            }
+
+            if (diagnostics.topRejectedSegments == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < diagnostics.topRejectedSegments.Count && i < 5; i++)
+            {
+                DirectionalWideBeachRejectedSegmentInfo info = diagnostics.topRejectedSegments[i];
+                Debug.Log(
+                    $"[ShoreSand.DirectionalWideBeach.RejectedSegment] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} reason={info.reason} length={info.length} start={info.startPoint} end={info.endPoint} curvature={info.curvatureRatio:F3} averageInlandSupport={info.averageInlandSupport} exteriorOceanContactCount={info.exteriorOceanContactCount} branchPointCount={info.branchPointCount} nearEnclosedWaterCount={info.nearEnclosedWaterCount}",
+                    this);
+            }
         }
 
         private ShoreEdgeDirection GetClockwiseDirection(ShoreEdgeDirection direction)
@@ -8943,6 +9720,66 @@ namespace UnderTheStars.GenerationMap
             return yaw;
         }
 
+        [ContextMenu("Clear Generated Map")]
+        public void ClearGeneratedMap()
+        {
+            int generationId = currentGenerateMapDebugId;
+            int shoreSandChildCount = CountChildren(shoreSandParent != null ? shoreSandParent : transform.Find(GeneratedShoreSandRootName));
+            int propsChildCount = CountChildren(FindChildRecursive(paintProp != null ? paintProp.transform : null, GeneratedPropsRootName));
+            int wallColliderChildCount = CountChildren(FindChildRecursive(paintTilemap != null ? paintTilemap.transform : null, GeneratedWallColliderRootName));
+            int deletedRuntimePlayerCount = 0;
+            bool deletedGeneratedShoreSandRoot = false;
+
+            if (Application.isPlaying)
+            {
+                PlayerSpawnManager playerSpawnManager = FindObjectOfType<PlayerSpawnManager>();
+                if (playerSpawnManager != null)
+                {
+                    deletedRuntimePlayerCount = playerSpawnManager.ClearSpawnedPlayers();
+                }
+            }
+
+            if (paintTilemap != null)
+            {
+                paintTilemap.InitClearTile();
+            }
+
+            if (paintProp != null)
+            {
+                paintProp.InitClearProp();
+            }
+
+            deletedGeneratedShoreSandRoot = ClearGeneratedShoreSandInstances();
+
+            floorPoints = null;
+            propsPoints = null;
+            wallColliderPoints = null;
+            generatedShoreSandPoints = null;
+            connectorFloorPoints = null;
+            currentExteriorOceanPoints = null;
+            currentShoreWaterPoints = null;
+            currentShoreLandBounds = null;
+            currentLocalMaximumDepthByPoint = null;
+            currentDirectionalWideBeachDirections = null;
+            currentDirectionalWideBeachBatchId = 0;
+            currentDirectionalWideBeachCallIndex = 0;
+            currentEnclosedWaterPointCount = 0;
+            shoreClassificationDebugBatchCounter = 0;
+            activeRegionLayouts = null;
+            activeRegionColumns = 0;
+            activeRegionRows = 0;
+            player = null;
+            playerSpawnedGenerationId = -1;
+
+            int deletedGeneratedObjectCount = shoreSandChildCount + propsChildCount + wallColliderChildCount + (deletedGeneratedShoreSandRoot ? 1 : 0);
+            Debug.Log(
+                $"[RandomMap.Clear] generationId={generationId} isPlaying={Application.isPlaying} " +
+                $"deletedGeneratedObjectCount={deletedGeneratedObjectCount} " +
+                $"shoreSandDeleted={shoreSandChildCount} propsDeleted={propsChildCount} wallCollidersDeleted={wallColliderChildCount} " +
+                $"deletedGeneratedShoreSandRoot={deletedGeneratedShoreSandRoot} deletedRuntimePlayerCount={deletedRuntimePlayerCount}",
+                this);
+        }
+
         private Transform ResolveGeneratedShoreSandParent()
         {
             if (shoreSandParent != null)
@@ -8963,12 +9800,12 @@ namespace UnderTheStars.GenerationMap
             return shoreSandParent;
         }
 
-        private void ClearGeneratedShoreSandInstances()
+        private bool ClearGeneratedShoreSandInstances()
         {
             Transform parent = shoreSandParent != null ? shoreSandParent : transform.Find(GeneratedShoreSandRootName);
             if (parent == null)
             {
-                return;
+                return false;
             }
 
             for (int i = parent.childCount - 1; i >= 0; i--)
@@ -8983,6 +9820,60 @@ namespace UnderTheStars.GenerationMap
                     DestroyImmediate(child.gameObject);
                 }
             }
+
+            bool shouldDestroyParent = parent.name == GeneratedShoreSandRootName && parent.parent == transform;
+            if (shouldDestroyParent)
+            {
+                if (Application.isPlaying)
+                {
+                    Destroy(parent.gameObject);
+                }
+                else
+                {
+                    DestroyImmediate(parent.gameObject);
+                }
+
+                if (shoreSandParent == parent)
+                {
+                    shoreSandParent = null;
+                }
+            }
+
+            return shouldDestroyParent;
+        }
+
+        private bool IsGenerationStillCurrent(int generationId)
+        {
+            return currentGenerateMapDebugId == generationId;
+        }
+
+        private static int CountChildren(Transform parent)
+        {
+            return parent != null ? parent.childCount : 0;
+        }
+
+        private static Transform FindChildRecursive(Transform root, string targetName)
+        {
+            if (root == null || string.IsNullOrEmpty(targetName))
+            {
+                return null;
+            }
+
+            if (root.name == targetName)
+            {
+                return root;
+            }
+
+            for (int i = 0; i < root.childCount; i++)
+            {
+                Transform match = FindChildRecursive(root.GetChild(i), targetName);
+                if (match != null)
+                {
+                    return match;
+                }
+            }
+
+            return null;
         }
         #endregion
     }
