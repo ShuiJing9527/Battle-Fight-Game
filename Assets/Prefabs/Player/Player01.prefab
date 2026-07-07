@@ -735,6 +735,9 @@ GameObject:
   - component: {fileID: 9102100000000000001}
   - component: {fileID: 6314844839368463526}
   - component: {fileID: 2075970721406039689}
+  - component: {fileID: -7867576579282457241}
+  - component: {fileID: -4643023811783076160}
+  - component: {fileID: -8567865723057192826}
   m_Layer: 0
   m_Name: Player01
   m_TagString: Player
@@ -1652,6 +1655,61 @@ MonoBehaviour:
   groundLayer:
     serializedVersion: 2
     m_Bits: 0
+--- !u!114 &-7867576579282457241
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e460e6726d33df43b1f64f24d871930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSFXByKey
+  flashKey: 113
+  flashSfx: {fileID: 0}
+  dashKey: 101
+  dashSfx: {fileID: 8300000, guid: 4fd6dc6d1229873499e4cf1fe4755ef9, type: 3}
+  skillKey: 114
+  skillSfx: {fileID: 8300000, guid: dda4145e249f9664cb6adc5ad6a95029, type: 3}
+  volume: 1
+--- !u!114 &-4643023811783076160
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e460e6726d33df43b1f64f24d871930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSFXByKey
+  flashKey: 113
+  flashSfx: {fileID: 0}
+  dashKey: 101
+  dashSfx: {fileID: 0}
+  skillKey: 114
+  skillSfx: {fileID: 8300000, guid: 3b56640df2e09a54894e221773facf4e, type: 3}
+  volume: 1
+--- !u!114 &-8567865723057192826
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13e64e5ecb621e847bf1418bdfca965a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthAudioWatcher
+  healthScript: {fileID: 0}
+  healthFieldName: currentHP
+  hitSfx: {fileID: 0}
+  deathSfx: {fileID: 0}
+  volume: 1
 --- !u!1 &8709825368551096566
 GameObject:
   m_ObjectHideFlags: 0

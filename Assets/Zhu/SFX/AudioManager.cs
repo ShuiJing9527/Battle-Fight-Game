@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using System.Collections.Generic;
 
 public class AudioManager : MonoBehaviour
 {
@@ -32,8 +33,20 @@ public class AudioManager : MonoBehaviour
     public string menuSceneName = "StartScene";
     public string gameSceneName = "GameScene";
 
+    [Header("音效限制")]
+    public int maxSfxVoices = 8;
+
+    [Tooltip("同一个音效最短间隔，防止一堆史莱姆同时乱叫")]
+    public float sameClipCooldown = 0.08f;
+
+    [Tooltip("普通音效整体压低，防止盖住BGM")]
+    [Range(0f, 1f)] public float globalSfxLimiter = 0.75f;
+
     private AudioSource bgmSource;
-    private AudioSource sfxSource;
+    private List<AudioSource> sfxSources = new List<AudioSource>();
+    private Dictionary<AudioClip, float> lastClipPlayTime = new Dictionary<AudioClip, float>();
+
+    private int sfxIndex = 0;
 
     private void Awake()
     {
@@ -75,31 +88,38 @@ public class AudioManager : MonoBehaviour
 
     private void InitAudioSources()
     {
-        AudioSource[] sources = GetComponents<AudioSource>();
+        AudioSource[] oldSources = GetComponents<AudioSource>();
 
-        if (sources.Length >= 1)
+        if (oldSources.Length >= 1)
         {
-            bgmSource = sources[0];
+            bgmSource = oldSources[0];
         }
         else
         {
             bgmSource = gameObject.AddComponent<AudioSource>();
         }
 
-        if (sources.Length >= 2)
-        {
-            sfxSource = sources[1];
-        }
-        else
-        {
-            sfxSource = gameObject.AddComponent<AudioSource>();
-        }
-
         bgmSource.playOnAwake = false;
         bgmSource.loop = true;
 
-        sfxSource.playOnAwake = false;
-        sfxSource.loop = false;
+        sfxSources.Clear();
+
+        for (int i = 1; i < oldSources.Length; i++)
+        {
+            sfxSources.Add(oldSources[i]);
+        }
+
+        while (sfxSources.Count < maxSfxVoices)
+        {
+            AudioSource source = gameObject.AddComponent<AudioSource>();
+            sfxSources.Add(source);
+        }
+
+        foreach (AudioSource source in sfxSources)
+        {
+            source.playOnAwake = false;
+            source.loop = false;
+        }
     }
 
     private void LoadVolumeFromGameManager()
@@ -179,8 +199,6 @@ public class AudioManager : MonoBehaviour
         bgmSource.volume = bgmVolume;
         bgmSource.loop = true;
         bgmSource.Play();
-
-        Debug.Log("播放BGM：" + clip.name);
     }
 
     public void StopAllBGM()
@@ -238,12 +256,69 @@ public class AudioManager : MonoBehaviour
     {
         if (clip == null) return;
 
-        if (sfxSource == null)
+        if (sfxSources == null || sfxSources.Count == 0)
         {
             InitAudioSources();
         }
 
-        sfxSource.PlayOneShot(clip, sfxVolume * volumeMultiplier);
+        if (IsSameClipTooSoon(clip))
+        {
+            return;
+        }
+
+        AudioSource source = GetAvailableSfxSource();
+
+        if (source == null)
+        {
+            return;
+        }
+
+        float finalVolume = sfxVolume * volumeMultiplier * globalSfxLimiter;
+        finalVolume = Mathf.Clamp01(finalVolume);
+
+        lastClipPlayTime[clip] = Time.time;
+
+        source.Stop();
+        source.clip = clip;
+        source.volume = finalVolume;
+        source.Play();
+    }
+
+    private bool IsSameClipTooSoon(AudioClip clip)
+    {
+        if (clip == null) return true;
+
+        if (lastClipPlayTime.TryGetValue(clip, out float lastTime))
+        {
+            if (Time.time - lastTime < sameClipCooldown)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private AudioSource GetAvailableSfxSource()
+    {
+        for (int i = 0; i < sfxSources.Count; i++)
+        {
+            AudioSource source = sfxSources[i];
+
+            if (source != null && !source.isPlaying)
+            {
+                return source;
+            }
+        }
+
+        sfxIndex++;
+
+        if (sfxIndex >= sfxSources.Count)
+        {
+            sfxIndex = 0;
+        }
+
+        return sfxSources[sfxIndex];
     }
 
     public void PlayPlayerAttack()
@@ -253,7 +328,7 @@ public class AudioManager : MonoBehaviour
 
     public void PlayEnemyAttack()
     {
-        PlaySFX(enemyAttackSfx);
+        PlaySFX(enemyAttackSfx, 0.7f);
     }
 
     public void PlayPlayerHit()
@@ -263,7 +338,7 @@ public class AudioManager : MonoBehaviour
 
     public void PlayEnemyHit()
     {
-        PlaySFX(enemyHitSfx);
+        PlaySFX(enemyHitSfx, 0.6f);
     }
 
     public void PlayPlayerDeath()
@@ -273,7 +348,7 @@ public class AudioManager : MonoBehaviour
 
     public void PlayEnemyDeath()
     {
-        PlaySFX(enemyDeathSfx);
+        PlaySFX(enemyDeathSfx, 0.7f);
     }
 
     public void PlayButtonClick()

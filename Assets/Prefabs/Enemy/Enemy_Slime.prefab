@@ -111,6 +111,8 @@ GameObject:
   - component: {fileID: 7001000000000000001}
   - component: {fileID: -1639656773854988091}
   - component: {fileID: -3701539833070586107}
+  - component: {fileID: -4093800141867408178}
+  - component: {fileID: 8611158825158774867}
   m_Layer: 0
   m_Name: Enemy_Slime
   m_TagString: Untagged
@@ -244,10 +246,17 @@ MonoBehaviour:
   groundedProbeDistance: 0.2
   maxVerticalAttackDifference: 0.75
   maxHorizontalAttackDistance: 1.35
+  groundedAttackGraceTime: 0
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugAttackDiagnostics: 0
   debugSpeedDiagnostics: 0
+  debugChaseDiagnostics: 1
+  debugAttackStateTransitions: 0
+  debugSlimeAttackLogs: 0
+  debugAttackLogInterval: 0.3
   debugSpeedLogInterval: 1
+  targetResolveRetryInterval: 0.25
 --- !u!114 &2725362885038075655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -321,10 +330,14 @@ MonoBehaviour:
   growthPoint5Weight: 1
   extraSoulDropChancePerLuck: 0.01
   maxExtraSoulDropChance: 0.5
-  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
+  runePickupPrefab: {fileID: 0}
   runeDropYOffset: 0.25
   extraRuneDropChancePerLuck: 0.005
   maxExtraRuneDropChance: 0.3
+  highRuneDropTestMode: 1
+  normalRuneDropRateMultiplier: 0.25
+  debugLuckDropLog: 0
+  debugRuneDropDiagLog: 1
 --- !u!114 &5420526972999163506
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -340,6 +353,7 @@ MonoBehaviour:
   species: 0
   rank: 0
   attackStyle: 0
+  suppressRuneDrop: 0
 --- !u!114 &1144444444444444441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -487,3 +501,46 @@ MonoBehaviour:
   delayBeforeDestroy: 0
   includeRendererRoots: []
   excludeRendererRoots: []
+--- !u!114 &-4093800141867408178
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56f5fa6a33375474db32bdf0e6fddc6a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeMoveSFX
+  moveSfx:
+  - {fileID: 8300000, guid: 2839060380126f14bbac0ec9c437c4d6, type: 3}
+  rb: {fileID: 7990415199108324068}
+  minMoveSpeed: 0.1
+  soundInterval: 0.45
+  volume: 0.7
+--- !u!114 &8611158825158774867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7c5aeaf494db384a901d2c322c383b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeJumpAttackSFX
+  rb: {fileID: 7990415199108324068}
+  playerTag: Player
+  detectPlayerDistance: 2
+  jumpVelocityThreshold: 2
+  jumpSfx: {fileID: 0}
+  landSfx: {fileID: 8300000, guid: 064c65941bacb944b9a5b87ec6ebaa61, type: 3}
+  volume: 0.8
+  jumpCooldown: 0.8
+  groundCheck: {fileID: 0}
+  groundCheckRadius: 0.25
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 0

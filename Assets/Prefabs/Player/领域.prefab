@@ -124,7 +124,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d10864ca5ad23044a9c9364857d5a888, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
-  appearSfx: {fileID: 0}
+  appearSfx: {fileID: 8300000, guid: b55abca4d2e48d944be96044fb6b4a87, type: 3}
   hitSfx: {fileID: 0}
   hitTags: []
   volume: 1
