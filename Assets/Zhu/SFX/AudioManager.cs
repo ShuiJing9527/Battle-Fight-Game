@@ -24,9 +24,9 @@ public class AudioManager : MonoBehaviour
     public AudioClip openPanelSfx;
     public AudioClip closePanelSfx;
 
-    [Header("默认音量")]
-    [Range(0f, 1f)] public float defaultBgmVolume = 0.5f;
-    [Range(0f, 1f)] public float defaultSfxVolume = 0.8f;
+    [Header("音量")]
+    [Range(0f, 1f)] public float bgmVolume = 0.5f;
+    [Range(0f, 1f)] public float sfxVolume = 0.8f;
 
     [Header("场景名称设置")]
     public string menuSceneName = "StartScene";
@@ -47,6 +47,8 @@ public class AudioManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
 
         InitAudioSources();
+        LoadVolumeFromGameManager();
+        ApplyVolume();
     }
 
     private void OnEnable()
@@ -66,6 +68,8 @@ public class AudioManager : MonoBehaviour
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        LoadVolumeFromGameManager();
+        ApplyVolume();
         PlayBGMBySceneName(scene.name);
     }
 
@@ -98,19 +102,30 @@ public class AudioManager : MonoBehaviour
         sfxSource.loop = false;
     }
 
-    private float GetMusicVolume()
+    private void LoadVolumeFromGameManager()
     {
-        if (GameManager.Instance != null && GameManager.Instance.settings != null)
-        {
-            return GameManager.Instance.settings.musicVolume;
-        }
+        if (GameManager.Instance == null || GameManager.Instance.settings == null)
+            return;
 
-        return defaultBgmVolume;
+        bgmVolume = Mathf.Clamp01(GameManager.Instance.settings.musicVolume);
+        sfxVolume = Mathf.Clamp01(GameManager.Instance.settings.sfxVolume);
     }
 
-    private float GetSfxVolume()
+    private void SaveVolumeToGameManager()
     {
-        return defaultSfxVolume;
+        if (GameManager.Instance == null || GameManager.Instance.settings == null)
+            return;
+
+        GameManager.Instance.settings.musicVolume = bgmVolume;
+        GameManager.Instance.settings.sfxVolume = sfxVolume;
+    }
+
+    private void ApplyVolume()
+    {
+        if (bgmSource != null)
+        {
+            bgmSource.volume = bgmVolume;
+        }
     }
 
     private void PlayBGMByCurrentScene()
@@ -121,8 +136,6 @@ public class AudioManager : MonoBehaviour
 
     private void PlayBGMBySceneName(string sceneName)
     {
-        Debug.Log("当前场景：" + sceneName);
-
         if (sceneName == menuSceneName)
         {
             PlayMenuBGM();
@@ -130,11 +143,6 @@ public class AudioManager : MonoBehaviour
         else if (sceneName == gameSceneName)
         {
             PlayGameBGM();
-        }
-        else
-        {
-            // 其他场景默认继续播放当前音乐
-            // 如果你想失败/胜利界面停音乐，可以改成 StopAllBGM();
         }
     }
 
@@ -152,7 +160,7 @@ public class AudioManager : MonoBehaviour
     {
         if (clip == null)
         {
-            Debug.LogWarning("BGM 音频没有拖进去");
+            Debug.LogWarning("BGM 没有拖进去");
             return;
         }
 
@@ -163,11 +171,12 @@ public class AudioManager : MonoBehaviour
 
         if (bgmSource.clip == clip && bgmSource.isPlaying)
         {
+            bgmSource.volume = bgmVolume;
             return;
         }
 
         bgmSource.clip = clip;
-        bgmSource.volume = GetMusicVolume();
+        bgmSource.volume = bgmVolume;
         bgmSource.loop = true;
         bgmSource.Play();
 
@@ -184,10 +193,40 @@ public class AudioManager : MonoBehaviour
 
     public void SetBgmVolume(float volume)
     {
+        bgmVolume = Mathf.Clamp01(volume);
+
         if (bgmSource != null)
         {
-            bgmSource.volume = volume;
+            bgmSource.volume = bgmVolume;
         }
+
+        SaveVolumeToGameManager();
+    }
+
+    public void SetMusicVolume(float volume)
+    {
+        SetBgmVolume(volume);
+    }
+
+    public void SetSfxVolume(float volume)
+    {
+        sfxVolume = Mathf.Clamp01(volume);
+        SaveVolumeToGameManager();
+    }
+
+    public void SetSoundVolume(float volume)
+    {
+        SetSfxVolume(volume);
+    }
+
+    public float GetBgmVolume()
+    {
+        return bgmVolume;
+    }
+
+    public float GetSfxVolume()
+    {
+        return sfxVolume;
     }
 
     public void PlaySFX(AudioClip clip)
@@ -204,7 +243,7 @@ public class AudioManager : MonoBehaviour
             InitAudioSources();
         }
 
-        sfxSource.PlayOneShot(clip, GetSfxVolume() * volumeMultiplier);
+        sfxSource.PlayOneShot(clip, sfxVolume * volumeMultiplier);
     }
 
     public void PlayPlayerAttack()

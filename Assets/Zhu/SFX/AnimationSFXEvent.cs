@@ -4,8 +4,9 @@ public class AnimationSFXEvent : MonoBehaviour
 {
     [Header("动画音效")]
     public AudioClip attackSfx;
-    public AudioClip footstepSfx;
+    public AudioClip skillSfx;
     public AudioClip specialSfx;
+    public AudioClip footstepSfx;
 
     [Header("音量")]
     [Range(0f, 1f)] public float volume = 1f;
@@ -15,13 +16,18 @@ public class AnimationSFXEvent : MonoBehaviour
         AudioManager.Instance?.PlaySFX(attackSfx, volume);
     }
 
-    public void PlayFootstepSFX()
+    public void PlaySkillSFX()
     {
-        AudioManager.Instance?.PlaySFX(footstepSfx, volume);
+        AudioManager.Instance?.PlaySFX(skillSfx, volume);
     }
 
     public void PlaySpecialSFX()
     {
         AudioManager.Instance?.PlaySFX(specialSfx, volume);
+    }
+
+    public void PlayFootstepSFX()
+    {
+        AudioManager.Instance?.PlaySFX(footstepSfx, volume);
     }
 }

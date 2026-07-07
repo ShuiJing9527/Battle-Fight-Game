@@ -734,6 +734,7 @@ GameObject:
   - component: {fileID: 2817237619367692519}
   - component: {fileID: 9102100000000000001}
   - component: {fileID: 6314844839368463526}
+  - component: {fileID: 2075970721406039689}
   m_Layer: 0
   m_Name: Player01
   m_TagString: Player
@@ -1626,6 +1627,31 @@ MonoBehaviour:
   returnDuration: 0.1
   useLocalSpace: 1
   debugLog: 1
+--- !u!114 &2075970721406039689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 628590361b3628240ab676150538b4b0, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FootstepAudio
+  footstepSfx:
+  - {fileID: 8300000, guid: 482d63937299cad47b2c46f0c947a2e6, type: 3}
+  - {fileID: 8300000, guid: ca2ed351b14771f4b900f229556afd35, type: 3}
+  rb: {fileID: 0}
+  minMoveSpeed: 0.1
+  stepInterval: 0.35
+  volume: 0.7
+  playInAir: 0
+  groundCheck: {fileID: 0}
+  groundCheckRadius: 0.15
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
 --- !u!1 &8709825368551096566
 GameObject:
   m_ObjectHideFlags: 0

@@ -3,7 +3,7 @@ using System.Reflection;
 
 public class HealthAudioWatcher : MonoBehaviour
 {
-    [Header("血量脚本，不填就自动找")]
+    [Header("血量脚本，不填就自动找自己身上的脚本")]
     public MonoBehaviour healthScript;
 
     [Header("血量变量名")]
@@ -18,7 +18,7 @@ public class HealthAudioWatcher : MonoBehaviour
     [Header("音量")]
     [Range(0f, 1f)] public float volume = 1f;
 
-    private int lastHealth;
+    private float lastHealth;
     private bool initialized = false;
     private bool dead = false;
 
@@ -44,7 +44,7 @@ public class HealthAudioWatcher : MonoBehaviour
     {
         if (!initialized || healthScript == null) return;
 
-        int currentHealth = GetHealthValue();
+        float currentHealth = GetHealthValue();
 
         if (currentHealth < lastHealth)
         {
@@ -87,10 +87,12 @@ public class HealthAudioWatcher : MonoBehaviour
             BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance
         );
 
-        return field != null && field.FieldType == typeof(int);
+        if (field == null) return false;
+
+        return field.FieldType == typeof(int) || field.FieldType == typeof(float);
     }
 
-    private int GetHealthValue()
+    private float GetHealthValue()
     {
         if (healthScript == null) return lastHealth;
 
@@ -112,7 +114,12 @@ public class HealthAudioWatcher : MonoBehaviour
             return intValue;
         }
 
-        Debug.LogWarning(gameObject.name + " 的血量变量不是 int 类型：" + healthFieldName);
+        if (value is float floatValue)
+        {
+            return floatValue;
+        }
+
+        Debug.LogWarning(gameObject.name + " 的血量变量不是 int 或 float 类型：" + healthFieldName);
         return lastHealth;
     }
 

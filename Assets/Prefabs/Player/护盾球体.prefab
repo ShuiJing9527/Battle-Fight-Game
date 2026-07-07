@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 1731267186311707204}
   - component: {fileID: 2162444456657855262}
   - component: {fileID: 1937898275402062360}
+  - component: {fileID: -939776382300334485}
   m_Layer: 0
   m_Name: "\u62A4\u76FE\u7403\u4F53"
   m_TagString: Untagged
@@ -126,4 +127,21 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
   appearSfx: {fileID: 8300000, guid: 0fc84851de37e3a418b54e5cf46b7dd7, type: 3}
   hitSfx: {fileID: 0}
+  hitTags: []
+  volume: 1
+--- !u!114 &-939776382300334485
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7457087479993937334}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d10864ca5ad23044a9c9364857d5a888, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
+  appearSfx: {fileID: 8300000, guid: 0fc84851de37e3a418b54e5cf46b7dd7, type: 3}
+  hitSfx: {fileID: 0}
+  hitTags: []
   volume: 1
