@@ -101,6 +101,8 @@ namespace UnderTheStars.GenerationMap
         private HashSet<Vector2Int>[,] propsPoints;// Prop points
         private HashSet<Vector2Int> wallColliderPoints;// Wall collider points
         private HashSet<Vector2Int> generatedShoreSandPoints;// Shore sand points
+        private HashSet<Vector2Int> finalBeachPoints;
+        private HashSet<Vector2Int> finalCoastTransitionPoints;
         private HashSet<Vector2Int> connectorFloorPoints;// Protected connector points
         private HashSet<Vector2Int> currentExteriorOceanPoints;
         private HashSet<Vector2Int> currentShoreWaterPoints;
@@ -561,7 +563,7 @@ namespace UnderTheStars.GenerationMap
             }
 
             Dictionary<Vector2Int, AreaType> pointAreaTypes = BuildPointAreaTypes();
-            paintProp.SpawnProps(floorPoints, refTilemap, pointAreaTypes);
+            paintProp.SpawnProps(floorPoints, refTilemap, pointAreaTypes, this);
         }
 
         private Dictionary<Vector2Int, AreaType> BuildPointAreaTypes()
@@ -2961,6 +2963,8 @@ namespace UnderTheStars.GenerationMap
             wallColliderPoints = null;
             LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(InitMapData));
             generatedShoreSandPoints = null;
+            finalBeachPoints = null;
+            finalCoastTransitionPoints = null;
             LogMapDataMutation(nameof(connectorFloorPoints), connectorFloorPoints != null ? connectorFloorPoints.Count : 0, 0, nameof(InitMapData));
             connectorFloorPoints = new HashSet<Vector2Int>();
             LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(InitMapData));
@@ -3477,6 +3481,8 @@ namespace UnderTheStars.GenerationMap
 
             LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             generatedShoreSandPoints = null;
+            finalBeachPoints = null;
+            finalCoastTransitionPoints = null;
             ClearGeneratedShoreSandInstances();
             LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(GenerateShoreSandAsync));
             currentExteriorOceanPoints = null;
@@ -3691,6 +3697,8 @@ namespace UnderTheStars.GenerationMap
             Transform parent = ResolveGeneratedShoreSandParent();
             int previousGeneratedShoreCount = generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0;
             generatedShoreSandPoints = new HashSet<Vector2Int>(placements.Count);
+            finalBeachPoints = new HashSet<Vector2Int>(placements.Count);
+            finalCoastTransitionPoints = new HashSet<Vector2Int>(placements.Count);
             LogMapDataMutation(nameof(generatedShoreSandPoints), previousGeneratedShoreCount, generatedShoreSandPoints.Count, nameof(GenerateShoreSandAsync));
 
             for (int i = 0; i < placements.Count; i++)
@@ -3728,6 +3736,7 @@ namespace UnderTheStars.GenerationMap
                 GameObject instance = Instantiate(prefab, worldPosition, finalRotation, parent);
                 ApplyShoreSandDebugName(instance, placements[i], point);
                 TraceFinalShoreSandInstantiation(point, placements[i], prefab, finalYaw, instance);
+                finalBeachPoints.Add(point);
                 if (placements[i].marksAsBeach)
                 {
                     if (!placements[i].replacesGrassTile &&
@@ -3746,6 +3755,11 @@ namespace UnderTheStars.GenerationMap
                             worldPosition,
                             previousClassificationBeforeInstantiation);
                     }
+                }
+
+                if (IsOceanTransitionPlacement(placements[i]))
+                {
+                    finalCoastTransitionPoints.Add(point);
                 }
 
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
@@ -3769,6 +3783,16 @@ namespace UnderTheStars.GenerationMap
             return shoreSandNormalPrefab != null &&
                    shoreSandOceanTransitionPrefab != null &&
                    shoreSandGrassTransitionPrefab != null;
+        }
+
+        public bool IsFinalBeachPoint(Vector2Int point)
+        {
+            return finalBeachPoints != null && finalBeachPoints.Contains(point);
+        }
+
+        public bool IsFinalCoastTransitionPoint(Vector2Int point)
+        {
+            return finalCoastTransitionPoints != null && finalCoastTransitionPoints.Contains(point);
         }
 
         private HashSet<Vector2Int> CollectExteriorOceanPoints(HashSet<Vector2Int> allLandPoints)
@@ -10794,6 +10818,8 @@ namespace UnderTheStars.GenerationMap
             wallColliderPoints = null;
             LogMapDataMutation(nameof(generatedShoreSandPoints), generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             generatedShoreSandPoints = null;
+            finalBeachPoints = null;
+            finalCoastTransitionPoints = null;
             LogMapDataMutation(nameof(connectorFloorPoints), connectorFloorPoints != null ? connectorFloorPoints.Count : 0, 0, nameof(ClearGeneratedMap));
             connectorFloorPoints = null;
             LogMapDataMutation(nameof(currentExteriorOceanPoints), currentExteriorOceanPoints != null ? currentExteriorOceanPoints.Count : 0, 0, nameof(ClearGeneratedMap));

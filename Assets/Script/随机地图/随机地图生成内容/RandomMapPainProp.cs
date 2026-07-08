@@ -82,6 +82,7 @@ namespace UnderTheStars.GenerationMap
         [Header("Spawn Rules")]
         [SerializeField] private List<PropSpawnRule> spawnRules = new List<PropSpawnRule>();
         [SerializeField] private List<PropGroupRule> groupRules = new List<PropGroupRule>();
+        [SerializeField] private List<PropSpawnRule> beachSpawnRules = new List<PropSpawnRule>();
 
         [Header("Container")]
         [SerializeField] private string propsRootName = "PropsRoot";
@@ -131,9 +132,13 @@ namespace UnderTheStars.GenerationMap
             }
         }
 
-        internal void SpawnProps(HashSet<Vector2Int>[,] floorPoints, Tilemap referenceTilemap, Dictionary<Vector2Int, AreaType> areaTypeByPoint)
+        internal void SpawnProps(
+            HashSet<Vector2Int>[,] floorPoints,
+            Tilemap referenceTilemap,
+            Dictionary<Vector2Int, AreaType> areaTypeByPoint,
+            RandomMapGeneration mapGeneration)
         {
-            if (floorPoints == null || referenceTilemap == null || spawnRules == null || spawnRules.Count == 0)
+            if (floorPoints == null || referenceTilemap == null || !HasAnySpawnRules())
             {
                 return;
             }
@@ -147,6 +152,12 @@ namespace UnderTheStars.GenerationMap
             }
 
             Shuffle(allFloorPoints);
+            List<SpawnPoint> ordinaryFloorPoints = FilterSpawnPoints(
+                allFloorPoints,
+                point => IsOrdinaryPropSpawnPoint(point, mapGeneration));
+            List<SpawnPoint> beachFloorPoints = FilterSpawnPoints(
+                allFloorPoints,
+                point => IsBeachPropSpawnPoint(point, mapGeneration));
 
             List<SpawnedPropRecord> spawnedRecords = new List<SpawnedPropRecord>();
             SpatialSpawnIndex spawnIndex = new SpatialSpawnIndex(minDistanceGridCellSize);
@@ -157,9 +168,31 @@ namespace UnderTheStars.GenerationMap
             List<PropSpawnRule> singleRules = new List<PropSpawnRule>();
             SplitRules(clusterRules, singleRules);
 
-            SpawnGroups(groupRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex);
-            SpawnClusters(clusterRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
-            SpawnSingles(singleRules, allFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
+            SpawnGroups(groupRules, ordinaryFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex);
+            SpawnClusters(clusterRules, ordinaryFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
+            SpawnSingles(singleRules, ordinaryFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
+
+            if (beachSpawnRules != null && beachSpawnRules.Count > 0 && beachFloorPoints.Count > 0)
+            {
+                List<PropSpawnRule> beachSingleRules = new List<PropSpawnRule>();
+                for (int i = 0; i < beachSpawnRules.Count; i++)
+                {
+                    PropSpawnRule rule = beachSpawnRules[i];
+                    if (rule != null && rule.spawnMode != SpawnMode.Cluster)
+                    {
+                        beachSingleRules.Add(rule);
+                    }
+                }
+
+                SpawnSingles(beachSingleRules, beachFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
+            }
+        }
+
+        private bool HasAnySpawnRules()
+        {
+            return (spawnRules != null && spawnRules.Count > 0)
+                || (groupRules != null && groupRules.Count > 0)
+                || (beachSpawnRules != null && beachSpawnRules.Count > 0);
         }
 
         private void SpawnGroups(
@@ -560,6 +593,66 @@ namespace UnderTheStars.GenerationMap
             }
 
             return lookup;
+        }
+
+        private static List<SpawnPoint> FilterSpawnPoints(List<SpawnPoint> points, Predicate<SpawnPoint> predicate)
+        {
+            if (points == null || points.Count == 0 || predicate == null)
+            {
+                return new List<SpawnPoint>();
+            }
+
+            List<SpawnPoint> result = new List<SpawnPoint>(points.Count);
+            for (int i = 0; i < points.Count; i++)
+            {
+                SpawnPoint point = points[i];
+                if (predicate(point))
+                {
+                    result.Add(point);
+                }
+            }
+
+            return result;
+        }
+
+        private static bool IsOrdinaryPropSpawnAreaType(AreaType areaType)
+        {
+            return areaType == AreaType.Grass
+                || areaType == AreaType.Forest;
+        }
+
+        private static bool IsOrdinaryPropSpawnPoint(SpawnPoint spawnPoint, RandomMapGeneration mapGeneration)
+        {
+            if (!IsOrdinaryPropSpawnAreaType(spawnPoint.areaType))
+            {
+                return false;
+            }
+
+            if (mapGeneration != null)
+            {
+                if (mapGeneration.IsFinalBeachPoint(spawnPoint.point))
+                {
+                    return false;
+                }
+
+                if (mapGeneration.IsFinalCoastTransitionPoint(spawnPoint.point))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool IsBeachPropSpawnPoint(SpawnPoint spawnPoint, RandomMapGeneration mapGeneration)
+        {
+            if (mapGeneration != null)
+            {
+                return mapGeneration.IsFinalBeachPoint(spawnPoint.point)
+                    && !mapGeneration.IsFinalCoastTransitionPoint(spawnPoint.point);
+            }
+
+            return spawnPoint.areaType == AreaType.Beach;
         }
 
         private void FillCandidateRules(
