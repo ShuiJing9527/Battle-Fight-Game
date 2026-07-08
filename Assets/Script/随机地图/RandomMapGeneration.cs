@@ -3302,7 +3302,7 @@ namespace UnderTheStars.GenerationMap
                 for (int y = 0; y < floorPoints.GetLength(1); y++)
                 {
                     HashSet<Vector2Int> regionPointSet = floorPoints[x, y];
-                    if (regionPointSet == null || ResolveRegionAreaType(x, y) != AreaType.Grass)
+                    if (regionPointSet == null || !IsBaseLandAreaType(ResolveRegionAreaType(x, y)))
                     {
                         continue;
                     }
@@ -3704,7 +3704,8 @@ namespace UnderTheStars.GenerationMap
                 if (placements[i].replacesGrassTile)
                 {
                     string previousClassification = ResolvePointClassificationLabel(point, areaByPoint);
-                    if (previousClassification == AreaType.Grass.ToString())
+                    if (areaByPoint.TryGetValue(point, out AreaType previousAreaType) &&
+                        IsBaseLandAreaType(previousAreaType))
                     {
                         LogGrassChangedToShore(point, previousClassification, AreaType.Beach.ToString(), nameof(GenerateShoreSandAsync));
                     }
@@ -3729,7 +3730,9 @@ namespace UnderTheStars.GenerationMap
                 TraceFinalShoreSandInstantiation(point, placements[i], prefab, finalYaw, instance);
                 if (placements[i].marksAsBeach)
                 {
-                    if (previousClassificationBeforeInstantiation == AreaType.Grass.ToString() && !placements[i].replacesGrassTile)
+                    if (!placements[i].replacesGrassTile &&
+                        areaByPoint.TryGetValue(point, out AreaType previousAreaTypeBeforeInstantiation) &&
+                        IsBaseLandAreaType(previousAreaTypeBeforeInstantiation))
                     {
                         LogGrassChangedToShore(point, previousClassificationBeforeInstantiation, AreaType.Beach.ToString(), nameof(GenerateShoreSandAsync));
                     }
@@ -8454,7 +8457,7 @@ namespace UnderTheStars.GenerationMap
             {
                 if (!shorePoints.Contains(point) &&
                     areaByPoint.TryGetValue(point, out AreaType areaType) &&
-                    areaType == AreaType.Grass)
+                    IsBaseLandAreaType(areaType))
                 {
                     grassPoints.Add(point);
                 }
@@ -9790,7 +9793,7 @@ namespace UnderTheStars.GenerationMap
                              allLandPoints.Contains(neighborPoint) &&
                              areaByPoint != null &&
                              areaByPoint.TryGetValue(neighborPoint, out AreaType areaType) &&
-                             areaType == AreaType.Grass;
+                             IsBaseLandAreaType(areaType);
             bool occupiedByShore = shorePoints != null && shorePoints.Contains(neighborPoint);
             bool ordinaryGrass = IsOrdinaryGrassNeighbor(neighborPoint, allLandPoints, areaByPoint, shorePoints);
             bool ocean = currentShoreWaterPoints != null && currentShoreWaterPoints.Contains(neighborPoint);
@@ -9847,7 +9850,7 @@ namespace UnderTheStars.GenerationMap
             return allLandPoints.Contains(point) &&
                    !finalShoreSandPoints.Contains(point) &&
                    areaByPoint.TryGetValue(point, out AreaType areaType) &&
-                   areaType == AreaType.Grass;
+                   IsBaseLandAreaType(areaType);
         }
 
         private bool TryResolveOceanInnerCornerFromGeometry(
@@ -10046,7 +10049,7 @@ namespace UnderTheStars.GenerationMap
             return allLandPoints.Contains(point) &&
                    !finalShoreSandPoints.Contains(point) &&
                    areaByPoint.TryGetValue(point, out AreaType areaType) &&
-                   areaType == AreaType.Grass;
+                   IsBaseLandAreaType(areaType);
         }
 
         private static bool TryGetAdjacentDirectionPair(
@@ -10435,6 +10438,13 @@ namespace UnderTheStars.GenerationMap
             return placement.usesGrassTransitionDirectionMapping;
         }
 
+        private static bool IsBaseLandAreaType(AreaType areaType)
+        {
+            return areaType == AreaType.Grass ||
+                   areaType == AreaType.Forest ||
+                   areaType == AreaType.Rock;
+        }
+
         private static bool IsGrassLandPoint(
             Vector2Int point,
             HashSet<Vector2Int> allLandPoints,
@@ -10442,7 +10452,7 @@ namespace UnderTheStars.GenerationMap
         {
             return allLandPoints.Contains(point) &&
                    areaByPoint.TryGetValue(point, out AreaType areaType) &&
-                   areaType == AreaType.Grass;
+                   IsBaseLandAreaType(areaType);
         }
 
         private static bool TryGetSingleSeaEdgeDirection(
