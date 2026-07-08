@@ -9,6 +9,7 @@ public class EnemyController : MonoBehaviour
     private const float BossProjectileScale = 0.45f;
     private const float NormalProjectileScale = 0.28f;
     private const float EdgeDistanceEpsilon = 0.02f;
+    private const string DefaultProjectilePrefabResourcePath = "Prefabs/Enemy/BossProjectile";
 
     [Header("Target")]
     [SerializeField] private Transform playerTarget;
@@ -34,6 +35,7 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float attackDamage = 3f;
     [SerializeField] private MonsterAttackStyle attackStyle = MonsterAttackStyle.Melee;
     [SerializeField] private float projectileSpeed = 8f;
+    [SerializeField] private GameObject projectilePrefab;
     [SerializeField] private float attackIntervalMultiplier = 1f;
     [SerializeField] private float outgoingDamageMultiplier = 1f;
     [SerializeField] private float meleeHitAngle = 100f;
@@ -77,6 +79,7 @@ public class EnemyController : MonoBehaviour
     private float nextChaseDiagnosticTime;
     private float nextTargetResolveTime;
     private Collider[] separationHits;
+    private static GameObject cachedDefaultProjectilePrefab;
     private float lastAttackTime = -1f;
     private float lastGroundedTime = float.NegativeInfinity;
     private EnemyAttackRuntimeState lastLoggedAttackState = EnemyAttackRuntimeState.None;
@@ -153,11 +156,14 @@ public class EnemyController : MonoBehaviour
         float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
         float verticalDifference = Mathf.Abs(playerTarget.position.y - transform.position.y);
         float horizontalEdgeDistance = ResolveHorizontalEdgeDistance(playerTarget, out Vector3 enemyClosestPoint, out Vector3 playerClosestPoint);
-        float attackDistance = UsesProjectileAttack() ? horizontalCenterDistance : horizontalEdgeDistance;
+        float attackDistance = ResolveAttackDistance(horizontalCenterDistance, horizontalEdgeDistance);
         float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
         bool grounded = IsGroundedForAttack();
         string attackFailReason = EvaluateAttackFailReason(attackDistance, verticalDifference, grounded);
         bool canAttack = string.IsNullOrEmpty(attackFailReason);
+        bool isAttackAnimationActive = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
+        bool hasPhysicalContact = horizontalEdgeDistance <= EdgeDistanceEpsilon;
+        bool insideStopDistance = horizontalEdgeDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon;
         LogRuntimeAttackConfigOnce();
         LogAttackDiagnostics(
             statsSpeed,
@@ -186,7 +192,7 @@ public class EnemyController : MonoBehaviour
         }
 
         // 攻击动作进行中时，原地停住并保持当前朝向，等待攻击回调结算。
-        if (attackInProgress)
+        if (isAttackAnimationActive)
         {
             rb.linearVelocity = Vector3.zero;
             LogChaseDiagnostics(attackDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", "AttackInProgress");
@@ -208,7 +214,7 @@ public class EnemyController : MonoBehaviour
         }
 
         // Hold position inside stop distance to avoid face-hug jitter and constant pushing.
-        if (attackDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon || centerDistance < MovementZeroEpsilon)
+        if (hasPhysicalContact || insideStopDistance || centerDistance < MovementZeroEpsilon)
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
@@ -220,7 +226,7 @@ public class EnemyController : MonoBehaviour
                 verticalDifference,
                 grounded,
                 false,
-                "StopDistance",
+                hasPhysicalContact ? "PhysicalContact" : "StopDistance",
                 enemyClosestPoint,
                 playerClosestPoint);
             if (keepFlatRotation)
@@ -476,7 +482,10 @@ public class EnemyController : MonoBehaviour
         toTarget.y = 0f;
         if (UsesProjectileAttack())
         {
-            if (toTarget.sqrMagnitude > attackHitRange * attackHitRange)
+            float projectileCenterDistance = toTarget.magnitude;
+            float projectileEdgeDistance = ResolveHorizontalEdgeDistance(hitTarget, out _, out _);
+            float projectileAttackDistance = ResolveAttackDistance(projectileCenterDistance, projectileEdgeDistance);
+            if (projectileAttackDistance > attackHitRange)
             {
                 if (debugAttackDiagnostics)
                 {
@@ -712,6 +721,16 @@ public class EnemyController : MonoBehaviour
         Vector3 flatPlayerPoint = playerClosest;
         flatPlayerPoint.y = 0f;
         return Vector3.Distance(flatEnemyPoint, flatPlayerPoint);
+    }
+
+    private float ResolveAttackDistance(float horizontalCenterDistance, float horizontalEdgeDistance)
+    {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            return horizontalEdgeDistance;
+        }
+
+        return UsesProjectileAttack() ? horizontalCenterDistance : horizontalEdgeDistance;
     }
 
     private Collider ResolvePlayerCollider(Transform hitTarget)
@@ -1223,23 +1242,64 @@ public class EnemyController : MonoBehaviour
         BattleDamageType damageType = ResolvePrimaryDamageType();
 
         // 投射物出生点维持在角色前上方，避免和本体碰撞体重叠。
-        GameObject projectile = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        GameObject projectile = CreateProjectileObject();
         projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Element Projectile" : "Monster Projectile";
         projectile.transform.position = transform.position + Vector3.up * ProjectileSpawnHeightOffset + direction.normalized * ProjectileSpawnForwardOffset;
         projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? BossProjectileScale : NormalProjectileScale);
 
         Collider projectileCollider = projectile.GetComponent<Collider>();
+        if (projectileCollider == null)
+        {
+            projectileCollider = projectile.AddComponent<SphereCollider>();
+        }
         projectileCollider.isTrigger = true;
 
-        Rigidbody projectileBody = projectile.AddComponent<Rigidbody>();
+        Rigidbody projectileBody = projectile.GetComponent<Rigidbody>();
+        if (projectileBody == null)
+        {
+            projectileBody = projectile.AddComponent<Rigidbody>();
+        }
         projectileBody.isKinematic = true;
 
-        MonsterProjectile monsterProjectile = projectile.AddComponent<MonsterProjectile>();
+        MonsterProjectile monsterProjectile = projectile.GetComponent<MonsterProjectile>();
+        if (monsterProjectile == null)
+        {
+            monsterProjectile = projectile.AddComponent<MonsterProjectile>();
+        }
         monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(damageType), damageType, gameObject);
 
-        Renderer renderer = projectile.GetComponent<Renderer>();
-        renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
-        renderer.material.color = ResolveProjectileColor(damageType);
+        Renderer renderer = projectile.GetComponentInChildren<Renderer>();
+        if (renderer != null)
+        {
+            renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            renderer.material.color = ResolveProjectileColor(damageType);
+        }
+    }
+
+    private GameObject CreateProjectileObject()
+    {
+        GameObject prefab = ResolveProjectilePrefab();
+        if (prefab != null)
+        {
+            return Instantiate(prefab);
+        }
+
+        return GameObject.CreatePrimitive(PrimitiveType.Sphere);
+    }
+
+    private GameObject ResolveProjectilePrefab()
+    {
+        if (projectilePrefab != null)
+        {
+            return projectilePrefab;
+        }
+
+        if (cachedDefaultProjectilePrefab == null)
+        {
+            cachedDefaultProjectilePrefab = Resources.Load<GameObject>(DefaultProjectilePrefabResourcePath);
+        }
+
+        return cachedDefaultProjectilePrefab;
     }
 
     private Color ResolveProjectileColor(BattleDamageType damageType)

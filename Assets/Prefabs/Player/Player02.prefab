@@ -502,10 +502,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 4.5
+  moveSpeed: 4.8
   playerBaseMoveSpeedScale: 1
-  speedStatMoveRatio: 0.005
-  maxActualMoveSpeed: 12
+  speedStatMoveRatio: 0.0025
+  maxActualMoveSpeed: 10
   rb: {fileID: 4389982266256825078}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1

@@ -827,10 +827,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 4
+  moveSpeed: 4.5
   playerBaseMoveSpeedScale: 1
-  speedStatMoveRatio: 0.005
-  maxActualMoveSpeed: 12
+  speedStatMoveRatio: 0.0002
+  maxActualMoveSpeed: 9
   rb: {fileID: 7237885085105757803}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1

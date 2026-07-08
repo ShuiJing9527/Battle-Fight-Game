@@ -219,7 +219,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
   playerTarget: {fileID: 0}
   playerTag: Player
-  moveSpeed: 2.5
+  moveSpeed: 2.2
   stopDistance: 0.8
   maxHorizontalMoveSpeed: 2.6
   faceMoveDirection: 0
@@ -314,10 +314,10 @@ MonoBehaviour:
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
   dropYOffset: 0.5
   dropScatterRadius: 0.8
-  lifeSoulWeight: 25
-  energySoulWeight: 20
-  functionSoulWeight: 15
-  growthSoulWeight: 40
+  lifeSoulWeight: 30
+  energySoulWeight: 25
+  functionSoulWeight: 20
+  growthSoulWeight: 25
   resourcePoint1Weight: 50
   resourcePoint2Weight: 25
   resourcePoint3Weight: 15

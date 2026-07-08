@@ -1088,7 +1088,7 @@ public class EnemySpawner : MonoBehaviour
                 range = 1.6f;
                 hitRange = 1.8f;
                 cooldown = 1.5f;
-                identity.attackStyle = MonsterAttackStyle.Melee;
+                identity.attackStyle = MonsterAttackStyle.ElementalBoss;
             }
             else
             {

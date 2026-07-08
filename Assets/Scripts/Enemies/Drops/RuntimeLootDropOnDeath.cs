@@ -6,7 +6,6 @@ using UnityEditor;
 
 public class RuntimeLootDropOnDeath : MonoBehaviour
 {
-    private const float LuckSoulDropChancePerPoint = 0.025f;
     private const float LuckRuneDropChancePerPoint = 0.03f;
 
     [Header("Soul Drop")]
@@ -308,7 +307,8 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     public float GetExtraSoulDropChanceForLuck(float luck)
     {
-        return Mathf.Max(0f, luck - 1f) * LuckSoulDropChancePerPoint;
+        float chance = Mathf.Max(0f, luck - 1f) * Mathf.Max(0f, extraSoulDropChancePerLuck);
+        return Mathf.Clamp(chance, 0f, Mathf.Max(0f, maxExtraSoulDropChance));
     }
 
     public float GetExtraRuneDropChanceForLuck(float luck)
@@ -620,7 +620,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             return;
         }
 
-        float soulLuckMultiplier = 1f + Mathf.Max(0f, luck - 1f) * LuckSoulDropChancePerPoint;
+        float soulLuckMultiplier = 1f + Mathf.Max(0f, luck - 1f) * Mathf.Max(0f, extraSoulDropChancePerLuck);
         float runeLuckMultiplier = 1f + Mathf.Max(0f, luck - 1f) * LuckRuneDropChancePerPoint;
         float finalSoulDropChance = GetExtraSoulDropChanceForLuck(luck);
         float finalRuneDropChance = GetExtraRuneDropChanceForLuck(luck);

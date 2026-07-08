@@ -51,12 +51,22 @@ public static class MonsterCombatAutoSetup
 
     private static MonsterAttackStyle ResolveAttackStyle(MonsterIdentity identity)
     {
-        if (identity != null && IsSlimeSpecies(identity.species))
+        if (identity == null)
         {
             return MonsterAttackStyle.Melee;
         }
 
-        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (identity.rank == MonsterRank.Boss && IsSlimeSpecies(identity.species))
+        {
+            return MonsterAttackStyle.ElementalBoss;
+        }
+
+        if (IsSlimeSpecies(identity.species))
+        {
+            return MonsterAttackStyle.Melee;
+        }
+
+        MonsterRank rank = identity.rank;
         if (rank == MonsterRank.Boss)
         {
             return MonsterAttackStyle.ElementalBoss;
