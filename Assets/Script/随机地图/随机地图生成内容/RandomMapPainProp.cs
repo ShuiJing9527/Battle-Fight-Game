@@ -174,16 +174,27 @@ namespace UnderTheStars.GenerationMap
 
             if (beachSpawnRules != null && beachSpawnRules.Count > 0 && beachFloorPoints.Count > 0)
             {
+                List<PropSpawnRule> beachClusterRules = new List<PropSpawnRule>();
                 List<PropSpawnRule> beachSingleRules = new List<PropSpawnRule>();
                 for (int i = 0; i < beachSpawnRules.Count; i++)
                 {
                     PropSpawnRule rule = beachSpawnRules[i];
-                    if (rule != null && rule.spawnMode != SpawnMode.Cluster)
+                    if (rule == null)
+                    {
+                        continue;
+                    }
+
+                    if (rule.spawnMode == SpawnMode.Cluster)
+                    {
+                        beachClusterRules.Add(rule);
+                    }
+                    else
                     {
                         beachSingleRules.Add(rule);
                     }
                 }
 
+                SpawnClusters(beachClusterRules, beachFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
                 SpawnSingles(beachSingleRules, beachFloorPoints, areaLookup, referenceTilemap, spawnedRecords, spawnIndex, spawnedCountPerRule);
             }
         }

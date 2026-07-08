@@ -587,7 +587,15 @@ namespace UnderTheStars.GenerationMap
                     AreaType areaType = ResolveRegionAreaType(x, y);
                     foreach (Vector2Int point in regionPointSet)
                     {
-                        if (generatedShoreSandPoints != null && generatedShoreSandPoints.Contains(point))
+                        if (finalCoastTransitionPoints != null && finalCoastTransitionPoints.Contains(point))
+                        {
+                            result[point] = AreaType.CoastTransition;
+                        }
+                        else if (finalBeachPoints != null && finalBeachPoints.Contains(point))
+                        {
+                            result[point] = AreaType.Beach;
+                        }
+                        else if (generatedShoreSandPoints != null && generatedShoreSandPoints.Contains(point))
                         {
                             result[point] = AreaType.Beach;
                         }
