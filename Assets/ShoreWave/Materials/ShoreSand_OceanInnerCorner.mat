@@ -51,7 +51,9 @@ Material:
     m_Ints: []
     m_Floats:
     - _AlphaMultiplier: 1
+    - _BaseSandReflectionStrength: 0.36
     - _Brightness: 1.2
+    - _CoastalReflectionBoost: 0.28
     - _CornerBlend: 0.45
     - _CornerInner: 1
     - _CornerMode: 1
@@ -63,13 +65,19 @@ Material:
     - _FadeWidth: 0.5
     - _GrassBlendStrength: 0
     - _GrassBlendWidth: 0
-    - _LightingStrength: 1
+    - _LightingStrength: 1.08
     - _Metallic: 0
-    - _MinimumAmbient: 0.12
+    - _MinimumAmbient: 0.08
     - _NormalStrength: 1
+    - _NormalWetReflectionStrength: 0.52
     - _ReceiveShadows: 1
-    - _Smoothness: 0.5
-    - _WetSandStrength: 0.12
+    - _Smoothness: 0.18
+    - _SpecularStrength: 0.12
+    - _SunGlintStrength: 0.9
+    - _WetColorStrength: 0
+    - _WetSandStrength: 0.4
+    - _WetSmoothness: 0.42
+    - _WetSpecularStrength: 0.7
     m_Colors:
     - _GrassBlendColor: {r: 0.86, g: 0.84, b: 0.68, a: 1}
     - _SandTint: {r: 1, g: 1, b: 1, a: 1}
