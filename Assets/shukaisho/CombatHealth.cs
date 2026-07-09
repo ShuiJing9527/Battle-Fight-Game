@@ -163,6 +163,7 @@ public class CombatHealth : MonoBehaviour
         float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
         damage.amount = outgoingDamage;
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
+        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _);
         GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
@@ -189,6 +190,7 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
+            DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(damage.source, gameObject);
             ThornCounterEntryLog("TakeDamage(BattleDamage)", gameObject, damage.source, finalDamage);
             ThornCounterEntryLog(
                 "TakeDamage(BattleDamage):ResolvedSource",
@@ -249,6 +251,7 @@ public class CombatHealth : MonoBehaviour
         }
 
         float finalDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(source, amount);
+        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(source, gameObject, finalDamage, out _);
         GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(source);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
@@ -270,6 +273,7 @@ public class CombatHealth : MonoBehaviour
 
         if (finalDamage > 0f)
         {
+            DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(source, gameObject);
             ThornCounterEntryLog("ApplyDirectDamage", gameObject, source, finalDamage);
             ThornCounterEntryLog(
                 "ApplyDirectDamage:ResolvedSource",

@@ -155,7 +155,8 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
 
         float? eliteRuneRoll;
-        int runeCount = ResolveRuneDropCount(rank, killerLuck, out eliteRuneRoll);
+        int ownedRuneCount = ResolveOwnedRuneCount(killer);
+        int runeCount = ResolveRuneDropCount(rank, killerLuck, ownedRuneCount, out eliteRuneRoll);
         if (rank != MonsterRank.Normal)
         {
             runeCount = Mathf.Clamp(runeCount, 1, 3);
@@ -166,13 +167,13 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         }
         int baseRuneDropCount = GetBaseRuneDropCount(rank);
         int extraRuneCount = Mathf.Max(0, runeCount - baseRuneDropCount);
-        float extraRuneChance = GetEffectiveExtraRuneDropChance(rank, killerLuck);
+        float extraRuneChance = GetEffectiveExtraRuneDropChance(rank, killerLuck, ownedRuneCount);
         string runeDropSource = runeDropManager != null ? "RuntimeLootDropOnDeath/RuneDropManager" : "RuntimeLootDropOnDeath/Fallback";
 
         if (debugRuneDropDiagLog)
         {
             Debug.Log(
-                $"[RuneDropDiag] enemy={name} rank={rank} eliteRoll={(eliteRuneRoll.HasValue ? eliteRuneRoll.Value.ToString("F4") : "n/a")} suppressRuneDrop={suppressRuneDrop} luck={killerLuck:F2} finalRuneCount={runeCount} source=RuntimeLootDropOnDeath healthInstanceId={healthInstanceId} dropperInstanceId={dropperInstanceId} hasDropped={hasDropped} path={runeDropSource} baseRuneCount={baseRuneDropCount} extraRuneChance={extraRuneChance:F4} extraRuneCount={extraRuneCount} dropCallId={dropCallId}",
+                $"[RuneDropDiag] enemy={name} rank={rank} eliteRoll={(eliteRuneRoll.HasValue ? eliteRuneRoll.Value.ToString("F4") : "n/a")} suppressRuneDrop={suppressRuneDrop} luck={killerLuck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={runeCount} source=RuntimeLootDropOnDeath healthInstanceId={healthInstanceId} dropperInstanceId={dropperInstanceId} hasDropped={hasDropped} path={runeDropSource} baseRuneCount={baseRuneDropCount} extraRuneChance={extraRuneChance:F4} extraRuneCount={extraRuneCount} dropCallId={dropCallId}",
                 this);
         }
 
@@ -190,7 +191,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             CreateRune(transform.position + Vector3.up * runeDropYOffset);
         }
 
-        LogDropLuckDiagnostics(killer, rank, killerLuck, baseRuneDropCount, extraSoulDropped, runeCount > baseRuneDropCount, runeCount);
+        LogDropLuckDiagnostics(killer, rank, killerLuck, ownedRuneCount, baseRuneDropCount, extraSoulDropped, runeCount > baseRuneDropCount, runeCount);
     }
 
     private Vector3 RandomOffset()
@@ -548,7 +549,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return runeDropManager;
     }
 
-    private int ResolveRuneDropCount(MonsterRank rank, float luck, out float? eliteRoll)
+    private int ResolveRuneDropCount(MonsterRank rank, float luck, int ownedRuneCount, out float? eliteRoll)
     {
         eliteRoll = null;
         MonsterIdentity identity = GetComponent<MonsterIdentity>();
@@ -565,17 +566,17 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         RuneDropManager manager = ResolveRuneDropManager();
         if (manager != null)
         {
-            return manager.RollRuneDropCount(rank, luck);
+            return manager.RollRuneDropCount(rank, luck, ownedRuneCount);
         }
 
         if (rank == MonsterRank.Elite)
         {
-            return RollEliteRuneDropCount(out eliteRoll);
+            return RollEliteRuneDropCount(ownedRuneCount, out eliteRoll);
         }
 
         int baseCount = GetBaseRuneDropCount(rank);
         int maxCount = GetMaxRuneDropCount(rank);
-        float extraChance = GetEffectiveExtraRuneDropChance(rank, luck);
+        float extraChance = GetEffectiveExtraRuneDropChance(rank, luck, ownedRuneCount);
         int count = baseCount;
         int extraRollCount = GetExtraRollCount(rank);
 
@@ -596,16 +597,18 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return ClampRuneDropCountByRank(rank, count);
     }
 
-    private static int RollEliteRuneDropCount(out float? eliteRoll)
+    private static int RollEliteRuneDropCount(int ownedRuneCount, out float? eliteRoll)
     {
         float roll = Random.value;
         eliteRoll = roll;
-        if (roll < 0.05f)
+        float thirdRuneChance = ApplyOwnedRuneDropDecay(0.05f, ownedRuneCount);
+        if (roll < thirdRuneChance)
         {
             return 3;
         }
 
-        if (roll < 0.35f)
+        float secondOrThirdRuneChance = ApplyOwnedRuneDropDecay(0.35f, ownedRuneCount);
+        if (roll < secondOrThirdRuneChance)
         {
             return 2;
         }
@@ -613,7 +616,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return 1;
     }
 
-    private void LogDropLuckDiagnostics(GameObject killer, MonsterRank rank, float luck, int baseRuneDropCount, bool extraSoulDropped, bool extraRuneDropped, int runeCount)
+    private void LogDropLuckDiagnostics(GameObject killer, MonsterRank rank, float luck, int ownedRuneCount, int baseRuneDropCount, bool extraSoulDropped, bool extraRuneDropped, int runeCount)
     {
         if (!debugLuckDropLog)
         {
@@ -623,10 +626,10 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         float soulLuckMultiplier = 1f + Mathf.Max(0f, luck - 1f) * Mathf.Max(0f, extraSoulDropChancePerLuck);
         float runeLuckMultiplier = 1f + Mathf.Max(0f, luck - 1f) * LuckRuneDropChancePerPoint;
         float finalSoulDropChance = GetExtraSoulDropChanceForLuck(luck);
-        float finalRuneDropChance = GetExtraRuneDropChanceForLuck(luck);
+        float finalRuneDropChance = GetEffectiveExtraRuneDropChance(rank, luck, ownedRuneCount);
 
         Debug.Log(
-            $"[DropLuckDiag] killer={(killer != null ? killer.name : "null")} luck={luck:F2} baseSoulDropChance=0.00 luckSoulDropMultiplier={soulLuckMultiplier:F2} finalSoulDropChance={finalSoulDropChance:F4} baseRuneDropChance=0.00 luckRuneDropMultiplier={runeLuckMultiplier:F2} finalRuneDropChance={finalRuneDropChance:F4} resultSoul={(extraSoulDropped ? 1 : 0)} resultRune={(extraRuneDropped ? 1 : 0)} runeCount={runeCount} baseRuneDropCount={baseRuneDropCount}",
+            $"[DropLuckDiag] killer={(killer != null ? killer.name : "null")} luck={luck:F2} ownedRuneCount={ownedRuneCount} baseSoulDropChance=0.00 luckSoulDropMultiplier={soulLuckMultiplier:F2} finalSoulDropChance={finalSoulDropChance:F4} baseRuneDropChance=0.00 luckRuneDropMultiplier={runeLuckMultiplier:F2} finalRuneDropChance={finalRuneDropChance:F4} resultSoul={(extraSoulDropped ? 1 : 0)} resultRune={(extraRuneDropped ? 1 : 0)} runeCount={runeCount} baseRuneDropCount={baseRuneDropCount}",
             this);
     }
 
@@ -655,12 +658,97 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return rank == MonsterRank.Boss ? 4 : (rank == MonsterRank.Elite ? 2 : 0);
     }
 
-    private float GetEffectiveExtraRuneDropChance(MonsterRank rank, float luck)
+    private float GetEffectiveExtraRuneDropChance(MonsterRank rank, float luck, int ownedRuneCount)
     {
-        float extraChance = GetExtraRuneDropChanceForLuck(luck);
-        return highRuneDropTestMode
-            ? extraChance
-            : Mathf.Clamp01(extraChance * Mathf.Max(0f, normalRuneDropRateMultiplier));
+        float baseChance = GetExtraRuneDropChanceForLuck(luck);
+        baseChance = highRuneDropTestMode
+            ? baseChance
+            : Mathf.Clamp01(baseChance * Mathf.Max(0f, normalRuneDropRateMultiplier));
+        return ApplyOwnedRuneDropDecay(baseChance, ownedRuneCount);
+    }
+
+    private int ResolveOwnedRuneCount(GameObject killer)
+    {
+        RuneInventory inventory = ResolveOwnedRuneInventory(killer);
+        return inventory != null ? Mathf.Max(0, inventory.Count) : 0;
+    }
+
+    private RuneInventory ResolveOwnedRuneInventory(GameObject killer)
+    {
+        RuneInventory sharedInventory = ResolveSharedRuneInventory();
+        if (sharedInventory != null)
+        {
+            return sharedInventory;
+        }
+
+        if (killer == null)
+        {
+            return null;
+        }
+
+        RuneInventory inventory = killer.GetComponentInChildren<RuneInventory>(true) ?? killer.GetComponent<RuneInventory>();
+        if (inventory != null)
+        {
+            return inventory;
+        }
+
+        Transform root = killer.transform.root;
+        if (root == null)
+        {
+            return null;
+        }
+
+        return root.GetComponentInChildren<RuneInventory>(true) ?? root.GetComponent<RuneInventory>();
+    }
+
+    private RuneInventory ResolveSharedRuneInventory()
+    {
+        RuneDropManager manager = ResolveRuneDropManager();
+        if (manager != null)
+        {
+            RuneInventory inventory = manager.GetComponent<RuneInventory>();
+            if (inventory != null)
+            {
+                return inventory;
+            }
+
+            inventory = manager.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
+            }
+        }
+
+        RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
+        for (int i = 0; i < libraries.Length; i++)
+        {
+            RuneLibrary library = libraries[i];
+            if (library == null)
+            {
+                continue;
+            }
+
+            RuneInventory inventory = library.GetComponent<RuneInventory>();
+            if (inventory != null)
+            {
+                return inventory;
+            }
+
+            inventory = library.GetComponentInChildren<RuneInventory>(true);
+            if (inventory != null)
+            {
+                return inventory;
+            }
+        }
+
+        return null;
+    }
+
+    private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)
+    {
+        float minimumChance = Mathf.Min(baseRuneDropChance, 0.05f);
+        float reducedChance = baseRuneDropChance - Mathf.Max(0, ownedRuneCount) * 0.05f;
+        return Mathf.Clamp(reducedChance, minimumChance, baseRuneDropChance);
     }
 
     private void WarnMissingSoulPrefabOnce()
