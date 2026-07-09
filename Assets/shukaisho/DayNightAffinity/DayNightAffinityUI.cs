@@ -7,6 +7,7 @@ public class DayNightAffinityUI : MonoBehaviour
     private static readonly int FlowScaleId = Shader.PropertyToID("_FlowScale");
     private static readonly int DistortionStrengthId = Shader.PropertyToID("_DistortionStrength");
     private static readonly int HighlightStrengthId = Shader.PropertyToID("_HighlightStrength");
+    private static readonly int HighlightWidthId = Shader.PropertyToID("_HighlightWidth");
     private static readonly int FlowTimeId = Shader.PropertyToID("_FlowTime");
     private static readonly int AlphaId = Shader.PropertyToID("_Alpha");
 
@@ -20,12 +21,18 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField] private RectTransform gaugeRoot;
     [SerializeField] private Image gaugeBackground;
     [SerializeField] private Image twilightFill;
+    [SerializeField] private Image twilightFillDark;
+    [SerializeField] private Image twilightFillLight;
     [SerializeField] private Image radianceFill;
+    [SerializeField] private Image radianceFillDark;
+    [SerializeField] private Image radianceFillLight;
     [SerializeField] private Image flowFill;
     [SerializeField] private Image centerMarker;
 
     [Header("Flow Materials")]
+    [SerializeField] private Material twilightDarkFlowMaterial;
     [SerializeField] private Material twilightFlowMaterial;
+    [SerializeField] private Material radianceDarkFlowMaterial;
     [SerializeField] private Material radianceFlowMaterial;
 
     [Header("Texts")]
@@ -35,20 +42,21 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField] private Text statusText;
 
     [Header("Colors")]
-    [SerializeField] private Color gaugeBackgroundColor = new Color(0.05f, 0.08f, 0.12f, 0.88f);
+    [SerializeField] private Color gaugeBackgroundColor = new Color(0.05f, 0.08f, 0.12f, 0.42f);
     [SerializeField] private Color twilightColor = new Color(0.56f, 0.8f, 1f, 0.88f);
     [SerializeField] private Color radianceColor = new Color(1f, 0.83f, 0.35f, 0.88f);
-    [SerializeField] private Color centerMarkerColor = new Color(1f, 1f, 1f, 0.9f);
+    [SerializeField] private Color centerMarkerColor = new Color(1f, 1f, 1f, 0.28f);
     [SerializeField] private Color textColor = new Color(0.96f, 0.97f, 1f, 1f);
     [SerializeField] private Color boostedStatusColor = new Color(1f, 0.96f, 0.78f, 1f);
     [SerializeField] private Color weakenedStatusColor = new Color(0.76f, 0.88f, 1f, 1f);
     [SerializeField] private Color neutralStatusColor = new Color(0.88f, 0.9f, 0.95f, 0.92f);
 
     [Header("Flow")]
-    [SerializeField, Min(0f)] private float flowSpeed = 1.9f;
-    [SerializeField, Min(0.1f)] private float flowScale = 5.8f;
-    [SerializeField, Range(0f, 0.2f)] private float distortionStrength = 0.12f;
-    [SerializeField, Range(0f, 2f)] private float highlightStrength = 1.05f;
+    [SerializeField, Min(0f)] private float flowSpeed = 1.15f;
+    [SerializeField, Min(0.1f)] private float flowScale = 2.55f;
+    [SerializeField, Range(0f, 0.2f)] private float distortionStrength = 0.016f;
+    [SerializeField, Range(0f, 2f)] private float highlightStrength = 0.95f;
+    [SerializeField, Range(0.01f, 0.4f)] private float highlightWidth = 0.1f;
     [SerializeField, Range(0f, 1f)] private float activeIconAlpha = 1f;
     [SerializeField, Range(0f, 1f)] private float inactiveIconAlpha = 0.45f;
 
@@ -60,7 +68,9 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField] private Color sunGlowColor = new Color(1f, 0.88f, 0.5f, 0.42f);
 
     private Player2Bootstrap cachedBootstrap;
+    private Material runtimeTwilightDarkMaterial;
     private Material runtimeTwilightMaterial;
+    private Material runtimeRadianceDarkMaterial;
     private Material runtimeRadianceMaterial;
     private bool resolvedBootstrap;
 
@@ -84,7 +94,9 @@ public class DayNightAffinityUI : MonoBehaviour
 
     private void OnDestroy()
     {
+        DestroyRuntimeMaterial(ref runtimeTwilightDarkMaterial);
         DestroyRuntimeMaterial(ref runtimeTwilightMaterial);
+        DestroyRuntimeMaterial(ref runtimeRadianceDarkMaterial);
         DestroyRuntimeMaterial(ref runtimeRadianceMaterial);
     }
 
@@ -99,11 +111,19 @@ public class DayNightAffinityUI : MonoBehaviour
         bool hasDay = TODDayNightAdapter.TryGetIsDay(out bool isDay);
         bool hasNight = TODDayNightAdapter.TryGetIsNight(out bool isNight);
 
+        float balanceValue = Mathf.Clamp(gaugeState.BalanceValue, 0f, 100f);
         float radianceValue = Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
         float twilightValue = Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
 
-        UpdateFill(twilightFill, 0f, Mathf.Clamp01(twilightValue / 100f), twilightColor);
-        UpdateFill(radianceFill, 1f - Mathf.Clamp01(radianceValue / 100f), 1f, radianceColor);
+        float twilightDominance = balanceValue < 50f
+            ? Mathf.Clamp01((50f - balanceValue) / 50f)
+            : 0f;
+        float radianceDominance = balanceValue > 50f
+            ? Mathf.Clamp01((balanceValue - 50f) / 50f)
+            : 0f;
+
+        UpdateFillContainer(twilightFill, twilightFillDark, twilightFillLight, 0f, twilightDominance);
+        UpdateFillContainer(radianceFill, radianceFillDark, radianceFillLight, 1f - radianceDominance, 1f);
         UpdateFlowMaterials();
         UpdateValueTexts(twilightValue, radianceValue);
         UpdateIconState(hasDay, hasNight, isDay, isNight);
@@ -113,8 +133,12 @@ public class DayNightAffinityUI : MonoBehaviour
     private void InitializeVisuals()
     {
         ConfigureImage(gaugeBackground, gaugeBackgroundColor);
-        ConfigureImage(twilightFill, Color.white);
-        ConfigureImage(radianceFill, Color.white);
+        ConfigureFillContainer(twilightFill);
+        ConfigureFillContainer(radianceFill);
+        ConfigureImage(twilightFillDark, Color.white);
+        ConfigureImage(twilightFillLight, Color.white);
+        ConfigureImage(radianceFillDark, Color.white);
+        ConfigureImage(radianceFillLight, Color.white);
         ConfigureImage(centerMarker, centerMarkerColor);
         ConfigureImage(moonGlow, ApplyAlpha(moonGlowColor, 0f));
         ConfigureImage(sunGlow, ApplyAlpha(sunGlowColor, 0f));
@@ -123,12 +147,19 @@ public class DayNightAffinityUI : MonoBehaviour
         ConfigureText(phaseText, textColor, TextAnchor.MiddleCenter);
         ConfigureText(statusText, neutralStatusColor, TextAnchor.MiddleCenter);
 
-        SetupRuntimeMaterial(twilightFill, twilightFlowMaterial, ref runtimeTwilightMaterial);
-        SetupRuntimeMaterial(radianceFill, radianceFlowMaterial, ref runtimeRadianceMaterial);
+        SetupRuntimeMaterial(twilightFillDark, ResolveFlowTemplate(twilightFillDark, twilightDarkFlowMaterial), ref runtimeTwilightDarkMaterial);
+        SetupRuntimeMaterial(twilightFillLight, ResolveFlowTemplate(twilightFillLight, twilightFlowMaterial), ref runtimeTwilightMaterial);
+        SetupRuntimeMaterial(radianceFillDark, ResolveFlowTemplate(radianceFillDark, radianceDarkFlowMaterial), ref runtimeRadianceDarkMaterial);
+        SetupRuntimeMaterial(radianceFillLight, ResolveFlowTemplate(radianceFillLight, radianceFlowMaterial), ref runtimeRadianceMaterial);
 
         if (flowFill != null)
         {
             flowFill.gameObject.SetActive(false);
+        }
+
+        if (centerMarker != null)
+        {
+            centerMarker.gameObject.SetActive(false);
         }
 
         Transform energyNoise = transform.Find("GaugeRoot/EnergyNoiseMask");
@@ -184,21 +215,31 @@ public class DayNightAffinityUI : MonoBehaviour
     private void UpdateFlowMaterials()
     {
         float flowTime = Time.unscaledTime;
-        UpdateFlowMaterial(runtimeTwilightMaterial, flowTime);
-        UpdateFlowMaterial(runtimeRadianceMaterial, flowTime);
+        UpdateFlowMaterial(runtimeTwilightDarkMaterial, flowTime, 0.88f, 0.82f, 0.5f, 1.15f, 0.92f);
+        UpdateFlowMaterial(runtimeTwilightMaterial, flowTime, 1f, 1f, 1f, 1f, 1f);
+        UpdateFlowMaterial(runtimeRadianceDarkMaterial, flowTime, 0.88f, 0.82f, 0.5f, 1.15f, 0.92f);
+        UpdateFlowMaterial(runtimeRadianceMaterial, flowTime, 1f, 1f, 1f, 1f, 1f);
     }
 
-    private void UpdateFlowMaterial(Material targetMaterial, float flowTime)
+    private void UpdateFlowMaterial(
+        Material targetMaterial,
+        float flowTime,
+        float speedMultiplier,
+        float scaleMultiplier,
+        float distortionMultiplier,
+        float highlightMultiplier,
+        float highlightWidthMultiplier)
     {
         if (targetMaterial == null)
         {
             return;
         }
 
-        targetMaterial.SetFloat(FlowSpeedId, flowSpeed);
-        targetMaterial.SetFloat(FlowScaleId, flowScale);
-        targetMaterial.SetFloat(DistortionStrengthId, distortionStrength);
-        targetMaterial.SetFloat(HighlightStrengthId, highlightStrength);
+        targetMaterial.SetFloat(FlowSpeedId, flowSpeed * speedMultiplier);
+        targetMaterial.SetFloat(FlowScaleId, flowScale * scaleMultiplier);
+        targetMaterial.SetFloat(DistortionStrengthId, distortionStrength * distortionMultiplier);
+        targetMaterial.SetFloat(HighlightStrengthId, highlightStrength * highlightMultiplier);
+        targetMaterial.SetFloat(HighlightWidthId, highlightWidth * highlightWidthMultiplier);
         targetMaterial.SetFloat(FlowTimeId, flowTime);
         targetMaterial.SetFloat(AlphaId, 1f);
     }
@@ -220,14 +261,29 @@ public class DayNightAffinityUI : MonoBehaviour
         image.raycastTarget = false;
     }
 
-    private static void UpdateFill(Image fill, float minX, float maxX, Color color)
+    private static Material ResolveFlowTemplate(Image image, Material fallbackTemplate)
     {
-        if (fill == null)
+        if (fallbackTemplate != null)
+        {
+            return fallbackTemplate;
+        }
+
+        return image != null ? image.material : null;
+    }
+
+    private static void UpdateFillContainer(
+        Image fillRoot,
+        Image darkLayer,
+        Image lightLayer,
+        float minX,
+        float maxX)
+    {
+        if (fillRoot == null)
         {
             return;
         }
 
-        RectTransform rect = fill.rectTransform;
+        RectTransform rect = fillRoot.rectTransform;
         if (rect == null)
         {
             return;
@@ -237,9 +293,29 @@ public class DayNightAffinityUI : MonoBehaviour
         rect.anchorMax = new Vector2(Mathf.Clamp01(Mathf.Max(minX, maxX)), 1f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
-        fill.color = Color.white;
-        fill.raycastTarget = false;
-        fill.enabled = maxX - minX > 0.001f;
+
+        bool hasVisibleWidth = maxX - minX > 0.001f;
+        if (darkLayer != null)
+        {
+            darkLayer.enabled = hasVisibleWidth;
+        }
+
+        if (lightLayer != null)
+        {
+            lightLayer.enabled = hasVisibleWidth;
+        }
+    }
+
+    private static void ConfigureFillContainer(Image image)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.color = new Color(1f, 1f, 1f, 0f);
+        image.raycastTarget = false;
+        image.enabled = false;
     }
 
     private static void DestroyRuntimeMaterial(ref Material runtimeMaterial)
@@ -343,9 +419,29 @@ public class DayNightAffinityUI : MonoBehaviour
             twilightFill = FindImage("GaugeRoot/TwilightFill") ?? FindImage("GaugeRoot/EnergyGlowOuter");
         }
 
+        if (twilightFillDark == null)
+        {
+            twilightFillDark = FindImage("GaugeRoot/TwilightFill/TwilightFill_Dark");
+        }
+
+        if (twilightFillLight == null)
+        {
+            twilightFillLight = FindImage("GaugeRoot/TwilightFill/TwilightFill_Light");
+        }
+
         if (radianceFill == null)
         {
             radianceFill = FindImage("GaugeRoot/RadianceFill") ?? FindImage("GaugeRoot/EnergyCore");
+        }
+
+        if (radianceFillDark == null)
+        {
+            radianceFillDark = FindImage("GaugeRoot/RadianceFill/RadianceFill_Dark");
+        }
+
+        if (radianceFillLight == null)
+        {
+            radianceFillLight = FindImage("GaugeRoot/RadianceFill/RadianceFill_Light");
         }
 
         if (flowFill == null)

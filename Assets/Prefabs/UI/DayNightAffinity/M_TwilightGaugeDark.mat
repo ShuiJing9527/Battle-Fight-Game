@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: M_RadianceGaugeFlow
+  m_Name: M_TwilightGaugeDark
   m_Shader: {fileID: 4800000, guid: e029d6ffeaf24734a38c71ae8c255686, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -35,27 +35,27 @@ Material:
     m_Floats:
     - _Alpha: 1
     - _ColorMask: 15
-    - _CoreGlow: 0.36
-    - _DistortionStrength: 0.12
-    - _EdgeFade: 0.8
-    - _EdgeShade: 0.24
-    - _FlowScale: 5.8
-    - _FlowSpeed: 1.9
+    - _CoreGlow: 0.22
+    - _DistortionStrength: 0.018
+    - _EdgeFade: 0.78
+    - _EdgeShade: 0.34
+    - _FlowScale: 2.4
+    - _FlowSpeed: 1.08
     - _FlowTime: 0
-    - _GradientDirection: 1
+    - _GradientDirection: 2
     - _GradientPower: 1.8
-    - _HighlightStrength: 1.05
-    - _HighlightWidth: 0.12
+    - _HighlightStrength: 0.42
+    - _HighlightWidth: 0.15
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
     - _UseUIAlphaClip: 0
-    - _VerticalGlow: 0.28
+    - _VerticalGlow: 0.16
     m_Colors:
-    - _DeepColor: {r: 0.19999996, g: 0.19999996, b: 0.29999998, a: 1}
-    - _HighlightColor: {r: 1, g: 0.97, b: 0.8, a: 1}
-    - _TintColor: {r: 1, g: 0.83, b: 0.35, a: 1}
+    - _DeepColor: {r: 0.08, g: 0.08, b: 0.22, a: 1}
+    - _HighlightColor: {r: 0.75, g: 0.88, b: 1, a: 1}
+    - _TintColor: {r: 0.16, g: 0.18, b: 0.46, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
