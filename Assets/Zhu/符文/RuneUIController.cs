@@ -6,6 +6,45 @@ using UnityEngine.EventSystems;
 
 public class RuneUIController : MonoBehaviour
 {
+    [System.Serializable]
+    public class RuneInventoryLayoutSettings
+    {
+        public Vector2 panelAnchoredPosition = Vector2.zero;
+        public Vector2 panelSize = new Vector2(0f, 0f);
+        public Vector2 viewportAnchoredPosition = Vector2.zero;
+        public Vector2 viewportSize = new Vector2(0f, 0f);
+        public Vector2 viewportOffsetMin = Vector2.zero;
+        public Vector2 viewportOffsetMax = Vector2.zero;
+        public Vector2 contentAnchoredPosition = Vector2.zero;
+        public Vector2 contentSize = new Vector2(0f, 0f);
+        public Vector2 contentAnchorMin = new Vector2(0f, 1f);
+        public Vector2 contentAnchorMax = new Vector2(1f, 1f);
+        public Vector2 contentPivot = new Vector2(0.5f, 1f);
+        public Vector2 itemSpacing = new Vector2(0f, 8f);
+        public Vector2 itemSize = new Vector2(0f, 40f);
+        public float contentTopPadding = 0f;
+        public float contentBottomPadding = 0f;
+        public int columnCount = 1;
+    }
+
+    [System.Serializable]
+    public class RuneDescriptionLayoutSettings
+    {
+        public Vector2 panelAnchoredPosition = new Vector2(20f, 60f);
+        public Vector2 panelSize = new Vector2(0f, 150f);
+        public Vector2 panelAnchorMin = new Vector2(0f, 0f);
+        public Vector2 panelAnchorMax = new Vector2(0f, 0f);
+        public Vector2 panelPivot = new Vector2(0f, 0f);
+        public Vector2 titleOffsetMin = new Vector2(18f, -42f);
+        public Vector2 titleOffsetMax = new Vector2(-18f, -10f);
+        public Vector2 bodyViewportOffsetMin = new Vector2(0f, 18f);
+        public Vector2 bodyViewportOffsetMax = new Vector2(0f, -46f);
+        public Vector2 bodyOffsetMin = new Vector2(18f, 0f);
+        public Vector2 bodyOffsetMax = new Vector2(-18f, 0f);
+        public Vector2 bodyAnchoredPosition = new Vector2(0f, -18f);
+        public float maxHeight = 320f;
+    }
+
     private struct RuneStackEntry
     {
         public RuneDefinition rune;
@@ -40,6 +79,15 @@ public class RuneUIController : MonoBehaviour
     [Header("Root")]
     public GameObject mainPanel;
     public Button closeButton;
+    [SerializeField] private RectTransform runeInventoryPanel;
+    [SerializeField] private ScrollRect runeInventoryScrollRect;
+    [SerializeField] private RectTransform runeInventoryViewport;
+    [SerializeField] private RectTransform runeInventoryContent;
+    [SerializeField] private Scrollbar runeInventoryScrollbar;
+    [SerializeField] private RectTransform runeDescriptionPanel;
+    [SerializeField] private RectTransform runeDescriptionViewport;
+    [SerializeField] private RectTransform runeDescriptionContent;
+    [SerializeField] private RectTransform runeDescriptionBackground;
     public Transform runeListContent;
     public TextMeshProUGUI selectedRuneText;
     public TextMeshProUGUI noRuneText;
@@ -121,6 +169,11 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private float runeBagContentTopPadding = 0f;
     [SerializeField] private float runeBagContentBottomPadding = 0f;
     [SerializeField] private bool hideLegacyRuneDetailPanel = true;
+    [SerializeField] private bool buildUiAtRuntime = false;
+    [SerializeField] private bool applyInventoryLayoutAtRuntime = false;
+    [SerializeField] private bool applyDescriptionLayoutAtRuntime = false;
+    [SerializeField] private RuneInventoryLayoutSettings inventoryLayoutSettings = new RuneInventoryLayoutSettings();
+    [SerializeField] private RuneDescriptionLayoutSettings descriptionLayoutSettings = new RuneDescriptionLayoutSettings();
 
     [Header("Attribute Panel")]
     [SerializeField] private Color attributePanelColor = new Color(0.10f, 0.12f, 0.18f, 0.96f);
@@ -575,14 +628,27 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        if (runeInventoryPanel == null)
+        {
+            runeInventoryPanel = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+        }
+
         if (runeBagViewportRect == null)
         {
             runeBagViewportRect = FindChildRecursive(mainPanel.transform, "RuneListViewport") as RectTransform;
+        }
+        if (runeInventoryViewport == null)
+        {
+            runeInventoryViewport = runeBagViewportRect;
         }
 
         if (runeBagContentRoot == null)
         {
             runeBagContentRoot = FindChildRecursive(mainPanel.transform, "RuneListContent") as RectTransform;
+        }
+        if (runeInventoryContent == null)
+        {
+            runeInventoryContent = runeBagContentRoot;
         }
 
         if (detailPanelRoot == null)
@@ -592,14 +658,18 @@ public class RuneUIController : MonoBehaviour
 
         if (runeBagScrollbar == null)
         {
-            RectTransform bagPanel = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+            RectTransform bagPanel = runeInventoryPanel != null ? runeInventoryPanel : FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
             if (bagPanel != null)
             {
                 runeBagScrollbar = bagPanel.GetComponentInChildren<Scrollbar>(true);
             }
         }
+        if (runeInventoryScrollbar == null)
+        {
+            runeInventoryScrollbar = runeBagScrollbar;
+        }
 
-        if (noRuneText != null && runeBagViewportRect != null && noRuneText.transform.parent != runeBagViewportRect)
+        if (applyInventoryLayoutAtRuntime && noRuneText != null && runeBagViewportRect != null && noRuneText.transform.parent != runeBagViewportRect)
         {
             noRuneText.transform.SetParent(runeBagViewportRect, false);
         }
@@ -615,7 +685,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         ScrollRect scrollRect = null;
-        RectTransform bagPanelRect = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+        RectTransform bagPanelRect = runeInventoryPanel != null ? runeInventoryPanel : FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
         if (bagPanelRect != null)
         {
             scrollRect = bagPanelRect.GetComponent<ScrollRect>();
@@ -625,21 +695,30 @@ public class RuneUIController : MonoBehaviour
         {
             scrollRect = runeBagViewportRect.GetComponentInParent<ScrollRect>();
         }
+        if (runeInventoryScrollRect == null)
+        {
+            runeInventoryScrollRect = scrollRect;
+        }
 
         if (scrollRect != null)
         {
             scrollRect.viewport = runeBagViewportRect;
             scrollRect.content = runeBagContentRoot;
-            scrollRect.horizontal = false;
-            scrollRect.vertical = true;
-            scrollRect.movementType = ScrollRect.MovementType.Clamped;
-            if (runeBagScrollbar != null)
+            if (applyInventoryLayoutAtRuntime)
             {
-                scrollRect.verticalScrollbar = runeBagScrollbar;
-                scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-                runeBagScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                scrollRect.horizontal = false;
+                scrollRect.vertical = true;
+                scrollRect.movementType = ScrollRect.MovementType.Clamped;
+                if (runeBagScrollbar != null)
+                {
+                    scrollRect.verticalScrollbar = runeBagScrollbar;
+                    scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                    runeBagScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                }
             }
         }
+
+        ApplyInventoryLayoutIfEnabled();
     }
 
     private void EnsureRuneButtonTemplate()
@@ -669,7 +748,7 @@ public class RuneUIController : MonoBehaviour
 
     private void UpdateRuneListContentHeight(int runeCount)
     {
-        if (runeBagContentRoot == null)
+        if (runeBagContentRoot == null || !applyInventoryLayoutAtRuntime)
         {
             return;
         }
@@ -684,6 +763,54 @@ public class RuneUIController : MonoBehaviour
             + Mathf.Max(0, rows - 1) * Mathf.Max(0f, runeBagItemSpacing.y)
             + runeBagContentBottomPadding;
         runeBagContentRoot.sizeDelta = new Vector2(runeBagContentRoot.sizeDelta.x, contentHeight);
+    }
+
+    private void ApplyInventoryLayoutIfEnabled()
+    {
+        if (!applyInventoryLayoutAtRuntime)
+        {
+            return;
+        }
+
+        if (runeInventoryPanel != null)
+        {
+            if (inventoryLayoutSettings.panelSize.x > 0f || inventoryLayoutSettings.panelSize.y > 0f)
+            {
+                runeInventoryPanel.sizeDelta = inventoryLayoutSettings.panelSize;
+            }
+
+            runeInventoryPanel.anchoredPosition = inventoryLayoutSettings.panelAnchoredPosition;
+        }
+
+        if (runeInventoryViewport != null)
+        {
+            if (inventoryLayoutSettings.viewportSize.x > 0f || inventoryLayoutSettings.viewportSize.y > 0f)
+            {
+                runeInventoryViewport.sizeDelta = inventoryLayoutSettings.viewportSize;
+            }
+
+            runeInventoryViewport.anchoredPosition = inventoryLayoutSettings.viewportAnchoredPosition;
+            runeInventoryViewport.offsetMin = inventoryLayoutSettings.viewportOffsetMin;
+            runeInventoryViewport.offsetMax = inventoryLayoutSettings.viewportOffsetMax;
+        }
+
+        if (runeInventoryContent != null)
+        {
+            runeInventoryContent.anchorMin = inventoryLayoutSettings.contentAnchorMin;
+            runeInventoryContent.anchorMax = inventoryLayoutSettings.contentAnchorMax;
+            runeInventoryContent.pivot = inventoryLayoutSettings.contentPivot;
+            runeInventoryContent.anchoredPosition = inventoryLayoutSettings.contentAnchoredPosition;
+            if (inventoryLayoutSettings.contentSize.x > 0f || inventoryLayoutSettings.contentSize.y > 0f)
+            {
+                runeInventoryContent.sizeDelta = inventoryLayoutSettings.contentSize;
+            }
+        }
+
+        runeBagItemSpacing = inventoryLayoutSettings.itemSpacing;
+        runeBagItemSize = inventoryLayoutSettings.itemSize;
+        runeBagContentTopPadding = inventoryLayoutSettings.contentTopPadding;
+        runeBagContentBottomPadding = inventoryLayoutSettings.contentBottomPadding;
+        runeBagColumnCount = Mathf.Max(1, inventoryLayoutSettings.columnCount);
     }
 
     private float ResolveTemplateItemHeight()
@@ -1304,12 +1431,15 @@ public class RuneUIController : MonoBehaviour
         EnsureSkillRowIcon("W");
         EnsureSkillRowIcon("E");
         EnsureSkillRowIcon("R");
-        ApplyRuneSkillPanelTitleLayout();
-        ApplySkillRowVerticalLayout();
-        ApplySkillRowLayout("Q");
-        ApplySkillRowLayout("W");
-        ApplySkillRowLayout("E");
-        ApplySkillRowLayout("R");
+        if (applyDescriptionLayoutAtRuntime)
+        {
+            ApplyRuneSkillPanelTitleLayout();
+            ApplySkillRowVerticalLayout();
+            ApplySkillRowLayout("Q");
+            ApplySkillRowLayout("W");
+            ApplySkillRowLayout("E");
+            ApplySkillRowLayout("R");
+        }
     }
 
     private void RefreshSkillInfoVisuals()
@@ -1333,6 +1463,11 @@ public class RuneUIController : MonoBehaviour
         if (skillDescriptionPanel != null)
         {
             EnsureSkillDescriptionScrollSetup();
+            if (applyDescriptionLayoutAtRuntime)
+            {
+                ApplySkillDescriptionPanelLayout(skillDescriptionPanel.transform as RectTransform);
+                ApplySkillDescriptionTextLayout();
+            }
             return;
         }
 
@@ -1340,6 +1475,8 @@ public class RuneUIController : MonoBehaviour
         if (existing != null)
         {
             skillDescriptionPanel = existing.gameObject;
+            runeDescriptionPanel = existing as RectTransform;
+            runeDescriptionBackground = existing as RectTransform;
             skillDescriptionTitleText = existing.Find("Title")?.GetComponent<TextMeshProUGUI>();
             skillDescriptionBodyText = existing.Find("Body")?.GetComponent<TextMeshProUGUI>();
             if (skillDescriptionBodyText == null)
@@ -1347,7 +1484,17 @@ public class RuneUIController : MonoBehaviour
                 skillDescriptionBodyText = existing.Find("BodyViewport/Body")?.GetComponent<TextMeshProUGUI>();
             }
             EnsureSkillDescriptionScrollSetup();
+            if (applyDescriptionLayoutAtRuntime)
+            {
+                ApplySkillDescriptionPanelLayout(existing as RectTransform);
+                ApplySkillDescriptionTextLayout();
+            }
             skillDescriptionPanel.SetActive(false);
+            return;
+        }
+
+        if (!buildUiAtRuntime)
+        {
             return;
         }
 
@@ -1355,6 +1502,8 @@ public class RuneUIController : MonoBehaviour
         panel.transform.SetParent(panelParent, false);
         RectTransform rect = panel.GetComponent<RectTransform>();
         ApplySkillDescriptionPanelLayout(rect);
+        runeDescriptionPanel = rect;
+        runeDescriptionBackground = rect;
 
         Image background = panel.GetComponent<Image>();
         background.color = skillDescriptionPanelColor;
@@ -1396,7 +1545,10 @@ public class RuneUIController : MonoBehaviour
 
         if (attributePanel != null)
         {
-            ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
+            if (applyDescriptionLayoutAtRuntime)
+            {
+                ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
+            }
             return;
         }
 
@@ -1407,8 +1559,16 @@ public class RuneUIController : MonoBehaviour
             attributePanelTitleText = existing.Find("Title")?.GetComponent<TextMeshProUGUI>();
             attributeFooterText = existing.Find("Footer")?.GetComponent<TextMeshProUGUI>();
             CacheAttributeRows(existing);
-            ApplyAttributePanelLayout(existing as RectTransform);
-            ApplyAttributePanelTextLayout();
+            if (applyDescriptionLayoutAtRuntime)
+            {
+                ApplyAttributePanelLayout(existing as RectTransform);
+                ApplyAttributePanelTextLayout();
+            }
+            return;
+        }
+
+        if (!buildUiAtRuntime)
+        {
             return;
         }
 
@@ -1636,31 +1796,31 @@ public class RuneUIController : MonoBehaviour
 
     private void ApplySkillDescriptionPanelLayout(RectTransform rect)
     {
-        if (rect == null)
+        if (rect == null || !applyDescriptionLayoutAtRuntime)
         {
             return;
         }
 
         RectTransform parentRect = rect.parent as RectTransform;
-        float width = skillDescriptionPanelSize.x;
+        float width = descriptionLayoutSettings.panelSize.x > 0f
+            ? descriptionLayoutSettings.panelSize.x
+            : skillDescriptionPanelSize.x;
         if (width <= 0f && parentRect != null)
         {
-            width = Mathf.Max(0f, parentRect.rect.width - (skillDescriptionPanelOffset.x * 2f));
+            width = Mathf.Max(0f, parentRect.rect.width - (descriptionLayoutSettings.panelAnchoredPosition.x * 2f));
         }
 
         if (parentRect != null)
         {
-            float maxWidth = Mathf.Max(0f, parentRect.rect.width - skillDescriptionPanelOffset.x);
+            float maxWidth = Mathf.Max(0f, parentRect.rect.width - descriptionLayoutSettings.panelAnchoredPosition.x);
             width = Mathf.Min(width, maxWidth);
         }
 
-        rect.anchorMin = new Vector2(0f, 0f);
-        rect.anchorMax = new Vector2(0f, 0f);
-        rect.pivot = new Vector2(0f, 0f);
-        rect.sizeDelta = new Vector2(width, skillDescriptionPanelSize.y);
-        rect.anchoredPosition = new Vector2(
-            skillDescriptionPanelOffset.x,
-            skillDescriptionPanelOffset.y);
+        rect.anchorMin = descriptionLayoutSettings.panelAnchorMin;
+        rect.anchorMax = descriptionLayoutSettings.panelAnchorMax;
+        rect.pivot = descriptionLayoutSettings.panelPivot;
+        rect.sizeDelta = new Vector2(width, Mathf.Max(1f, descriptionLayoutSettings.panelSize.y));
+        rect.anchoredPosition = descriptionLayoutSettings.panelAnchoredPosition;
     }
 
     private void EnsureSkillDescriptionScrollSetup()
@@ -1682,34 +1842,45 @@ public class RuneUIController : MonoBehaviour
         }
 
         skillDescriptionBodyViewportRect = viewportTransform as RectTransform;
+        if (runeDescriptionViewport == null)
+        {
+            runeDescriptionViewport = skillDescriptionBodyViewportRect;
+        }
         if (skillDescriptionBodyText.transform.parent != viewportTransform)
         {
             skillDescriptionBodyText.transform.SetParent(viewportTransform, false);
         }
 
         sharedDescriptionText = skillDescriptionBodyText;
+        if (runeDescriptionContent == null && skillDescriptionBodyText != null)
+        {
+            runeDescriptionContent = skillDescriptionBodyText.rectTransform;
+        }
         if (sharedDescriptionScrollRect != null)
         {
             sharedDescriptionScrollRect.viewport = skillDescriptionBodyViewportRect;
             sharedDescriptionScrollRect.content = skillDescriptionBodyText.rectTransform;
-            sharedDescriptionScrollRect.horizontal = false;
-            sharedDescriptionScrollRect.vertical = true;
-            sharedDescriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
-            sharedDescriptionScrollRect.scrollSensitivity = 24f;
-
-            Scrollbar existingScrollbar = skillDescriptionPanel.GetComponentInChildren<Scrollbar>(true);
-            if (existingScrollbar != null)
+            if (applyDescriptionLayoutAtRuntime)
             {
-                sharedDescriptionScrollRect.verticalScrollbar = existingScrollbar;
-                sharedDescriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-                existingScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                sharedDescriptionScrollRect.horizontal = false;
+                sharedDescriptionScrollRect.vertical = true;
+                sharedDescriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
+                sharedDescriptionScrollRect.scrollSensitivity = 24f;
+
+                Scrollbar existingScrollbar = skillDescriptionPanel.GetComponentInChildren<Scrollbar>(true);
+                if (existingScrollbar != null)
+                {
+                    sharedDescriptionScrollRect.verticalScrollbar = existingScrollbar;
+                    sharedDescriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+                    existingScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                }
             }
         }
     }
 
     private void RefreshSkillDescriptionPanelHeight()
     {
-        if (skillDescriptionPanel == null)
+        if (skillDescriptionPanel == null || !applyDescriptionLayoutAtRuntime)
         {
             return;
         }
@@ -1745,8 +1916,8 @@ public class RuneUIController : MonoBehaviour
 
         float titleBodySpacing = titleHeight > 0f && bodyHeight > 0f ? 14f : 0f;
         float calculatedTextHeight = titleHeight + titleBodySpacing + bodyHeight;
-        float finalHeight = Mathf.Max(skillDescriptionPanelSize.y, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
-        finalHeight = Mathf.Min(finalHeight, Mathf.Max(skillDescriptionPanelSize.y, skillDescriptionPanelMaxHeight));
+        float finalHeight = Mathf.Max(descriptionLayoutSettings.panelSize.y, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
+        finalHeight = Mathf.Min(finalHeight, Mathf.Max(descriptionLayoutSettings.panelSize.y, descriptionLayoutSettings.maxHeight));
         panelRect.sizeDelta = new Vector2(panelWidth, finalHeight);
 
         ApplySkillDescriptionTextLayout();
@@ -1754,14 +1925,19 @@ public class RuneUIController : MonoBehaviour
 
     private void ApplySkillDescriptionTextLayout()
     {
+        if (!applyDescriptionLayoutAtRuntime)
+        {
+            return;
+        }
+
         if (skillDescriptionTitleText != null)
         {
             RectTransform titleRect = skillDescriptionTitleText.rectTransform;
             titleRect.anchorMin = new Vector2(0f, 1f);
             titleRect.anchorMax = new Vector2(1f, 1f);
             titleRect.pivot = new Vector2(0.5f, 1f);
-            titleRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, -42f);
-            titleRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, -10f);
+            titleRect.offsetMin = descriptionLayoutSettings.titleOffsetMin;
+            titleRect.offsetMax = descriptionLayoutSettings.titleOffsetMax;
         }
 
         if (skillDescriptionBodyText != null)
@@ -1774,16 +1950,16 @@ public class RuneUIController : MonoBehaviour
                 ? Mathf.Max(40f, skillDescriptionBodyViewportRect.rect.width - (skillDescriptionPanelPadding.x * 2f))
                 : 200f;
             float preferredHeight = skillDescriptionBodyText.GetPreferredValues(skillDescriptionBodyText.text, viewportWidth, Mathf.Infinity).y;
-            bodyRect.offsetMin = new Vector2(skillDescriptionPanelPadding.x, 0f);
-            bodyRect.offsetMax = new Vector2(-skillDescriptionPanelPadding.x, 0f);
+            bodyRect.offsetMin = descriptionLayoutSettings.bodyOffsetMin;
+            bodyRect.offsetMax = descriptionLayoutSettings.bodyOffsetMax;
             bodyRect.sizeDelta = new Vector2(0f, Mathf.Max(preferredHeight, 10f));
-            bodyRect.anchoredPosition = new Vector2(0f, -skillDescriptionPanelPadding.y);
+            bodyRect.anchoredPosition = descriptionLayoutSettings.bodyAnchoredPosition;
         }
 
         if (skillDescriptionBodyViewportRect != null)
         {
-            skillDescriptionBodyViewportRect.offsetMin = new Vector2(0f, skillDescriptionPanelPadding.y);
-            skillDescriptionBodyViewportRect.offsetMax = new Vector2(0f, -46f);
+            skillDescriptionBodyViewportRect.offsetMin = descriptionLayoutSettings.bodyViewportOffsetMin;
+            skillDescriptionBodyViewportRect.offsetMax = descriptionLayoutSettings.bodyViewportOffsetMax;
         }
     }
 
@@ -1963,8 +2139,11 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
-        ApplyAttributePanelTextLayout();
+        if (applyDescriptionLayoutAtRuntime)
+        {
+            ApplyAttributePanelLayout(attributePanel.transform as RectTransform);
+            ApplyAttributePanelTextLayout();
+        }
 
         CombatStats stats = currentPlayer != null ? BattleStatUtility.GetCombatStats(currentPlayer) : null;
         if (attributePanelTitleText != null)
@@ -2167,6 +2346,59 @@ public class RuneUIController : MonoBehaviour
         }
 
         return null;
+    }
+
+    private void OnValidate()
+    {
+        inventoryLayoutSettings.columnCount = Mathf.Max(1, inventoryLayoutSettings.columnCount);
+
+        if (!Application.isPlaying && mainPanel != null)
+        {
+            if (runeInventoryPanel == null)
+            {
+                runeInventoryPanel = FindChildRecursive(mainPanel.transform, "RuneBagPanel") as RectTransform;
+            }
+
+            if (runeInventoryViewport == null)
+            {
+                runeInventoryViewport = FindChildRecursive(mainPanel.transform, "RuneListViewport") as RectTransform;
+            }
+
+            if (runeInventoryContent == null)
+            {
+                runeInventoryContent = FindChildRecursive(mainPanel.transform, "RuneListContent") as RectTransform;
+            }
+
+            if (runeInventoryScrollRect == null && runeInventoryPanel != null)
+            {
+                runeInventoryScrollRect = runeInventoryPanel.GetComponent<ScrollRect>();
+            }
+
+            if (runeInventoryScrollbar == null && runeInventoryPanel != null)
+            {
+                runeInventoryScrollbar = runeInventoryPanel.GetComponentInChildren<Scrollbar>(true);
+            }
+
+            if (runeDescriptionPanel == null)
+            {
+                runeDescriptionPanel = FindChildRecursive(mainPanel.transform, "SkillDescriptionPanel") as RectTransform;
+            }
+
+            if (runeDescriptionViewport == null && runeDescriptionPanel != null)
+            {
+                runeDescriptionViewport = runeDescriptionPanel.Find("BodyViewport") as RectTransform;
+            }
+
+            if (runeDescriptionContent == null && runeDescriptionViewport != null)
+            {
+                runeDescriptionContent = runeDescriptionViewport.Find("Body") as RectTransform;
+            }
+
+            if (runeDescriptionBackground == null)
+            {
+                runeDescriptionBackground = runeDescriptionPanel;
+            }
+        }
     }
 }
 

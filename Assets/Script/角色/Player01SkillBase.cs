@@ -173,6 +173,7 @@ public abstract class Player01SkillBase : MonoBehaviour
         }
 
         PrepareRuneCastContext();
+        NotifyDayNightGaugeSkillCast();
         castFinished = false;
         return true;
     }
@@ -287,6 +288,35 @@ public abstract class Player01SkillBase : MonoBehaviour
         }
 
         return Mathf.Max(0f, runtimeState.GetOutgoingDamageMultiplier(SkillIndex));
+    }
+
+    protected virtual float ResolveSkillManaCostForGauge()
+    {
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            return SkillResource.GetSkillManaCost(SkillIndex);
+        }
+
+        return 0f;
+    }
+
+    protected virtual float ResolveSkillCooldownForGauge()
+    {
+        if (SkillResource != null && SkillIndex >= 0)
+        {
+            return SkillResource.GetSkillMaxCD(SkillIndex);
+        }
+
+        return Mathf.Max(0f, cooldown);
+    }
+
+    protected virtual void NotifyDayNightGaugeSkillCast()
+    {
+        DayNightAffinityDamageModifier.NotifySuccessfulSkillCast(
+            Controller != null ? Controller.gameObject : gameObject,
+            ResolveSkillManaCostForGauge(),
+            ResolveSkillCooldownForGauge(),
+            GetSkillLabel());
     }
 
     [System.Diagnostics.Conditional("UNITY_EDITOR")]

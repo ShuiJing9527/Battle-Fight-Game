@@ -2,6 +2,10 @@ using UnityEngine;
 
 public static class DayNightAffinityDamageModifier
 {
+    private const float SkillGaugeGainManaWeight = 0.5f;
+    private const float SkillGaugeGainMin = 5f;
+    private const float SkillGaugeGainMax = 30f;
+
     public static float ApplyModifier(GameObject attacker, GameObject defender, float damage, out float multiplier)
     {
         multiplier = 1f;
@@ -127,20 +131,7 @@ public static class DayNightAffinityDamageModifier
             return false;
         }
 
-        float amount = gauge.GaugeGainPerHit;
-        float previousBalance = gauge.BalanceValue;
-        string action = "none";
-        if (affinity.IsNightChild)
-        {
-            gauge.AddTwilight(amount);
-            action = "AddTwilight";
-        }
-        else if (affinity.IsDayChild)
-        {
-            gauge.AddRadiance(amount);
-            action = "AddRadiance";
-        }
-        else
+        if (!affinity.IsNightChild && !affinity.IsDayChild)
         {
             LogHitFlow(debugHitFlow, $"skipped reason=affinity-type-none originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} target={GetObjectName(resolvedDefender)}", resolvedAttacker);
             return false;
@@ -148,8 +139,63 @@ public static class DayNightAffinityDamageModifier
 
         LogHitFlow(
             debugHitFlow,
-            $"success target={GetObjectName(resolvedDefender)} originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} affinity={GetAffinityName(affinity)} attackerIsPlayer={BattleTargetUtility.IsPlayer(resolvedAttacker)} targetIsMonster={BattleTargetUtility.IsMonster(resolvedDefender)} action={action} oldBalance={previousBalance:F2} newBalance={gauge.BalanceValue:F2}",
+            $"skipped reason=hit-gain-disabled target={GetObjectName(resolvedDefender)} originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} affinity={GetAffinityName(affinity)} attackerIsPlayer={BattleTargetUtility.IsPlayer(resolvedAttacker)} targetIsMonster={BattleTargetUtility.IsMonster(resolvedDefender)} balanceUnchanged={gauge.BalanceValue:F2}",
             resolvedDefender);
+        return false;
+    }
+
+    public static bool NotifySuccessfulSkillCast(GameObject caster, float manaCost, float cooldownSeconds, string skillLabel = null)
+    {
+        if (caster == null)
+        {
+            return false;
+        }
+
+        DayNightGaugeRuntimeState gauge = DayNightGaugeRuntimeState.Instance;
+        bool debugHitFlow = gauge != null && gauge.DebugHitFlowEnabled;
+        PlayerDayNightAffinity affinity = ResolveAffinity(caster);
+        GameObject resolvedCaster = ResolvePlayerSource(caster) ?? caster;
+
+        if (gauge == null)
+        {
+            LogHitFlow(debugHitFlow, $"skill-cast skipped reason=gauge-null caster={GetObjectName(resolvedCaster)} skill={skillLabel ?? "<unknown>"}", resolvedCaster);
+            return false;
+        }
+
+        if (affinity == null)
+        {
+            LogHitFlow(debugHitFlow, $"skill-cast skipped reason=affinity-not-found caster={GetObjectName(resolvedCaster)} skill={skillLabel ?? "<unknown>"}", resolvedCaster);
+            return false;
+        }
+
+        if (!affinity.IsDayChild && !affinity.IsNightChild)
+        {
+            LogHitFlow(debugHitFlow, $"skill-cast skipped reason=affinity-type-none caster={GetObjectName(resolvedCaster)} skill={skillLabel ?? "<unknown>"}", resolvedCaster);
+            return false;
+        }
+
+        float gain = Mathf.Clamp(
+            Mathf.Max(0f, manaCost) * SkillGaugeGainManaWeight + Mathf.Max(0f, cooldownSeconds),
+            SkillGaugeGainMin,
+            SkillGaugeGainMax);
+        float previousBalance = gauge.BalanceValue;
+        string action;
+
+        if (affinity.IsDayChild)
+        {
+            gauge.AddRadiance(gain);
+            action = "AddRadiance";
+        }
+        else
+        {
+            gauge.AddTwilight(gain);
+            action = "AddTwilight";
+        }
+
+        LogHitFlow(
+            debugHitFlow,
+            $"skill-cast success caster={GetObjectName(resolvedCaster)} skill={skillLabel ?? "<unknown>"} affinity={GetAffinityName(affinity)} manaCost={manaCost:F2} cooldown={cooldownSeconds:F2} gain={gain:F2} action={action} oldBalance={previousBalance:F2} newBalance={gauge.BalanceValue:F2}",
+            resolvedCaster);
         return true;
     }
 
