@@ -161,6 +161,11 @@ public class CombatHealth : MonoBehaviour
         }
 
         float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
+        CombatStats attackerStats = BattleStatUtility.GetCombatStats(damage.source);
+        if (attackerStats != null)
+        {
+            outgoingDamage *= Mathf.Max(0f, attackerStats.outgoingDamageMultiplier);
+        }
         damage.amount = outgoingDamage;
         float finalDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
         finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _);

@@ -124,43 +124,6 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 7435951962475006116, guid: 1b67adffd422cf1429f189a19e413b87, type: 3}
   m_PrefabInstance: {fileID: 4640890769329215388}
   m_PrefabAsset: {fileID: 0}
---- !u!84 &125381703
-RenderTexture:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_Name: 
-  m_ImageContentsHash:
-    serializedVersion: 2
-    Hash: 00000000000000000000000000000000
-  m_IsAlphaChannelOptional: 0
-  serializedVersion: 6
-  m_Width: 128
-  m_Height: 128
-  m_AntiAliasing: 1
-  m_MipCount: -1
-  m_DepthStencilFormat: 90
-  m_ColorFormat: 8
-  m_MipMap: 1
-  m_GenerateMips: 1
-  m_SRGB: 0
-  m_UseDynamicScale: 0
-  m_UseDynamicScaleExplicit: 0
-  m_BindMS: 0
-  m_EnableCompatibleFormat: 1
-  m_EnableRandomWrite: 0
-  m_TextureSettings:
-    serializedVersion: 2
-    m_FilterMode: 1
-    m_Aniso: 1
-    m_MipBias: 0
-    m_WrapU: 1
-    m_WrapV: 1
-    m_WrapW: 1
-  m_Dimension: 4
-  m_VolumeDepth: 1
-  m_ShadowSamplingMode: 2
 --- !u!1 &174403695
 GameObject:
   m_ObjectHideFlags: 0
@@ -56241,8 +56204,93 @@ MonoBehaviour:
   maplterations: 50
   paintTilemap: {fileID: 1103478512}
   paintProp: {fileID: 1103478511}
+  enableShoreSand: 1
+  shoreSandNormalPrefab: {fileID: 0}
+  shoreSandOceanTransitionPrefab: {fileID: 0}
+  shoreSandGrassTransitionPrefab: {fileID: 0}
+  shoreSandOceanOuterCornerPrefab: {fileID: 0}
+  shoreSandOceanInnerCornerPrefab: {fileID: 0}
+  shoreSandGrassOuterCornerPrefab: {fileID: 0}
+  shoreSandGrassInnerCornerPrefab: {fileID: 0}
+  shoreSandParent: {fileID: 0}
+  shoreSandHeightOffset: 0.02
+  shoreSandWidth: 5
+  minimumShoreSandFootprint: 2
+  debugShoreSandPlacements: 0
+  enableShoreClassificationDebugLogs: 0
+  enableDirectionalWideBeach: 1
+  directionalBeachTargetGrassRatio: 0.3
+  directionalMainBeachBudgetRatio: 0.8
+  directionalSecondaryBeachMaxCount: 2
+  directionalWideBeachMinimumSegmentLength: 10
+  directionalWideBeachMinimumDepth: 5
+  directionalWideBeachMaximumDepth: 14
+  directionalWideBeachFalloffLength: 5
+  directionalWideBeachCurvatureTolerance: 0.45
+  debugShoreSandDecisionTrace: 0
+  debugShoreSandGridPoint: {x: 0, y: 0}
   regionSize: {x: 3, y: 3}
   regionArea: {x: 100, y: 100}
+  regionGenerateOptions:
+  - displayName: Region 0
+    generateThisRegion: 1
+    paintSlotIndex: 0
+    areaType: 0
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 1
+    generateThisRegion: 1
+    paintSlotIndex: 1
+    areaType: 6
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 2
+    generateThisRegion: 0
+    paintSlotIndex: 2
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 3
+    generateThisRegion: 0
+    paintSlotIndex: 3
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 4
+    generateThisRegion: 0
+    paintSlotIndex: 4
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 5
+    generateThisRegion: 0
+    paintSlotIndex: 5
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 6
+    generateThisRegion: 0
+    paintSlotIndex: 6
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 7
+    generateThisRegion: 0
+    paintSlotIndex: 7
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  - displayName: Region 8
+    generateThisRegion: 0
+    paintSlotIndex: 8
+    areaType: 5
+    sizeMultiplier: {x: 1, y: 1}
+  regionsPerRow: 3
+  regionSpacing: {x: 12, y: 12}
+  defaultRegionSizeMultiplier: {x: 1, y: 1}
+  compactByActualFloorBounds: 1
+  actualLandSpacing: 3
+  centerFirstRegionAtWorldOrigin: 1
+  createConnectorBetweenRegions: 0
+  enableLandShapeCleanup: 0
+  fillTinyWaterPockets: 1
+  removeSingleTileSpikes: 1
+  cleanupIterations: 1
+  minimumTerrainFeatureWidth: 4
+  enableShorelineMicroCleanup: 1
+  shorelineMicroCleanupSize: 2
   useRegionAreaTypes: 0
   regionAreaTypes: 000000000000000000000000000000000000000000000000000000000000000000000000
   grassRegionIndices: 00000000
@@ -56806,6 +56854,7 @@ MonoBehaviour:
     clusterMaxCount: 7
     clusterFalloff: 1
   groupRules: []
+  beachSpawnRules: []
   propsRootName: PropsRoot
   minDistanceGridCellSize: 2
 --- !u!114 &1103478512
@@ -56844,6 +56893,7 @@ MonoBehaviour:
   wallColliderTilemap: {fileID: 174403698}
   wallColliderHeight: 2
   wallColliderRootName: Merged Wall Colliders
+  debugOceanWallColliders: 0
 --- !u!114 &1103478513
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -56864,9 +56914,12 @@ MonoBehaviour:
   player01Name: Player01
   player02Name: Player02
   partyLeaderName: Player01
+  drawLegacyHud: 0
   showSwitchHint: 1
   disablePlayer2AnimatorIfSharedController: 0
   showHealthBar: 1
+  showRuneHint: 1
+  runeBagUI: {fileID: 0}
   playerStartHealth: 100
 --- !u!114 &1103478514
 MonoBehaviour:
@@ -56886,18 +56939,109 @@ MonoBehaviour:
   - {fileID: 8809199598531854168, guid: c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8, type: 3}
   - {fileID: 8809199598531854168, guid: b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7, type: 3}
   - {fileID: 8809199598531854168, guid: d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9, type: 3}
-  maxEnemyCount: 5
+  normalEnemyPrefabs: []
+  eliteEnemyPrefabs: []
+  bossEnemyPrefabs: []
+  useRuntimeRankOverride: 1
   spawnInterval: 3
   startDelay: 2
+  eliteSpawnInterval: 30
+  baseNormalMonsterCount: 5
+  maxNormalMonsterCount: 50
+  normalReinforceIntervalMin: 5
+  normalReinforceIntervalMax: 10
+  normalReinforceCountMin: 1
+  normalReinforceCountMax: 5
+  baseHealthMultiplier: 1
+  baseAttackMultiplier: 1
+  baseDefenseMultiplier: 1
+  baseSpecialAttackMultiplier: 1
+  baseSpecialDefenseMultiplier: 1
+  baseSpeedMultiplier: 1
+  monsterStatGrowthIntervalMin: 30
+  monsterStatGrowthIntervalMax: 60
+  monsterStatGrowthPercentMin: 0.01
+  monsterStatGrowthPercentMax: 0.05
+  currentMonsterStatMultiplier: 1
+  normalHealthMultiplier: 1
+  normalAttackMultiplier: 1
+  normalDefenseMultiplier: 1
+  normalMagicMultiplier: 1
+  normalResistanceMultiplier: 1
+  normalSpeedMultiplier: 1
+  eliteHealthMultiplier: 3
+  eliteAttackMultiplier: 2
+  eliteDefenseMultiplier: 1.5
+  eliteMagicMultiplier: 2
+  eliteResistanceMultiplier: 1.5
+  eliteSpeedMultiplier: 1.1
+  eliteAttackIntervalMultiplier: 1.1
+  eliteOutgoingDamageMultiplier: 1
+  bossHealthMultiplier: 10
+  bossAttackMultiplier: 5
+  bossDefenseMultiplier: 3
+  bossMagicMultiplier: 5
+  bossResistanceMultiplier: 3
+  bossSpeedMultiplier: 1
+  bossAttackIntervalMultiplier: 1.8
+  bossOutgoingDamageMultiplier: 1.5
+  eliteSpawnIntervalMin: 10
+  eliteSpawnIntervalMax: 30
+  eliteGuaranteedSpawnTime: 30
+  maxAliveEliteCount: 1
+  bossCheckIntervalGameHours: 6
+  bossSpawnChancePerCheck: 0.25
+  maxAliveBossCount: 1
+  finalMomentBossHpMultiplier: 1.5
+  finalMomentBossAttackMultiplier: 1.25
+  finalMomentBossDefenseMultiplier: 1
+  finalMomentBossSpecialAttackMultiplier: 1.25
+  finalMomentBossSpecialDefenseMultiplier: 1
+  finalMomentBossSpeedMultiplier: 1
+  ultimateBossHpPerRemainingEnemy: 0.05
+  ultimateBossAttackPerRemainingEnemy: 0.03
+  ultimateBossMaxHpMultiplier: 5
+  ultimateBossMaxAttackMultiplier: 3
+  ultimateBossSpeedMultiplier: 1
+  cleanupBossHealthMultiplier: 1
+  cleanupBossAttackMultiplier: 1
+  cleanupBossDefenseMultiplier: 1
+  cleanupBossSpecialAttackMultiplier: 1
+  cleanupBossSpecialDefenseMultiplier: 1
+  cleanupBossSpeedMultiplier: 1
+  cleanupBossScaleMultiplier: 1
+  cleanupBossOutgoingDamageMultiplier: 1
+  cleanupBossAttackIntervalMultiplier: 1
+  cleanupBossRewardMultiplier: 1
+  cleanupBossPhaseSplitEnabled: 1
+  cleanupBossSplitHealthThresholds:
+  - 0.7
+  - 0.5
+  - 0.3
+  cleanupBossSplitCountPerThreshold: 2
+  cleanupBossSplitScatterRadius: 1.5
+  cleanupBossSplitChildRank: 1
+  cleanupBossSplitChildHealthRatio: 0.35
+  cleanupBossSplitChildAttackRatio: 0.55
+  cleanupBossSplitChildDefenseRatio: 0.5
+  cleanupBossSplitChildSpeedRatio: 1
+  cleanupBossSplitChildScaleRatio: 0.75
+  cleanupBossSplitChildrenCanSplit: 0
+  debugCleanupBossPhaseSplit: 0
+  debugCleanupBossScaling: 0
   spawnAroundPlayer: 1
   spawnMinDistance: 6
   spawnMaxDistance: 12
   fallbackSpawnRadiusX: 10
   fallbackSpawnRadiusZ: 10
-  includeGeneratedMissingArchetypes: 1
-  generatedArchetypeChance: 0.35
   playerTarget: {fileID: 0}
   playerTag: Player
+  enemyLayerName: Enemy
+  ignoreEnemySelfCollision: 1
+  freezeEnemyVerticalPosition: 0
+  difficultyDirector: {fileID: 0}
+  debugDifficultySpawnLogs: 0
+  debugScalingBreakdown: 0
 --- !u!1 &1119862288
 GameObject:
   m_ObjectHideFlags: 0
@@ -62169,7 +62313,7 @@ ReflectionProbe:
   m_RenderDynamicObjects: 0
   m_UseOcclusionCulling: 1
   m_Importance: 1
-  m_CustomBakedTexture: {fileID: 125381703}
+  m_CustomBakedTexture: {fileID: 1424317110}
 --- !u!4 &1174314785
 Transform:
   m_ObjectHideFlags: 0
@@ -78620,8 +78764,8 @@ Light:
   m_Enabled: 1
   serializedVersion: 11
   m_Type: 1
-  m_Color: {r: 0.080467366, g: 0.0993574, b: 0.30085096, a: 0}
-  m_Intensity: 0
+  m_Color: {r: 0.98049265, g: 0.69843996, b: 0.3085618, a: 1}
+  m_Intensity: 8
   m_Range: 10
   m_SpotAngle: 30
   m_InnerSpotAngle: 21.80208
@@ -78683,7 +78827,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1373474694}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
+  m_LocalRotation: {x: 0.6950241, y: 0.18623114, z: 0.17973666, w: 0.67078626}
   m_LocalPosition: {x: 0, y: 5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -78766,6 +78910,43 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+--- !u!84 &1424317110
+RenderTexture:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: 
+  m_ImageContentsHash:
+    serializedVersion: 2
+    Hash: 00000000000000000000000000000000
+  m_IsAlphaChannelOptional: 0
+  serializedVersion: 6
+  m_Width: 128
+  m_Height: 128
+  m_AntiAliasing: 1
+  m_MipCount: -1
+  m_DepthStencilFormat: 90
+  m_ColorFormat: 8
+  m_MipMap: 1
+  m_GenerateMips: 1
+  m_SRGB: 0
+  m_UseDynamicScale: 0
+  m_UseDynamicScaleExplicit: 0
+  m_BindMS: 0
+  m_EnableCompatibleFormat: 1
+  m_EnableRandomWrite: 0
+  m_TextureSettings:
+    serializedVersion: 2
+    m_FilterMode: 1
+    m_Aniso: 1
+    m_MipBias: 0
+    m_WrapU: 1
+    m_WrapV: 1
+    m_WrapW: 1
+  m_Dimension: 4
+  m_VolumeDepth: 1
+  m_ShadowSamplingMode: 2
 --- !u!1 &1662612881
 GameObject:
   m_ObjectHideFlags: 0
@@ -80288,11 +80469,52 @@ PrefabInstance:
       propertyPath: m_LocalEulerAnglesHint.z
       value: 0
       objectReference: {fileID: 0}
+    - target: {fileID: 6561031579482037920, guid: 766097ebe66a1274c99fe455b9cdac39, type: 3}
+      propertyPath: m_Intensity
+      value: 1.462867
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
-    m_AddedComponents: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 6561031579482037922, guid: 766097ebe66a1274c99fe455b9cdac39, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 1245118931489144647}
   m_SourcePrefab: {fileID: 100100000, guid: 766097ebe66a1274c99fe455b9cdac39, type: 3}
+--- !u!1 &1245118931489144646 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 6561031579482037922, guid: 766097ebe66a1274c99fe455b9cdac39, type: 3}
+  m_PrefabInstance: {fileID: 1245118931489144645}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &1245118931489144647
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1245118931489144646}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 474bcb49853aa07438625e644c072ee6, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Unity.RenderPipelines.Universal.Runtime::UnityEngine.Rendering.Universal.UniversalAdditionalLightData
+  m_UsePipelineSettings: 1
+  m_AdditionalLightsShadowResolutionTier: 2
+  m_CustomShadowLayers: 0
+  m_LightCookieSize: {x: 1, y: 1}
+  m_LightCookieOffset: {x: 0, y: 0}
+  m_SoftShadowQuality: 0
+  m_RenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_ShadowRenderingLayersMask:
+    serializedVersion: 0
+    m_Bits: 1
+  m_Version: 4
+  m_LightLayerMask: 1
+  m_ShadowLayerMask: 1
+  m_RenderingLayers: 1
+  m_ShadowRenderingLayers: 1
 --- !u!4 &1392241771748888899 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1335155494633307472, guid: c1863f58801432043bcbc0a94c3f6557, type: 3}
@@ -80761,6 +80983,10 @@ PrefabInstance:
     - target: {fileID: 1446829692210700123, guid: 6484bf4b50bad604b8cfcc1ee02603fb, type: 3}
       propertyPath: rOrbitClearWhenOrbitEnds
       value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 5269848324019781677, guid: 6484bf4b50bad604b8cfcc1ee02603fb, type: 3}
+      propertyPath: m_Mesh
+      value: 
       objectReference: {fileID: 0}
     - target: {fileID: 5650248378318002330, guid: 6484bf4b50bad604b8cfcc1ee02603fb, type: 3}
       propertyPath: eRailDuration
