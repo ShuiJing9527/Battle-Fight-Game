@@ -18,6 +18,20 @@ public class PlayerSpawnManager : MonoBehaviour
     private GameObject player01Instance;
     private GameObject player02Instance;
 
+    public int ClearSpawnedPlayers()
+    {
+        int clearedCount = 0;
+        clearedCount += ClearSpawnedPlayer(ref player01Instance);
+        clearedCount += ClearSpawnedPlayer(ref player02Instance);
+
+        Debug.Log(
+            $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} " +
+            $"clearedRuntimePlayers={clearedCount}",
+            this);
+
+        return clearedCount;
+    }
+
     public bool SpawnPartyAtRandomSafePoint()
     {
         RandomMapGeneration mapGeneration = FindObjectOfType<RandomMapGeneration>();
@@ -26,9 +40,17 @@ public class PlayerSpawnManager : MonoBehaviour
 
     public bool SpawnPartyAtRandomSafePoint(RandomMapGeneration mapGeneration)
     {
+        Debug.Log(
+            $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+            $"action=spawn-party prefab01={(player01Prefab != null ? player01Prefab.name : "null")} " +
+            $"prefab02={(player02Prefab != null ? player02Prefab.name : "null")}",
+            this);
+
         if (mapGeneration == null)
         {
-            Debug.LogWarning("[PlayerSpawnManager] Map generation not found.", this);
+            Debug.LogWarning(
+                $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} skipped=True reason=map-generation-not-found",
+                this);
             return false;
         }
 
@@ -48,15 +70,28 @@ public class PlayerSpawnManager : MonoBehaviour
             return true;
         }
 
-        Debug.LogWarning("[PlayerSpawnManager] No safe grass spawn position found.", this);
+        Debug.LogWarning(
+            $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+            "skipped=True reason=no-safe-grass-spawn",
+            this);
         return false;
     }
 
     public void SpawnPartyAtWorldPosition(RandomMapGeneration mapGeneration, Vector3 spawnPosition, Vector2Int spawnCoord)
     {
+        Debug.Log(
+            $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+            "action=spawn-world-position " +
+            $"spawnCoord={spawnCoord} spawnPosition={spawnPosition} " +
+            $"preExistingPlayer01Count={CountSceneObjectsNamed("Player01")} " +
+            $"preExistingPlayer02Count={CountSceneObjectsNamed("Player02")}",
+            this);
+
         if (player01Prefab == null)
         {
-            Debug.LogWarning("[PlayerSpawnManager] player01Prefab is missing.", this);
+            Debug.LogWarning(
+                $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} skipped=True reason=missing-player01-prefab",
+                this);
             return;
         }
 
@@ -100,7 +135,10 @@ public class PlayerSpawnManager : MonoBehaviour
             cameraRig.playerSlot = player01Instance.transform;
         }
 
-        Debug.Log($"[PlayerSpawnManager] Spawned party at cell={spawnCoord} world={spawnPosition}", this);
+        Debug.Log(
+            $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+            $"spawned=True spawnCoord={spawnCoord} spawnPosition={spawnPosition}",
+            this);
     }
 
     private GameObject EnsurePlayerInstance(GameObject instance, GameObject prefab, string fallbackName)
@@ -131,14 +169,40 @@ public class PlayerSpawnManager : MonoBehaviour
         Rigidbody rb = player.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                player != null ? player.GetComponent<PlayerMovement>() : null,
+                nameof(PlayerSpawnManager),
+                nameof(ResetMotion),
+                rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "spawn-reset-motion-root-rigidbody",
+                "none",
+                "none",
+                "spawn-reset");
             rb.angularVelocity = Vector3.zero;
         }
 
         PlayerMovement movement = player.GetComponentInChildren<PlayerMovement>();
         if (movement != null && movement.rb != null)
         {
-            movement.rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = movement.rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            movement.rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                movement,
+                nameof(PlayerSpawnManager),
+                nameof(ResetMotion),
+                movement.rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "spawn-reset-motion-player-movement-rigidbody",
+                "none",
+                "none",
+                "spawn-reset");
             movement.rb.angularVelocity = Vector3.zero;
         }
     }
@@ -169,5 +233,58 @@ public class PlayerSpawnManager : MonoBehaviour
         }
 
         return false;
+    }
+
+    private static int CountSceneObjectsNamed(string exactName)
+    {
+        if (string.IsNullOrEmpty(exactName))
+        {
+            return 0;
+        }
+
+        int count = 0;
+        GameObject[] objects = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < objects.Length; i++)
+        {
+            GameObject obj = objects[i];
+            if (obj == null || !obj.scene.IsValid() || !obj.scene.isLoaded)
+            {
+                continue;
+            }
+
+            if (obj.name == exactName)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private static int ResolveGenerationId(RandomMapGeneration mapGeneration)
+    {
+        return mapGeneration != null ? mapGeneration.GetCurrentGenerateMapDebugId() : -1;
+    }
+
+    private int ClearSpawnedPlayer(ref GameObject instance)
+    {
+        if (instance == null)
+        {
+            return 0;
+        }
+
+        GameObject target = instance;
+        instance = null;
+
+        if (Application.isPlaying)
+        {
+            Destroy(target);
+        }
+        else
+        {
+            DestroyImmediate(target);
+        }
+
+        return 1;
     }
 }

@@ -1,0 +1,38 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a62c34e8345f4b7caee6f598c8d61e31, type: 3}
+  m_Name: RuneDropSettings
+  m_EditorClassIdentifier: 
+  normalRuneDrops: 0
+  eliteRuneDrops: 1
+  bossRuneDrops: 2
+  normalExtraRuneChance: 0
+  eliteExtraRuneChance: 0
+  bossExtraRuneChance: 0
+  extraRuneDropChancePerLuck: 0.005
+  maxExtraRuneDropChanceFromLuck: 0.3
+  highRuneDropTestMode: 0
+  normalRuneDropRateMultiplier: 0.25
+  dropYOffset: 0.3
+  runeDropPrefabs:
+  - {fileID: 2995015994627158919, guid: f49ac055fb7c12d4a97d628b127435c8, type: 3}
+  runeWeights:
+  - runeType: 1
+    weight: 20
+  - runeType: 2
+    weight: 20
+  - runeType: 3
+    weight: 20
+  - runeType: 4
+    weight: 20
+  - runeType: 5
+    weight: 20

@@ -108,8 +108,11 @@ GameObject:
   - component: {fileID: 4867309581870666108}
   - component: {fileID: 1144444444444444443}
   - component: {fileID: 6628814007878360940}
+  - component: {fileID: 7001000000000000003}
   - component: {fileID: -5861998377959674883}
   - component: {fileID: -4019637321156011623}
+  - component: {fileID: 47422418825983060}
+  - component: {fileID: 5557483866425931479}
   m_Layer: 0
   m_Name: Enemy_Slime_Poison
   m_TagString: Untagged
@@ -147,14 +150,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
   playerTarget: {fileID: 0}
   playerTag: Player
-  moveSpeed: 2.5
+  moveSpeed: 2.2
   stopDistance: 0.8
+  maxHorizontalMoveSpeed: 3
   faceMoveDirection: 0
   keepFlatRotation: 1
   enableEnemySoftAvoidance: 1
   enemySeparationRadius: 1.2
   enemySeparationWeight: 0.6
   enemySeparationMaxNeighbors: 8
+  maxVerticalTargetDifference: 1.5
+  maxVerticalVelocity: 4
   attackRange: 1.35
   attackHitRange: 1.6
   attackCooldown: 1.1
@@ -167,8 +173,21 @@ MonoBehaviour:
   meleeHitForwardOffset: 0
   closeHitRadius: 0
   meleeBodyContactRadius: 0.45
+  requireGroundedToAttack: 1
+  groundedProbeDistance: 0.2
+  maxVerticalAttackDifference: 0.75
+  maxHorizontalAttackDistance: 1.35
+  groundedAttackGraceTime: 0
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugAttackDiagnostics: 0
+  debugSpeedDiagnostics: 0
+  debugChaseDiagnostics: 1
+  debugAttackStateTransitions: 0
+  debugSlimeAttackLogs: 0
+  debugAttackLogInterval: 0.3
+  debugSpeedLogInterval: 1
+  targetResolveRetryInterval: 0.25
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -266,6 +285,9 @@ MonoBehaviour:
   attackSquashAmount: 0.2
   attackStretchAmount: 0.22
   attackStopDistance: 0.7
+  allowAttackForwardLeap: 1
+  allowAttackVerticalLeap: 1
+  maxAttackLeapDistance: 0.65
   minimumVisibleAlpha: 0.92
   deathDuration: 0.65
   deathFadeTime: 0.45
@@ -292,10 +314,10 @@ MonoBehaviour:
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
   dropYOffset: 0.5
   dropScatterRadius: 0.8
-  lifeSoulWeight: 25
-  energySoulWeight: 20
-  functionSoulWeight: 15
-  growthSoulWeight: 40
+  lifeSoulWeight: 30
+  energySoulWeight: 25
+  functionSoulWeight: 20
+  growthSoulWeight: 25
   resourcePoint1Weight: 50
   resourcePoint2Weight: 25
   resourcePoint3Weight: 15
@@ -308,10 +330,14 @@ MonoBehaviour:
   growthPoint5Weight: 1
   extraSoulDropChancePerLuck: 0.01
   maxExtraSoulDropChance: 0.5
-  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
+  runePickupPrefab: {fileID: 0}
   runeDropYOffset: 0.25
   extraRuneDropChancePerLuck: 0.005
   maxExtraRuneDropChance: 0.3
+  highRuneDropTestMode: 1
+  normalRuneDropRateMultiplier: 0.25
+  debugLuckDropLog: 0
+  debugRuneDropDiagLog: 1
 --- !u!114 &4867309581870666108
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -327,6 +353,7 @@ MonoBehaviour:
   species: 3
   rank: 0
   attackStyle: 0
+  suppressRuneDrop: 0
 --- !u!114 &1144444444444444443
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -344,7 +371,7 @@ MonoBehaviour:
   physicalDefense: 24
   specialAttack: 24
   specialDefense: 32
-  speed: 10
+  speed: 5
   luck: 6
 --- !u!114 &6628814007878360940
 MonoBehaviour:
@@ -368,6 +395,32 @@ MonoBehaviour:
   bossScale: 2.4
   applyScale: 1
   createFallbackLight: 1
+--- !u!114 &7001000000000000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88e6d39061144dfe9b8142287c87c8da, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::EliteSlimeSplitOnDeath
+  splitCount: 2
+  splitScatterRadius: 1.2
+  bossCanSplit: 1
+  bossSplitCount: 2
+  bossSplitScatterRadius: 1.5
+  bossSplitChildRank: 1
+  bossSplitHealthRatio: 0.65
+  bossSplitAttackRatio: 0.75
+  bossSplitDefenseRatio: 0.7
+  bossSplitSpeedRatio: 1
+  bossSplitScaleRatio: 0.9
+  bossChildrenCanSplit: 0
+  finalBossCanSplit: 1
+  debugSplitLogs: 0
 --- !u!114 &-5861998377959674883
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -448,3 +501,46 @@ MonoBehaviour:
   delayBeforeDestroy: 0
   includeRendererRoots: []
   excludeRendererRoots: []
+--- !u!114 &47422418825983060
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56f5fa6a33375474db32bdf0e6fddc6a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeMoveSFX
+  moveSfx:
+  - {fileID: 8300000, guid: 75d8fec8f5f1c5c4dacc63c17b7a63a7, type: 3}
+  rb: {fileID: 7990415199108324068}
+  minMoveSpeed: 0.1
+  soundInterval: 0.45
+  volume: 0.7
+--- !u!114 &5557483866425931479
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7c5aeaf494db384a901d2c322c383b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeJumpAttackSFX
+  rb: {fileID: 7990415199108324068}
+  playerTag: Player
+  detectPlayerDistance: 2
+  jumpVelocityThreshold: 2
+  jumpSfx: {fileID: 0}
+  landSfx: {fileID: 8300000, guid: 80736a17ce50c7c47b2585dd878fadf2, type: 3}
+  volume: 0.8
+  jumpCooldown: 0.8
+  groundCheck: {fileID: 0}
+  groundCheckRadius: 0.25
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 0

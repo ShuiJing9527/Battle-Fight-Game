@@ -414,6 +414,9 @@ GameObject:
   - component: {fileID: 5650248378318002330}
   - component: {fileID: 1446829692210700123}
   - component: {fileID: 9102200000000000001}
+  - component: {fileID: 4060893002195802195}
+  - component: {fileID: 7052170241724997631}
+  - component: {fileID: 9135020000000000001}
   m_Layer: 0
   m_Name: Player02
   m_TagString: Player
@@ -431,7 +434,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 99.50003, y: 1.2000153, z: 98.500015}
-  m_LocalScale: {x: 0.08, y: 0.08, z: 0.08}
+  m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 9205788309606312631}
@@ -500,8 +503,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 5
+  moveSpeed: 4.8
+  playerBaseMoveSpeedScale: 1
+  speedStatMoveRatio: 0.0025
+  maxActualMoveSpeed: 10
   rb: {fileID: 4389982266256825078}
+  debugSpeedDiagnostics: 0
+  debugSpeedLogInterval: 1
 --- !u!114 &1546861807539437966
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -545,6 +553,20 @@ MonoBehaviour:
   growthAttackBonusPerSoul: 0.03
   functionSoul: 0
   functionCooldownMultiplierPerSoul: 0.97
+  debugGrowthSoulRollLog: 0
+--- !u!114 &9135020000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  affinityType: 2
 --- !u!114 &2543590936332733996
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -571,6 +593,7 @@ MonoBehaviour:
   physicalDamageColor: {r: 1, g: 0.25, b: 0.25, a: 1}
   specialDamageColor: {r: 0.78, g: 0.35, b: 1, a: 1}
   criticalDamageColor: {r: 1, g: 0.84, b: 0.2, a: 1}
+  missDamageColor: {r: 0.75, g: 0.95, b: 1, a: 1}
   damagePopupOffset: {x: 0, y: 1, z: 0}
   damagePopupRandomOffset: {x: 0.3, y: 0.15}
 --- !u!114 &6060743048085689631
@@ -594,91 +617,71 @@ MonoBehaviour:
     baseDamage: 10
     attackRange: 2
     equippedRunes:
-    - id: 0
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
   - skillName: W Defense Skill
     skillType: 0
     energyCost: 30
@@ -687,91 +690,71 @@ MonoBehaviour:
     baseDamage: 0
     attackRange: 0
     equippedRunes:
-    - id: 0
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
   - skillName: E Movement Skill
     skillType: 0
     energyCost: 20
@@ -780,91 +763,71 @@ MonoBehaviour:
     baseDamage: 16
     attackRange: 1.2
     equippedRunes:
-    - id: 0
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
   - skillName: R Ultimate Skill
     skillType: 1
     energyCost: 60
@@ -873,91 +836,71 @@ MonoBehaviour:
     baseDamage: 50
     attackRange: 6
     equippedRunes:
-    - id: 0
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
-    - id: 0
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
+    - runeId: 0
       runeName: 
-      category: 
+      runeType: 0
       rarity: 0
-      mechanic: 0
-      triggerCondition: 
-      limitOrSideEffect: 
-      playStyle: 
-      extraHitCount: 0
-      extraCastCount: 1
-      damageMultiplier: 1
-      delaySeconds: 0
-      cooldownMultiplier: 1
-      range: 0
-      healthCost: 0
-      healAmount: 0
-      lifeSoulPrefab: {fileID: 0}
+      description: 
+      icon: {fileID: 0}
+      displayPrefab: {fileID: 0}
+      tier1Effect: 
+      tier2Effect: 
+      tier3Effect: 
+      tier4Effect: 
+      tier5Effect: 
+      setBonusEffect: 
   attackPoint: {fileID: 922604953166537750}
   enemyLayer:
     serializedVersion: 2
@@ -1002,7 +945,7 @@ MonoBehaviour:
   eSkill: {fileID: 5650248378318002330}
   rSkill: {fileID: 1446829692210700123}
   cooldownManager: {fileID: 0}
-  moveSpeed: 5
+  moveSpeed: 5.5
   dashDistance: 4
   dashDuration: 0.15
   lockCharacterRotation: 1
@@ -1131,6 +1074,8 @@ MonoBehaviour:
   eStarFallPathJitter: 0.25
   eStarFallSequentialDelay: 0.07
   currentSwordEnergy: 1
+  divineSealRequiredStarBladeCount: 36
+  accumulatedQStarBladeCountForDivineSeal: 0
   rBaseSwordCount: 7
   debugSkillCooldownFlow: 1
   sharedSkillEffectPrefab: {fileID: 5092486940606590864, guid: 171e622fbe0dbd64fbbea1a3cffaeb8c, type: 3}
@@ -1305,8 +1250,14 @@ MonoBehaviour:
   baseDamage: 10
   physicalScaling: 0.8
   specialScaling: 1
-  qStarFallDamageRadius: 0.8
-  qStarFallEnableDamage: 1
+  qPhysicalBaseDamage: 10
+  qPhysicalFromPhysicalAttackScaling: 0.6
+  qPhysicalFromSpecialAttackScaling: 0
+  qSpecialBaseDamage: 20
+  qSpecialFromPhysicalAttackScaling: 0
+  qSpecialFromSpecialAttackScaling: 0.3
+  qStarFallDamageRadius: 1
+  qStarFallEnableDamage: 0
   qStarFallDamageMultiplier: 1
   qDamageDebugLog: 0
   debugCriticalLog: 1
@@ -1331,6 +1282,7 @@ MonoBehaviour:
   qImpactLightningLocalOffset: {x: 0, y: -1, z: 0}
   qImpactLightningScale: {x: 1, y: 1, z: 1}
   qStarFallBladeCount: 5
+  divineSealRequiredStarBladeCount: 36
   qStarFallMinBladeCount: 1
   qStarFallBaseMaxBladeCount: 3
   qStarFallMaxBladeCountCap: 7
@@ -1405,21 +1357,31 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 3a1994dff4cc9c84cbcf8969b78086bd, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_W_HolyWheelDeflection
-  cooldown: 8
+  wCooldown: 12
   manaCost: 40
-  wDuration: 5
+  wShieldDuration: 5
   wDamageReduction: 0.4
   wShieldMaxHpMultiplier: 1
   wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
+  wOrbitStarBladeDamageShieldRatio: 0.5
+  wOrbitStarBladeFlatDamage: 0
+  wOrbitStarBladePhysicalSplitRatio: 0.5
+  wOrbitStarBladeSpecialSplitRatio: 0.5
+  wOrbitStarBladeFinalDamageMultiplier: 1
+  wOrbitStarBladeHitRadius: 0.45
+  wOrbitStarBladeKnockbackForce: 4
+  wOrbitStarBladeHitInterval: 0.35
   wDamageReductionPerSword: 0.03
   wMaxDamageReduction: 0.8
-  wCounterDamageRatio: 0.5
+  wCounterDamageFromShieldRatio: 0.5
+  wCounterDamageFromBlockedDamageRatio: 0
+  wCounterFlatDamage: 0
+  wCounterFinalDamageMultiplier: 1
   wEffectScale: {x: 1.2, y: 1.2, z: 1.2}
   wEffectScaleMultiplier: 1
-  baseWSwordCount: 3
-  useSwordEnergyForW: 1
-  maxWSwordCount: 12
+  wBaseOrbitStarBladeCount: 3
+  wMaxOrbitStarBladeCount: 12
   wEffectOrbitRadius: 1.5
   wEffectHeight: 0
   wEffectOrbitSpeed: 80
@@ -1453,11 +1415,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 45276561a2769df41a45b9e9df485010, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player2Skill_E_CelestialShift
-  cooldown: 3
-  manaCost: 20
+  cooldown: 2.5
+  manaCost: 10
   dashDistance: 4
   dashDuration: 0.15
   eRailDuration: 0.4
+  ePhysicalBaseDamage: 10
+  ePhysicalFromPhysicalAttackScaling: 0.6
+  ePhysicalFromSpecialAttackScaling: 0
+  eSpecialBaseDamage: 30
+  eSpecialFromPhysicalAttackScaling: 0
+  eSpecialFromSpecialAttackScaling: 0.3
+  ePhysicalDamageMultiplier: 1
+  eSpecialDamageMultiplier: 1
+  ePathHitRadius: 0.6
   eEnableAfterimageShader: 1
   eAfterimageSourceRenderer: {fileID: 7009046691658483294}
   eAfterimageMaterial: {fileID: 0}
@@ -1512,12 +1483,21 @@ MonoBehaviour:
   rSwarmBaseRotationSpeed: 90
   rSwarmRotationSpeedPerSword: 4
   rSwarmMaxRotationSpeed: 360
+  rVisibleStarBladeLimit: 64
+  rExtraDamagePerOverflowStarBlade: 10
   rDamageDebugLog: 0
-  rSwarmDebugLog: 0
+  rSwarmDebugLog: 1
   debugCriticalLog: 0
   baseDamage: 12
   physicalScaling: 0.5
   specialScaling: 1.3
+  rSwarmTickPhysicalBaseDamage: 20
+  rSwarmTickPhysicalFromPhysicalAttackScaling: 0.8
+  rSwarmTickPhysicalFromSpecialAttackScaling: 0
+  rSwarmTickSpecialBaseDamage: 40
+  rSwarmTickSpecialFromPhysicalAttackScaling: 0.4
+  rSwarmTickSpecialFromSpecialAttackScaling: 0.4
+  rSwarmTickDamageMultiplier: 1
   rEffectScale: {x: 0.3, y: 0.3, z: 0.3}
   rEffectRotationZ: 0
   rEffectOffset: {x: 0, y: 0, z: 0}
@@ -1583,7 +1563,13 @@ MonoBehaviour:
   rStarRainFallSpeed: 10
   rStarRainRandomDelay: 0.15
   rStarRainDamageRadius: 1.2
-  rStarRainDamageMultiplier: 0.6
+  rStarRainImpactDamageMultiplier: 0.6
+  rStarRainImpactPhysicalBaseDamage: 4
+  rStarRainImpactPhysicalFromPhysicalAttackScaling: 0.45
+  rStarRainImpactPhysicalFromSpecialAttackScaling: 0
+  rStarRainImpactSpecialBaseDamage: 15
+  rStarRainImpactSpecialFromPhysicalAttackScaling: 0
+  rStarRainImpactSpecialFromSpecialAttackScaling: 0.2
   rStarRainContinueAfterOrbit: 1
   rStarRainExtraDurationAfterOrbit: 0.6
   rStarRainAngleMin: 10
@@ -1669,3 +1655,39 @@ MonoBehaviour:
   includeRendererRoots:
   - {fileID: 9205788309606312631}
   excludeRendererRoots: []
+--- !u!114 &4060893002195802195
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e460e6726d33df43b1f64f24d871930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSFXByKey
+  flashKey: 113
+  flashSfx: {fileID: 0}
+  dashKey: 101
+  dashSfx: {fileID: 8300000, guid: 3e3c13bba6eb5d74791cbbcc84c5b99b, type: 3}
+  skillKey: 0
+  skillSfx: {fileID: 0}
+  volume: 1
+--- !u!114 &7052170241724997631
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13e64e5ecb621e847bf1418bdfca965a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthAudioWatcher
+  healthScript: {fileID: 0}
+  healthFieldName: currentHP
+  hitSfx: {fileID: 0}
+  deathSfx: {fileID: 0}
+  volume: 1

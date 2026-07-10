@@ -1,21 +1,29 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 public class Player1Skill_W_ThreadFlow : Player01SkillBase
 {
     [Header("W - Veil Barrier / Base")]
     [SerializeField, Min(0f)] private float wDuration = 8f;
     [SerializeField, Min(0f)] private float wCooldown = 8f;
-    [SerializeField, Min(0.1f)] private float wRadius = 4.5f;
+    [SerializeField, Min(0f)] private float wManaCost = 35f;
+    [FormerlySerializedAs("wRadius")]
+    [SerializeField, Min(0.1f)] private float wFieldRadius = 3.5f;
     [SerializeField] private bool wFollowPlayer = true;
 
     [Header("W - Veil Barrier / Damage")]
-    [SerializeField, Range(0f, 1f)] private float playerDamageTakenMultiplier = 0.5f;
+    [FormerlySerializedAs("playerDamageTakenMultiplier")]
+    [SerializeField, Range(0f, 1f)] private float wPlayerDamageReductionRatio = 0.5f;
 
     [Header("W - Veil Barrier / Enemy Debuff")]
-    [SerializeField, Range(0f, 1f)] private float enemyMoveSpeedMultiplier = 0.5f;
-    [SerializeField, Range(0f, 1f)] private float enemyAttackMultiplier = 0.5f;
+    [FormerlySerializedAs("enemyMoveSpeedMultiplier")]
+    [SerializeField, Range(0f, 1f)] private float wEnemyMoveSpeedMultiplier = 0.5f;
+    [FormerlySerializedAs("enemyAttackMultiplier")]
+    [SerializeField, Min(1f)] private float wEnemyAttackIntervalMultiplier = 1.5f;
+    [SerializeField, Range(0f, 1f)] private float wEnemyDamageMultiplier = 0.5f;
     [SerializeField, Min(0.01f)] private float enemyDebuffRefreshInterval = 0.1f;
 
     [Header("W - Veil Barrier / Visual")]
@@ -50,21 +58,25 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private Coroutine barrierDissolveRoutine;
     private Coroutine enemyDebuffRoutine;
     private string damageModifierKey;
-    private const string VeilDebuffKey = "Player01_W_Veil";
+    private const string VeilDebuffKey = "Player01_W_ThreadFlow";
     private RuneRuntimeState runeRuntimeState;
+    private bool playerDamageModifierApplied;
+    private Vector3 barrierCenterWorld;
 
     private void Reset()
     {
         wDuration = 8f;
         wCooldown = 8f;
-        wRadius = 4.5f;
+        wManaCost = 35f;
+        wFieldRadius = 3.5f;
         wFollowPlayer = true;
         effectPower = 0.8f;
         animationName = "";
         debugLog = true;
-        playerDamageTakenMultiplier = 0.5f;
-        enemyMoveSpeedMultiplier = 0.5f;
-        enemyAttackMultiplier = 0.5f;
+        wPlayerDamageReductionRatio = 0.5f;
+        wEnemyMoveSpeedMultiplier = 0.5f;
+        wEnemyAttackIntervalMultiplier = 1.5f;
+        wEnemyDamageMultiplier = 0.5f;
         enemyDebuffRefreshInterval = 0.1f;
         wDissolveInDuration = 0.4f;
         wDissolveOutDuration = 0.45f;
@@ -76,6 +88,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         veilBarrierScale = new Vector3(45f, 45f, 45f);
         veilBarrierLocalOffset = Vector3.zero;
         SyncSkillTiming();
+        SyncWVeilSkillConfig();
     }
 
     private void Awake()
@@ -83,17 +96,27 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         SyncSkillTiming();
         CacheReferences();
         runeRuntimeState = ResolveRuneRuntimeState();
+        SyncWVeilSkillConfig();
+    }
+
+    public override void Initialize(Player01SkillController controller)
+    {
+        base.Initialize(controller);
+        SyncWVeilSkillConfig();
     }
 
     private void OnValidate()
     {
+        wEnemyAttackIntervalMultiplier = Mathf.Max(1f, wEnemyAttackIntervalMultiplier);
         SyncSkillTiming();
         CacheReferences();
+        SyncWVeilSkillConfig();
     }
 
     private void LateUpdate()
     {
         ApplyBarrierTransform();
+        RefreshPlayerDamageModifierState();
     }
 
     public override bool LocksLocomotionAnimation()
@@ -103,24 +126,26 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
     protected override void OnCastStarted()
     {
-        runeRuntimeState = runeRuntimeState != null ? runeRuntimeState : ResolveRuneRuntimeState();
-        runeRuntimeState?.NotifySkillCastStarted(SkillIndex);
+        runeRuntimeState = ResolvePlayerRuneRuntimeState();
         IsDefending = true;
         SyncSkillTiming();
         CacheReferences();
+        SyncWVeilSkillConfig();
+        StopEnemyDebuffRoutine();
+        RemovePlayerDamageModifier();
+        ClearEnemyDebuffs();
         activeDebuffedEnemies.Clear();
         currentDebuffedEnemies.Clear();
-        ApplyPlayerDamageModifier();
+        barrierCenterWorld = transform.position + transform.TransformVector(veilBarrierLocalOffset);
         CreateBarrierInstance();
         StartEnemyDebuffRoutine();
+        RefreshPlayerDamageModifierState();
         StartBarrierDissolveIn();
         Controller?.FinishSkill(this);
 
-        if (debugLog)
-        {
-            Debug.Log("[Player01 W Veil] barrier active, skills remain usable", this);
-            Debug.Log($"[Player01 W Veil] Start duration={wDuration:F2} radius={wRadius:F2}", this);
-        }
+        Debug.Log(
+            $"Player01 W 星辰帷幕：持续={wDuration:F2}，半径={wFieldRadius:F2}，减伤={wPlayerDamageReductionRatio:F2}，敌人速度倍率={wEnemyMoveSpeedMultiplier:F2}，敌人攻击间隔倍率={wEnemyAttackIntervalMultiplier:F2}，敌人伤害倍率={wEnemyDamageMultiplier:F2}，CD={wCooldown:F2}，蓝耗={wManaCost:F2}",
+            this);
     }
 
     protected override IEnumerator CastRoutine()
@@ -144,24 +169,27 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         IsDefending = false;
         StopEnemyDebuffRoutine();
         RemovePlayerDamageModifier();
-        ClearEnemyDebuffs();
+        int restoredEnemyCount = ClearEnemyDebuffs();
         StartBarrierDissolveOut();
 
-        if (debugLog)
-        {
-            Debug.Log("[Player01 W Veil] End", this);
-        }
+        Debug.Log($"Player01 W 星辰帷幕结束，已恢复受影响敌人数量={restoredEnemyCount}", this);
     }
 
     protected override void OnDisable()
     {
         base.OnDisable();
+        StopEnemyDebuffRoutine();
+        RemovePlayerDamageModifier();
+        ClearEnemyDebuffs();
         CleanupBarrierVisualImmediate();
     }
 
     protected override void OnDestroy()
     {
         base.OnDestroy();
+        StopEnemyDebuffRoutine();
+        RemovePlayerDamageModifier();
+        ClearEnemyDebuffs();
         CleanupBarrierVisualImmediate();
     }
 
@@ -176,6 +204,29 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     {
         duration = Mathf.Max(0f, wDuration);
         cooldown = Mathf.Max(0f, wCooldown);
+    }
+
+    private void SyncWVeilSkillConfig()
+    {
+        float resolvedCooldown = Mathf.Max(0f, wCooldown);
+        float resolvedManaCost = Mathf.Max(0f, wManaCost);
+
+        if (SkillResource != null && SkillIndex >= 0 && SkillResource.skillDatas != null && SkillResource.skillDatas.Length > SkillIndex)
+        {
+            SkillCostCDData wData = SkillResource.skillDatas[SkillIndex];
+            wData.maxCooldown = resolvedCooldown;
+            wData.manaCost = resolvedManaCost;
+            SkillResource.skillDatas[SkillIndex] = wData;
+        }
+
+        if (Controller != null)
+        {
+            FieldInfo wCooldownField = typeof(Player01SkillController).GetField("wCooldown", BindingFlags.Instance | BindingFlags.NonPublic);
+            if (wCooldownField != null)
+            {
+                wCooldownField.SetValue(Controller, resolvedCooldown);
+            }
+        }
     }
 
     private void CacheReferences()
@@ -277,8 +328,15 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             return;
         }
 
-        float multiplier = Mathf.Clamp(playerDamageTakenMultiplier, 0f, 1f);
+        float effectiveReductionRatio = Mathf.Clamp01(wPlayerDamageReductionRatio * ResolveManaRuneScaledMultiplier(0.25f));
+        if (effectiveReductionRatio > wPlayerDamageReductionRatio)
+        {
+            LogManaRuneApplied("W", "DamageReductionRatio", wPlayerDamageReductionRatio, effectiveReductionRatio);
+        }
+
+        float multiplier = 1f - effectiveReductionRatio;
         cachedCombatHealth.AddDamageReductionModifier(damageModifierKey, multiplier);
+        playerDamageModifierApplied = true;
 
         if (debugLog)
         {
@@ -299,6 +357,56 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         }
 
         cachedCombatHealth.RemoveDamageReductionModifier(damageModifierKey);
+        playerDamageModifierApplied = false;
+    }
+
+    private void RefreshPlayerDamageModifierState()
+    {
+        if (!IsDefending)
+        {
+            if (playerDamageModifierApplied)
+            {
+                RemovePlayerDamageModifier();
+            }
+            return;
+        }
+
+        if (IsPlayerInsideBarrier())
+        {
+            if (!playerDamageModifierApplied)
+            {
+                ApplyPlayerDamageModifier();
+            }
+        }
+        else if (playerDamageModifierApplied)
+        {
+            RemovePlayerDamageModifier();
+        }
+    }
+
+    private bool IsPlayerInsideBarrier()
+    {
+        Vector3 barrierCenter = ResolveBarrierCenterWorld();
+        Vector3 playerPosition = transform.position;
+        barrierCenter.y = 0f;
+        playerPosition.y = 0f;
+        return Vector3.Distance(playerPosition, barrierCenter) <= Mathf.Max(0.1f, wFieldRadius);
+    }
+
+    private Vector3 ResolveBarrierCenterWorld()
+    {
+        Transform barrierTransform = activeBarrierInstance != null ? activeBarrierInstance.transform : null;
+        if (barrierTransform != null)
+        {
+            return barrierTransform.position;
+        }
+
+        if (wFollowPlayer)
+        {
+            return transform.position + transform.TransformVector(veilBarrierLocalOffset);
+        }
+
+        return barrierCenterWorld;
     }
 
     private void CreateBarrierInstance()
@@ -653,8 +761,9 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private void RefreshEnemyDebuffs()
     {
         currentDebuffedEnemies.Clear();
-
-        Collider[] hits = Physics.OverlapSphere(transform.position, Mathf.Max(0.1f, wRadius), ~0, QueryTriggerInteraction.Collide);
+        float barrierRadius = Mathf.Max(0.1f, wFieldRadius);
+        Vector3 barrierCenter = ResolveBarrierCenterWorld();
+        Collider[] hits = Physics.OverlapSphere(barrierCenter, barrierRadius, ~0, QueryTriggerInteraction.Collide);
         if (debugLog)
         {
             Debug.Log($"[Player01 W Veil] overlap count = {hits.Length}", this);
@@ -684,19 +793,30 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
                 Debug.Log($"[Player01 W Veil] found enemy = {enemyController.name}", enemyController);
             }
 
+            if (!IsEnemyWithinBarrierRange(enemyController.transform, barrierCenter, barrierRadius))
+            {
+                if (debugLog)
+                {
+                    Debug.Log($"[Player01 W Veil] skip out-of-range enemy = {enemyController.name}", enemyController);
+                }
+
+                continue;
+            }
+
             EnemyDebuffReceiver receiver = enemyController.GetComponentInParent<EnemyDebuffReceiver>();
             if (receiver == null)
             {
                 receiver = enemyController.gameObject.AddComponent<EnemyDebuffReceiver>();
             }
 
-            receiver.ApplyMoveSpeedMultiplier(damageModifierKey, Mathf.Clamp01(enemyMoveSpeedMultiplier));
-            receiver.ApplyAttackMultiplier(damageModifierKey, Mathf.Clamp01(enemyAttackMultiplier));
+            receiver.ApplyMoveSpeedMultiplier(damageModifierKey, Mathf.Clamp01(wEnemyMoveSpeedMultiplier));
+            receiver.ApplyAttackMultiplier(damageModifierKey, Mathf.Max(1f, wEnemyAttackIntervalMultiplier));
+            receiver.ApplyOutgoingDamageMultiplier(damageModifierKey, Mathf.Clamp01(wEnemyDamageMultiplier));
             currentDebuffedEnemies.Add(receiver);
 
             if (debugLog)
             {
-                Debug.Log($"[EnemyDebuff] Apply key={damageModifierKey} move={Mathf.Clamp01(enemyMoveSpeedMultiplier):F2} attack={Mathf.Clamp01(enemyAttackMultiplier):F2} enemy={enemyController.name}", enemyController);
+                Debug.Log($"[EnemyDebuff] Apply key={damageModifierKey} move={Mathf.Clamp01(wEnemyMoveSpeedMultiplier):F2} attackInterval={Mathf.Max(1f, wEnemyAttackIntervalMultiplier):F2} damage={Mathf.Clamp01(wEnemyDamageMultiplier):F2} enemy={enemyController.name}", enemyController);
             }
 
             if (!activeDebuffedEnemies.Contains(receiver) && debugLog)
@@ -728,6 +848,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
             receiver.RemoveMoveSpeedMultiplier(damageModifierKey);
             receiver.RemoveAttackMultiplier(damageModifierKey);
+            receiver.RemoveOutgoingDamageMultiplier(damageModifierKey);
 
             if (debugLog)
             {
@@ -736,8 +857,9 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         }
     }
 
-    private void ClearEnemyDebuffs()
+    private int ClearEnemyDebuffs()
     {
+        int restoredCount = 0;
         foreach (EnemyDebuffReceiver receiver in activeDebuffedEnemies)
         {
             if (receiver == null)
@@ -747,10 +869,27 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
             receiver.RemoveMoveSpeedMultiplier(damageModifierKey);
             receiver.RemoveAttackMultiplier(damageModifierKey);
+            receiver.RemoveOutgoingDamageMultiplier(damageModifierKey);
+            restoredCount++;
         }
 
         activeDebuffedEnemies.Clear();
         currentDebuffedEnemies.Clear();
+        return restoredCount;
+    }
+
+    private static bool IsEnemyWithinBarrierRange(Transform enemyTransform, Vector3 barrierCenter, float barrierRadius)
+    {
+        if (enemyTransform == null)
+        {
+            return false;
+        }
+
+        Vector3 enemyPosition = enemyTransform.position;
+        enemyPosition.y = barrierCenter.y;
+        Vector3 centeredBarrier = barrierCenter;
+        centeredBarrier.y = enemyPosition.y;
+        return Vector3.Distance(enemyPosition, centeredBarrier) <= barrierRadius;
     }
 
     private GameObject ResolveBarrierPrefab()

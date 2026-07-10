@@ -11,6 +11,7 @@ GameObject:
   - component: {fileID: 3039504028386278727}
   - component: {fileID: 5631639409175261293}
   - component: {fileID: 3452768298564656582}
+  - component: {fileID: 3403221781723054219}
   m_Layer: 0
   m_Name: Player01ScissorCutEffect
   m_TagString: Untagged
@@ -124,8 +125,27 @@ MonoBehaviour:
   - {fileID: 1146251755, guid: cc76ce7c634c13d43979437f2bca6eac, type: 3}
   - {fileID: -523982581, guid: cc76ce7c634c13d43979437f2bca6eac, type: 3}
   lifetime: 0.28
+  frameRate: 24
   playOnEnable: 1
+  loop: 0
+  autoHideOnComplete: 1
   destroyOnComplete: 1
   fadeOut: 1
   startScale: {x: 1, y: 1, z: 1}
   endScale: {x: 1, y: 1, z: 1}
+--- !u!114 &3403221781723054219
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8335468127871354634}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d10864ca5ad23044a9c9364857d5a888, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
+  appearSfx: {fileID: 8300000, guid: 3b56640df2e09a54894e221773facf4e, type: 3}
+  hitSfx: {fileID: 8300000, guid: b1f468b2bc8a34a41b40c8188f9658a8, type: 3}
+  hitTags: []
+  volume: 1

@@ -32,4 +32,5 @@ public class MonsterIdentity : MonoBehaviour
     public MonsterSpecies species = MonsterSpecies.BlueSlime;
     public MonsterRank rank = MonsterRank.Normal;
     public MonsterAttackStyle attackStyle = MonsterAttackStyle.Melee;
+    public bool suppressRuneDrop;
 }

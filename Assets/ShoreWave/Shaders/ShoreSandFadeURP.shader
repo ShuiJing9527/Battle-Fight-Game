@@ -1,0 +1,258 @@
+Shader "ShoreWave/Sand Fade URP"
+{
+    Properties
+    {
+        _BaseSandTex ("Base Sand Texture", 2D) = "white" {}
+        _FadeNoiseTex ("Fade Noise Tex", 2D) = "gray" {}
+        _GrassTransitionTex ("Grass Transition Texture", 2D) = "white" {}
+
+        _SandTint ("Sand Tint", Color) = (1, 1, 1, 1)
+        _Brightness ("Brightness", Range(0.0, 3.0)) = 1.0
+        _TextureTiling ("Texture Tiling", Vector) = (1, 1, 0, 0)
+        _EnableShoreFade ("Enable Shore Fade", Range(0.0, 1.0)) = 1.0
+        _CornerMode ("Corner Mode", Range(0.0, 1.0)) = 0.0
+        _CornerInner ("Corner Inner", Range(0.0, 1.0)) = 0.0
+        _CornerBlend ("Corner Blend", Range(0.0, 1.0)) = 0.45
+
+        _FadeStart ("Fade Start", Range(-0.5, 1.5)) = 0.58
+        _FadeWidth ("Fade Width", Range(0.01, 1.5)) = 0.36
+        _FadeSoftness ("Fade Softness", Range(0.001, 0.5)) = 0.1
+        _FadeReverse ("Fade Reverse", Range(0.0, 1.0)) = 0.0
+        _FadeNoiseStrength ("Fade Noise Strength", Range(0.0, 0.25)) = 0.035
+        _WetSandStrength ("Wet Sand Strength", Range(0.0, 1.0)) = 0.18
+        _WetSandColor ("Wet Sand Color", Color) = (0.72, 0.66, 0.52, 1)
+        _AlphaMultiplier ("Alpha Multiplier", Range(0.0, 1.0)) = 1.0
+        _Smoothness ("Smoothness", Range(0.0, 1.0)) = 0.5
+        _Metallic ("Metallic", Range(0.0, 1.0)) = 0.0
+        _NormalStrength ("Normal Strength", Range(0.0, 2.0)) = 1.0
+        _ReceiveShadows ("Receive Shadows", Range(0.0, 1.0)) = 1.0
+        _LightingStrength ("Lighting Strength", Range(0.0, 1.5)) = 1.0
+        _MinimumAmbient ("Minimum Ambient", Range(0.0, 1.0)) = 0.08
+        _SpecularStrength ("Specular Strength", Range(0.0, 1.0)) = 0.24
+        _WetSmoothness ("Wet Smoothness", Range(0.0, 1.0)) = 0.78
+        _WetSpecularStrength ("Wet Specular Strength", Range(0.0, 2.0)) = 1.0
+        _SunGlintStrength ("Sun Glint Strength", Range(0.0, 3.0)) = 1.3
+        _NormalWetReflectionStrength ("Normal Wet Reflection Strength", Range(0.0, 1.0)) = 0.52
+        _WetColorStrength ("Wet Color Strength", Range(0.0, 0.25)) = 0.05
+        _BaseSandReflectionStrength ("Base Sand Reflection Strength", Range(0.0, 1.0)) = 0.36
+        _CoastalReflectionBoost ("Coastal Reflection Boost", Range(0.0, 1.0)) = 0.28
+        _GrassBlendColor ("Grass Blend Color", Color) = (0.86, 0.84, 0.68, 1)
+        _GrassBlendWidth ("Grass Blend Width", Range(0.0, 1.0)) = 0.0
+        _GrassBlendStrength ("Grass Blend Strength", Range(0.0, 1.0)) = 0.0
+    }
+
+    SubShader
+    {
+        Tags
+        {
+            "RenderType" = "Transparent"
+            "Queue" = "Transparent"
+            "RenderPipeline" = "UniversalPipeline"
+        }
+
+        Pass
+        {
+            Name "Forward"
+            Tags { "LightMode" = "UniversalForward" }
+
+            Blend SrcAlpha OneMinusSrcAlpha
+            Cull Off
+            ZWrite Off
+            ZTest LEqual
+
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_CASCADE
+            #pragma multi_compile _ _MAIN_LIGHT_SHADOWS_SCREEN
+            #pragma multi_compile_fragment _ _SHADOWS_SOFT
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
+
+            struct Attributes
+            {
+                float4 positionOS : POSITION;
+                float2 uv : TEXCOORD0;
+                float3 normalOS : NORMAL;
+            };
+
+            struct Varyings
+            {
+                float4 positionCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float3 positionWS : TEXCOORD1;
+                half3 normalWS : TEXCOORD2;
+            };
+
+            TEXTURE2D(_BaseSandTex);
+            SAMPLER(sampler_BaseSandTex);
+            TEXTURE2D(_FadeNoiseTex);
+            SAMPLER(sampler_FadeNoiseTex);
+            TEXTURE2D(_GrassTransitionTex);
+            SAMPLER(sampler_GrassTransitionTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _SandTint;
+                float _Brightness;
+                float4 _TextureTiling;
+                float _EnableShoreFade;
+                float _CornerMode;
+                float _CornerInner;
+                float _CornerBlend;
+                float _FadeStart;
+                float _FadeWidth;
+                float _FadeSoftness;
+                float _FadeReverse;
+                float _FadeNoiseStrength;
+                float _WetSandStrength;
+                float4 _WetSandColor;
+                float _AlphaMultiplier;
+                float _Smoothness;
+                float _Metallic;
+                float _NormalStrength;
+                float _ReceiveShadows;
+                float _LightingStrength;
+                float _MinimumAmbient;
+                float _SpecularStrength;
+                float _WetSmoothness;
+                float _WetSpecularStrength;
+                float _SunGlintStrength;
+                float _NormalWetReflectionStrength;
+                float _WetColorStrength;
+                float _BaseSandReflectionStrength;
+                float _CoastalReflectionBoost;
+                float4 _GrassBlendColor;
+                float _GrassBlendWidth;
+                float _GrassBlendStrength;
+            CBUFFER_END
+
+            Varyings Vert(Attributes input)
+            {
+                Varyings output;
+                output.positionWS = TransformObjectToWorld(input.positionOS.xyz);
+                output.positionCS = TransformWorldToHClip(output.positionWS);
+                output.normalWS = TransformObjectToWorldNormal(input.normalOS);
+                output.uv = input.uv;
+                return output;
+            }
+
+            half4 Frag(Varyings input) : SV_Target
+            {
+                float2 tiledUV = input.uv * max(_TextureTiling.xy, float2(0.0001, 0.0001)) + _TextureTiling.zw;
+                half4 sand = SAMPLE_TEXTURE2D(_BaseSandTex, sampler_BaseSandTex, tiledUV);
+                float noise = SAMPLE_TEXTURE2D(_FadeNoiseTex, sampler_FadeNoiseTex, tiledUV * 0.8).r;
+                float shoreFadeEnabled = saturate(_EnableShoreFade);
+
+                float linearFadeAxis = lerp(input.uv.y, 1.0 - input.uv.y, saturate(_FadeReverse));
+                float2 topRightEdgeDistance = saturate(float2(1.0 - input.uv.x, 1.0 - input.uv.y));
+                float outerCornerMetric = lerp(
+                    min(topRightEdgeDistance.x, topRightEdgeDistance.y),
+                    saturate(length(topRightEdgeDistance) * 0.70710678),
+                    saturate(_CornerBlend));
+                float innerCornerMetric = saturate(length(topRightEdgeDistance) * 0.70710678);
+                float outerCornerAxis = 1.0 - outerCornerMetric;
+                float innerCornerAxis = 1.0 - innerCornerMetric;
+                float cornerFadeAxis = lerp(outerCornerAxis, innerCornerAxis, saturate(_CornerInner));
+                float fadeAxis = lerp(linearFadeAxis, cornerFadeAxis, saturate(_CornerMode));
+                float fadeNoiseOffset = (noise - 0.5) * _FadeNoiseStrength;
+                float distortedFadeAxis = saturate(fadeAxis + fadeNoiseOffset);
+
+                float fadeStart = _FadeStart;
+                float fadeEnd = _FadeStart + max(_FadeWidth, 0.0001);
+                float fade = 1.0 - smoothstep(fadeStart, fadeEnd, distortedFadeAxis);
+                fade = smoothstep(0.0, 1.0, fade);
+
+                float edgeProximity = 1.0 - smoothstep(fadeStart - _FadeSoftness, fadeEnd + _FadeSoftness, distortedFadeAxis);
+                float wetMaskFromFade = saturate((1.0 - fade) * 1.15 + edgeProximity * 0.45);
+                // No-fade mode has no reliable shoreline axis, so keep a weak uniform wet mask
+                // instead of reusing distorted fade UV/noise, which creates repeating diagonal bands.
+                float wetMaskWithoutFade = 0.28;
+                float oceanSideMask = lerp(wetMaskWithoutFade, wetMaskFromFade, shoreFadeEnabled);
+                float coastalReflectionBoost = saturate(oceanSideMask * _CoastalReflectionBoost);
+                float wetSpecMask = saturate(_BaseSandReflectionStrength + coastalReflectionBoost);
+
+                float3 surfaceColor = sand.rgb * _SandTint.rgb * _Brightness;
+                float wetBlend = 0.0;
+                surfaceColor = lerp(surfaceColor, surfaceColor * _WetSandColor.rgb, wetBlend);
+
+                float grassTransitionSample = SAMPLE_TEXTURE2D(_GrassTransitionTex, sampler_GrassTransitionTex, input.uv).r;
+                float grassBlendEdge = 1.0 - smoothstep(
+                    max(_GrassBlendWidth, 0.0001),
+                    max(_GrassBlendWidth, 0.0001) + max(_FadeSoftness, 0.0001),
+                    distortedFadeAxis);
+                float grassBlendMask = saturate(grassTransitionSample * grassBlendEdge * _GrassBlendStrength);
+                surfaceColor = lerp(surfaceColor, surfaceColor * _GrassBlendColor.rgb, grassBlendMask);
+
+                float fullAlpha = saturate(sand.a * _SandTint.a * _AlphaMultiplier);
+                float fadeAlpha = saturate(fade * sand.a * _SandTint.a * _AlphaMultiplier);
+                fadeAlpha *= 1.0 - smoothstep(1.0, 1.0 + _FadeSoftness, distortedFadeAxis);
+                float alpha = lerp(fullAlpha, fadeAlpha, shoreFadeEnabled);
+
+                half3 normalWS = input.normalWS;
+                half normalLenSq = dot(normalWS, normalWS);
+                normalWS = (normalLenSq > 1e-4h) ? normalize(normalWS) : half3(0.0h, 1.0h, 0.0h);
+                half effectiveNormalStrength = saturate(lerp(_NormalStrength, _NormalStrength * 0.25h, wetSpecMask));
+                normalWS = normalize(lerp(half3(0.0h, 1.0h, 0.0h), normalWS, effectiveNormalStrength));
+
+                float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
+                Light mainLight = GetMainLight(shadowCoord);
+
+                half3 lightDirWS = SafeNormalize(mainLight.direction);
+                half3 viewDirWS = SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
+                half3 halfDirWS = SafeNormalize(lightDirWS + viewDirWS);
+
+                half receiveShadows = saturate(_ReceiveShadows);
+                half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, receiveShadows);
+                half lightAttenuation = mainLight.distanceAttenuation * shadowAttenuation;
+
+                half3 indirectLighting = max(SampleSH(normalWS), half3(_MinimumAmbient, _MinimumAmbient, _MinimumAmbient));
+                half ndotl = saturate(dot(normalWS, lightDirWS));
+                half3 diffuseLighting =
+                    surfaceColor
+                    * mainLight.color
+                    * ndotl
+                    * lightAttenuation
+                    * saturate(_LightingStrength);
+
+                half effectiveSmoothness = saturate(lerp(_Smoothness, _WetSmoothness, wetSpecMask));
+                half effectiveMetallic = saturate(_Metallic);
+                half drySpecularStrength = saturate(lerp(_SpecularStrength, _WetSpecularStrength, wetSpecMask));
+                half drySpecPower = lerp(8.0h, 96.0h, effectiveSmoothness);
+                half ndoth = saturate(dot(normalWS, halfDirWS));
+                half drySpecTerm = pow(ndoth, drySpecPower);
+                half3 specularColor = lerp(half3(0.10h, 0.09h, 0.075h), surfaceColor, effectiveMetallic);
+                half3 drySpecularLighting =
+                    mainLight.color
+                    * drySpecTerm
+                    * specularColor
+                    * drySpecularStrength
+                    * lightAttenuation;
+
+                half3 reflectedLightWS = reflect(-lightDirWS, normalWS);
+                half reflectionAlignment = saturate(dot(reflectedLightWS, viewDirWS));
+                half broadReflection =
+                    pow(reflectionAlignment, lerp(3.0h, 18.0h, saturate(_WetSmoothness)));
+                half sharpGlint =
+                    pow(reflectionAlignment, lerp(24.0h, 96.0h, saturate(_WetSmoothness)));
+                half wetSunGlintTerm = broadReflection * 0.85h + sharpGlint * 0.15h;
+                half3 wetSunReflection =
+                    mainLight.color
+                    * wetSunGlintTerm
+                    * wetSpecMask
+                    * _WetSpecularStrength
+                    * _SunGlintStrength
+                    * lightAttenuation;
+
+                half3 finalColor =
+                    surfaceColor * indirectLighting
+                    + diffuseLighting
+                    + drySpecularLighting
+                    + wetSunReflection;
+                return half4(finalColor, alpha);
+            }
+            ENDHLSL
+        }
+    }
+}

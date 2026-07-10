@@ -5,6 +5,7 @@ public class EnemyDebuffReceiver : MonoBehaviour
 {
     private readonly Dictionary<string, float> moveSpeedMultipliers = new Dictionary<string, float>();
     private readonly Dictionary<string, float> attackMultipliers = new Dictionary<string, float>();
+    private readonly Dictionary<string, float> outgoingDamageMultipliers = new Dictionary<string, float>();
 
     public void ApplyMoveSpeedMultiplier(string key, float multiplier)
     {
@@ -46,6 +47,26 @@ public class EnemyDebuffReceiver : MonoBehaviour
         attackMultipliers.Remove(key);
     }
 
+    public void ApplyOutgoingDamageMultiplier(string key, float multiplier)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        outgoingDamageMultipliers[key] = Mathf.Max(0f, multiplier);
+    }
+
+    public void RemoveOutgoingDamageMultiplier(string key)
+    {
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        outgoingDamageMultipliers.Remove(key);
+    }
+
     public float GetMoveSpeedMultiplier()
     {
         return GetProduct(moveSpeedMultipliers);
@@ -56,10 +77,16 @@ public class EnemyDebuffReceiver : MonoBehaviour
         return GetProduct(attackMultipliers);
     }
 
+    public float GetOutgoingDamageMultiplier()
+    {
+        return GetProduct(outgoingDamageMultipliers);
+    }
+
     private void OnDisable()
     {
         moveSpeedMultipliers.Clear();
         attackMultipliers.Clear();
+        outgoingDamageMultipliers.Clear();
     }
 
     private static float GetProduct(Dictionary<string, float> multipliers)

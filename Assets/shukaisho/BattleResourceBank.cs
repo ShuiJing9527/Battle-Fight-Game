@@ -3,6 +3,9 @@ using UnityEngine;
 
 public class BattleResourceBank : MonoBehaviour
 {
+    private const float SpeedGrowthSoulRedirectChance = 0.5f;
+    private const float SpeedGrowthSoulConsumableRedirectChance = 0.5f;
+
     [Header("Health")]
     [Min(0f)] public float maxHealth = 3f;
     [Min(0f)] public float currentHealth = 3f;
@@ -22,6 +25,9 @@ public class BattleResourceBank : MonoBehaviour
     [Header("Function")]
     [Min(0)] public int functionSoul = 0;
     [Range(0.1f, 1f)] public float functionCooldownMultiplierPerSoul = 0.97f;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugGrowthSoulRollLog = false;
 
     public event Action<SoulType, float> SoulApplied;
     public event Action FunctionSoulTriggered;
@@ -258,12 +264,26 @@ public class BattleResourceBank : MonoBehaviour
         CombatStats stats = GetComponent<CombatStats>();
         CombatHealth combatHealth = GetComponent<CombatHealth>();
         int growthChoice = UnityEngine.Random.Range(0, 6);
+        int finalChoice = growthChoice;
+        bool redirected = false;
+        bool redirectedToConsumable = false;
+        if (growthChoice == 5 && UnityEngine.Random.value < SpeedGrowthSoulRedirectChance)
+        {
+            finalChoice = UnityEngine.Random.Range(0, 5);
+            redirected = true;
+        }
+
         int growthAmount = Mathf.Clamp(soulPoint, 1, 5);
         float healthGrowth = growthAmount * 10f;
 
         if (stats == null)
         {
-            if (growthChoice == 0)
+            if (finalChoice != 0)
+            {
+                finalChoice = 0;
+            }
+
+            if (finalChoice == 0)
             {
                 maxHealth += healthGrowth;
                 currentHealth = Mathf.Min(maxHealth, currentHealth + healthGrowth);
@@ -272,12 +292,31 @@ public class BattleResourceBank : MonoBehaviour
                     combatHealth.currentHealth = currentHealth;
                 }
 
+                LogGrowthSoulRoll(growthChoice, finalChoice, redirected, redirectedToConsumable, null);
                 return $"HP +{Mathf.CeilToInt(healthGrowth)}";
             }
 
+            LogGrowthSoulRoll(growthChoice, finalChoice, redirected, redirectedToConsumable, null);
             return string.Empty;
         }
 
+        if (growthChoice == 5 && !redirected && UnityEngine.Random.value < SpeedGrowthSoulConsumableRedirectChance)
+        {
+            redirectedToConsumable = true;
+            SoulType consumableType = ResolveRandomConsumableSoulType();
+            float consumableValue = ResolveSoulValue(consumableType, soulPoint);
+            string consumableFeedback = ApplyConsumableSoul(consumableType, consumableValue);
+            LogGrowthSoulRoll(growthChoice, finalChoice, redirected, redirectedToConsumable, consumableType);
+            return consumableFeedback;
+        }
+
+        string result = ApplyGrowthSoulResult(stats, combatHealth, finalChoice, growthAmount, healthGrowth);
+        LogGrowthSoulRoll(growthChoice, finalChoice, redirected, redirectedToConsumable, null);
+        return result;
+    }
+
+    private string ApplyGrowthSoulResult(CombatStats stats, CombatHealth combatHealth, int growthChoice, int growthAmount, float healthGrowth)
+    {
         switch (growthChoice)
         {
             case 0:
@@ -310,6 +349,60 @@ public class BattleResourceBank : MonoBehaviour
                 stats.speed += growthAmount;
                 return $"SPD +{growthAmount}";
         }
+    }
+
+    private string ApplyConsumableSoul(SoulType soulType, float amount)
+    {
+        switch (soulType)
+        {
+            case SoulType.Life:
+                ApplyLifeSoul(amount);
+                return $"HP +{Mathf.CeilToInt(amount)}";
+            case SoulType.Function:
+                ApplyFunctionSoul(amount);
+                return $"Shield +{Mathf.CeilToInt(amount)}";
+            case SoulType.Energy:
+            default:
+                ApplyEnergySoul(amount);
+                return $"MP +{Mathf.CeilToInt(amount)}";
+        }
+    }
+
+    private static SoulType ResolveRandomConsumableSoulType()
+    {
+        int roll = UnityEngine.Random.Range(0, 3);
+        return roll switch
+        {
+            0 => SoulType.Life,
+            1 => SoulType.Function,
+            _ => SoulType.Energy
+        };
+    }
+
+    private void LogGrowthSoulRoll(int originalChoice, int finalChoice, bool redirected, bool redirectedToConsumable, SoulType? consumableSoulType)
+    {
+        if (!debugGrowthSoulRollLog)
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[GrowthSoulRoll] original={GetGrowthSoulLabel(originalChoice)} redirected={redirected} redirectedToConsumable={redirectedToConsumable} final={GetGrowthSoulLabel(finalChoice)} consumable={(consumableSoulType.HasValue ? consumableSoulType.Value.ToString() : "None")} redirectChance={SpeedGrowthSoulRedirectChance:F1} consumableRedirectChance={SpeedGrowthSoulConsumableRedirectChance:F1}",
+            this);
+    }
+
+    private static string GetGrowthSoulLabel(int growthChoice)
+    {
+        return growthChoice switch
+        {
+            0 => "HP",
+            1 => "PhysicalAttack",
+            2 => "PhysicalDefense",
+            3 => "SpecialAttack",
+            4 => "SpecialDefense",
+            5 => "SPD",
+            _ => $"Unknown({growthChoice})"
+        };
     }
 
     public float AbsorbDamage(float amount)

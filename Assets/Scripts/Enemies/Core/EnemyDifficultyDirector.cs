@@ -1,0 +1,625 @@
+using System;
+using UnityEngine;
+
+public enum DifficultyPhase
+{
+    Normal,
+    FinalRush,
+    SpawnStopped,
+    Victory
+}
+
+public class EnemyDifficultyDirector : MonoBehaviour
+{
+    private static EnemyDifficultyDirector instance;
+    private static bool isShuttingDown;
+
+    [Header("Timeline")]
+    [Tooltip("Seconds required to gain one normal difficulty level before FinalRush starts.")]
+    [SerializeField, Min(1f)] private float normalLevelInterval = 10f;
+    [Tooltip("Elapsed battle time in seconds when FinalRush begins.")]
+    [SerializeField, Min(0f)] private float finalRushStartTime = 600f;
+    [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
+    [SerializeField, Min(0f)] private float finalRushDuration = 180f;
+
+    [Header("Base Multipliers")]
+    [Tooltip("Base HP multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseHealthMultiplier = 1f;
+    [Tooltip("Base physical attack multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseAttackMultiplier = 1f;
+    [Tooltip("Base physical defense multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseDefenseMultiplier = 1f;
+    [Tooltip("Base special attack multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpecialAttackMultiplier = 1f;
+    [Tooltip("Base special defense multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpecialDefenseMultiplier = 1f;
+    [Tooltip("Base speed multiplier for the first difficulty layer. 1 means unchanged.")]
+    [SerializeField, Min(0.01f)] private float baseSpeedMultiplier = 1f;
+
+    [Header("Per-Level Growth")]
+    [Tooltip("Additive HP growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float hpGrowthPerLevel = 0.10f;
+    [Tooltip("Additive physical attack growth per difficulty level. 0.12 means +12% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float attackGrowthPerLevel = 0.12f;
+    [Tooltip("Additive physical defense growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float defenseGrowthPerLevel = 0.10f;
+    [Tooltip("Additive special attack growth per difficulty level. 0.12 means +12% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float specialAttackGrowthPerLevel = 0.12f;
+    [Tooltip("Additive special defense growth per difficulty level. 0.10 means +10% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float specialDefenseGrowthPerLevel = 0.10f;
+    [Tooltip("Additive speed growth per difficulty level. 0.06 means +6% per level before FinalRush overrides.")]
+    [SerializeField, Min(0f)] private float speedGrowthPerLevel = 0.06f;
+
+    [Header("Final Rush Multipliers")]
+    [Tooltip("Extra HP multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 2.5f;
+    [Tooltip("Extra physical attack multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 2.2f;
+    [Tooltip("Extra physical defense multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.8f;
+    [Tooltip("Extra special attack multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 2.2f;
+    [Tooltip("Extra special defense multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.8f;
+    [Tooltip("Extra speed multiplier applied when FinalRush is active.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.4f;
+
+    [Header("Spawn Pressure")]
+    [Tooltip("Additive spawn-rate growth per difficulty level. Higher values make spawn intervals shorter.")]
+    [SerializeField, Min(0f)] private float spawnRateGrowthPerLevel = 0.08f;
+    [Tooltip("Extra alive-enemy cap granted per difficulty level.")]
+    [SerializeField, Min(0)] private int extraMaxAlivePerLevel = 2;
+    [Tooltip("FinalRush multiplier applied to the resolved spawn interval. Values below 1 spawn faster.")]
+    [SerializeField, Min(0.01f)] private float finalRushSpawnIntervalMultiplier = 0.25f;
+    [Tooltip("Extra alive-enemy cap granted while FinalRush is active.")]
+    [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 40;
+
+    [Header("Boss Spawn By Kills")]
+    [SerializeField, Min(1)] private int killsPerBossSpawn = 100;
+
+    [Header("Victory Check")]
+    [SerializeField, Min(0.1f)] private float remainingEnemyCheckInterval = 0.5f;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugLogs = false;
+    [SerializeField] private bool debugScaleLogs = false;
+
+    private float elapsedTime;
+    private float lastRemainingEnemyCheckTime = -1f;
+    private DifficultyPhase currentPhase = DifficultyPhase.Normal;
+    private bool finalRushLogged;
+    private bool spawnStoppedLogged;
+    private bool finalRushStarted;
+    private bool finalRushEnded;
+    private bool bossDefeated;
+    private bool victoryTriggered;
+    private bool finalRushVictoryArmed;
+    private bool spawnStoppedBossVictoryArmed;
+    private GameObject cleanupBossInstance;
+    private int totalEnemyKills;
+    private int spawnedBossCountByKills;
+    private const float FinalRushBonusLevelInterval = 5f;
+
+    public static EnemyDifficultyDirector Instance
+    {
+        get
+        {
+            if (isShuttingDown)
+            {
+                return null;
+            }
+
+            if (instance == null)
+            {
+                instance = FindObjectOfType<EnemyDifficultyDirector>();
+            }
+
+            return instance;
+        }
+    }
+
+    public static EnemyDifficultyDirector GetOrCreateInstance()
+    {
+        if (isShuttingDown)
+        {
+            return null;
+        }
+
+        if (Instance != null)
+        {
+            return instance;
+        }
+
+        GameObject directorObject = new GameObject("EnemyDifficultyDirector");
+        instance = directorObject.AddComponent<EnemyDifficultyDirector>();
+        return instance;
+    }
+
+    public event Action OnVictory;
+
+    public DifficultyPhase CurrentPhase => currentPhase;
+    public float ElapsedTime => elapsedTime;
+    public int CurrentNormalDifficultyLevel => Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(Mathf.Max(0f, elapsedTime), Mathf.Max(0f, finalRushStartTime)) / Mathf.Max(1f, normalLevelInterval)));
+    public int CurrentFinalRushDifficultyLevel => ResolveCurrentFinalRushDifficultyLevel();
+    public int CurrentDifficultyLevel => Mathf.Max(0, CurrentNormalDifficultyLevel + CurrentFinalRushDifficultyLevel);
+    public float FinalRushEndTime => finalRushStartTime + Mathf.Max(0f, finalRushDuration);
+    public bool IsFinalRushActive => currentPhase == DifficultyPhase.FinalRush;
+    public bool CanSpawnEnemies => currentPhase == DifficultyPhase.Normal || currentPhase == DifficultyPhase.FinalRush;
+    public bool ShouldAllowSpawning => CanSpawnEnemies;
+
+    public float CurrentHpMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseHealthMultiplier) * (1f + CurrentDifficultyLevel * hpGrowthPerLevel), finalRushHpMultiplier);
+    public float CurrentAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseAttackMultiplier) * (1f + CurrentDifficultyLevel * attackGrowthPerLevel), finalRushAttackMultiplier);
+    public float CurrentDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseDefenseMultiplier) * (1f + CurrentDifficultyLevel * defenseGrowthPerLevel), finalRushDefenseMultiplier);
+    public float CurrentSpecialAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialAttackMultiplier) * (1f + CurrentDifficultyLevel * specialAttackGrowthPerLevel), finalRushSpecialAttackMultiplier);
+    public float CurrentSpecialDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * (1f + CurrentDifficultyLevel * specialDefenseGrowthPerLevel), finalRushSpecialDefenseMultiplier);
+    public float CurrentSpeedMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpeedMultiplier) * (1f + CurrentDifficultyLevel * speedGrowthPerLevel), finalRushSpeedMultiplier);
+    public float CurrentSpawnIntervalMultiplier => ResolveSpawnIntervalMultiplier();
+    public int CurrentExtraMaxAlive => ResolveExtraMaxAlive();
+    public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
+
+    private void Awake()
+    {
+        isShuttingDown = false;
+
+        if (instance != null && instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        instance = this;
+    }
+
+    private void Start()
+    {
+        BattleTimerUI timerUi = BattleTimerUI.EnsureInstance();
+        if (timerUi == null && debugLogs)
+        {
+            Debug.LogWarning("[EnemyDifficultyDirector] BattleTimerUI was not found in scene. Use Tools/YY/Battle/Create Battle Timer And Difficulty Director to create it.", this);
+        }
+
+        LogDifficultySnapshot();
+    }
+
+    private void Update()
+    {
+        UpdateTimeline();
+        CheckVictoryFromRemainingEnemies();
+    }
+
+    public void ApplyDifficultyToEnemy(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        CombatStats stats = enemy.GetComponent<CombatStats>();
+        if (stats == null)
+        {
+            return;
+        }
+
+        float baseHp = stats.maxHealth;
+        float baseAttack = stats.physicalAttack;
+        float baseDefense = stats.physicalDefense;
+        float baseSpecialAttack = stats.specialAttack;
+        float baseSpecialDefense = stats.specialDefense;
+        float baseSpeed = stats.speed;
+        float hpMultiplier = CurrentHpMultiplier;
+        float attackMultiplier = CurrentAttackMultiplier;
+        float defenseMultiplier = CurrentDefenseMultiplier;
+        float specialAttackMultiplier = CurrentSpecialAttackMultiplier;
+        float specialDefenseMultiplier = CurrentSpecialDefenseMultiplier;
+        float speedMultiplier = CurrentSpeedMultiplier;
+
+        stats.maxHealth = Mathf.Max(1f, Mathf.Round(baseHp * hpMultiplier));
+        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(baseAttack * attackMultiplier));
+        stats.specialAttack = Mathf.Max(0f, Mathf.Round(baseSpecialAttack * specialAttackMultiplier));
+        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(baseDefense * defenseMultiplier));
+        stats.specialDefense = Mathf.Max(0f, Mathf.Round(baseSpecialDefense * specialDefenseMultiplier));
+        stats.speed = Mathf.Max(0.1f, RoundToDecimals(baseSpeed * speedMultiplier, 2));
+
+        BattleResourceBank resourceBank = enemy.GetComponent<BattleResourceBank>();
+        CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = stats.maxHealth;
+            resourceBank.currentHealth = stats.maxHealth;
+        }
+
+        if (combatHealth != null)
+        {
+            combatHealth.stats = stats;
+            combatHealth.resourceBank = resourceBank;
+            combatHealth.currentHealth = stats.maxHealth;
+        }
+
+        EnemyDifficultyTrackedEnemy trackedEnemy = enemy.GetComponent<EnemyDifficultyTrackedEnemy>();
+        if (trackedEnemy == null)
+        {
+            trackedEnemy = enemy.AddComponent<EnemyDifficultyTrackedEnemy>();
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        trackedEnemy.Initialize(this, identity != null && identity.rank == MonsterRank.Boss);
+
+        if (debugScaleLogs)
+        {
+            Debug.Log(
+                "[EnemyScaling] " +
+                $"name={enemy.name} species={(identity != null ? identity.species.ToString() : "Unknown")} rank={(identity != null ? identity.rank.ToString() : "Unknown")} phase={currentPhase} " +
+                $"baseHP={baseHp:F1} difficultyHP={hpMultiplier:F2} finalHP={stats.maxHealth:F1} " +
+                $"baseATK={baseAttack:F1} difficultyATK={attackMultiplier:F2} finalATK={stats.physicalAttack:F1} " +
+                $"baseDEF={baseDefense:F1} difficultyDEF={defenseMultiplier:F2} finalDEF={stats.physicalDefense:F1} " +
+                $"baseSATK={baseSpecialAttack:F1} difficultySATK={specialAttackMultiplier:F2} finalSATK={stats.specialAttack:F1} " +
+                $"baseSDEF={baseSpecialDefense:F1} difficultySDEF={specialDefenseMultiplier:F2} finalSDEF={stats.specialDefense:F1} " +
+                $"baseSPD={baseSpeed:F2} difficultySPD={speedMultiplier:F2} finalSPD={stats.speed:F2}",
+                enemy);
+        }
+    }
+
+    public void NotifyBossDefeated(GameObject defeatedBoss)
+    {
+        if (currentPhase == DifficultyPhase.Victory)
+        {
+            return;
+        }
+
+        if (!spawnStoppedBossVictoryArmed || !finalRushStarted || !finalRushEnded)
+        {
+            return;
+        }
+
+        if (bossDefeated)
+        {
+            return;
+        }
+
+        if (cleanupBossInstance == null || defeatedBoss != cleanupBossInstance)
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[CleanupBossVictory] cleanup boss body died boss={(defeatedBoss != null ? defeatedBoss.name : "null")} cleanupBossInstanceMatched={defeatedBoss == cleanupBossInstance} remainingSplitChildrenIgnored=true victoryTriggered=true",
+            this);
+        bossDefeated = true;
+        spawnStoppedBossVictoryArmed = false;
+        cleanupBossInstance = null;
+        SetVictory("CleanupBossDefeatedAfterFinalRush");
+    }
+
+    public bool NotifyEnemyKilled(bool wasBoss)
+    {
+        if (wasBoss)
+        {
+            return false;
+        }
+
+        totalEnemyKills++;
+        int requiredBossSpawnCount = totalEnemyKills / Mathf.Max(1, killsPerBossSpawn);
+        bool shouldSpawnBoss = requiredBossSpawnCount > spawnedBossCountByKills;
+        if (shouldSpawnBoss)
+        {
+            spawnedBossCountByKills++;
+        }
+
+        if (debugLogs && (shouldSpawnBoss || totalEnemyKills % Mathf.Max(1, killsPerBossSpawn) == 0))
+        {
+            Debug.Log(
+                "[EnemyKillCount] " +
+                $"kills={totalEnemyKills} spawnBoss={shouldSpawnBoss} spawnedBossCountByKills={spawnedBossCountByKills}",
+                this);
+        }
+
+        return shouldSpawnBoss;
+    }
+
+    public string BuildTimerText()
+    {
+        switch (currentPhase)
+        {
+            case DifficultyPhase.Normal:
+                return FormatSeconds(Mathf.Max(0f, finalRushStartTime - elapsedTime));
+            case DifficultyPhase.FinalRush:
+                return "FINAL RUSH " + FormatSeconds(Mathf.Max(0f, FinalRushEndTime - elapsedTime));
+            case DifficultyPhase.SpawnStopped:
+                return "CLEAR REMAINING ENEMIES";
+            case DifficultyPhase.Victory:
+                return "VICTORY";
+            default:
+                return FormatSeconds(Mathf.Max(0f, finalRushStartTime - elapsedTime));
+        }
+    }
+
+    public string BuildPhaseSummaryText()
+    {
+        switch (currentPhase)
+        {
+            case DifficultyPhase.FinalRush:
+                return "FINAL RUSH";
+            case DifficultyPhase.SpawnStopped:
+                return "SPAWN STOPPED";
+            case DifficultyPhase.Victory:
+                return "VICTORY";
+            default:
+                return "NORMAL";
+        }
+    }
+
+    private void UpdateTimeline()
+    {
+        if (currentPhase == DifficultyPhase.SpawnStopped || currentPhase == DifficultyPhase.Victory)
+        {
+            return;
+        }
+
+        elapsedTime += Time.deltaTime;
+
+        if (currentPhase == DifficultyPhase.Normal && elapsedTime >= finalRushStartTime)
+        {
+            currentPhase = DifficultyPhase.FinalRush;
+            finalRushVictoryArmed = false;
+            finalRushStarted = true;
+            if (!finalRushLogged)
+            {
+                finalRushLogged = true;
+                Log("[FinalRush] started at elapsed=" + elapsedTime.ToString("F1"));
+            }
+        }
+
+        if (currentPhase == DifficultyPhase.FinalRush && elapsedTime >= FinalRushEndTime)
+        {
+            currentPhase = DifficultyPhase.SpawnStopped;
+            elapsedTime = FinalRushEndTime;
+            finalRushVictoryArmed = false;
+            finalRushEnded = true;
+            if (!spawnStoppedLogged)
+            {
+                spawnStoppedLogged = true;
+                Log("[SpawnStopped] final rush ended, stop spawning");
+            }
+        }
+    }
+
+    private void CheckVictoryFromRemainingEnemies()
+    {
+        if (!debugLogs || currentPhase != DifficultyPhase.SpawnStopped || victoryTriggered)
+        {
+            return;
+        }
+
+        if (Time.time < lastRemainingEnemyCheckTime + Mathf.Max(0.1f, remainingEnemyCheckInterval))
+        {
+            return;
+        }
+
+        lastRemainingEnemyCheckTime = Time.time;
+        int aliveEnemies = CountAliveEnemiesForVictory();
+        Debug.Log(
+            $"[VictoryCheck] aliveEnemies={aliveEnemies} phase={currentPhase} cleanupBossArmed={spawnStoppedBossVictoryArmed} cleanupBoss={(cleanupBossInstance != null ? cleanupBossInstance.name : "null")}",
+            this);
+    }
+
+    private void SetVictory(string reason)
+    {
+        if (victoryTriggered || currentPhase == DifficultyPhase.Victory)
+        {
+            return;
+        }
+
+        victoryTriggered = true;
+        currentPhase = DifficultyPhase.Victory;
+        Log("[GameVictory] reason=" + reason);
+        OnVictory?.Invoke();
+    }
+
+    public void ArmFinalRushVictory()
+    {
+        finalRushVictoryArmed = false;
+    }
+
+    public void ArmSpawnStoppedBossVictory(GameObject cleanupBoss)
+    {
+        if (currentPhase != DifficultyPhase.SpawnStopped || currentPhase == DifficultyPhase.Victory)
+        {
+            return;
+        }
+
+        if (!finalRushStarted || !finalRushEnded || cleanupBoss == null)
+        {
+            return;
+        }
+
+        cleanupBossInstance = cleanupBoss;
+        spawnStoppedBossVictoryArmed = true;
+        bossDefeated = false;
+        Debug.Log($"[CleanupBossVictory] cleanup boss armed boss={cleanupBoss.name}", this);
+    }
+
+    public bool HasFinalRushStarted => finalRushStarted;
+    public bool HasFinalRushEnded => finalRushEnded;
+    public GameObject CleanupBossInstance => cleanupBossInstance;
+
+    private int CountAliveEnemiesForVictory()
+    {
+        EnemySpawner spawner = FindObjectOfType<EnemySpawner>();
+        if (spawner != null)
+        {
+            return spawner.CountAliveEnemiesForVictory();
+        }
+
+        EnemyController[] enemies = FindObjectsOfType<EnemyController>();
+        int count = 0;
+        for (int i = 0; i < enemies.Length; i++)
+        {
+            EnemyController enemy = enemies[i];
+            if (enemy == null || !enemy.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
+            if (combatHealth != null && combatHealth.IsDead)
+            {
+                continue;
+            }
+
+            count++;
+        }
+
+        return count;
+    }
+
+    private float ResolvePerSpawnMultiplier(float normalMultiplier, float finalRushMultiplier)
+    {
+        if (currentPhase == DifficultyPhase.FinalRush)
+        {
+            return Mathf.Max(0.01f, normalMultiplier) * Mathf.Max(0.01f, finalRushMultiplier);
+        }
+
+        return Mathf.Max(0.01f, normalMultiplier);
+    }
+
+    private float ResolveSpawnIntervalMultiplier()
+    {
+        float multiplier = 1f / (1f + CurrentDifficultyLevel * Mathf.Max(0f, spawnRateGrowthPerLevel));
+        if (currentPhase == DifficultyPhase.FinalRush)
+        {
+            multiplier *= Mathf.Max(0.01f, finalRushSpawnIntervalMultiplier);
+        }
+
+        return Mathf.Max(0.05f, multiplier);
+    }
+
+    private int ResolveExtraMaxAlive()
+    {
+        int extra = Mathf.Max(0, CurrentDifficultyLevel * Mathf.Max(0, extraMaxAlivePerLevel));
+        if (currentPhase == DifficultyPhase.FinalRush)
+        {
+            extra += Mathf.Max(0, finalRushExtraMaxAlive);
+        }
+
+        return extra;
+    }
+
+    private int ResolveSpawnBatchCount()
+    {
+        int batchCount = 2 + Mathf.Max(0, CurrentDifficultyLevel) / 2;
+        if (currentPhase == DifficultyPhase.FinalRush)
+        {
+            batchCount += 5;
+        }
+
+        int maxBatchCount = currentPhase == DifficultyPhase.FinalRush ? 20 : 12;
+        return Mathf.Clamp(batchCount, 2, maxBatchCount);
+    }
+
+    private int ResolveCurrentFinalRushDifficultyLevel()
+    {
+        if (elapsedTime < finalRushStartTime)
+        {
+            return 0;
+        }
+
+        float clampedFinalRushElapsed = Mathf.Max(0f, Mathf.Min(elapsedTime, FinalRushEndTime) - finalRushStartTime);
+        return Mathf.Max(0, Mathf.FloorToInt(clampedFinalRushElapsed / Mathf.Max(0.1f, FinalRushBonusLevelInterval)));
+    }
+
+    private static string FormatSeconds(float seconds)
+    {
+        int totalSeconds = Mathf.Max(0, Mathf.FloorToInt(seconds));
+        int minutes = totalSeconds / 60;
+        int remainSeconds = totalSeconds % 60;
+        return minutes.ToString("00") + ":" + remainSeconds.ToString("00");
+    }
+
+    private void LogDifficultySnapshot()
+    {
+        Log(
+            "[EnemyDifficulty] " +
+            $"elapsed={elapsedTime:F1} phase={currentPhase} level={CurrentDifficultyLevel} " +
+            $"hpMul={CurrentHpMultiplier:F2} atkMul={CurrentAttackMultiplier:F2} defMul={CurrentDefenseMultiplier:F2} " +
+            $"sAtkMul={CurrentSpecialAttackMultiplier:F2} sDefMul={CurrentSpecialDefenseMultiplier:F2} spdMul={CurrentSpeedMultiplier:F2} " +
+            $"spawnIntervalMul={CurrentSpawnIntervalMultiplier:F2} extraMaxAlive={CurrentExtraMaxAlive} " +
+            $"spawnStopped={!CanSpawnEnemies}");
+    }
+
+    private void Log(string message)
+    {
+        if (!debugLogs)
+        {
+            return;
+        }
+
+        Debug.Log(message, this);
+    }
+
+    private static float RoundToDecimals(float value, int decimals)
+    {
+        float multiplier = Mathf.Pow(10f, Mathf.Max(0, decimals));
+        return Mathf.Round(value * multiplier) / multiplier;
+    }
+
+    private void OnApplicationQuit()
+    {
+        isShuttingDown = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (instance == this)
+        {
+            isShuttingDown = true;
+            instance = null;
+        }
+    }
+
+}
+
+public sealed class EnemyDifficultyTrackedEnemy : MonoBehaviour
+{
+    private EnemyDifficultyDirector director;
+    private CombatHealth combatHealth;
+    private bool isBoss;
+    private bool subscribed;
+    private bool deathNotified;
+
+    public void Initialize(EnemyDifficultyDirector owner, bool boss)
+    {
+        director = owner;
+        isBoss = boss;
+        combatHealth = GetComponent<CombatHealth>();
+
+        if (combatHealth == null || subscribed)
+        {
+            return;
+        }
+
+        combatHealth.Died += HandleDied;
+        subscribed = true;
+    }
+
+    private void OnDestroy()
+    {
+        if (combatHealth != null && subscribed)
+        {
+            combatHealth.Died -= HandleDied;
+        }
+    }
+
+    private void HandleDied(GameObject killer)
+    {
+        if (deathNotified)
+        {
+            return;
+        }
+
+        deathNotified = true;
+        if (isBoss && director != null)
+        {
+            director.NotifyBossDefeated(gameObject);
+        }
+    }
+}

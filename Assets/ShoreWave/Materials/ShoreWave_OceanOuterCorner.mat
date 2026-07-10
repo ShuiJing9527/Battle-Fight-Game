@@ -1,0 +1,79 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: ShoreWave_OceanOuterCorner
+  m_Shader: {fileID: 4800000, guid: 4f2c7f3c4a9f41b8ab21e6a0d9c57b31, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses:
+  - MOTIONVECTORS
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _FoamNoiseTex:
+        m_Texture: {fileID: 2800000, guid: 2d07c6ea1647605458192a19f675c9e3, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WaveBandTex:
+        m_Texture: {fileID: 2800000, guid: 7634af3981296f34fb0b57ceb6e3c6f8, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _CornerBlend: 0.45
+    - _CornerInner: 0
+    - _CornerMode: 1
+    - _EdgeNoiseStrength: 0.16
+    - _FoamSoftness: 0.12
+    - _FoamStrength: 0.9
+    - _LightingStrength: 1
+    - _MainWaveOffset: 0.08
+    - _MainWaveOpacity: 1
+    - _MainWavePhase: 0
+    - _MainWaveWidth: 0.03
+    - _MidFoamOffset: 0.08
+    - _MidFoamOpacity: 0.42
+    - _MidFoamPhase: 1.5
+    - _MidFoamWidth: 0.03
+    - _MinimumAmbient: 0.06
+    - _OuterFoamOffset: 0.09
+    - _OuterFoamOpacity: 0.2
+    - _OuterFoamPhase: 3
+    - _OuterFoamWidth: 0.05
+    - _ReceiveShadows: 1
+    - _TideAmplitude: 0.08
+    - _TideOffset: 0.24
+    - _TideSpeed: 1.2
+    - _Tiling: 1.6
+    - _WaveBandInfluence: 0.25
+    m_Colors:
+    - _MainFoamColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SecondaryFoamColor: {r: 0.78, g: 0.9, b: 1, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

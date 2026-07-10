@@ -10,6 +10,7 @@ public class MonsterProjectile : MonoBehaviour
     private Vector3 direction;
     private GameObject source;
     private float spawnTime;
+    private bool hasHit;
 
     public void Launch(Vector3 direction, float speed, float damage, BattleDamageType damageType, GameObject source)
     {
@@ -19,6 +20,7 @@ public class MonsterProjectile : MonoBehaviour
         this.damageType = damageType;
         this.source = source;
         spawnTime = Time.time;
+        hasHit = false;
     }
 
     private void Update()
@@ -32,23 +34,61 @@ public class MonsterProjectile : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other == null || (source != null && other.transform.IsChildOf(source.transform)))
+        if (hasHit || ShouldIgnoreCollision(other))
         {
             return;
         }
 
-        if (!BattleTargetUtility.IsPlayer(other.gameObject))
+        CombatHealth playerHealth = ResolvePlayerCombatHealth(other);
+        if (playerHealth != null)
         {
+            hasHit = true;
+            playerHealth.TakeDamage(new BattleDamage(damage, damageType, source));
+            Destroy(gameObject);
             return;
         }
 
-        CombatHealth health = other.GetComponentInParent<CombatHealth>();
-        if (health == null)
-        {
-            return;
-        }
-
-        health.TakeDamage(new BattleDamage(damage, damageType, source));
+        hasHit = true;
         Destroy(gameObject);
+    }
+
+    private bool ShouldIgnoreCollision(Collider other)
+    {
+        if (other == null)
+        {
+            return true;
+        }
+
+        if (other.transform == transform || other.transform.IsChildOf(transform))
+        {
+            return true;
+        }
+
+        if (source != null && other.transform.IsChildOf(source.transform))
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    private static CombatHealth ResolvePlayerCombatHealth(Collider other)
+    {
+        if (other == null)
+        {
+            return null;
+        }
+
+        GameObject target = other.gameObject;
+        if (!BattleTargetUtility.IsPlayer(target))
+        {
+            Transform root = other.transform.root;
+            if (root == null || !BattleTargetUtility.IsPlayer(root.gameObject))
+            {
+                return null;
+            }
+        }
+
+        return other.GetComponentInParent<CombatHealth>();
     }
 }

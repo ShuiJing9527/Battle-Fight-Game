@@ -808,17 +808,6 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
-            bool castSucceeded = qSkill != null ? qSkill.Cast() : TryCastQFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 Q cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                return;
-            }
-
             bool consumeSucceeded = TryConsumeSkill(0);
             if (debugSkillCooldownFlow)
             {
@@ -827,6 +816,18 @@ public class Player2PrototypeController : MonoBehaviour
 
             if (!consumeSucceeded)
             {
+                return;
+            }
+
+            bool castSucceeded = qSkill != null ? qSkill.Cast() : TryCastQFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 Q cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                cooldownManager?.RefundSkillResource(0);
                 return;
             }
 
@@ -870,17 +871,6 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
-            bool castSucceeded = wSkill != null ? wSkill.Cast() : TryCastWFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 W cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                return;
-            }
-
             bool consumeSucceeded = TryConsumeSkill(1);
             if (debugSkillCooldownFlow)
             {
@@ -889,6 +879,18 @@ public class Player2PrototypeController : MonoBehaviour
 
             if (!consumeSucceeded)
             {
+                return;
+            }
+
+            bool castSucceeded = wSkill != null ? wSkill.Cast() : TryCastWFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 W cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                cooldownManager?.RefundSkillResource(1);
                 return;
             }
 
@@ -932,17 +934,6 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
-            bool castSucceeded = eSkill != null ? eSkill.Cast() : TryCastEFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 E cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                return;
-            }
-
             bool consumeSucceeded = TryConsumeSkill(2);
             if (debugSkillCooldownFlow)
             {
@@ -951,6 +942,18 @@ public class Player2PrototypeController : MonoBehaviour
 
             if (!consumeSucceeded)
             {
+                return;
+            }
+
+            bool castSucceeded = eSkill != null ? eSkill.Cast() : TryCastEFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 E cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                cooldownManager?.RefundSkillResource(2);
                 return;
             }
 
@@ -994,17 +997,6 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
-            bool castSucceeded = rSkill != null ? rSkill.Cast() : TryCastRFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 R cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                return;
-            }
-
             bool consumeSucceeded = TryConsumeSkill(3);
             if (debugSkillCooldownFlow)
             {
@@ -1013,6 +1005,18 @@ public class Player2PrototypeController : MonoBehaviour
 
             if (!consumeSucceeded)
             {
+                return;
+            }
+
+            bool castSucceeded = rSkill != null ? rSkill.Cast() : TryCastRFallback();
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 R cast result = {castSucceeded}", this);
+            }
+
+            if (!castSucceeded)
+            {
+                cooldownManager?.RefundSkillResource(3);
                 return;
             }
 
@@ -1245,12 +1249,12 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         float horizontal = 0f;
-        if (Keyboard.current.leftArrowKey.isPressed || Keyboard.current.aKey.isPressed)
+        if (Keyboard.current.leftArrowKey.isPressed)
         {
             horizontal -= 1f;
         }
 
-        if (Keyboard.current.rightArrowKey.isPressed || Keyboard.current.dKey.isPressed)
+        if (Keyboard.current.rightArrowKey.isPressed)
         {
             horizontal += 1f;
         }
@@ -1454,7 +1458,20 @@ public class Player2PrototypeController : MonoBehaviour
         if (rb != null)
         {
             rb.position = worldPosition;
-            rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player2PrototypeController),
+                nameof(MoveRootToGroundPosition),
+                rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "move-root-to-ground-position",
+                "MoveRootToGroundPosition",
+                "none",
+                enableSpawnUnstuck ? "spawn-unstuck-enabled" : "spawn-unstuck-disabled");
             rb.angularVelocity = Vector3.zero;
             rb.WakeUp();
         }

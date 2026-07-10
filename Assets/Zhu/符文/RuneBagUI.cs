@@ -5,6 +5,12 @@ using UnityEngine.UI;
 
 public class RuneBagUI : MonoBehaviour
 {
+    private struct RuneStackEntry
+    {
+        public RuneDefinition rune;
+        public int count;
+    }
+
     [System.Serializable]
     public class SkillSlot
     {
@@ -40,9 +46,6 @@ public class RuneBagUI : MonoBehaviour
 
     [Header("Selected Rune Text")]
     public TextMeshProUGUI selectedRuneText;
-
-    [Header("Debug Runes")]
-    public RuneDefinition[] testRunes;
 
     [Header("UI Scale")]
     [SerializeField, Min(1f)] private float panelScaleMultiplier = 1.25f;
@@ -80,14 +83,6 @@ public class RuneBagUI : MonoBehaviour
         BindSkillSlotButtons();
         RefreshAll();
         ClearSelectedRune();
-    }
-
-    private void Update()
-    {
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            AddTestRune();
-        }
     }
 
     private void OnDisable()
@@ -170,9 +165,11 @@ public class RuneBagUI : MonoBehaviour
             Destroy(runeContent.GetChild(i).gameObject);
         }
 
-        for (int i = 0; i < runeInventory.Count; i++)
+        System.Collections.Generic.List<RuneStackEntry> runeStacks = BuildRuneStacks();
+        for (int i = 0; i < runeStacks.Count; i++)
         {
-            RuneDefinition rune = runeInventory.GetRune(i);
+            RuneStackEntry stackEntry = runeStacks[i];
+            RuneDefinition rune = stackEntry.rune;
             if (rune == null)
             {
                 continue;
@@ -197,7 +194,7 @@ public class RuneBagUI : MonoBehaviour
 
             if (text != null)
             {
-                text.text = GetRuneName(rune);
+                text.text = $"{GetRuneName(rune)} x{Mathf.Max(1, stackEntry.count)}";
             }
 
             if (button != null)
@@ -349,33 +346,6 @@ public class RuneBagUI : MonoBehaviour
         }
     }
 
-    public void AddTestRune()
-    {
-        ResolveRuntimeReferences();
-
-        if (runeInventory == null)
-        {
-            Debug.LogWarning("[RuneBagUI] Missing RuneInventory.");
-            return;
-        }
-
-        if (testRunes == null || testRunes.Length == 0)
-        {
-            Debug.LogWarning("[RuneBagUI] Missing test runes.");
-            return;
-        }
-
-        RuneDefinition rune = testRunes[Random.Range(0, testRunes.Length)];
-        if (rune == null)
-        {
-            return;
-        }
-
-        runeInventory.AddRune(rune);
-        Debug.Log("[RuneBagUI] Added test rune: " + GetRuneName(rune));
-        RefreshRuneList();
-    }
-
     public RuneDefinition GetEquippedRune(int skillIndex)
     {
         if (skillSlots == null)
@@ -433,6 +403,131 @@ public class RuneBagUI : MonoBehaviour
         }
 
         return "Rune";
+    }
+
+    private System.Collections.Generic.List<RuneStackEntry> BuildRuneStacks()
+    {
+        System.Collections.Generic.List<RuneStackEntry> runeStacks = new System.Collections.Generic.List<RuneStackEntry>();
+        if (runeInventory == null || runeInventory.Count <= 0)
+        {
+            return runeStacks;
+        }
+
+        System.Collections.Generic.Dictionary<string, int> stackIndices = new System.Collections.Generic.Dictionary<string, int>();
+        for (int i = 0; i < runeInventory.Count; i++)
+        {
+            RuneDefinition rune = runeInventory.GetRune(i);
+            if (rune == null)
+            {
+                continue;
+            }
+
+            string runeKey = GetRuneStackKey(rune);
+            int stackIndex;
+            if (stackIndices.TryGetValue(runeKey, out stackIndex))
+            {
+                RuneStackEntry entry = runeStacks[stackIndex];
+                entry.count++;
+                runeStacks[stackIndex] = entry;
+                continue;
+            }
+
+            stackIndices[runeKey] = runeStacks.Count;
+            runeStacks.Add(new RuneStackEntry
+            {
+                rune = rune,
+                count = 1
+            });
+        }
+
+        for (int i = runeStacks.Count - 1; i >= 0; i--)
+        {
+            RuneStackEntry entry = runeStacks[i];
+            int availableCount = Mathf.Max(0, entry.count - CountEquippedRuneCopies(entry.rune));
+            if (availableCount <= 0)
+            {
+                runeStacks.RemoveAt(i);
+                continue;
+            }
+
+            entry.count = availableCount;
+            runeStacks[i] = entry;
+        }
+
+        return runeStacks;
+    }
+
+    private int CountEquippedRuneCopies(RuneDefinition rune)
+    {
+        if (rune == null || skillCaster == null || skillSlots == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < skillSlots.Length; skillIndex++)
+        {
+            BattleSkill skill = skillCaster.GetSkill(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            for (int i = 0; i < skill.equippedRunes.Length; i++)
+            {
+                if (RuneMatches(skill.equippedRunes[i], rune))
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private string GetRuneStackKey(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return "null";
+        }
+
+        if (rune.runeId != 0)
+        {
+            return $"id:{rune.runeId}";
+        }
+
+        if (!string.IsNullOrEmpty(rune.runeName))
+        {
+            return $"name:{rune.runeName}";
+        }
+
+        return $"ref:{rune.GetHashCode()}";
+    }
+
+    private bool RuneMatches(RuneDefinition a, RuneDefinition b)
+    {
+        if (ReferenceEquals(a, b))
+        {
+            return true;
+        }
+
+        if (a == null || b == null)
+        {
+            return false;
+        }
+
+        if (a.runeId != 0 && a.runeId == b.runeId)
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrEmpty(a.runeName) && !string.IsNullOrEmpty(b.runeName) && a.runeName == b.runeName)
+        {
+            return true;
+        }
+
+        return false;
     }
 
     private void CacheBootstrap()
