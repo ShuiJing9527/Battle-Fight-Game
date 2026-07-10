@@ -50,7 +50,10 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField, Range(0f, 1f)] private float activeIconAlpha = 1f;
     [SerializeField, Range(0f, 1f)] private float inactiveIconAlpha = 0.45f;
     [SerializeField, Range(0f, 1f)] private float maxCoverRatio = 0.9f;
-    [SerializeField, Range(0f, 1f)] private float oppositeAccentMinAlpha = 0.2f;
+    [SerializeField, Range(0f, 1f)] private float gaugeFillHeightRatio = 1f;
+    [SerializeField, Range(0f, 1f)] private float baseAccentFullAlpha = 1f;
+    [SerializeField, Range(0f, 1f)] private float baseAccentMinAlpha = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float baseAccentFadeStrength = 0.35f;
     [SerializeField, Range(0f, 1f)] private float coverFadeStartDominance = 0.75f;
     [SerializeField, Range(0f, 1f)] private float coverFadeMaxRatio = 0.45f;
     [SerializeField, Range(0f, 1f)] private float coverFadeMinRatio = 0.18f;
@@ -156,6 +159,8 @@ public class DayNightAffinityUI : MonoBehaviour
         SetupRuntimeMaterial(radianceCoverSolid, ref runtimeRadianceSolidMaterial);
         SetupRuntimeMaterial(radianceCoverFade, ref runtimeRadianceFadeMaterial);
 
+        ConfigureBaseAccentRect(twilightBaseAccent, false);
+        ConfigureBaseAccentRect(radianceBaseAccent, true);
         ConfigureCoverRootRect(twilightCoverRoot, false);
         ConfigureCoverRootRect(radianceCoverRoot, true);
         ConfigureCoverSegmentRect(twilightCoverSolid, false);
@@ -231,8 +236,17 @@ public class DayNightAffinityUI : MonoBehaviour
 
     private void UpdateBaseAccentState(float twilightDominance, float radianceDominance)
     {
-        UpdateAccentAlpha(twilightBaseAccent, Mathf.Lerp(1f, oppositeAccentMinAlpha, radianceDominance));
-        UpdateAccentAlpha(radianceBaseAccent, Mathf.Lerp(1f, oppositeAccentMinAlpha, twilightDominance));
+        float twilightBaseAlpha = Mathf.Lerp(
+            baseAccentFullAlpha,
+            baseAccentMinAlpha,
+            radianceDominance * baseAccentFadeStrength);
+        float radianceBaseAlpha = Mathf.Lerp(
+            baseAccentFullAlpha,
+            baseAccentMinAlpha,
+            twilightDominance * baseAccentFadeStrength);
+
+        UpdateAccentAlpha(twilightBaseAccent, Mathf.Max(baseAccentMinAlpha, twilightBaseAlpha));
+        UpdateAccentAlpha(radianceBaseAccent, Mathf.Max(baseAccentMinAlpha, radianceBaseAlpha));
     }
 
     private void UpdateCover(RectTransform coverRoot, Image solid, Image fade, bool anchorRight, float dominance)
@@ -293,7 +307,26 @@ public class DayNightAffinityUI : MonoBehaviour
         return gaugeRoot != null ? Mathf.Max(0f, gaugeRoot.rect.width) : 0f;
     }
 
-    private static void ConfigureCoverRootRect(RectTransform coverRoot, bool anchorRight)
+    private void ConfigureBaseAccentRect(Image image, bool anchorRight)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        RectTransform rect = image.rectTransform;
+        float minX = anchorRight ? 0.76f : 0f;
+        float maxX = anchorRight ? 1f : 0.24f;
+        float verticalInset = (1f - Mathf.Clamp01(gaugeFillHeightRatio)) * 0.5f;
+
+        rect.anchorMin = new Vector2(minX, verticalInset);
+        rect.anchorMax = new Vector2(maxX, 1f - verticalInset);
+        rect.pivot = new Vector2(anchorRight ? 1f : 0f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = Vector2.zero;
+    }
+
+    private void ConfigureCoverRootRect(RectTransform coverRoot, bool anchorRight)
     {
         if (coverRoot == null)
         {
@@ -301,10 +334,12 @@ public class DayNightAffinityUI : MonoBehaviour
         }
 
         float anchorX = anchorRight ? 1f : 0f;
-        coverRoot.anchorMin = new Vector2(anchorX, 0f);
-        coverRoot.anchorMax = new Vector2(anchorX, 1f);
+        float verticalInset = (1f - Mathf.Clamp01(gaugeFillHeightRatio)) * 0.5f;
+        coverRoot.anchorMin = new Vector2(anchorX, verticalInset);
+        coverRoot.anchorMax = new Vector2(anchorX, 1f - verticalInset);
         coverRoot.pivot = new Vector2(anchorX, 0.5f);
         coverRoot.anchoredPosition = Vector2.zero;
+        coverRoot.sizeDelta = new Vector2(coverRoot.sizeDelta.x, 0f);
     }
 
     private static void ConfigureCoverSegmentRect(Image image, bool anchorRight)

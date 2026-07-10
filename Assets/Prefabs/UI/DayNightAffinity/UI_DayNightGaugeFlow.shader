@@ -194,9 +194,10 @@ Shader "UI/DayNightGaugeFlow"
                 }
                 else
                 {
-                    float coverLongitudinal = pow(saturate(0.35 + uv.x * 0.65), max(0.75, gradientPower * 0.6));
-                    toneMask = saturate(0.28 + coverLongitudinal * 0.34 + membraneBand * 0.58);
-                    alphaMask = lerp(saturate(_EdgeFade), 1.0, membraneBand * 0.58 + coverLongitudinal * 0.42);
+                    // Solid cover should preserve the same vertical shading stack as the opaque
+                    // edge of the fade cover, only without the longitudinal transparency falloff.
+                    toneMask = 1.0;
+                    alphaMask = verticalGlowMask;
                 }
 
                 fixed3 layeredTint = lerp(_DeepColor.rgb, _TintColor.rgb, toneMask);

@@ -35,28 +35,28 @@ Material:
     m_Floats:
     - _Alpha: 1
     - _ColorMask: 15
-    - _CoreGlow: 0.36
-    - _DistortionStrength: 0.12
+    - _CoreGlow: 0.42
+    - _DistortionStrength: 0.08
     - _EdgeFade: 1
-    - _EdgeShade: 0.24
-    - _FlowScale: 5.8
-    - _FlowSpeed: 1.9
+    - _EdgeShade: 0.16
+    - _FlowScale: 5.4
+    - _FlowSpeed: 1.7
     - _FlowTime: 0
     - _GradientDirection: 0
-    - _GradientPower: 1.9
-    - _HighlightStrength: 1.05
-    - _HighlightWidth: 0.12
+    - _GradientPower: 2.4
+    - _HighlightStrength: 0.88
+    - _HighlightWidth: 0.11
     - _Stencil: 0
     - _StencilComp: 8
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
-    - _TailFadeStart: 0
+    - _TailFadeStart: 0.08
     - _UseUIAlphaClip: 0
-    - _VerticalGlow: 0.28
+    - _VerticalGlow: 0.3
     m_Colors:
-    - _DeepColor: {r: 0.19999996, g: 0.19999996, b: 0.29999998, a: 1}
-    - _HighlightColor: {r: 0.92, g: 0.97, b: 1, a: 1}
+    - _DeepColor: {r: 0.18, g: 0.22, b: 0.4, a: 1}
+    - _HighlightColor: {r: 0.93, g: 0.98, b: 1, a: 1}
     - _TintColor: {r: 0.56, g: 0.8, b: 1, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
