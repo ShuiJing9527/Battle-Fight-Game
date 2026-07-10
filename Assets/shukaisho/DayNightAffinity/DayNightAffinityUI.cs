@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 
 public class DayNightAffinityUI : MonoBehaviour
@@ -20,36 +20,26 @@ public class DayNightAffinityUI : MonoBehaviour
     [Header("Gauge")]
     [SerializeField] private RectTransform gaugeRoot;
     [SerializeField] private Image gaugeBackground;
-    [SerializeField] private Image twilightFill;
-    [SerializeField] private Image twilightFillDark;
-    [SerializeField] private Image twilightFillLight;
-    [SerializeField] private Image radianceFill;
-    [SerializeField] private Image radianceFillDark;
-    [SerializeField] private Image radianceFillLight;
-    [SerializeField] private Image flowFill;
-    [SerializeField] private Image centerMarker;
-
-    [Header("Flow Materials")]
-    [SerializeField] private Material twilightDarkFlowMaterial;
-    [SerializeField] private Material twilightFlowMaterial;
-    [SerializeField] private Material radianceDarkFlowMaterial;
-    [SerializeField] private Material radianceFlowMaterial;
-
-    [Header("Texts")]
+    [SerializeField] private Image twilightBaseAccent;
+    [SerializeField] private Image radianceBaseAccent;
+    [SerializeField] private RectTransform twilightCoverRoot;
+    [SerializeField] private Image twilightCoverSolid;
+    [SerializeField] private Image twilightCoverFade;
+    [SerializeField] private RectTransform radianceCoverRoot;
+    [SerializeField] private Image radianceCoverSolid;
+    [SerializeField] private Image radianceCoverFade;
     [SerializeField] private Text twilightText;
     [SerializeField] private Text radianceText;
-    [SerializeField] private Text phaseText;
-    [SerializeField] private Text statusText;
 
     [Header("Colors")]
     [SerializeField] private Color gaugeBackgroundColor = new Color(0.05f, 0.08f, 0.12f, 0.42f);
-    [SerializeField] private Color twilightColor = new Color(0.56f, 0.8f, 1f, 0.88f);
-    [SerializeField] private Color radianceColor = new Color(1f, 0.83f, 0.35f, 0.88f);
-    [SerializeField] private Color centerMarkerColor = new Color(1f, 1f, 1f, 0.28f);
     [SerializeField] private Color textColor = new Color(0.96f, 0.97f, 1f, 1f);
-    [SerializeField] private Color boostedStatusColor = new Color(1f, 0.96f, 0.78f, 1f);
-    [SerializeField] private Color weakenedStatusColor = new Color(0.76f, 0.88f, 1f, 1f);
-    [SerializeField] private Color neutralStatusColor = new Color(0.88f, 0.9f, 0.95f, 0.92f);
+    [SerializeField] private Color moonGlowColor = new Color(0.68f, 0.88f, 1f, 0.4f);
+    [SerializeField] private Color sunGlowColor = new Color(1f, 0.88f, 0.5f, 0.42f);
+    [SerializeField] private Color twilightDebugColor = new Color(0.32f, 0.76f, 1f, 0.92f);
+    [SerializeField] private Color twilightFadeDebugColor = new Color(0.82f, 0.94f, 1f, 0.95f);
+    [SerializeField] private Color radianceDebugColor = new Color(1f, 0.82f, 0.32f, 0.92f);
+    [SerializeField] private Color radianceFadeDebugColor = new Color(1f, 0.95f, 0.7f, 0.95f);
 
     [Header("Flow")]
     [SerializeField, Min(0f)] private float flowSpeed = 1.15f;
@@ -59,20 +49,33 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField, Range(0.01f, 0.4f)] private float highlightWidth = 0.1f;
     [SerializeField, Range(0f, 1f)] private float activeIconAlpha = 1f;
     [SerializeField, Range(0f, 1f)] private float inactiveIconAlpha = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float maxCoverRatio = 0.9f;
+    [SerializeField, Range(0f, 1f)] private float oppositeAccentMinAlpha = 0.2f;
+    [SerializeField, Range(0f, 1f)] private float coverFadeStartDominance = 0.75f;
+    [SerializeField, Range(0f, 1f)] private float coverFadeMaxRatio = 0.45f;
+    [SerializeField, Range(0f, 1f)] private float coverFadeMinRatio = 0.18f;
+    [SerializeField, Min(0f)] private float coverFadeMinPixels = 48f;
+    [SerializeField, Min(0f)] private float coverFadeMaxPixels = 180f;
+    [SerializeField] private bool debugGaugeVisual;
+    [SerializeField] private bool overrideGaugeForPreview;
+    [SerializeField, Range(0f, 100f)] private float previewBalanceValue = 50f;
 
     [Header("Icon Glow")]
     [SerializeField, Min(0f)] private float iconGlowPulseSpeed = 2.2f;
     [SerializeField, Range(0f, 1f)] private float iconGlowMinAlpha = 0.18f;
     [SerializeField, Range(0f, 1f)] private float iconGlowMaxAlpha = 0.52f;
-    [SerializeField] private Color moonGlowColor = new Color(0.68f, 0.88f, 1f, 0.4f);
-    [SerializeField] private Color sunGlowColor = new Color(1f, 0.88f, 0.5f, 0.42f);
 
-    private Player2Bootstrap cachedBootstrap;
-    private Material runtimeTwilightDarkMaterial;
-    private Material runtimeTwilightMaterial;
-    private Material runtimeRadianceDarkMaterial;
-    private Material runtimeRadianceMaterial;
-    private bool resolvedBootstrap;
+    private Material runtimeTwilightSolidMaterial;
+    private Material runtimeTwilightFadeMaterial;
+    private Material runtimeRadianceSolidMaterial;
+    private Material runtimeRadianceFadeMaterial;
+
+    private struct CoverMetrics
+    {
+        public float TotalWidth;
+        public float SolidWidth;
+        public float FadeWidth;
+    }
 
     private void Awake()
     {
@@ -94,10 +97,10 @@ public class DayNightAffinityUI : MonoBehaviour
 
     private void OnDestroy()
     {
-        DestroyRuntimeMaterial(ref runtimeTwilightDarkMaterial);
-        DestroyRuntimeMaterial(ref runtimeTwilightMaterial);
-        DestroyRuntimeMaterial(ref runtimeRadianceDarkMaterial);
-        DestroyRuntimeMaterial(ref runtimeRadianceMaterial);
+        DestroyRuntimeMaterial(ref runtimeTwilightSolidMaterial);
+        DestroyRuntimeMaterial(ref runtimeTwilightFadeMaterial);
+        DestroyRuntimeMaterial(ref runtimeRadianceSolidMaterial);
+        DestroyRuntimeMaterial(ref runtimeRadianceFadeMaterial);
     }
 
     private void Refresh()
@@ -111,9 +114,12 @@ public class DayNightAffinityUI : MonoBehaviour
         bool hasDay = TODDayNightAdapter.TryGetIsDay(out bool isDay);
         bool hasNight = TODDayNightAdapter.TryGetIsNight(out bool isNight);
 
-        float balanceValue = Mathf.Clamp(gaugeState.BalanceValue, 0f, 100f);
-        float radianceValue = Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
-        float twilightValue = Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
+        float balanceValue = overrideGaugeForPreview
+            ? Mathf.Clamp(previewBalanceValue, 0f, 100f)
+            : Mathf.Clamp(gaugeState.BalanceValue, 0f, 100f);
+
+        float radianceValue = overrideGaugeForPreview ? balanceValue : Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
+        float twilightValue = overrideGaugeForPreview ? 100f - balanceValue : Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
 
         float twilightDominance = balanceValue < 50f
             ? Mathf.Clamp01((50f - balanceValue) / 50f)
@@ -122,8 +128,9 @@ public class DayNightAffinityUI : MonoBehaviour
             ? Mathf.Clamp01((balanceValue - 50f) / 50f)
             : 0f;
 
-        UpdateFillContainer(twilightFill, twilightFillDark, twilightFillLight, 0f, twilightDominance);
-        UpdateFillContainer(radianceFill, radianceFillDark, radianceFillLight, 1f - radianceDominance, 1f);
+        UpdateBaseAccentState(twilightDominance, radianceDominance);
+        UpdateCover(twilightCoverRoot, twilightCoverSolid, twilightCoverFade, false, twilightDominance);
+        UpdateCover(radianceCoverRoot, radianceCoverSolid, radianceCoverFade, true, radianceDominance);
         UpdateFlowMaterials();
         UpdateValueTexts(twilightValue, radianceValue);
         UpdateIconState(hasDay, hasNight, isDay, isNight);
@@ -133,58 +140,43 @@ public class DayNightAffinityUI : MonoBehaviour
     private void InitializeVisuals()
     {
         ConfigureImage(gaugeBackground, gaugeBackgroundColor);
-        ConfigureFillContainer(twilightFill);
-        ConfigureFillContainer(radianceFill);
-        ConfigureImage(twilightFillDark, Color.white);
-        ConfigureImage(twilightFillLight, Color.white);
-        ConfigureImage(radianceFillDark, Color.white);
-        ConfigureImage(radianceFillLight, Color.white);
-        ConfigureImage(centerMarker, centerMarkerColor);
-        ConfigureImage(moonGlow, ApplyAlpha(moonGlowColor, 0f));
-        ConfigureImage(sunGlow, ApplyAlpha(sunGlowColor, 0f));
+        ConfigureImage(twilightBaseAccent, Color.white);
+        ConfigureImage(radianceBaseAccent, Color.white);
+        ConfigureImage(twilightCoverSolid, debugGaugeVisual ? twilightDebugColor : Color.white);
+        ConfigureImage(twilightCoverFade, debugGaugeVisual ? twilightFadeDebugColor : Color.white);
+        ConfigureImage(radianceCoverSolid, debugGaugeVisual ? radianceDebugColor : Color.white);
+        ConfigureImage(radianceCoverFade, debugGaugeVisual ? radianceFadeDebugColor : Color.white);
         ConfigureText(twilightText, textColor, TextAnchor.MiddleLeft);
         ConfigureText(radianceText, textColor, TextAnchor.MiddleRight);
-        ConfigureText(phaseText, textColor, TextAnchor.MiddleCenter);
-        ConfigureText(statusText, neutralStatusColor, TextAnchor.MiddleCenter);
+        ConfigureImage(moonGlow, ApplyAlpha(moonGlowColor, 0f));
+        ConfigureImage(sunGlow, ApplyAlpha(sunGlowColor, 0f));
 
-        SetupRuntimeMaterial(twilightFillDark, ResolveFlowTemplate(twilightFillDark, twilightDarkFlowMaterial), ref runtimeTwilightDarkMaterial);
-        SetupRuntimeMaterial(twilightFillLight, ResolveFlowTemplate(twilightFillLight, twilightFlowMaterial), ref runtimeTwilightMaterial);
-        SetupRuntimeMaterial(radianceFillDark, ResolveFlowTemplate(radianceFillDark, radianceDarkFlowMaterial), ref runtimeRadianceDarkMaterial);
-        SetupRuntimeMaterial(radianceFillLight, ResolveFlowTemplate(radianceFillLight, radianceFlowMaterial), ref runtimeRadianceMaterial);
+        SetupRuntimeMaterial(twilightCoverSolid, ref runtimeTwilightSolidMaterial);
+        SetupRuntimeMaterial(twilightCoverFade, ref runtimeTwilightFadeMaterial);
+        SetupRuntimeMaterial(radianceCoverSolid, ref runtimeRadianceSolidMaterial);
+        SetupRuntimeMaterial(radianceCoverFade, ref runtimeRadianceFadeMaterial);
 
-        if (flowFill != null)
-        {
-            flowFill.gameObject.SetActive(false);
-        }
+        ConfigureCoverRootRect(twilightCoverRoot, false);
+        ConfigureCoverRootRect(radianceCoverRoot, true);
+        ConfigureCoverSegmentRect(twilightCoverSolid, false);
+        ConfigureCoverSegmentRect(twilightCoverFade, false);
+        ConfigureCoverSegmentRect(radianceCoverSolid, true);
+        ConfigureCoverSegmentRect(radianceCoverFade, true);
 
-        if (centerMarker != null)
-        {
-            centerMarker.gameObject.SetActive(false);
-        }
-
-        Transform energyNoise = transform.Find("GaugeRoot/EnergyNoiseMask");
-        if (energyNoise != null)
-        {
-            energyNoise.gameObject.SetActive(false);
-        }
-
-        Transform energyOverlay = transform.Find("GaugeRoot/EnergyFlowOverlay");
-        if (energyOverlay != null)
-        {
-            energyOverlay.gameObject.SetActive(false);
-        }
+        SetCoverVisible(twilightCoverRoot, twilightCoverSolid, twilightCoverFade, false);
+        SetCoverVisible(radianceCoverRoot, radianceCoverSolid, radianceCoverFade, false);
     }
 
     private void UpdateValueTexts(float twilightValue, float radianceValue)
     {
         if (twilightText != null)
         {
-            twilightText.text = $"夜暮 {Mathf.RoundToInt(twilightValue)}";
+            twilightText.text = $"螟懈坩 {Mathf.RoundToInt(twilightValue)}";
         }
 
         if (radianceText != null)
         {
-            radianceText.text = $"辉光 {Mathf.RoundToInt(radianceValue)}";
+            radianceText.text = $"霎牙・ {Mathf.RoundToInt(radianceValue)}";
         }
     }
 
@@ -215,170 +207,172 @@ public class DayNightAffinityUI : MonoBehaviour
     private void UpdateFlowMaterials()
     {
         float flowTime = Time.unscaledTime;
-        UpdateFlowMaterial(runtimeTwilightDarkMaterial, flowTime, 0.88f, 0.82f, 0.5f, 1.15f, 0.92f);
-        UpdateFlowMaterial(runtimeTwilightMaterial, flowTime, 1f, 1f, 1f, 1f, 1f);
-        UpdateFlowMaterial(runtimeRadianceDarkMaterial, flowTime, 0.88f, 0.82f, 0.5f, 1.15f, 0.92f);
-        UpdateFlowMaterial(runtimeRadianceMaterial, flowTime, 1f, 1f, 1f, 1f, 1f);
+        UpdateFlowMaterial(runtimeTwilightSolidMaterial, flowTime);
+        UpdateFlowMaterial(runtimeTwilightFadeMaterial, flowTime);
+        UpdateFlowMaterial(runtimeRadianceSolidMaterial, flowTime);
+        UpdateFlowMaterial(runtimeRadianceFadeMaterial, flowTime);
     }
 
-    private void UpdateFlowMaterial(
-        Material targetMaterial,
-        float flowTime,
-        float speedMultiplier,
-        float scaleMultiplier,
-        float distortionMultiplier,
-        float highlightMultiplier,
-        float highlightWidthMultiplier)
+    private void UpdateFlowMaterial(Material targetMaterial, float flowTime)
     {
         if (targetMaterial == null)
         {
             return;
         }
 
-        targetMaterial.SetFloat(FlowSpeedId, flowSpeed * speedMultiplier);
-        targetMaterial.SetFloat(FlowScaleId, flowScale * scaleMultiplier);
-        targetMaterial.SetFloat(DistortionStrengthId, distortionStrength * distortionMultiplier);
-        targetMaterial.SetFloat(HighlightStrengthId, highlightStrength * highlightMultiplier);
-        targetMaterial.SetFloat(HighlightWidthId, highlightWidth * highlightWidthMultiplier);
+        targetMaterial.SetFloat(FlowSpeedId, flowSpeed);
+        targetMaterial.SetFloat(FlowScaleId, flowScale);
+        targetMaterial.SetFloat(DistortionStrengthId, distortionStrength);
+        targetMaterial.SetFloat(HighlightStrengthId, highlightStrength);
+        targetMaterial.SetFloat(HighlightWidthId, highlightWidth);
         targetMaterial.SetFloat(FlowTimeId, flowTime);
         targetMaterial.SetFloat(AlphaId, 1f);
     }
 
-    private void SetupRuntimeMaterial(Image image, Material template, ref Material runtimeMaterial)
+    private void UpdateBaseAccentState(float twilightDominance, float radianceDominance)
     {
-        if (image == null || template == null)
+        UpdateAccentAlpha(twilightBaseAccent, Mathf.Lerp(1f, oppositeAccentMinAlpha, radianceDominance));
+        UpdateAccentAlpha(radianceBaseAccent, Mathf.Lerp(1f, oppositeAccentMinAlpha, twilightDominance));
+    }
+
+    private void UpdateCover(RectTransform coverRoot, Image solid, Image fade, bool anchorRight, float dominance)
+    {
+        if (coverRoot == null || solid == null || fade == null)
         {
             return;
         }
 
-        if (runtimeMaterial == null)
-        {
-            runtimeMaterial = new Material(template);
-            runtimeMaterial.name = template.name + " (Runtime)";
-        }
+        CoverMetrics metrics = CalculateCoverMetrics(Mathf.Clamp01(dominance));
+        bool visible = metrics.TotalWidth > 0.001f;
+        SetCoverVisible(coverRoot, solid, fade, visible);
 
-        image.material = runtimeMaterial;
-        image.raycastTarget = false;
+        ConfigureCoverRootRect(coverRoot, anchorRight);
+        coverRoot.sizeDelta = new Vector2(visible ? metrics.TotalWidth : 0f, coverRoot.sizeDelta.y);
+
+        UpdateCoverSegment(solid.rectTransform, anchorRight, 0f, visible ? metrics.SolidWidth : 0f);
+        float fadeOffset = anchorRight ? -metrics.SolidWidth : metrics.SolidWidth;
+        UpdateCoverSegment(fade.rectTransform, anchorRight, visible ? fadeOffset : 0f, visible ? metrics.FadeWidth : 0f);
+
+        solid.enabled = visible && metrics.SolidWidth > 0.001f;
+        fade.enabled = visible && metrics.FadeWidth > 0.001f;
     }
 
-    private static Material ResolveFlowTemplate(Image image, Material fallbackTemplate)
+    private CoverMetrics CalculateCoverMetrics(float dominance)
     {
-        if (fallbackTemplate != null)
+        float coverTotalWidth = ResolveGaugeWidth() * Mathf.Clamp01(maxCoverRatio) * dominance;
+        if (coverTotalWidth <= 0.001f)
         {
-            return fallbackTemplate;
+            return default;
         }
 
-        return image != null ? image.material : null;
+        float fadeRatio = dominance <= coverFadeStartDominance
+            ? coverFadeMaxRatio
+            : Mathf.Lerp(
+                coverFadeMaxRatio,
+                coverFadeMinRatio,
+                Mathf.InverseLerp(coverFadeStartDominance, 1f, dominance));
+
+        fadeRatio = Mathf.Clamp01(fadeRatio);
+
+        float fadeWidth = coverTotalWidth * fadeRatio;
+        float minFadePixels = Mathf.Max(0f, coverFadeMinPixels);
+        float maxFadePixels = Mathf.Max(minFadePixels, coverFadeMaxPixels);
+        fadeWidth = Mathf.Clamp(fadeWidth, minFadePixels, maxFadePixels);
+        fadeWidth = Mathf.Min(fadeWidth, coverTotalWidth);
+
+        return new CoverMetrics
+        {
+            TotalWidth = coverTotalWidth,
+            FadeWidth = fadeWidth,
+            SolidWidth = Mathf.Max(0f, coverTotalWidth - fadeWidth)
+        };
     }
 
-    private static void UpdateFillContainer(
-        Image fillRoot,
-        Image darkLayer,
-        Image lightLayer,
-        float minX,
-        float maxX)
+    private float ResolveGaugeWidth()
     {
-        if (fillRoot == null)
+        return gaugeRoot != null ? Mathf.Max(0f, gaugeRoot.rect.width) : 0f;
+    }
+
+    private static void ConfigureCoverRootRect(RectTransform coverRoot, bool anchorRight)
+    {
+        if (coverRoot == null)
         {
             return;
         }
 
-        RectTransform rect = fillRoot.rectTransform;
-        if (rect == null)
-        {
-            return;
-        }
-
-        rect.anchorMin = new Vector2(Mathf.Clamp01(minX), 0f);
-        rect.anchorMax = new Vector2(Mathf.Clamp01(Mathf.Max(minX, maxX)), 1f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
-
-        bool hasVisibleWidth = maxX - minX > 0.001f;
-        if (darkLayer != null)
-        {
-            darkLayer.enabled = hasVisibleWidth;
-        }
-
-        if (lightLayer != null)
-        {
-            lightLayer.enabled = hasVisibleWidth;
-        }
+        float anchorX = anchorRight ? 1f : 0f;
+        coverRoot.anchorMin = new Vector2(anchorX, 0f);
+        coverRoot.anchorMax = new Vector2(anchorX, 1f);
+        coverRoot.pivot = new Vector2(anchorX, 0.5f);
+        coverRoot.anchoredPosition = Vector2.zero;
     }
 
-    private static void ConfigureFillContainer(Image image)
+    private static void ConfigureCoverSegmentRect(Image image, bool anchorRight)
     {
         if (image == null)
         {
             return;
         }
 
-        image.color = new Color(1f, 1f, 1f, 0f);
-        image.raycastTarget = false;
-        image.enabled = false;
+        RectTransform rect = image.rectTransform;
+        float anchorX = anchorRight ? 1f : 0f;
+        rect.anchorMin = new Vector2(anchorX, 0f);
+        rect.anchorMax = new Vector2(anchorX, 1f);
+        rect.pivot = new Vector2(anchorX, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(0f, rect.sizeDelta.y);
     }
 
-    private static void DestroyRuntimeMaterial(ref Material runtimeMaterial)
+    private static void UpdateCoverSegment(RectTransform segment, bool anchorRight, float offsetX, float width)
     {
-        if (runtimeMaterial == null)
+        if (segment == null)
         {
             return;
         }
 
-        Object.Destroy(runtimeMaterial);
-        runtimeMaterial = null;
+        float anchorX = anchorRight ? 1f : 0f;
+        segment.anchorMin = new Vector2(anchorX, 0f);
+        segment.anchorMax = new Vector2(anchorX, 1f);
+        segment.pivot = new Vector2(anchorX, 0.5f);
+        segment.anchoredPosition = new Vector2(offsetX, 0f);
+        segment.sizeDelta = new Vector2(width, segment.sizeDelta.y);
     }
 
-    private PlayerDayNightAffinity ResolveCurrentAffinity()
+    private static void SetCoverVisible(RectTransform coverRoot, Image solid, Image fade, bool visible)
     {
-        if (!resolvedBootstrap || cachedBootstrap == null)
+        if (coverRoot != null && coverRoot.gameObject.activeSelf != visible)
         {
-            cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
-            resolvedBootstrap = true;
+            coverRoot.gameObject.SetActive(visible);
         }
 
-        if (cachedBootstrap != null && cachedBootstrap.CurrentPlayer != null)
+        if (solid != null)
         {
-            PlayerDayNightAffinity affinity = ResolveAffinityFromObject(cachedBootstrap.CurrentPlayer);
-            if (affinity != null)
-            {
-                return affinity;
-            }
+            solid.enabled = visible;
+            solid.raycastTarget = false;
         }
 
-        PlayerDayNightAffinity[] affinities = FindObjectsOfType<PlayerDayNightAffinity>(true);
-        for (int i = 0; i < affinities.Length; i++)
+        if (fade != null)
         {
-            PlayerDayNightAffinity affinity = affinities[i];
-            if (affinity != null && affinity.gameObject.activeInHierarchy)
-            {
-                return affinity;
-            }
+            fade.enabled = visible;
+            fade.raycastTarget = false;
         }
-
-        return null;
     }
 
-    private static PlayerDayNightAffinity ResolveAffinityFromObject(GameObject target)
+    private static void SetupRuntimeMaterial(Image image, ref Material runtimeMaterial)
     {
-        if (target == null)
+        if (image == null || image.material == null)
         {
-            return null;
+            return;
         }
 
-        PlayerDayNightAffinity affinity = target.GetComponent<PlayerDayNightAffinity>();
-        if (affinity != null)
+        if (runtimeMaterial == null)
         {
-            return affinity;
+            runtimeMaterial = new Material(image.material);
+            runtimeMaterial.name = image.material.name + " (Runtime)";
         }
 
-        affinity = target.GetComponentInChildren<PlayerDayNightAffinity>(true);
-        if (affinity != null)
-        {
-            return affinity;
-        }
-
-        return target.GetComponentInParent<PlayerDayNightAffinity>(true);
+        image.material = runtimeMaterial;
+        image.raycastTarget = false;
     }
 
     private void AutoBindReferences()
@@ -405,8 +399,7 @@ public class DayNightAffinityUI : MonoBehaviour
 
         if (gaugeRoot == null)
         {
-            Transform root = transform.Find("GaugeRoot");
-            gaugeRoot = root as RectTransform;
+            gaugeRoot = FindRect("GaugeRoot");
         }
 
         if (gaugeBackground == null)
@@ -414,64 +407,54 @@ public class DayNightAffinityUI : MonoBehaviour
             gaugeBackground = FindImage("GaugeRoot/GaugeBackground");
         }
 
-        if (twilightFill == null)
+        if (twilightBaseAccent == null)
         {
-            twilightFill = FindImage("GaugeRoot/TwilightFill") ?? FindImage("GaugeRoot/EnergyGlowOuter");
+            twilightBaseAccent = FindImage("GaugeRoot/TwilightBaseAccent");
         }
 
-        if (twilightFillDark == null)
+        if (radianceBaseAccent == null)
         {
-            twilightFillDark = FindImage("GaugeRoot/TwilightFill/TwilightFill_Dark");
+            radianceBaseAccent = FindImage("GaugeRoot/RadianceBaseAccent");
         }
 
-        if (twilightFillLight == null)
+        if (twilightCoverRoot == null)
         {
-            twilightFillLight = FindImage("GaugeRoot/TwilightFill/TwilightFill_Light");
+            twilightCoverRoot = FindRect("GaugeRoot/TwilightCover");
         }
 
-        if (radianceFill == null)
+        if (twilightCoverSolid == null)
         {
-            radianceFill = FindImage("GaugeRoot/RadianceFill") ?? FindImage("GaugeRoot/EnergyCore");
+            twilightCoverSolid = FindImage("GaugeRoot/TwilightCover/TwilightCoverSolid");
         }
 
-        if (radianceFillDark == null)
+        if (twilightCoverFade == null)
         {
-            radianceFillDark = FindImage("GaugeRoot/RadianceFill/RadianceFill_Dark");
+            twilightCoverFade = FindImage("GaugeRoot/TwilightCover/TwilightCoverFade");
         }
 
-        if (radianceFillLight == null)
+        if (radianceCoverRoot == null)
         {
-            radianceFillLight = FindImage("GaugeRoot/RadianceFill/RadianceFill_Light");
+            radianceCoverRoot = FindRect("GaugeRoot/RadianceCover");
         }
 
-        if (flowFill == null)
+        if (radianceCoverSolid == null)
         {
-            flowFill = FindImage("GaugeRoot/FlowFill") ?? FindImage("GaugeRoot/EnergyNoiseMask");
+            radianceCoverSolid = FindImage("GaugeRoot/RadianceCover/RadianceCoverSolid");
         }
 
-        if (centerMarker == null)
+        if (radianceCoverFade == null)
         {
-            centerMarker = FindImage("GaugeRoot/CenterMarker");
+            radianceCoverFade = FindImage("GaugeRoot/RadianceCover/RadianceCoverFade");
         }
 
         if (twilightText == null)
         {
-            twilightText = FindText("GaugeRoot/TwilightValueText") ?? FindText("GaugeRoot/TwilightText");
+            twilightText = FindText("GaugeRoot/TwilightText");
         }
 
         if (radianceText == null)
         {
-            radianceText = FindText("GaugeRoot/RadianceValueText") ?? FindText("GaugeRoot/RadianceText");
-        }
-
-        if (phaseText == null)
-        {
-            phaseText = FindText("PhaseText");
-        }
-
-        if (statusText == null)
-        {
-            statusText = FindText("StatusText");
+            radianceText = FindText("GaugeRoot/RadianceText");
         }
     }
 
@@ -479,6 +462,12 @@ public class DayNightAffinityUI : MonoBehaviour
     {
         Transform target = transform.Find(path);
         return target != null ? target.GetComponent<Image>() : null;
+    }
+
+    private RectTransform FindRect(string path)
+    {
+        Transform target = transform.Find(path);
+        return target as RectTransform;
     }
 
     private Text FindText(string path)
@@ -508,6 +497,29 @@ public class DayNightAffinityUI : MonoBehaviour
         text.color = color;
         text.alignment = alignment;
         text.raycastTarget = false;
+    }
+
+    private static void DestroyRuntimeMaterial(ref Material runtimeMaterial)
+    {
+        if (runtimeMaterial == null)
+        {
+            return;
+        }
+
+        Object.Destroy(runtimeMaterial);
+        runtimeMaterial = null;
+    }
+
+    private static void UpdateAccentAlpha(Image image, float alpha)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        image.color = ApplyAlpha(image.color, alpha);
+        image.enabled = alpha > 0.001f;
+        image.raycastTarget = false;
     }
 
     private static Color ApplyAlpha(Color color, float alpha)

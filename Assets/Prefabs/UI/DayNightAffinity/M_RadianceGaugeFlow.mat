@@ -37,13 +37,13 @@ Material:
     - _ColorMask: 15
     - _CoreGlow: 0.36
     - _DistortionStrength: 0.12
-    - _EdgeFade: 0.8
+    - _EdgeFade: 1
     - _EdgeShade: 0.24
     - _FlowScale: 5.8
     - _FlowSpeed: 1.9
     - _FlowTime: 0
     - _GradientDirection: 1
-    - _GradientPower: 1.8
+    - _GradientPower: 1.9
     - _HighlightStrength: 1.05
     - _HighlightWidth: 0.12
     - _Stencil: 0
@@ -51,6 +51,7 @@ Material:
     - _StencilOp: 0
     - _StencilReadMask: 255
     - _StencilWriteMask: 255
+    - _TailFadeStart: 0
     - _UseUIAlphaClip: 0
     - _VerticalGlow: 0.28
     m_Colors:

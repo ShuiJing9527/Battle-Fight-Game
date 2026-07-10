@@ -23,7 +23,8 @@ Shader "UI/DayNightGaugeFlow"
         _HighlightStrength ("Highlight Strength", Range(0,1)) = 0.22
         _HighlightWidth ("Highlight Width", Range(0.01,0.4)) = 0.12
         _GradientDirection ("Gradient Direction", Float) = 1
-        _GradientPower ("Gradient Power", Range(0.5,4)) = 1.8
+        _GradientPower ("Gradient Power", Range(0.5,5)) = 1.8
+        _TailFadeStart ("Tail Fade Start", Range(0,1)) = 0
         _EdgeFade ("Edge Fade", Range(0,1)) = 0.8
         _EdgeShade ("Edge Shade", Range(0,1)) = 0.24
         _CoreGlow ("Core Glow", Range(0,2)) = 0.36
@@ -102,6 +103,7 @@ Shader "UI/DayNightGaugeFlow"
             float _HighlightWidth;
             float _GradientDirection;
             float _GradientPower;
+            float _TailFadeStart;
             float _EdgeFade;
             float _EdgeShade;
             float _CoreGlow;
@@ -158,15 +160,37 @@ Shader "UI/DayNightGaugeFlow"
                 float alphaMask;
                 if (_GradientDirection < 0.5)
                 {
-                    float leftFade = pow(saturate(1.0 - uv.x), gradientPower);
-                    toneMask = saturate(0.18 + leftFade * 0.82);
-                    alphaMask = saturate(leftFade * _EdgeFade) * verticalGlowMask;
+                    if (_TailFadeStart > 0.001)
+                    {
+                        float tailProgress = saturate((uv.x - _TailFadeStart) / max(0.0001, 1.0 - _TailFadeStart));
+                        float shapedTail = pow(tailProgress, gradientPower);
+                        float tailFade = 1.0 - smoothstep(0.0, 1.0, shapedTail);
+                        toneMask = saturate(0.18 + tailFade * 0.82);
+                        alphaMask = saturate(lerp(1.0, tailFade, _EdgeFade)) * verticalGlowMask;
+                    }
+                    else
+                    {
+                        float leftFade = pow(saturate(1.0 - uv.x), gradientPower);
+                        toneMask = saturate(0.18 + leftFade * 0.82);
+                        alphaMask = saturate(leftFade * _EdgeFade) * verticalGlowMask;
+                    }
                 }
                 else if (_GradientDirection < 1.5)
                 {
-                    float rightFade = pow(saturate(uv.x), gradientPower);
-                    toneMask = saturate(0.18 + rightFade * 0.82);
-                    alphaMask = saturate(rightFade * _EdgeFade) * verticalGlowMask;
+                    if (_TailFadeStart > 0.001)
+                    {
+                        float tailProgress = saturate(((1.0 - uv.x) - _TailFadeStart) / max(0.0001, 1.0 - _TailFadeStart));
+                        float shapedTail = pow(tailProgress, gradientPower);
+                        float tailFade = 1.0 - smoothstep(0.0, 1.0, shapedTail);
+                        toneMask = saturate(0.18 + tailFade * 0.82);
+                        alphaMask = saturate(lerp(1.0, tailFade, _EdgeFade)) * verticalGlowMask;
+                    }
+                    else
+                    {
+                        float rightFade = pow(saturate(uv.x), gradientPower);
+                        toneMask = saturate(0.18 + rightFade * 0.82);
+                        alphaMask = saturate(rightFade * _EdgeFade) * verticalGlowMask;
+                    }
                 }
                 else
                 {

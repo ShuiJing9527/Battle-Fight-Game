@@ -62,39 +62,63 @@ public static class DayNightAffinityDamageModifier
         return finalDamage;
     }
 
-    public static void NotifySuccessfulPlayerHit(GameObject attacker, GameObject defender)
+    public static bool NotifySuccessfulPlayerHit(GameObject attacker, GameObject defender)
     {
+        DayNightGaugeRuntimeState gauge = DayNightGaugeRuntimeState.Instance;
+        bool debugHitFlow = gauge != null && gauge.DebugHitFlowEnabled;
+
         if (attacker == null || defender == null)
         {
-            return;
+            LogHitFlow(debugHitFlow, $"skipped reason={(attacker == null ? "attacker-null" : "defender-null")} originalAttacker={GetObjectName(attacker)} target={GetObjectName(defender)}", defender != null ? defender : attacker);
+            return false;
         }
 
-        if (!BattleTargetUtility.IsPlayer(attacker) || !BattleTargetUtility.IsMonster(defender))
+        GameObject resolvedAttacker = ResolvePlayerSource(attacker);
+        GameObject resolvedDefender = ResolveMonsterTarget(defender);
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedAttacker != null ? resolvedAttacker : attacker);
+
+        if (resolvedAttacker == null)
         {
-            return;
+            LogHitFlow(debugHitFlow, $"skipped reason=attacker-not-player originalAttacker={GetObjectName(attacker)} target={GetObjectName(defender)}", attacker);
+            return false;
         }
 
-        PlayerDayNightAffinity affinity = ResolveAffinity(attacker);
         if (affinity == null)
         {
-            return;
+            LogHitFlow(debugHitFlow, $"skipped reason=affinity-not-found originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} target={GetObjectName(defender)}", resolvedAttacker);
+            return false;
         }
 
-        DayNightGaugeRuntimeState gauge = DayNightGaugeRuntimeState.Instance;
-        if (gauge == null)
+        if (resolvedDefender == null)
         {
-            return;
+            LogHitFlow(debugHitFlow, $"skipped reason=target-not-monster originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} target={GetObjectName(defender)}", defender);
+            return false;
         }
 
         float amount = gauge.GaugeGainPerHit;
+        float previousBalance = gauge.BalanceValue;
+        string action = "none";
         if (affinity.IsNightChild)
         {
             gauge.AddTwilight(amount);
+            action = "AddTwilight";
         }
         else if (affinity.IsDayChild)
         {
             gauge.AddRadiance(amount);
+            action = "AddRadiance";
         }
+        else
+        {
+            LogHitFlow(debugHitFlow, $"skipped reason=affinity-type-none originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} target={GetObjectName(resolvedDefender)}", resolvedAttacker);
+            return false;
+        }
+
+        LogHitFlow(
+            debugHitFlow,
+            $"success target={GetObjectName(resolvedDefender)} originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} affinity={GetAffinityName(affinity)} attackerIsPlayer={BattleTargetUtility.IsPlayer(resolvedAttacker)} targetIsMonster={BattleTargetUtility.IsMonster(resolvedDefender)} action={action} oldBalance={previousBalance:F2} newBalance={gauge.BalanceValue:F2}",
+            resolvedDefender);
+        return true;
     }
 
     private static bool TryResolveDayState(out bool isDay, out bool isNight)
@@ -132,8 +156,115 @@ public static class DayNightAffinityDamageModifier
         return target.GetComponentInChildren<PlayerDayNightAffinity>(true);
     }
 
+    private static GameObject ResolvePlayerSource(GameObject source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        if (BattleTargetUtility.IsPlayer(source))
+        {
+            return source;
+        }
+
+        CombatHealth combatHealth = source.GetComponentInParent<CombatHealth>();
+        if (combatHealth != null && BattleTargetUtility.IsPlayer(combatHealth.gameObject))
+        {
+            return combatHealth.gameObject;
+        }
+
+        PlayerMovement movement = source.GetComponentInParent<PlayerMovement>(true);
+        if (movement != null)
+        {
+            return movement.gameObject;
+        }
+
+        Player01SkillController player01 = source.GetComponentInParent<Player01SkillController>(true);
+        if (player01 != null)
+        {
+            return player01.gameObject;
+        }
+
+        Player2PrototypeController player02 = source.GetComponentInParent<Player2PrototypeController>(true);
+        if (player02 != null)
+        {
+            return player02.gameObject;
+        }
+
+        PlayerDayNightAffinity affinity = ResolveAffinity(source);
+        return affinity != null ? affinity.gameObject : null;
+    }
+
+    private static GameObject ResolveMonsterTarget(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        if (BattleTargetUtility.IsMonster(target))
+        {
+            CombatHealth combatHealth = target.GetComponentInParent<CombatHealth>();
+            return combatHealth != null ? combatHealth.gameObject : target;
+        }
+
+        CombatHealth parentHealth = target.GetComponentInParent<CombatHealth>();
+        if (parentHealth != null && BattleTargetUtility.IsMonster(parentHealth.gameObject))
+        {
+            return parentHealth.gameObject;
+        }
+
+        EnemyController enemyController = target.GetComponentInParent<EnemyController>(true);
+        if (enemyController != null)
+        {
+            return enemyController.gameObject;
+        }
+
+        MonsterIdentity identity = target.GetComponentInParent<MonsterIdentity>(true);
+        return identity != null ? identity.gameObject : null;
+    }
+
     private static string GetAffinityName(PlayerDayNightAffinity affinity)
     {
         return affinity != null ? affinity.AffinityType.ToString() : "None";
+    }
+
+    private static void LogHitFlow(bool enabled, string message, Object context)
+    {
+        if (!enabled)
+        {
+            return;
+        }
+
+        Debug.Log($"[DayNightHitFlow] {message}", context);
+    }
+
+    private static string GetObjectName(GameObject target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        return $"{target.name} ({GetHierarchyPath(target)})";
+    }
+
+    private static string GetHierarchyPath(GameObject target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        Transform current = target.transform;
+        string path = current.name;
+        while (current.parent != null)
+        {
+            current = current.parent;
+            path = current.name + "/" + path;
+        }
+
+        return path;
     }
 }
