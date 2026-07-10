@@ -36,6 +36,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [InspectorName("Mana Cost")]
     [SerializeField, Min(0f)] private float manaCost = 10f;
     [SerializeField, Range(0f, 1f)] private float quickShearLifeStealRatio = 0.5f;
+    [Header("Night Buff")]
+    [SerializeField, Min(1f)] private float nightBuffLifeStealMultiplier = 1.5f;
+    [SerializeField, Range(0f, 1f)] private float nightBuffSlowMoveSpeedMultiplier = 0.8f;
+    [SerializeField, Min(0f)] private float nightBuffSlowDuration = 1.5f;
 
     [Header("Q - Scissor Effects")]
     [SerializeField] private GameObject scissorCutEffectPrefab;
@@ -91,6 +95,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private int currentRuneCastId = -1;
     private int qMovementLockToken;
     private float qMovementLockEndTime;
+    private bool nightBuffEmpoweredThisCast;
 
     private void Reset()
     {
@@ -113,6 +118,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         enemyLayer = ~0;
         manaCost = 10f;
         quickShearLifeStealRatio = 0.5f;
+        nightBuffLifeStealMultiplier = 1.5f;
+        nightBuffSlowMoveSpeedMultiplier = 0.8f;
+        nightBuffSlowDuration = 1.5f;
         scissorCutEffectOffset = new Vector3(0.9f, 0.15f, 0f);
         scissorSlashWaveEffectOffset = new Vector3(1.35f, 0.15f, 0f);
         scissorEndEffectOffset = new Vector3(0.95f, 0.15f, 0f);
@@ -246,6 +254,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         SyncQuickShearSkillConfig();
         runeRuntimeState = ResolvePlayerRuneRuntimeState();
         currentRuneCastId = CurrentRuneCastId;
+        nightBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsNightChildBuffActive(Controller != null ? Controller.gameObject : gameObject);
 
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
@@ -401,6 +410,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
                 float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
+                resolvedDamage *= PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
+                PlayerNextSkillDamageBoostStatus nextSkillDamageBoost = PlayerNextSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
+                if (nextSkillDamageBoost != null)
+                {
+                    resolvedDamage *= nextSkillDamageBoost.Multiplier;
+                }
+
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
                 float afterHealth = ResolveCurrentHealth(combatHealth);
@@ -408,6 +424,12 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 if (actualDamage > 0f)
                 {
+                    if (nextSkillDamageBoost != null && nextSkillDamageBoost.TryConsume(out float consumedMultiplier))
+                    {
+                        Debug.Log($"[SecondBuffDebug] Player01 next skill damage boost consumed by Q on {combatHealth.name} x{consumedMultiplier:F2}.", this);
+                    }
+
+                    ApplyNightBuffSlow(combatHealth);
                     TryPlayQuickShearCritFlash(hit, damageResult);
                 }
                 totalDamageDealt += actualDamage;
@@ -626,7 +648,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     private void ApplyQLifeSteal(float damageDealt)
     {
-        float healAmount = Mathf.Max(0f, damageDealt) * Mathf.Max(0f, quickShearLifeStealRatio);
+        float lifeStealRatio = Mathf.Max(0f, quickShearLifeStealRatio);
+        if (nightBuffEmpoweredThisCast)
+        {
+            lifeStealRatio *= Mathf.Max(1f, nightBuffLifeStealMultiplier);
+        }
+
+        float healAmount = Mathf.Max(0f, damageDealt) * lifeStealRatio;
         if (healAmount <= 0f)
         {
             return;
@@ -650,6 +678,36 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         {
             Debug.Log($"[Player01 Q Lifesteal] damage={damageDealt:F2} heal={actualHeal:F2}", this);
         }
+    }
+
+    private void ApplyNightBuffSlow(CombatHealth combatHealth)
+    {
+        if (!nightBuffEmpoweredThisCast || combatHealth == null)
+        {
+            return;
+        }
+
+        TimedEnemyMoveSpeedDebuff.ApplyOrRefresh(
+            ResolveNightBuffSlowTarget(combatHealth),
+            $"{nameof(Player1Skill_Q_QuickShear)}_{GetInstanceID()}",
+            Mathf.Clamp01(nightBuffSlowMoveSpeedMultiplier),
+            Mathf.Max(0f, nightBuffSlowDuration));
+    }
+
+    private static GameObject ResolveNightBuffSlowTarget(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return null;
+        }
+
+        EnemyController enemyController = combatHealth.GetComponent<EnemyController>();
+        if (enemyController == null)
+        {
+            enemyController = combatHealth.GetComponentInChildren<EnemyController>(true);
+        }
+
+        return enemyController != null ? enemyController.gameObject : combatHealth.gameObject;
     }
 
     private float ResolveCurrentHealth(CombatHealth combatHealth)

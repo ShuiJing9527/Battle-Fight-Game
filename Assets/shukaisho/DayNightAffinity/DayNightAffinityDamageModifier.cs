@@ -3,6 +3,7 @@ using UnityEngine;
 public static class DayNightAffinityDamageModifier
 {
     private const float SkillGaugeGainManaWeight = 0.5f;
+    private const float SkillGaugeGainCooldownWeight = 0.5f;
     private const float SkillGaugeGainMin = 5f;
     private const float SkillGaugeGainMax = 30f;
 
@@ -175,7 +176,8 @@ public static class DayNightAffinityDamageModifier
         }
 
         float gain = Mathf.Clamp(
-            Mathf.Max(0f, manaCost) * SkillGaugeGainManaWeight + Mathf.Max(0f, cooldownSeconds),
+            Mathf.Max(0f, manaCost) * SkillGaugeGainManaWeight
+            + Mathf.Max(0f, cooldownSeconds) * SkillGaugeGainCooldownWeight,
             SkillGaugeGainMin,
             SkillGaugeGainMax);
         float previousBalance = gauge.BalanceValue;
@@ -197,6 +199,28 @@ public static class DayNightAffinityDamageModifier
             $"skill-cast success caster={GetObjectName(resolvedCaster)} skill={skillLabel ?? "<unknown>"} affinity={GetAffinityName(affinity)} manaCost={manaCost:F2} cooldown={cooldownSeconds:F2} gain={gain:F2} action={action} oldBalance={previousBalance:F2} newBalance={gauge.BalanceValue:F2}",
             resolvedCaster);
         return true;
+    }
+
+    public static bool IsNightChildBuffActive(GameObject target)
+    {
+        GameObject resolvedTarget = ResolvePlayerSource(target) ?? target;
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedTarget);
+        return affinity != null
+               && affinity.IsNightChild
+               && DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge)
+               && gauge != null
+               && gauge.IsTwilightBuffActive();
+    }
+
+    public static bool IsDayChildBuffActive(GameObject target)
+    {
+        GameObject resolvedTarget = ResolvePlayerSource(target) ?? target;
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedTarget);
+        return affinity != null
+               && affinity.IsDayChild
+               && DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge)
+               && gauge != null
+               && gauge.IsRadianceBuffActive();
     }
 
     private static bool TryResolveDayState(out bool isDay, out bool isNight)

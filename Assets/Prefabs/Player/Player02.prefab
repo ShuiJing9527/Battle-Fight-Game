@@ -1247,6 +1247,9 @@ MonoBehaviour:
   cooldown: 0.8
   manaCost: 10
   qDelay: 0.35
+  dayBuffRadianceMarkDuration: 3
+  dayBuffRadianceMarkVisualPrefab: {fileID: 100000, guid: 9c09baa69c174af1aa66722d7f7bc1d0, type: 3}
+  dayBuffRadianceMarkIconSprite: {fileID: 21300000, guid: 74d7b55c98bd4552971e305a10083d02, type: 3}
   baseDamage: 10
   physicalScaling: 0.8
   specialScaling: 1

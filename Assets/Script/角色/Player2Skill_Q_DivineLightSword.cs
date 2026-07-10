@@ -10,6 +10,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField, Min(0f)] private float manaCost = 10f;
     [InspectorName("Q Delay")]
     [SerializeField] private float qDelay = 0.35f;
+    [Header("Day Buff")]
+    [SerializeField, Min(0f)] private float dayBuffRadianceMarkDuration = 3f;
+    [SerializeField] private GameObject dayBuffRadianceMarkVisualPrefab;
+    [SerializeField] private Sprite dayBuffRadianceMarkIconSprite;
     [Header("Q - 旧伤害参数（当前直伤公式未使用）")]
     [FormerlySerializedAs("qStarFallDamage")]
     [HideInInspector]
@@ -242,10 +246,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qVisualYawJitter = 10f;
 
     private readonly List<GameObject> activeQBlades = new List<GameObject>();
+    private readonly HashSet<int> radianceMarkedCastIds = new HashSet<int>();
     private int activeQWaveCount;
     protected override int SkillIndex => 0;
     private Coroutine qCastRoutine;
     private RuneRuntimeState runeRuntimeState;
+    private bool dayBuffEmpoweredThisCast;
+    private int nextRadianceMarkCastId = 1;
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -299,8 +306,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         runeRuntimeState = debugRuneState;
+        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        int radianceMarkCastId = AllocateRadianceMarkCastId();
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, 1f));
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, radianceMarkCastId, 1f));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         if (debugThornCounter)
         {
@@ -332,10 +341,12 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
+        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        int radianceMarkCastId = AllocateRadianceMarkCastId();
         PrepareRuneCastContext();
         int runeCastId = CurrentRuneCastId;
         float manaRuneDamageMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, manaRuneDamageMultiplier));
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
     }
@@ -345,6 +356,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         StopAllCoroutines();
         qCastRoutine = null;
         activeQWaveCount = 0;
+        dayBuffEmpoweredThisCast = false;
+        radianceMarkedCastIds.Clear();
         ResetRuneCastContext();
 
         for (int i = 0; i < activeQBlades.Count; i++)
@@ -370,7 +383,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #endif
     }
 
-    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId, float manaRuneDamageMultiplier)
+    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         activeQWaveCount++;
         try
@@ -452,7 +465,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     waveBlades.Add(blade);
                     activeQBlades.Add(blade);
                     AccumulateDivineSealFromQBladeSpawn(1);
-                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId, manaRuneDamageMultiplier));
+                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier));
                 }
 
                 if (qStarFallSequentialDelay > 0f)
@@ -467,6 +480,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
         finally
         {
+            radianceMarkedCastIds.Remove(radianceMarkCastId);
             activeQWaveCount = Mathf.Max(0, activeQWaveCount - 1);
             qCastRoutine = null;
         }
@@ -496,7 +510,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         return bladeRoot;
     }
 
-    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId, float manaRuneDamageMultiplier)
+    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         while (bladeRoot != null && Vector3.Distance(bladeRoot.transform.position, targetPos) > 0.05f)
         {
@@ -510,7 +524,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            ApplyQStarFallDamage(targetPos, runeCastId, manaRuneDamageMultiplier);
+            ApplyQStarFallDamage(targetPos, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier);
 
             SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
@@ -522,7 +536,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void ApplyQStarFallDamage(Vector3 center, int runeCastId, float manaRuneDamageMultiplier)
+    private void ApplyQStarFallDamage(Vector3 center, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         if (qStarFallDamageRadius <= 0f)
         {
@@ -576,6 +590,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
                 float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
+                TryApplyRadianceMark(combatHealth, radianceMarkCastId);
                 hitAnyEnemy = true;
                 continue;
             }
@@ -585,6 +600,34 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         {
             Debug.Log("[Player02 Q] no enemy hit", this);
         }
+    }
+
+    private void TryApplyRadianceMark(CombatHealth combatHealth, int radianceMarkCastId)
+    {
+        bool isFirstHitThisCast = !radianceMarkedCastIds.Contains(radianceMarkCastId);
+        if (!dayBuffEmpoweredThisCast || !isFirstHitThisCast || combatHealth == null)
+        {
+            return;
+        }
+
+        RadianceMarkStatus.ApplyOrRefresh(
+            combatHealth.gameObject,
+            Mathf.Max(0f, dayBuffRadianceMarkDuration),
+            dayBuffRadianceMarkVisualPrefab,
+            dayBuffRadianceMarkIconSprite);
+        radianceMarkedCastIds.Add(radianceMarkCastId);
+    }
+
+    private int AllocateRadianceMarkCastId()
+    {
+        int castId = nextRadianceMarkCastId++;
+        if (nextRadianceMarkCastId >= int.MaxValue)
+        {
+            nextRadianceMarkCastId = 1;
+        }
+
+        radianceMarkedCastIds.Remove(castId);
+        return castId;
     }
 
     private float ConsumeRuneFirstHitBonusDamage(int runeCastId)

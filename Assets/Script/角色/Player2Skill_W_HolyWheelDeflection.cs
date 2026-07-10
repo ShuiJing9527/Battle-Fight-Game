@@ -14,6 +14,9 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [SerializeField, Min(0f)] private float wShieldDuration = 5f;
     [InspectorName("W 基础减伤")]
     [SerializeField] private float wDamageReduction = 0.4f;
+    [Header("Day Buff")]
+    [SerializeField, Min(1f)] private float dayBuffShieldMultiplier = 1.3f;
+    [SerializeField, Min(0f)] private float dayBuffManaRefund = 15f;
 
     [Header("W - 星刃护盾 / 护盾")]
     [InspectorName("W 护盾倍率")]
@@ -138,6 +141,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
     private RuneRuntimeState runeRuntimeState;
+    private bool dayBuffEmpoweredThisCast;
+    private bool shieldBrokenThisCast;
     protected override int SkillIndex => 1;
 
     public override float CooldownSeconds => wCooldown;
@@ -170,6 +175,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         Cleanup();
         runeRuntimeState = ResolveRuneRuntimeState();
+        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        shieldBrokenThisCast = false;
         PrepareRuneCastContext();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
@@ -230,6 +237,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         currentWFinalDamageReduction = 0f;
         currentWOrbitBladeDamage = 0f;
         currentWOrbitRadius = 0f;
+        dayBuffEmpoweredThisCast = false;
+        shieldBrokenThisCast = false;
         orbitBladeNextHitTimeByTarget.Clear();
         orbitBladeProcessedTargetIds.Clear();
         ClearWShield();
@@ -284,6 +293,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private IEnumerator ShieldRoutine()
     {
         isShielding = true;
+        shieldBrokenThisCast = false;
 
         GameObject orbitRoot = new GameObject("W_OrbitVisualRoot");
         orbitRoot.transform.position = Owner != null ? Owner.transform.position : transform.position;
@@ -417,6 +427,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
             if (ShouldEndWBecauseShieldExpired())
             {
+                shieldBrokenThisCast = true;
                 break;
             }
 
@@ -428,6 +439,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         {
             yield return FadeOutWShieldBubble(shieldBubble, orbitRoot != null ? orbitRoot.transform : null, wShieldBubbleFadeOutDuration);
         }
+
+        TryRefundDayBuffMana();
 
         Cleanup();
         isShielding = false;
@@ -1497,6 +1510,10 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier * manaMultiplier);
         float shieldRuneMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldGainMultiplier() : 1f;
         float finalShield = baseShield * Mathf.Max(0f, shieldRuneMultiplier);
+        if (dayBuffEmpoweredThisCast)
+        {
+            finalShield *= Mathf.Max(1f, dayBuffShieldMultiplier);
+        }
         if (manaMultiplier > 1f)
         {
             LogManaRuneApplied("Player02 W", "Shield", Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier), finalShield);
@@ -1536,6 +1553,37 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         return 0f;
+    }
+
+    private void TryRefundDayBuffMana()
+    {
+        if (!dayBuffEmpoweredThisCast || shieldBrokenThisCast || ResolveCurrentShieldValue() <= 0f)
+        {
+            return;
+        }
+
+        float refundAmount = Mathf.Max(0f, dayBuffManaRefund);
+        if (refundAmount <= 0f || Owner == null)
+        {
+            return;
+        }
+
+        BattleResourceBank bank = Owner.GetComponent<BattleResourceBank>();
+        if (bank == null)
+        {
+            PlayerSkillCooldownManager cooldownManager = Owner.GetComponent<PlayerSkillCooldownManager>();
+            if (cooldownManager != null)
+            {
+                bank = cooldownManager.resourceBank;
+            }
+        }
+
+        if (bank == null)
+        {
+            return;
+        }
+
+        bank.currentEnergy = Mathf.Clamp(bank.currentEnergy + refundAmount, 0f, bank.maxEnergy);
     }
 
     private float ResolveOwnerMaxHp()

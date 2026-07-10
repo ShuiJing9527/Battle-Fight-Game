@@ -85,14 +85,18 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
 
             float beforeHealth = ResolveCurrentHealth(combatHealth);
             float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
-            if (physicalDamageAmount + runeBonusDamage > 0f)
+            float skillDamageTakenMultiplier = PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
+            float skillDamageMultiplier = ownerSkill != null ? ownerSkill.ResolveActiveSkillDamageMultiplier() : 1f;
+            float resolvedPhysicalDamage = (physicalDamageAmount + runeBonusDamage) * skillDamageTakenMultiplier * skillDamageMultiplier;
+            float resolvedSpecialDamage = specialDamageAmount * skillDamageTakenMultiplier * skillDamageMultiplier;
+            if (resolvedPhysicalDamage > 0f)
             {
-                combatHealth.TakeDamage(new BattleDamage(physicalDamageAmount + runeBonusDamage, BattleDamageType.Physical, source));
+                combatHealth.TakeDamage(new BattleDamage(resolvedPhysicalDamage, BattleDamageType.Physical, source));
             }
 
-            if (!combatHealth.IsDead && specialDamageAmount > 0f)
+            if (!combatHealth.IsDead && resolvedSpecialDamage > 0f)
             {
-                combatHealth.TakeDamage(new BattleDamage(specialDamageAmount, BattleDamageType.Special, source));
+                combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, source));
             }
 
             float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
@@ -101,6 +105,7 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
 
             if (ownerSkill != null)
             {
+                ownerSkill.NotifySkillDamageApplied(actualDamage, combatHealth, "R needle");
                 ownerSkill.RegisterNeedleDamageResult(combatHealth, actualDamage, killedByThisHit);
             }
             else

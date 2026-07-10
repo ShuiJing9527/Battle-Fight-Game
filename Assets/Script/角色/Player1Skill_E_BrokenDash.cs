@@ -7,6 +7,10 @@ using UnityEngine.Serialization;
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
     private const float MoveSpeedEpsilon = 0.001f;
+    private const float NightBuffDurationMultiplier = 1.2f;
+    private const float NightBuffHealMultiplier = 1.5f;
+    private const float NightBuffNextSkillDamageMultiplier = 1.2f;
+    private const float NightBuffNextSkillDamageDuration = 2f;
     private static readonly string[] GroundLikeKeywords = { "ground", "floor", "terrain", "platform" };
     private static readonly string[] TerrainObstacleKeywords = { "wall", "airwall", "obstacle", "barrier", "block" };
     private static readonly string[] EnemyLikeKeywords = { "enemy", "monster", "elite", "boss", "slime" };
@@ -64,6 +68,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private RigidbodyConstraints cachedRigidbodyConstraints;
     private float cachedGhostStartY;
     private bool hasGroundSafetyLock;
+    private bool nightBuffEmpoweredThisCast;
 
     private void LateUpdate()
     {
@@ -158,7 +163,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         ResolvePlayerRuneRuntimeState();
         IsRunningBoost = true;
+        nightBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsNightChildBuffActive(Controller != null ? Controller.gameObject : gameObject);
         SyncEStateConfig();
+        duration = Mathf.Max(0f, nightBuffEmpoweredThisCast ? eDuration * NightBuffDurationMultiplier : eDuration);
         BeginGroundSafetyLock();
         ApplySpeedBoost();
         ApplyTerrainCollisionIgnore(true);
@@ -166,6 +173,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostStateVisible(true);
         SetGhostShadowVisible(true);
         SetGhostParticlesVisible(true);
+        if (nightBuffEmpoweredThisCast)
+        {
+            Debug.Log($"[SecondBuffDebug] Player01 E night buff active. duration x{NightBuffDurationMultiplier:F2}, heal x{NightBuffHealMultiplier:F2}.", this);
+        }
         Debug.Log(
             $"Player01 E 灵体疾行：持续={eDuration:F2}，移速倍率={eMoveSpeedMultiplier:F2}，每秒回血={eHealPercentPerSecond:P0} MaxHP，免疫怪物物理攻击={eImmuneToMonsterPhysicalDamage}，CD={eCooldown:F2}，蓝耗={eManaCost:F2}",
             this);
@@ -204,6 +215,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
+        if (nightBuffEmpoweredThisCast)
+        {
+            PlayerNextSkillDamageBoostStatus.ApplyOrRefresh(
+                Controller != null ? Controller.gameObject : gameObject,
+                NightBuffNextSkillDamageMultiplier,
+                NightBuffNextSkillDamageDuration);
+            Debug.Log($"[SecondBuffDebug] Player01 E granted next skill damage boost x{NightBuffNextSkillDamageMultiplier:F2} for {NightBuffNextSkillDamageDuration:F2}s.", this);
+        }
+
+        nightBuffEmpoweredThisCast = false;
         Debug.Log("Player01 E 灵体疾行结束，已恢复移动速度/碰撞/受击状态", this);
     }
 
@@ -333,6 +354,11 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         float healAmount = maxHealth * eHealPercentPerSecond * deltaTime;
+        if (nightBuffEmpoweredThisCast)
+        {
+            healAmount *= NightBuffHealMultiplier;
+        }
+
         if (healAmount > 0f)
         {
             cachedCombatHealth.Heal(healAmount);
