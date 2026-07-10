@@ -20,44 +20,76 @@ public static class DayNightAffinityDamageModifier
             return damage;
         }
 
+        bool hasGauge = DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge);
+        bool radianceBuffActive = hasGauge && gauge.IsRadianceBuffActive();
+        bool twilightBuffActive = hasGauge && gauge.IsTwilightBuffActive();
+        bool debugEnabled = hasGauge && gauge.DebugAffinityDamageEnabled;
+
         PlayerDayNightAffinity attackerAffinity = ResolveAffinity(attacker);
         PlayerDayNightAffinity defenderAffinity = ResolveAffinity(defender);
+        string reason = "no-applicable-rule";
 
         if (attackerIsPlayer && defenderIsMonster && attackerAffinity != null)
         {
-            if (attackerAffinity.IsNightChild && isNight)
+            if (attackerAffinity.IsNightChild && isNight && twilightBuffActive)
             {
                 multiplier *= 1.5f;
+                reason = "night-child-night-buff-active-player-vs-monster";
             }
-            else if (attackerAffinity.IsDayChild && isDay)
+            else if (attackerAffinity.IsDayChild && isDay && radianceBuffActive)
             {
                 multiplier *= 1.5f;
+                reason = "day-child-day-buff-active-player-vs-monster";
+            }
+            else
+            {
+                reason = ResolvePlayerAttackMissReason(attackerAffinity, isDay, isNight, radianceBuffActive, twilightBuffActive, hasGauge);
             }
         }
         else if (attackerIsMonster && defenderIsPlayer && defenderAffinity != null)
         {
             if (defenderAffinity.IsNightChild)
             {
-                multiplier *= isNight ? 0.5f : 2f;
+                if (twilightBuffActive)
+                {
+                    multiplier *= isNight ? 0.5f : 2f;
+                    reason = isNight
+                        ? "night-child-night-buff-active-monster-vs-player-resist"
+                        : "night-child-day-buff-active-monster-vs-player-penalty";
+                }
+                else
+                {
+                    reason = hasGauge ? "twilight-buff-inactive" : "gauge-missing";
+                }
             }
             else if (defenderAffinity.IsDayChild)
             {
-                multiplier *= isDay ? 0.5f : 2f;
+                if (radianceBuffActive)
+                {
+                    multiplier *= isDay ? 0.5f : 2f;
+                    reason = isDay
+                        ? "day-child-day-buff-active-monster-vs-player-resist"
+                        : "day-child-night-buff-active-monster-vs-player-penalty";
+                }
+                else
+                {
+                    reason = hasGauge ? "radiance-buff-inactive" : "gauge-missing";
+                }
+            }
+            else
+            {
+                reason = "defender-affinity-none";
             }
         }
         else
         {
+            reason = ResolveUnhandledReason(attackerIsPlayer, defenderIsMonster, attackerIsMonster, defenderIsPlayer);
+            LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, isDay, isNight, radianceBuffActive, twilightBuffActive, damage, multiplier, reason);
             return damage;
         }
 
         float finalDamage = damage * multiplier;
-        DayNightGaugeRuntimeState gauge = DayNightGaugeRuntimeState.Instance;
-        if (gauge != null && gauge.DebugLogEnabled)
-        {
-            Debug.Log(
-                $"[DayNightAffinity] phase={TODDayNightAdapter.GetDebugPhaseName()} attacker={(attacker != null ? attacker.name : "null")} defender={(defender != null ? defender.name : "null")} attackerAffinity={GetAffinityName(attackerAffinity)} defenderAffinity={GetAffinityName(defenderAffinity)} originalDamage={damage:F2} multiplier={multiplier:F2} finalDamage={finalDamage:F2}",
-                defender != null ? defender : attacker);
-        }
+        LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, isDay, isNight, radianceBuffActive, twilightBuffActive, damage, multiplier, reason);
 
         return finalDamage;
     }
@@ -228,6 +260,111 @@ public static class DayNightAffinityDamageModifier
     private static string GetAffinityName(PlayerDayNightAffinity affinity)
     {
         return affinity != null ? affinity.AffinityType.ToString() : "None";
+    }
+
+    private static string ResolvePlayerAttackMissReason(
+        PlayerDayNightAffinity attackerAffinity,
+        bool isDay,
+        bool isNight,
+        bool radianceBuffActive,
+        bool twilightBuffActive,
+        bool hasGauge)
+    {
+        if (attackerAffinity == null)
+        {
+            return "attacker-affinity-none";
+        }
+
+        if (attackerAffinity.IsDayChild)
+        {
+            if (!hasGauge)
+            {
+                return "gauge-missing";
+            }
+
+            if (!radianceBuffActive)
+            {
+                return "radiance-buff-inactive";
+            }
+
+            return !isDay ? "phase-mismatch-not-day" : "no-applicable-rule";
+        }
+
+        if (attackerAffinity.IsNightChild)
+        {
+            if (!hasGauge)
+            {
+                return "gauge-missing";
+            }
+
+            if (!twilightBuffActive)
+            {
+                return "twilight-buff-inactive";
+            }
+
+            return !isNight ? "phase-mismatch-not-night" : "no-applicable-rule";
+        }
+
+        return "attacker-affinity-none";
+    }
+
+    private static string ResolveUnhandledReason(bool attackerIsPlayer, bool defenderIsMonster, bool attackerIsMonster, bool defenderIsPlayer)
+    {
+        if (!attackerIsPlayer && !attackerIsMonster)
+        {
+            return "attacker-not-player-or-monster";
+        }
+
+        if (!defenderIsPlayer && !defenderIsMonster)
+        {
+            return "defender-not-player-or-monster";
+        }
+
+        if (attackerIsPlayer && !defenderIsMonster)
+        {
+            return "not-player-vs-monster";
+        }
+
+        if (attackerIsMonster && !defenderIsPlayer)
+        {
+            return "not-monster-vs-player";
+        }
+
+        return "unsupported-target-pair";
+    }
+
+    private static void LogAffinityDecision(
+        bool enabled,
+        GameObject attacker,
+        GameObject defender,
+        PlayerDayNightAffinity attackerAffinity,
+        PlayerDayNightAffinity defenderAffinity,
+        DayNightGaugeRuntimeState gauge,
+        bool isDay,
+        bool isNight,
+        bool radianceBuffActive,
+        bool twilightBuffActive,
+        float originalDamage,
+        float multiplier,
+        string reason)
+    {
+        if (!enabled)
+        {
+            return;
+        }
+
+        float balance = gauge != null ? gauge.BalanceValue : -1f;
+        float radiance = gauge != null ? gauge.RadianceValue : -1f;
+        float twilight = gauge != null ? gauge.TwilightValue : -1f;
+        string phase = isDay ? "Day" : isNight ? "Night" : "Unknown";
+
+        Debug.Log(
+            $"[DayNightAffinity] phase={phase} attackerIsPlayer={BattleTargetUtility.IsPlayer(attacker)} defenderIsPlayer={BattleTargetUtility.IsPlayer(defender)} " +
+            $"attackerIsMonster={BattleTargetUtility.IsMonster(attacker)} defenderIsMonster={BattleTargetUtility.IsMonster(defender)} " +
+            $"attacker={GetObjectName(attacker)} defender={GetObjectName(defender)} attackerAffinity={GetAffinityName(attackerAffinity)} defenderAffinity={GetAffinityName(defenderAffinity)} " +
+            $"balance={balance:F2} radiance={radiance:F2} twilight={twilight:F2} radianceBuffActive={radianceBuffActive} twilightBuffActive={twilightBuffActive} " +
+            $"originalDamage={originalDamage:F2} multiplier={multiplier:F2} finalDamage={originalDamage * multiplier:F2} reason={reason}",
+            defender != null ? defender : attacker);
     }
 
     private static void LogHitFlow(bool enabled, string message, Object context)

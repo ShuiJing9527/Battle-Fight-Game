@@ -8,8 +8,11 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
 
     [SerializeField, Range(0f, 100f)] private float initialBalanceValue = 50f;
     [SerializeField, Min(0f)] private float gaugeGainPerHit = 3f;
+    [SerializeField, Range(0f, 100f)] private float buffActivationThreshold = 100f;
+    [SerializeField, Min(0f)] private float activationEpsilon = 0.001f;
     [SerializeField] private bool debugLog = false;
     [SerializeField] private bool debugHitFlow = false;
+    [SerializeField] private bool debugAffinityDamage = false;
 
     [field: SerializeField, Range(0f, 100f)]
     public float BalanceValue { get; private set; } = 50f;
@@ -18,8 +21,11 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     public float RadianceValue => BalanceValue;
     public float TwilightValue => 100f - BalanceValue;
     public float GaugeGainPerHit => gaugeGainPerHit;
+    public float BuffActivationThreshold => buffActivationThreshold;
+    public float ActivationEpsilon => activationEpsilon;
     public bool DebugLogEnabled => debugLog;
     public bool DebugHitFlowEnabled => debugHitFlow;
+    public bool DebugAffinityDamageEnabled => debugAffinityDamage;
 
     private void Awake()
     {
@@ -49,6 +55,16 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     public void ResetGauge()
     {
         SetBalance(initialBalanceValue, "ResetGauge", Mathf.Abs(initialBalanceValue - BalanceValue));
+    }
+
+    public bool IsRadianceBuffActive()
+    {
+        return RadianceValue >= buffActivationThreshold - activationEpsilon;
+    }
+
+    public bool IsTwilightBuffActive()
+    {
+        return TwilightValue >= buffActivationThreshold - activationEpsilon;
     }
 
     private void SetBalance(float newValue, string source, float amount)
