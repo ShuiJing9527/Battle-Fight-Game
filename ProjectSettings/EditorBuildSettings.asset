@@ -12,6 +12,9 @@ EditorBuildSettings:
     path: "Assets/Scenes/\u8349\u539F.unity"
     guid: 0fe5cea53e4a11a43957307364b28fb3
   - enabled: 1
+    path: Assets/Scenes/Demo.unity
+    guid: 7d8347b2e7d04af483f2e144194c5651
+  - enabled: 1
     path: Assets/Zhu/gamewin.unity
     guid: d92bdd173304128489aeec7d228e398e
   - enabled: 1

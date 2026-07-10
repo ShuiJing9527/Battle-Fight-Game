@@ -10,6 +10,7 @@ public class CombatStats : MonoBehaviour
     [Min(0f)] public float specialDefense = 0f;
     [Min(0f)] public float speed = 1f;
     [Min(0f)] public float luck = 0f;
+    [HideInInspector, Min(0f)] public float outgoingDamageMultiplier = 1f;
 
     public float ReduceDamage(BattleDamage damage)
     {

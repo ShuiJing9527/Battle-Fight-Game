@@ -147,6 +147,17 @@ public class EnemyDifficultyDirector : MonoBehaviour
     public bool CanSpawnEnemies => currentPhase == DifficultyPhase.Normal || currentPhase == DifficultyPhase.FinalRush;
     public bool ShouldAllowSpawning => CanSpawnEnemies;
 
+    /// <summary>
+    /// Reconfigures the battle clock before gameplay starts. This is used by
+    /// lightweight entry scenes such as the two-minute exhibition demo.
+    /// </summary>
+    public void ConfigureTimeline(float levelIntervalSeconds, float finalRushStartSeconds, float finalRushDurationSeconds)
+    {
+        normalLevelInterval = Mathf.Max(1f, levelIntervalSeconds);
+        finalRushStartTime = Mathf.Max(0f, finalRushStartSeconds);
+        finalRushDuration = Mathf.Max(0f, finalRushDurationSeconds);
+    }
+
     public float CurrentHpMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseHealthMultiplier) * (1f + CurrentDifficultyLevel * hpGrowthPerLevel), finalRushHpMultiplier);
     public float CurrentAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseAttackMultiplier) * (1f + CurrentDifficultyLevel * attackGrowthPerLevel), finalRushAttackMultiplier);
     public float CurrentDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseDefenseMultiplier) * (1f + CurrentDifficultyLevel * defenseGrowthPerLevel), finalRushDefenseMultiplier);

@@ -1130,6 +1130,7 @@ public class EnemySpawner : MonoBehaviour
         }
 
         scaleTarget.localScale = Vector3.Scale(snapshot.scaleTargetLocalScale, Vector3.one * Mathf.Max(0.01f, cleanupBossScaleMultiplier));
+        AlignBossVisualToGround(enemy);
     }
 
     private static bool TryGetEnemyScaleTarget(GameObject enemy, out Transform scaleTarget)
@@ -1398,7 +1399,25 @@ public class EnemySpawner : MonoBehaviour
         {
             RigidbodyConstraints constraints = body.constraints;
             constraints |= RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
-            constraints &= ~RigidbodyConstraints.FreezePositionY;
+            MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+            bool shouldFreezeVerticalPosition = freezeEnemyVerticalPosition ||
+                                                (identity != null && identity.rank == MonsterRank.Boss);
+            if (shouldFreezeVerticalPosition)
+            {
+                if (identity != null && identity.rank == MonsterRank.Boss)
+                {
+                    AlignBossVisualToGround(enemy);
+                }
+
+                constraints |= RigidbodyConstraints.FreezePositionY;
+                Vector3 velocity = body.linearVelocity;
+                velocity.y = 0f;
+                body.linearVelocity = velocity;
+            }
+            else
+            {
+                constraints &= ~RigidbodyConstraints.FreezePositionY;
+            }
 
             body.constraints = constraints;
         }
@@ -1420,6 +1439,65 @@ public class EnemySpawner : MonoBehaviour
             Collider[] otherColliders = otherEnemy.GetComponentsInChildren<Collider>(true);
             IgnoreColliderPairs(newEnemyColliders, otherColliders);
         }
+    }
+
+    private static void AlignBossVisualToGround(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        BossGroundAnchor anchor = enemy.GetComponent<BossGroundAnchor>();
+        if (anchor == null)
+        {
+            anchor = enemy.AddComponent<BossGroundAnchor>();
+            anchor.groundY = enemy.transform.position.y;
+        }
+
+        Transform visualRoot = enemy.transform;
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        if (rankVisual != null && rankVisual.visualRoot != null)
+        {
+            visualRoot = rankVisual.visualRoot;
+        }
+
+        Renderer[] renderers = visualRoot.GetComponentsInChildren<Renderer>(true);
+        bool hasVisualBounds = false;
+        Bounds visualBounds = default;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (renderer == null || renderer is ParticleSystemRenderer || renderer is TrailRenderer || renderer is LineRenderer)
+            {
+                continue;
+            }
+
+            if (!hasVisualBounds)
+            {
+                visualBounds = renderer.bounds;
+                hasVisualBounds = true;
+            }
+            else
+            {
+                visualBounds.Encapsulate(renderer.bounds);
+            }
+        }
+
+        if (!hasVisualBounds)
+        {
+            return;
+        }
+
+        float correction = anchor.groundY - visualBounds.min.y;
+        if (Mathf.Abs(correction) <= 0.001f)
+        {
+            return;
+        }
+
+        Vector3 position = enemy.transform.position;
+        position.y += correction;
+        enemy.transform.position = position;
     }
 
     private static void IgnoreColliderPairs(Collider[] first, Collider[] second)
@@ -2190,4 +2268,10 @@ public class EnemySpawner : MonoBehaviour
             Gizmos.DrawWireCube(transform.position, new Vector3(fallbackSpawnRadiusX * 2f, 1f, fallbackSpawnRadiusZ * 2f));
         }
     }
+}
+
+[DisallowMultipleComponent]
+internal sealed class BossGroundAnchor : MonoBehaviour
+{
+    public float groundY;
 }
