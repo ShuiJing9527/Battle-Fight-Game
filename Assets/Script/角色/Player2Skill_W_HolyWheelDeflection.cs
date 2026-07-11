@@ -16,7 +16,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [SerializeField] private float wDamageReduction = 0.4f;
     [Header("Day Buff")]
     [SerializeField, Min(1f)] private float dayBuffShieldMultiplier = 1.3f;
-    [SerializeField, Min(0f)] private float dayBuffManaRefund = 15f;
+    [SerializeField, Min(0f)] private float dayBuffRemainingShieldHealRatio = 0.5f;
 
     [Header("W - 星刃护盾 / 护盾")]
     [InspectorName("W 护盾倍率")]
@@ -141,7 +141,8 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
     private RuneRuntimeState runeRuntimeState;
-    private bool dayBuffEmpoweredThisCast;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
     private bool shieldBrokenThisCast;
     protected override int SkillIndex => 1;
 
@@ -175,7 +176,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
         Cleanup();
         runeRuntimeState = ResolveRuneRuntimeState();
-        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         shieldBrokenThisCast = false;
         PrepareRuneCastContext();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
@@ -237,7 +238,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         currentWFinalDamageReduction = 0f;
         currentWOrbitBladeDamage = 0f;
         currentWOrbitRadius = 0f;
-        dayBuffEmpoweredThisCast = false;
+        dayChildStateActiveThisCast = false;
         shieldBrokenThisCast = false;
         orbitBladeNextHitTimeByTarget.Clear();
         orbitBladeProcessedTargetIds.Clear();
@@ -440,7 +441,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             yield return FadeOutWShieldBubble(shieldBubble, orbitRoot != null ? orbitRoot.transform : null, wShieldBubbleFadeOutDuration);
         }
 
-        TryRefundDayBuffMana();
+        TryHealDayBuffRemainingShield();
 
         Cleanup();
         isShielding = false;
@@ -1510,7 +1511,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier * manaMultiplier);
         float shieldRuneMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldGainMultiplier() : 1f;
         float finalShield = baseShield * Mathf.Max(0f, shieldRuneMultiplier);
-        if (dayBuffEmpoweredThisCast)
+        if (dayChildStateActiveThisCast)
         {
             finalShield *= Mathf.Max(1f, dayBuffShieldMultiplier);
         }
@@ -1555,35 +1556,38 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         return 0f;
     }
 
-    private void TryRefundDayBuffMana()
+    private void TryHealDayBuffRemainingShield()
     {
-        if (!dayBuffEmpoweredThisCast || shieldBrokenThisCast || ResolveCurrentShieldValue() <= 0f)
+        if (!dayChildStateActiveThisCast || shieldBrokenThisCast || ResolveCurrentShieldValue() <= 0f)
         {
             return;
         }
 
-        float refundAmount = Mathf.Max(0f, dayBuffManaRefund);
-        if (refundAmount <= 0f || Owner == null)
+        if (Owner == null)
         {
             return;
         }
 
-        BattleResourceBank bank = Owner.GetComponent<BattleResourceBank>();
-        if (bank == null)
-        {
-            PlayerSkillCooldownManager cooldownManager = Owner.GetComponent<PlayerSkillCooldownManager>();
-            if (cooldownManager != null)
-            {
-                bank = cooldownManager.resourceBank;
-            }
-        }
-
-        if (bank == null)
+        CombatHealth combatHealth = Owner.GetComponent<CombatHealth>();
+        if (combatHealth == null || combatHealth.IsDead)
         {
             return;
         }
 
-        bank.currentEnergy = Mathf.Clamp(bank.currentEnergy + refundAmount, 0f, bank.maxEnergy);
+        float remainingShield = ResolveCurrentShieldValue();
+        if (remainingShield <= 0f)
+        {
+            return;
+        }
+
+        float healAmount = remainingShield * Mathf.Max(0f, dayBuffRemainingShieldHealRatio);
+        if (healAmount <= 0f)
+        {
+            return;
+        }
+
+        combatHealth.Heal(healAmount);
+        Debug.Log($"[SecondBuffDebug] Player02 W day buff healed HP from remaining shield. remainingShield={remainingShield:F2}, ratio={dayBuffRemainingShieldHealRatio:F2}, heal={healAmount:F2}.", this);
     }
 
     private float ResolveOwnerMaxHp()

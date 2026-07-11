@@ -106,7 +106,8 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private float currentTotalActualDamage;
     private float currentTotalHealAmount;
     private float currentTotalCooldownReduction;
-    private bool nightBuffEmpoweredThisCast;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
     private bool nightBuffDamageLoggedThisCast;
     private bool nightBuffExtraCooldownRefundTriggered;
 
@@ -215,7 +216,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         currentTotalActualDamage = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
-        nightBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsNightChildBuffActive(Controller != null ? Controller.gameObject : gameObject);
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
         nightBuffDamageLoggedThisCast = false;
         nightBuffExtraCooldownRefundTriggered = false;
         ClearDestroyedNeedles();
@@ -728,7 +729,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         currentTotalActualDamage = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
-        nightBuffEmpoweredThisCast = false;
+        nightChildStateActiveThisCast = false;
         nightBuffDamageLoggedThisCast = false;
         nightBuffExtraCooldownRefundTriggered = false;
         castRoutine = null;
@@ -836,7 +837,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     public float ResolveActiveSkillDamageMultiplier()
     {
         float multiplier = 1f;
-        if (nightBuffEmpoweredThisCast)
+        if (nightChildStateActiveThisCast)
         {
             multiplier *= NightBuffDamageMultiplier;
             if (!nightBuffDamageLoggedThisCast)
@@ -846,10 +847,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             }
         }
 
-        PlayerNextSkillDamageBoostStatus nextSkillDamageBoost = PlayerNextSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
-        if (nextSkillDamageBoost != null)
+        PlayerTimedSkillDamageBoostStatus timedSkillDamageBoost = PlayerTimedSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
+        if (timedSkillDamageBoost != null)
         {
-            multiplier *= nextSkillDamageBoost.Multiplier;
+            multiplier *= timedSkillDamageBoost.Multiplier;
         }
 
         return multiplier;
@@ -860,13 +861,6 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         if (actualDamage <= 0f)
         {
             return;
-        }
-
-        PlayerNextSkillDamageBoostStatus nextSkillDamageBoost = PlayerNextSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
-        if (nextSkillDamageBoost != null && nextSkillDamageBoost.TryConsume(out float consumedMultiplier))
-        {
-            string targetName = target != null ? target.name : "UnknownTarget";
-            Debug.Log($"[SecondBuffDebug] Player01 next skill damage boost consumed by {sourceLabel} on {targetName} x{consumedMultiplier:F2}.", this);
         }
     }
 
@@ -888,7 +882,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private void TryApplyNightBuffExtraCooldownRefund()
     {
-        if (!nightBuffEmpoweredThisCast || nightBuffExtraCooldownRefundTriggered || SkillResource == null)
+        if (!nightChildStateActiveThisCast || nightBuffExtraCooldownRefundTriggered || SkillResource == null)
         {
             return;
         }

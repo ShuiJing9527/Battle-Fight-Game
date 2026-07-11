@@ -687,6 +687,7 @@ public class DissolveOnDeath : MonoBehaviour
         loggedRendererDiagnostics = false;
         nextDissolveLogTime = 0f;
         DebugLog($"[DissolveOnDeath] Begin owner={name} hasCombatHealth={(combatHealth != null)}");
+        ClearAttachedRadianceMark("death-sequence-started");
         SyncDestroyOnDeathState(false);
         PrepareRuntimeMaterials();
         LogRendererDiagnostics();
@@ -940,6 +941,7 @@ public class DissolveOnDeath : MonoBehaviour
 
     private void FinalHideOwnerVisuals()
     {
+        ClearAttachedRadianceMark("owner-visual-hidden");
         ApplyDissolveProperties(1f);
 
         for (int bindingIndex = 0; bindingIndex < rendererBindings.Count; bindingIndex++)
@@ -964,6 +966,17 @@ public class DissolveOnDeath : MonoBehaviour
                 }
             }
         }
+    }
+
+    private void ClearAttachedRadianceMark(string reason)
+    {
+        RadianceMarkStatus radianceMark = GetComponent<RadianceMarkStatus>();
+        if (radianceMark == null)
+        {
+            return;
+        }
+
+        radianceMark.ForceClear($"DissolveOnDeath.{reason}", removeComponent: true);
     }
 
     private void ApplyDissolveProperties(float amount)

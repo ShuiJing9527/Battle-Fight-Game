@@ -95,7 +95,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private int currentRuneCastId = -1;
     private int qMovementLockToken;
     private float qMovementLockEndTime;
-    private bool nightBuffEmpoweredThisCast;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
 
     private void Reset()
     {
@@ -254,7 +255,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         SyncQuickShearSkillConfig();
         runeRuntimeState = ResolvePlayerRuneRuntimeState();
         currentRuneCastId = CurrentRuneCastId;
-        nightBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsNightChildBuffActive(Controller != null ? Controller.gameObject : gameObject);
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
 
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
@@ -411,10 +412,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             {
                 float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
                 resolvedDamage *= PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
-                PlayerNextSkillDamageBoostStatus nextSkillDamageBoost = PlayerNextSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
-                if (nextSkillDamageBoost != null)
+                PlayerTimedSkillDamageBoostStatus timedSkillDamageBoost = PlayerTimedSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
+                if (timedSkillDamageBoost != null)
                 {
-                    resolvedDamage *= nextSkillDamageBoost.Multiplier;
+                    resolvedDamage *= timedSkillDamageBoost.Multiplier;
                 }
 
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
@@ -424,11 +425,6 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 if (actualDamage > 0f)
                 {
-                    if (nextSkillDamageBoost != null && nextSkillDamageBoost.TryConsume(out float consumedMultiplier))
-                    {
-                        Debug.Log($"[SecondBuffDebug] Player01 next skill damage boost consumed by Q on {combatHealth.name} x{consumedMultiplier:F2}.", this);
-                    }
-
                     ApplyNightBuffSlow(combatHealth);
                     TryPlayQuickShearCritFlash(hit, damageResult);
                 }
@@ -649,7 +645,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private void ApplyQLifeSteal(float damageDealt)
     {
         float lifeStealRatio = Mathf.Max(0f, quickShearLifeStealRatio);
-        if (nightBuffEmpoweredThisCast)
+        if (nightChildStateActiveThisCast)
         {
             lifeStealRatio *= Mathf.Max(1f, nightBuffLifeStealMultiplier);
         }
@@ -682,7 +678,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     private void ApplyNightBuffSlow(CombatHealth combatHealth)
     {
-        if (!nightBuffEmpoweredThisCast || combatHealth == null)
+        if (!nightChildStateActiveThisCast || combatHealth == null)
         {
             return;
         }

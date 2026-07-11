@@ -5,7 +5,7 @@ public class EnemyController : MonoBehaviour
     private const float MovementZeroEpsilon = 0.001f;
     private const float AttackRecoveryDurationSeconds = 0.7f;
     private const float ProjectileSpawnHeightOffset = 0.8f;
-    private const float ProjectileSpawnForwardOffset = 0.5f;
+    private const float ProjectileSpawnForwardOffset = 0.8f;
     private const float BossProjectileScale = 0.45f;
     private const float NormalProjectileScale = 0.28f;
     private const float EdgeDistanceEpsilon = 0.02f;
@@ -78,6 +78,11 @@ public class EnemyController : MonoBehaviour
     private float nextSpeedDiagnosticTime;
     private float nextChaseDiagnosticTime;
     private float nextTargetResolveTime;
+    private Vector3 lastGroundProbeOrigin;
+    private bool lastGroundProbeHit;
+    private string lastGroundHitName = "None";
+    private int lastGroundHitLayer = -1;
+    private float lastGroundProbeCastDistance;
     private Collider[] separationHits;
     private static GameObject cachedDefaultProjectilePrefab;
     private float lastAttackTime = -1f;
@@ -98,6 +103,8 @@ public class EnemyController : MonoBehaviour
     }
 
     public float BaseMoveSpeed => moveSpeed;
+    public Transform CurrentTarget => playerTarget;
+    public MonsterAttackStyle CurrentAttackStyle => attackStyle;
 
     private void Start()
     {
@@ -195,7 +202,8 @@ public class EnemyController : MonoBehaviour
         if (isAttackAnimationActive)
         {
             rb.linearVelocity = Vector3.zero;
-            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", "AttackInProgress");
+            string chaseReason = string.IsNullOrEmpty(attackFailReason) ? "AttackInProgress" : attackFailReason;
+            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", chaseReason);
             LogAttackStateChange(
                 EnemyAttackRuntimeState.AttackInProgress,
                 centerDistance,
@@ -203,7 +211,7 @@ public class EnemyController : MonoBehaviour
                 verticalDifference,
                 grounded,
                 false,
-                "AttackInProgress",
+                chaseReason,
                 enemyClosestPoint,
                 playerClosestPoint);
             if (keepFlatRotation)
@@ -218,7 +226,10 @@ public class EnemyController : MonoBehaviour
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
-            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "HoldPosition", 0f, playerTarget != null ? playerTarget.name : "null", "StopDistance");
+            string chaseReason = string.IsNullOrEmpty(attackFailReason)
+                ? (hasPhysicalContact ? "PhysicalContact" : "StopDistance")
+                : attackFailReason;
+            LogChaseDiagnostics(attackDistance, false, false, false, false, false, "HoldPosition", 0f, playerTarget != null ? playerTarget.name : "null", chaseReason);
             LogAttackStateChange(
                 EnemyAttackRuntimeState.HoldPosition,
                 centerDistance,
@@ -226,7 +237,7 @@ public class EnemyController : MonoBehaviour
                 verticalDifference,
                 grounded,
                 false,
-                hasPhysicalContact ? "PhysicalContact" : "StopDistance",
+                chaseReason,
                 enemyClosestPoint,
                 playerClosestPoint);
             if (keepFlatRotation)
@@ -776,6 +787,11 @@ public class EnemyController : MonoBehaviour
         {
             // Boss multi-skill expansion point: keep projectile as the phase-one fallback
             // until fire ring / ground spike attacks are introduced.
+            if (debugAttackDiagnostics || debugLog)
+            {
+                float distanceToTarget = hitTarget != null ? Vector3.Distance(transform.position, hitTarget.position) : -1f;
+                Debug.Log($"[BossAcidAttack] enter ranged branch boss={name} target={(hitTarget != null ? hitTarget.name : "null")} distance={distanceToTarget:F2} attackStyle={attackStyle}", this);
+            }
             FireProjectileAt(hitTarget);
             return;
         }
@@ -879,6 +895,48 @@ public class EnemyController : MonoBehaviour
         Debug.Log(
             $"[EnemyTargetResolve] enemy={name} oldTarget={oldTargetName} newTarget={(playerTarget != null ? playerTarget.name : "null")} success={(playerTarget != null)} source={source}{(playerTarget == null ? " reason=NoActivePlayerFound" : string.Empty)}",
             this);
+    }
+
+    public string BuildRuntimeDebugSummary(Transform fallbackTarget = null)
+    {
+        Transform target = HasUsableTarget(playerTarget) ? playerTarget : fallbackTarget;
+        float centerDistance = target != null ? Vector3.Distance(target.position, transform.position) : -1f;
+        float edgeDistance = float.MaxValue;
+        Vector3 enemyClosest = transform.position;
+        Vector3 playerClosest = target != null ? target.position : transform.position;
+        if (target != null)
+        {
+            edgeDistance = ResolveHorizontalEdgeDistance(target, out enemyClosest, out playerClosest);
+        }
+
+        float verticalDifference = target != null ? Mathf.Abs(target.position.y - transform.position.y) : -1f;
+        bool grounded = IsGroundedForAttack();
+        string failReason = EvaluateAttackFailReason(edgeDistance, verticalDifference, grounded);
+        bool canAttack = string.IsNullOrEmpty(failReason);
+        CombatHealth health = GetComponent<CombatHealth>();
+        EnemyDebuffReceiver receiver = ResolveDebuffReceiver();
+        float cooldownRemaining = Mathf.Max(0f, nextAttackTime - Time.time);
+        bool isStunned = receiver != null && receiver.GetMoveSpeedMultiplier() <= 0f;
+        bool canMove = rb != null && !attackInProgress;
+        string state = playerTarget == null
+            ? EnemyAttackRuntimeState.NoTarget.ToString()
+            : (attackInProgress ? EnemyAttackRuntimeState.AttackInProgress.ToString() : (canAttack ? EnemyAttackRuntimeState.AttackReady.ToString() : EnemyAttackRuntimeState.Chase.ToString()));
+        Collider primaryCollider = meleeEnemyCollider != null ? meleeEnemyCollider : GetComponent<Collider>();
+        string rigidbodyConstraints = rb != null ? rb.constraints.ToString() : "None";
+
+        return
+            "[MonsterDebug] " +
+            $"name={name} position={transform.position} rank={(monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown")} " +
+            $"species={(monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown")} attackStyle={attackStyle} " +
+            $"enemyControllerExists=true enemyControllerEnabled={enabled} targetExists={(target != null)} targetName={(target != null ? target.name : "null")} " +
+            $"distanceToTarget={(centerDistance >= 0f ? centerDistance.ToString("F2") : "n/a")} edgeDistance={(edgeDistance < float.MaxValue ? edgeDistance.ToString("F2") : "n/a")} " +
+            $"moveSpeed={moveSpeed:F2} attackRange={attackRange:F2} rangedAttackRange={attackRange:F2} meleeAttackRange={attackHitRange:F2} " +
+            $"currentState={state} canMove={canMove} canAttack={canAttack} failReason={(string.IsNullOrEmpty(failReason) ? "None" : failReason)} " +
+            $"isDead={(health != null && health.IsDead)} isStunned={isStunned} isAttacking={attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking)} " +
+            $"attackCooldownRemaining={cooldownRemaining:F2} lastAttackTime={lastAttackTime:F2} " +
+            $"health={(health != null ? health.currentHealth.ToString("F1") : "n/a")}/{(health != null ? health.MaxHealthValue.ToString("F1") : "n/a")} " +
+            $"rigidbodyConstraints={rigidbodyConstraints} colliderEnabled={(primaryCollider != null && primaryCollider.enabled)} " +
+            $"layer={LayerMask.LayerToName(gameObject.layer)} tag={gameObject.tag}";
     }
 
     private EnemyDebuffReceiver ResolveDebuffReceiver()
@@ -995,8 +1053,18 @@ public class EnemyController : MonoBehaviour
         }
 
         nextChaseDiagnosticTime = Time.time + Mathf.Max(0.1f, debugSpeedLogInterval);
+        CombatHealth health = GetComponent<CombatHealth>();
+        bool isDead = health != null && health.IsDead;
+        bool isAttacking = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
+        float cooldownRemaining = Mathf.Max(0f, nextAttackTime - Time.time);
+        bool targetAssigned = playerTarget != null;
         Debug.Log(
-            $"[EnemyChaseDiag] enemy={name} distanceToTarget={distanceToTarget:F2} canMove={canMove} canAttack={canAttack} isKnockback={isKnockback} isStunned={isStunned} isBlocked={isBlocked} currentState={currentState} moveSpeed={moveSpeed:F2} target={targetName} reason={reason}",
+            $"[EnemyChaseDiag] enemy={name} rank={(monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown")} species={(monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown")} attackStyle={attackStyle} " +
+            $"distanceToTarget={distanceToTarget:F2} canMove={canMove} canAttack={canAttack} failReason={reason} " +
+            $"requireGroundedToAttack={requireGroundedToAttack} isGrounded={lastGroundProbeHit || (Time.time - lastGroundedTime <= Mathf.Max(0f, groundedAttackGraceTime))} groundedProbeDistance={groundedProbeDistance:F2} groundedProbeOrigin={lastGroundProbeOrigin} groundedProbeCastDistance={lastGroundProbeCastDistance:F2} " +
+            $"groundedProbeHit={lastGroundProbeHit} groundedHitName={lastGroundHitName} groundedHitLayer={(lastGroundHitLayer >= 0 ? LayerMask.LayerToName(lastGroundHitLayer) : "None")} " +
+            $"attackCooldownRemaining={cooldownRemaining:F2} isDead={isDead} isStunned={isStunned} isKnockback={isKnockback} isAttacking={isAttacking} isBlocked={isBlocked} " +
+            $"targetAssigned={targetAssigned} targetName={targetName} currentState={currentState} moveSpeed={moveSpeed:F2}",
             this);
     }
 
@@ -1116,6 +1184,11 @@ public class EnemyController : MonoBehaviour
     {
         float probeDistance = Mathf.Max(0.01f, groundedProbeDistance);
         ResolveMeleeHitSources();
+        lastGroundProbeHit = false;
+        lastGroundHitName = "None";
+        lastGroundHitLayer = -1;
+        lastGroundProbeCastDistance = probeDistance;
+        lastGroundProbeOrigin = transform.position + Vector3.up * 0.05f;
 
         Collider sourceCollider = meleeEnemyCollider != null ? meleeEnemyCollider : GetComponent<Collider>();
         if (sourceCollider != null)
@@ -1124,16 +1197,41 @@ public class EnemyController : MonoBehaviour
             Vector3 origin = bounds.center + Vector3.up * 0.05f;
             float radius = Mathf.Clamp(Mathf.Min(bounds.extents.x, bounds.extents.z) * 0.45f, 0.05f, 0.45f);
             float castDistance = Mathf.Max(probeDistance + bounds.extents.y + 0.1f, probeDistance + 0.15f);
-            if (Physics.SphereCast(origin, radius, Vector3.down, out _, castDistance, ~0, QueryTriggerInteraction.Ignore))
+            lastGroundProbeOrigin = origin;
+            lastGroundProbeCastDistance = castDistance;
+            if (Physics.SphereCast(origin, radius, Vector3.down, out RaycastHit sphereHit, castDistance, ~0, QueryTriggerInteraction.Ignore))
             {
+                lastGroundProbeHit = true;
+                lastGroundHitName = sphereHit.collider != null ? sphereHit.collider.name : "Unknown";
+                lastGroundHitLayer = sphereHit.collider != null ? sphereHit.collider.gameObject.layer : -1;
                 return true;
             }
 
-            return Physics.Raycast(origin, Vector3.down, castDistance + radius, ~0, QueryTriggerInteraction.Ignore);
+            float rayDistance = castDistance + radius;
+            lastGroundProbeCastDistance = rayDistance;
+            if (Physics.Raycast(origin, Vector3.down, out RaycastHit rayHit, rayDistance, ~0, QueryTriggerInteraction.Ignore))
+            {
+                lastGroundProbeHit = true;
+                lastGroundHitName = rayHit.collider != null ? rayHit.collider.name : "Unknown";
+                lastGroundHitLayer = rayHit.collider != null ? rayHit.collider.gameObject.layer : -1;
+                return true;
+            }
+
+            return false;
         }
 
         Vector3 fallbackOrigin = transform.position + Vector3.up * 0.05f;
-        return Physics.Raycast(fallbackOrigin, Vector3.down, probeDistance + 0.05f, ~0, QueryTriggerInteraction.Ignore);
+        lastGroundProbeOrigin = fallbackOrigin;
+        lastGroundProbeCastDistance = probeDistance + 0.05f;
+        if (Physics.Raycast(fallbackOrigin, Vector3.down, out RaycastHit fallbackHit, probeDistance + 0.05f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            lastGroundProbeHit = true;
+            lastGroundHitName = fallbackHit.collider != null ? fallbackHit.collider.name : "Unknown";
+            lastGroundHitLayer = fallbackHit.collider != null ? fallbackHit.collider.gameObject.layer : -1;
+            return true;
+        }
+
+        return false;
     }
 
     private bool IsSlimeIdentity()
@@ -1239,13 +1337,30 @@ public class EnemyController : MonoBehaviour
             direction = transform.forward;
         }
 
+        if (debugAttackDiagnostics || debugLog)
+        {
+            float distanceToTarget = Vector3.Distance(transform.position, hitTarget.position);
+            Debug.Log($"[BossAcidAttack] FireProjectileAt boss={name} target={hitTarget.name} distance={distanceToTarget:F2} spawnOffset={ProjectileSpawnForwardOffset:F2}", this);
+        }
+
         BattleDamageType damageType = ResolvePrimaryDamageType();
 
         // 投射物出生点维持在角色前上方，避免和本体碰撞体重叠。
         GameObject projectile = CreateProjectileObject();
-        projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Element Projectile" : "Monster Projectile";
+        if (projectile == null)
+        {
+            Debug.LogWarning($"[BossAcidAttack] Failed to create projectile for boss '{name}'.", this);
+            return;
+        }
+
+        projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Acid Projectile" : "Monster Projectile";
         projectile.transform.position = transform.position + Vector3.up * ProjectileSpawnHeightOffset + direction.normalized * ProjectileSpawnForwardOffset;
         projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? BossProjectileScale : NormalProjectileScale);
+
+        if (debugAttackDiagnostics || debugLog)
+        {
+            Debug.Log($"[BossAcidAttack] instantiated projectile={projectile.name} prefabSource={(ResolveProjectilePrefab() != null ? ResolveProjectilePrefab().name : "runtime sphere")} position={projectile.transform.position}", this);
+        }
 
         Collider projectileCollider = projectile.GetComponent<Collider>();
         if (projectileCollider == null)
@@ -1269,7 +1384,7 @@ public class EnemyController : MonoBehaviour
         monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(damageType), damageType, gameObject);
 
         Renderer renderer = projectile.GetComponentInChildren<Renderer>();
-        if (renderer != null)
+        if (renderer != null && attackStyle != MonsterAttackStyle.ElementalBoss)
         {
             renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
             renderer.material.color = ResolveProjectileColor(damageType);
@@ -1297,6 +1412,10 @@ public class EnemyController : MonoBehaviour
         if (cachedDefaultProjectilePrefab == null)
         {
             cachedDefaultProjectilePrefab = Resources.Load<GameObject>(DefaultProjectilePrefabResourcePath);
+            if (cachedDefaultProjectilePrefab == null)
+            {
+                Debug.LogWarning($"[BossAcidAttack] Missing fallback projectile prefab at Resources/{DefaultProjectilePrefabResourcePath}.", this);
+            }
         }
 
         return cachedDefaultProjectilePrefab;

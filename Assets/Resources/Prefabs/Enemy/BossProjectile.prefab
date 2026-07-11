@@ -15,7 +15,7 @@ GameObject:
   - component: {fileID: 5400000000000000000}
   - component: {fileID: 1140000000000000000}
   m_Layer: 0
-  m_Name: BossProjectile
+  m_Name: BossAcidProjectile
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -152,7 +152,29 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 9ddcc300af9dda049974708a9931fb96, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MonsterProjectile
-  damage: 8
+  damage: 10
   speed: 8
-  lifetime: 4
+  lifeTime: 5
   damageType: 0
+  hitLayerMask:
+    serializedVersion: 2
+    m_Bits: -129
+  destroyOnHit: 1
+  hitSplashPrefab: {fileID: 1000000000000000000, guid: 5b2c0bc346624d8ab8ac2780cf98eab2, type: 3}
+  visualRoot: {fileID: 0}
+  bodyMaterial: {fileID: 0}
+  trailMaterial: {fileID: 0}
+  splashMaterial: {fileID: 0}
+  bodySurfaceTexture: {fileID: 0}
+  dropletTexture: {fileID: 0}
+  trailTexture: {fileID: 0}
+  splashTexture: {fileID: 0}
+  rotateSpeed: 120
+  squashStretchAmount: 0.08
+  squashStretchSpeed: 6
+  bodyBaseScale: {x: 0.75, y: 0.6, z: 0.92}
+  bodyColor: {r: 0.64, g: 0.93, b: 0.22, a: 0.78}
+  bodyEdgeColor: {r: 0.24, g: 0.55, b: 0.12, a: 0.72}
+  bodySmoothness: 0.3
+  bodyMetallic: 0
+  debugProjectileLog: 1

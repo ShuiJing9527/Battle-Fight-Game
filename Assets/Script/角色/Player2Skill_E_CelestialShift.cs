@@ -102,7 +102,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     private readonly HashSet<int> hitEnemiesThisDash = new HashSet<int>();
     private RuneRuntimeState runeRuntimeState;
     private int currentDashHitCount;
-    private bool dayBuffEmpoweredThisCast;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
     protected override int SkillIndex => 2;
 
     public override float CooldownSeconds => cooldown;
@@ -121,7 +122,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
-        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         PrepareRuneCastContext();
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
@@ -134,7 +135,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         isDashing = false;
         currentDashHitCount = 0;
         hitEnemiesThisDash.Clear();
-        dayBuffEmpoweredThisCast = false;
+        dayChildStateActiveThisCast = false;
         ResetRuneCastContext();
 
         for (int i = 0; i < activeAfterimageGhosts.Count; i++)
@@ -379,10 +380,9 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         float outgoingDamageMultiplier = Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier());
         float physicalFinal = Mathf.Max(1f, (physicalRaw - targetPhysicalDefense) * Mathf.Max(0f, ePhysicalDamageMultiplier) * outgoingDamageMultiplier);
         float specialFinal = Mathf.Max(1f, (specialRaw - targetSpecialDefense) * Mathf.Max(0f, eSpecialDamageMultiplier) * outgoingDamageMultiplier);
-        if (dayBuffEmpoweredThisCast)
+        if (dayChildStateActiveThisCast && RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus radianceMark))
         {
-            RadianceMarkStatus radianceMark = targetRoot.GetComponentInParent<RadianceMarkStatus>();
-            if (radianceMark != null && radianceMark.Consume())
+            if (radianceMark.Consume())
             {
                 physicalFinal *= DayBuffMarkedDamageMultiplier;
                 specialFinal *= DayBuffMarkedDamageMultiplier;

@@ -26,6 +26,18 @@ public static class MonsterCombatAutoSetup
             identity.species = forcedSpecies ?? ResolveSpecies(monster.name);
             identity.rank = forcedRank ?? ResolveRank(identity.species);
         }
+        else
+        {
+            if (forcedSpecies.HasValue)
+            {
+                identity.species = forcedSpecies.Value;
+            }
+
+            if (forcedRank.HasValue)
+            {
+                identity.rank = forcedRank.Value;
+            }
+        }
 
         identity.attackStyle = ResolveAttackStyle(identity);
 
@@ -253,17 +265,32 @@ public static class MonsterCombatAutoSetup
             rankVisual = monster.AddComponent<MonsterRankVisual>();
         }
 
-        if (rankVisual.visualRoot == null)
-        {
-            rankVisual.visualRoot = monster.transform;
-        }
-
         if (rankVisual.effectRoot == null)
         {
             rankVisual.effectRoot = monster.transform;
         }
 
         rankVisual.Apply(identity);
+
+        if (identity != null && identity.rank == MonsterRank.Boss)
+        {
+            Transform runtimeVisualRoot = rankVisual.RuntimeVisualRoot;
+            Transform visualSlime = monster.transform.Find("Visual_Slime");
+            Debug.Log(
+                "[BossRankCheck] " +
+                "object=" + monster.name +
+                " MonsterIdentity.rank=" + identity.rank +
+                " runtime rank=" + identity.rank +
+                " configured rank=" + identity.rank +
+                " attackStyle=" + identity.attackStyle +
+                " isBoss=" + (identity.rank == MonsterRank.Boss) +
+                " MonsterRankVisual enabled=" + rankVisual.enabled +
+                " MonsterRankVisual applied rank=" + rankVisual.LastAppliedRank +
+                " Boss scale value=" + rankVisual.BossVisualScaleMultiplier.ToString("F2") +
+                " Visual_Slime=" + (visualSlime != null ? visualSlime.name : "null") +
+                " runtimeVisualRoot=" + (runtimeVisualRoot != null ? runtimeVisualRoot.name : "null"),
+                monster);
+        }
     }
 
     private static void ApplyStatVariance(

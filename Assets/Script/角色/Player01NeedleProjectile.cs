@@ -102,7 +102,17 @@ public class Player01NeedleProjectile : MonoBehaviour
         float outgoingDamageMultiplier = runtimeState != null && skillSlotIndex >= 0
             ? Mathf.Max(0f, runtimeState.GetOutgoingDamageMultiplier(skillSlotIndex))
             : 1f;
-        float resolvedDamage = Damage * outgoingDamageMultiplier + ConsumeRuneFirstHitBonusDamage();
+        float timedSkillDamageMultiplier = 1f;
+        if (source != null)
+        {
+            PlayerTimedSkillDamageBoostStatus timedSkillDamageBoost = PlayerTimedSkillDamageBoostStatus.Resolve(source);
+            if (timedSkillDamageBoost != null)
+            {
+                timedSkillDamageMultiplier = timedSkillDamageBoost.Multiplier;
+            }
+        }
+
+        float resolvedDamage = Damage * outgoingDamageMultiplier * timedSkillDamageMultiplier + ConsumeRuneFirstHitBonusDamage();
         float dealtDamage = resolvedDamage;
         CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(other, sourceTransform);
         if (combatHealth != null)

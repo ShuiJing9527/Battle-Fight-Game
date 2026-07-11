@@ -57,14 +57,26 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         SetBalance(initialBalanceValue, "ResetGauge", Mathf.Abs(initialBalanceValue - BalanceValue));
     }
 
-    public bool IsRadianceBuffActive()
+    // Radiance/Twilight state is earned by filling the corresponding gauge to the threshold.
+    // Day/night only changes whether that state is favorable or unfavorable.
+    public bool HasRadianceState()
     {
         return RadianceValue >= buffActivationThreshold - activationEpsilon;
     }
 
-    public bool IsTwilightBuffActive()
+    public bool HasTwilightState()
     {
         return TwilightValue >= buffActivationThreshold - activationEpsilon;
+    }
+
+    public bool IsRadianceBuffActive()
+    {
+        return HasRadianceState();
+    }
+
+    public bool IsTwilightBuffActive()
+    {
+        return HasTwilightState();
     }
 
     private void SetBalance(float newValue, string source, float amount)

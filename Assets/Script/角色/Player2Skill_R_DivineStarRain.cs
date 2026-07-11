@@ -261,7 +261,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private int currentROverflowStarBladeCount;
     private int currentROverflowBonusDamage;
     private int remainingRVisibleStarBladeSpawnBudget;
-    private bool dayBuffEmpoweredThisCast;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
     private bool dayBuffDamageLoggedThisCast;
     private bool dayBuffAuraHealLoggedThisCast;
     protected override int SkillIndex => 3;
@@ -309,7 +310,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         currentROverflowBonusDamage = 0;
         remainingRVisibleStarBladeSpawnBudget = 0;
         activeRuneCastId = -1;
-        dayBuffEmpoweredThisCast = false;
+        dayChildStateActiveThisCast = false;
         dayBuffDamageLoggedThisCast = false;
         dayBuffAuraHealLoggedThisCast = false;
         ResetRuneCastContext();
@@ -362,7 +363,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float finalDuration = ResolveFinalSwarmDuration(totalStarBladeCount);
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
-        dayBuffEmpoweredThisCast = DayNightAffinityDamageModifier.IsDayChildBuffActive(Owner != null ? Owner.gameObject : gameObject);
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         dayBuffDamageLoggedThisCast = false;
         dayBuffAuraHealLoggedThisCast = false;
         PrepareRuneCastContext();
@@ -990,7 +991,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         float healValue = maxHp * Mathf.Max(0f, rAuraHealPercentOfMaxHp);
-        if (dayBuffEmpoweredThisCast)
+        if (dayChildStateActiveThisCast)
         {
             healValue *= DayBuffAuraHealMultiplier;
             if (!dayBuffAuraHealLoggedThisCast)
@@ -1153,7 +1154,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                     specialFromSpecialAttackScaling,
                     damageMultiplier);
                 damageAmount += ConsumeRuneFirstHitBonusDamage();
-                if (dayBuffEmpoweredThisCast)
+                if (dayChildStateActiveThisCast)
                 {
                     damageAmount *= DayBuffDamageMultiplier;
                     if (!dayBuffDamageLoggedThisCast)
@@ -1163,8 +1164,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                     }
                 }
 
-                RadianceMarkStatus radianceMark = targetRoot.GetComponentInParent<RadianceMarkStatus>();
-                if (dayBuffEmpoweredThisCast && radianceMark != null && radianceMark.Consume())
+                if (dayChildStateActiveThisCast && RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus radianceMark) && radianceMark.Consume())
                 {
                     damageAmount *= DayBuffMarkedDamageMultiplier;
                     Debug.Log($"[SecondBuffDebug] Player02 R consumed RadianceMark on {targetRoot.name} and applied x{DayBuffMarkedDamageMultiplier:F2}.", this);
