@@ -6,6 +6,7 @@ using AHD2TimeOfDay;
 public class EnemySpawner : MonoBehaviour
 {
     private const string EliteSplitFromTestSuffix = "[EliteSplit_FromTest]";
+    private const string GroundSnapVersion = "BodyRendererDirect_20260713_01";
 
     private struct MonsterBaseSnapshot
     {
@@ -134,6 +135,7 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private float bossVisualScaleMultiplier = 4.0f;
     [SerializeField] private bool enableBossVisualGroundOffset = true;
     [SerializeField] private float bossVisualGroundOffsetY = 0.85f;
+    [SerializeField] private float bossVisibleGroundContactLocalYOffset = 1.0625f;
     [SerializeField] private float bossHealthBarOffsetY = 0.45f;
     [SerializeField] private bool debugBossVisualGroundOffset = true;
     [SerializeField] private bool enableBossHurtboxScale = true;
@@ -241,6 +243,13 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private string enemyLayerName = "Enemy";
     [SerializeField] private bool ignoreEnemySelfCollision = true;
     [SerializeField] private bool freezeEnemyVerticalPosition = false;
+
+    [Header("Ground Snap")]
+    [SerializeField] private LayerMask enemyGroundSnapLayerMask = 1;
+    [SerializeField, Min(1f)] private float enemyGroundSnapRayStartHeight = 20f;
+    [SerializeField, Min(1f)] private float enemyGroundSnapRayDistance = 80f;
+    [SerializeField, Min(0f)] private float enemyGroundSnapTolerance = 0.01f;
+    [SerializeField] private bool debugBossGroundSnap = true;
 
     [Header("Timed Difficulty")]
     [SerializeField] private EnemyDifficultyDirector difficultyDirector;
@@ -1117,6 +1126,11 @@ public class EnemySpawner : MonoBehaviour
             ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
         }
 
+        if (runtimeRank == MonsterRank.Boss)
+        {
+            SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
+        }
+
         if (initializeDeathNotifier)
         {
             EnemyDeathNotifier notifier = enemy.GetComponent<EnemyDeathNotifier>();
@@ -1955,6 +1969,230 @@ public class EnemySpawner : MonoBehaviour
         // Keep root / rigidbody / collider anchored to gameplay ground.
     }
 
+    public void SnapEnemyToGround(GameObject enemy, LayerMask groundMask, string spawnSource)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        Transform visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : enemy.transform.Find("Visual_Slime");
+        Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
+        Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
+        Transform groundContact = EnsureBossGroundContactTransform(visualRoot);
+        EnemyController enemyController = enemy.GetComponent<EnemyController>();
+        Transform target = ResolveActivePlayerTarget();
+
+        Vector3 positionBeforeSnap = enemy.transform.position;
+        Vector3 finalScale = visualRoot != null ? visualRoot.localScale : enemy.transform.localScale;
+        Vector3 visualRootLocalPosition = visualRoot != null ? visualRoot.localPosition : Vector3.zero;
+
+        Physics.SyncTransforms();
+
+        float colliderMinY = primaryCollider != null ? primaryCollider.bounds.min.y : float.PositiveInfinity;
+        float rendererMinY = visualRenderer != null ? visualRenderer.bounds.min.y : float.PositiveInfinity;
+        float groundContactY = groundContact != null ? groundContact.position.y : float.PositiveInfinity;
+        float chosenBottomY = groundContactY;
+        string chosenGroundingSource = groundContact != null ? "GroundContact" : "RootFallback";
+        float chosenBottomYImmediatelyAfterAssignment = chosenBottomY;
+        string scenePath = BuildScenePath(enemy.transform);
+        int scriptInstanceId = GetInstanceID();
+        int visualRendererInstanceId = visualRenderer != null ? visualRenderer.GetInstanceID() : 0;
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundTrace-A] " +
+                "version=" + GroundSnapVersion +
+                " scriptInstanceId=" + scriptInstanceId +
+                " gameObjectScenePath=" + scenePath +
+                " rendererMinY=" + rendererMinY.ToString("F3") +
+                " groundContactY=" + groundContactY.ToString("F3") +
+                " chosenBottomY=" + chosenBottomY.ToString("F3") +
+                " chosenGroundingSource=" + chosenGroundingSource +
+                " chosenBottomYImmediatelyAfterAssignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " visualRendererInstanceId=" + visualRendererInstanceId,
+                enemy);
+        }
+
+        if (float.IsInfinity(chosenBottomY))
+        {
+            chosenBottomY = enemy.transform.position.y;
+            chosenGroundingSource = "RootFallback";
+        }
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundTrace-B] " +
+                "version=" + GroundSnapVersion +
+                " scriptInstanceId=" + scriptInstanceId +
+                " gameObjectScenePath=" + scenePath +
+                " rendererMinY=" + rendererMinY.ToString("F3") +
+                " groundContactY=" + groundContactY.ToString("F3") +
+                " chosenBottomY=" + chosenBottomY.ToString("F3") +
+                " chosenGroundingSource=" + chosenGroundingSource +
+                " chosenBottomYImmediatelyAfterAssignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " visualRendererInstanceId=" + visualRendererInstanceId,
+                enemy);
+        }
+
+        float boundsTopY = Mathf.Max(
+            primaryCollider != null ? primaryCollider.bounds.max.y : enemy.transform.position.y,
+            visualRenderer != null ? visualRenderer.bounds.max.y : enemy.transform.position.y);
+
+        Vector3 rayOrigin = new Vector3(
+            enemy.transform.position.x,
+            Mathf.Max(enemy.transform.position.y, boundsTopY) + Mathf.Max(1f, enemyGroundSnapRayStartHeight),
+            enemy.transform.position.z);
+
+        if (!TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), groundMask, out RaycastHit groundHit))
+        {
+            if (debugBossGroundSnap)
+            {
+                Debug.LogWarning(
+                    "[BossGroundDebug] " +
+                    "version=" + GroundSnapVersion +
+                    " script instance id=" + scriptInstanceId +
+                    " gameObject scene path=" + scenePath +
+                    "boss name=" + enemy.name +
+                    " spawn source=" + spawnSource +
+                    " position before snap=" + positionBeforeSnap +
+                    " position after snap=" + enemy.transform.position +
+                    " final scale=" + finalScale +
+                    " visual root local position=" + visualRootLocalPosition +
+                    " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
+                    " ground contact world y=" + groundContactY.ToString("F3") +
+                    " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                    " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
+                    " rendererMinY raw=" + rendererMinY.ToString("F3") +
+                    " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                    " collider bottom y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                    " chosenBottomY immediately after assignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                    " chosen bottom y=" + chosenBottomY.ToString("F3") +
+                    " chosen grounding source=" + chosenGroundingSource +
+                    " visualRenderer instance id=" + visualRendererInstanceId +
+                    " collider type=" + (primaryCollider != null ? primaryCollider.GetType().Name : "None") +
+                    " collider center=" + ResolveColliderCenter(primaryCollider) +
+                    " collider radius/size=" + ResolveColliderSize(primaryCollider) +
+                    " collider bounds min y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                    " renderer bounds min y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                    " ground hit object=None ground hit layer=None ground hit y=n/a calculated correction y=0.000" +
+                    " vertical distance to target=" + (target != null ? Mathf.Abs(target.position.y - enemy.transform.position.y).ToString("F3") : "n/a") +
+                    " isGrounded=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                    " canAttack=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                    " rigidbody useGravity=" + (body != null && body.useGravity) +
+                    " rigidbody isKinematic=" + (body != null && body.isKinematic),
+                    enemy);
+            }
+
+            return;
+        }
+
+        float correctionY = groundHit.point.y - chosenBottomY;
+        if (Mathf.Abs(correctionY) > Mathf.Max(0f, enemyGroundSnapTolerance))
+        {
+            Vector3 snappedPosition = enemy.transform.position + Vector3.up * correctionY;
+            enemy.transform.position = snappedPosition;
+            if (body != null)
+            {
+                body.position = snappedPosition;
+                Vector3 velocity = body.linearVelocity;
+                velocity.y = 0f;
+                body.linearVelocity = velocity;
+            }
+        }
+
+        Physics.SyncTransforms();
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundDebug] " +
+                "version=" + GroundSnapVersion +
+                " script instance id=" + scriptInstanceId +
+                " gameObject scene path=" + scenePath +
+                "boss name=" + enemy.name +
+                " spawn source=" + spawnSource +
+                " position before snap=" + positionBeforeSnap +
+                " position after snap=" + enemy.transform.position +
+                " final scale=" + finalScale +
+                " visual root local position=" + visualRootLocalPosition +
+                " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
+                " ground contact world y=" + groundContactY.ToString("F3") +
+                " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
+                " rendererMinY raw=" + rendererMinY.ToString("F3") +
+                " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                " collider bottom y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                " chosenBottomY immediately after assignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " chosen bottom y=" + chosenBottomY.ToString("F3") +
+                " chosen grounding source=" + chosenGroundingSource +
+                " chosenBottomY before correction=" + chosenBottomY.ToString("F3") +
+                " visualRenderer instance id=" + visualRendererInstanceId +
+                " collider type=" + (primaryCollider != null ? primaryCollider.GetType().Name : "None") +
+                " collider center=" + ResolveColliderCenter(primaryCollider) +
+                " collider radius/size=" + ResolveColliderSize(primaryCollider) +
+                " collider bounds min y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                " renderer bounds min y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                " ground hit object=" + groundHit.collider.name +
+                " ground hit layer=" + LayerMask.LayerToName(groundHit.collider.gameObject.layer) +
+                " ground hit y=" + groundHit.point.y.ToString("F3") +
+                " calculated correction y=" + correctionY.ToString("F3") +
+                " vertical distance to target=" + (target != null ? Mathf.Abs(target.position.y - enemy.transform.position.y).ToString("F3") : "n/a") +
+                " isGrounded=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                " canAttack=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                " rigidbody useGravity=" + (body != null && body.useGravity) +
+                " rigidbody isKinematic=" + (body != null && body.isKinematic),
+                enemy);
+        }
+    }
+
+    private Transform EnsureBossGroundContactTransform(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return null;
+        }
+
+        Transform groundContact = visualRoot.Find("GroundContact");
+        if (groundContact == null)
+        {
+            GameObject groundContactObject = new GameObject("GroundContact");
+            groundContact = groundContactObject.transform;
+            groundContact.SetParent(visualRoot, false);
+        }
+
+        Vector3 localPosition = groundContact.localPosition;
+        localPosition.x = 0f;
+        localPosition.y = bossVisibleGroundContactLocalYOffset;
+        localPosition.z = 0f;
+        groundContact.localPosition = localPosition;
+        groundContact.localRotation = Quaternion.identity;
+        groundContact.localScale = Vector3.one;
+        return groundContact;
+    }
+
+    private static string BuildScenePath(Transform target)
+    {
+        if (target == null)
+        {
+            return "null";
+        }
+
+        string path = target.name;
+        Transform current = target.parent;
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+
+        return path;
+    }
+
     private void LogBossSpawnYDiagnostics(GameObject prefab, Vector3 spawnPosition, MonsterRank rank, MonsterIdentity prefabIdentity)
     {
         Transform activePlayer = ResolveActivePlayerTarget();
@@ -1963,6 +2201,84 @@ public class EnemySpawner : MonoBehaviour
             $"requested spawnPosition.y={spawnPosition.y:F2} final spawnPosition.y before Instantiate={spawnPosition.y:F2} player.position.y={(activePlayer != null ? activePlayer.position.y.ToString("F2") : "n/a")} " +
             $"spawner.position.y={transform.position.y:F2} rank={rank} attackStyle={(prefabIdentity != null ? prefabIdentity.attackStyle.ToString() : "Unknown")}",
             this);
+    }
+
+    private static bool TryRaycastGroundBelow(GameObject enemy, Vector3 rayOrigin, float rayDistance, LayerMask groundMask, out RaycastHit selectedHit)
+    {
+        RaycastHit[] hits = Physics.RaycastAll(
+            rayOrigin,
+            Vector3.down,
+            Mathf.Max(1f, rayDistance),
+            groundMask,
+            QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length == 0)
+        {
+            selectedHit = default;
+            return false;
+        }
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            Collider hitCollider = hit.collider;
+            if (hitCollider == null || hitCollider.isTrigger)
+            {
+                continue;
+            }
+
+            if (enemy != null && (hitCollider.transform == enemy.transform || hitCollider.transform.IsChildOf(enemy.transform)))
+            {
+                continue;
+            }
+
+            selectedHit = hit;
+            return true;
+        }
+
+        selectedHit = default;
+        return false;
+    }
+
+    private static string ResolveColliderCenter(Collider collider)
+    {
+        if (collider is SphereCollider sphere)
+        {
+            return sphere.center.ToString();
+        }
+
+        if (collider is CapsuleCollider capsule)
+        {
+            return capsule.center.ToString();
+        }
+
+        if (collider is BoxCollider box)
+        {
+            return box.center.ToString();
+        }
+
+        return "n/a";
+    }
+
+    private static string ResolveColliderSize(Collider collider)
+    {
+        if (collider is SphereCollider sphere)
+        {
+            return "radius=" + sphere.radius.ToString("F3");
+        }
+
+        if (collider is CapsuleCollider capsule)
+        {
+            return "radius=" + capsule.radius.ToString("F3") + " height=" + capsule.height.ToString("F3");
+        }
+
+        if (collider is BoxCollider box)
+        {
+            return "size=" + box.size;
+        }
+
+        return "n/a";
     }
 
     private static void IgnoreColliderPairs(Collider[] first, Collider[] second)
@@ -2781,12 +3097,27 @@ public class EnemySpawner : MonoBehaviour
         }
 
         Renderer directRenderer = visualTransform.GetComponent<Renderer>();
-        if (directRenderer != null)
+        if (IsValidBossBodyRenderer(directRenderer))
         {
             return directRenderer;
         }
 
-        return visualTransform.GetComponentInChildren<Renderer>(true);
+        MeshRenderer[] meshRenderers = visualTransform.GetComponentsInChildren<MeshRenderer>(true);
+        Renderer bestRenderer = SelectBestBossBodyRenderer(meshRenderers);
+        if (bestRenderer != null)
+        {
+            return bestRenderer;
+        }
+
+        SpriteRenderer[] spriteRenderers = visualTransform.GetComponentsInChildren<SpriteRenderer>(true);
+        bestRenderer = SelectBestBossBodyRenderer(spriteRenderers);
+        if (bestRenderer != null)
+        {
+            return bestRenderer;
+        }
+
+        Renderer[] renderers = visualTransform.GetComponentsInChildren<Renderer>(true);
+        return SelectBestBossBodyRenderer(renderers);
     }
 
     private Collider ResolveBossPrimaryBodyCollider(GameObject enemy)
@@ -2828,6 +3159,70 @@ public class EnemySpawner : MonoBehaviour
         }
 
         return bestCollider;
+    }
+
+    private static Renderer SelectBestBossBodyRenderer(Renderer[] renderers)
+    {
+        if (renderers == null || renderers.Length == 0)
+        {
+            return null;
+        }
+
+        Renderer bestRenderer = null;
+        float bestArea = float.MinValue;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (!IsValidBossBodyRenderer(renderer))
+            {
+                continue;
+            }
+
+            Bounds bounds = renderer.bounds;
+            float areaScore = bounds.size.x * bounds.size.y;
+            if (bestRenderer == null || areaScore > bestArea)
+            {
+                bestRenderer = renderer;
+                bestArea = areaScore;
+            }
+        }
+
+        return bestRenderer;
+    }
+
+    private static bool IsValidBossBodyRenderer(Renderer renderer)
+    {
+        if (renderer == null || !renderer.enabled)
+        {
+            return false;
+        }
+
+        if (renderer is TrailRenderer || renderer is ParticleSystemRenderer || renderer is LineRenderer)
+        {
+            return false;
+        }
+
+        Transform target = renderer.transform;
+        string name = target.name.ToLowerInvariant();
+        if (name.Contains("shadow") ||
+            name.Contains("healthbar") ||
+            name.Contains("hpbar") ||
+            name.Contains("trail") ||
+            name.Contains("particle") ||
+            name.Contains("effect") ||
+            name.Contains("aura") ||
+            name.Contains("warning") ||
+            name.Contains("indicator"))
+        {
+            return false;
+        }
+
+        if (target.GetComponentInParent<Canvas>(true) != null)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     private Collider EnsureBossScaledHurtbox(GameObject enemy, Collider sourceCollider)

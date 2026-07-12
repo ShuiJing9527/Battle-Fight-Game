@@ -7,6 +7,8 @@ public class MonsterProjectile : MonoBehaviour
     private const float DefaultSplashLifetime = 0.45f;
     private const float DefaultTrailTime = 0.32f;
     private const float DefaultTrailStartWidth = 0.35f;
+    private const float DefaultTrailEndWidth = 0f;
+    private const float DefaultTrailMinVertexDistance = 0.06f;
     private const float DefaultDropletRate = 10f;
     private const float DefaultDropletLifetime = 0.22f;
     private const float DefaultDropletSpeed = 0.55f;
@@ -40,6 +42,14 @@ public class MonsterProjectile : MonoBehaviour
     [SerializeField] private Color bodyEdgeColor = new Color(0.24f, 0.55f, 0.12f, 0.72f);
     [SerializeField, Min(0f)] private float bodySmoothness = 0.3f;
     [SerializeField, Min(0f)] private float bodyMetallic = 0f;
+    [Header("Trail")]
+    [SerializeField, Min(0.05f)] private float trailTime = 0.38f;
+    [SerializeField, Min(0.05f)] private float trailStartWidth = DefaultTrailStartWidth;
+    [SerializeField, Min(0f)] private float trailEndWidth = DefaultTrailEndWidth;
+    [SerializeField, Min(0.01f)] private float trailMinVertexDistance = DefaultTrailMinVertexDistance;
+    [SerializeField] private Color trailStartColor = new Color(0.72f, 0.97f, 0.34f, 0.58f);
+    [SerializeField] private Color trailMidColor = new Color(0.43f, 0.82f, 0.26f, 0.32f);
+    [SerializeField] private Color trailEndColor = new Color(0.18f, 0.42f, 0.12f, 0f);
     [SerializeField] private bool debugProjectileLog = false;
     [SerializeField] private bool useArcTrajectory = true;
     [SerializeField] private float arcHeight = 2.0f;
@@ -68,6 +78,17 @@ public class MonsterProjectile : MonoBehaviour
         EnsureRuntimeVisuals();
     }
 
+    private void OnEnable()
+    {
+        EnsureRuntimeVisuals();
+        ResetTrailForLaunch();
+    }
+
+    private void OnDisable()
+    {
+        StopTrailEmissionAndClear();
+    }
+
     public void Launch(Vector3 direction, float speed, float damage, BattleDamageType damageType, GameObject source)
     {
         this.direction = direction.sqrMagnitude > DirectionEpsilon ? direction.normalized : Vector3.forward;
@@ -82,7 +103,7 @@ public class MonsterProjectile : MonoBehaviour
 
         EnsureRuntimeVisuals();
         AlignVisualRootToDirection();
-        ClearTrail();
+        ResetTrailForLaunch();
 
         if (debugProjectileLog)
         {
@@ -192,6 +213,7 @@ public class MonsterProjectile : MonoBehaviour
 
     private void OnHit(Vector3 hitPoint, Vector3 hitNormal)
     {
+        StopTrailEmission();
         SpawnHitSplash(hitPoint, hitNormal);
         if (destroyOnHit)
         {
@@ -306,6 +328,37 @@ public class MonsterProjectile : MonoBehaviour
         }
     }
 
+    private void ResetTrailForLaunch()
+    {
+        if (cachedTrailRenderer == null)
+        {
+            return;
+        }
+
+        cachedTrailRenderer.emitting = false;
+        cachedTrailRenderer.Clear();
+        cachedTrailRenderer.emitting = true;
+    }
+
+    private void StopTrailEmission()
+    {
+        if (cachedTrailRenderer != null)
+        {
+            cachedTrailRenderer.emitting = false;
+        }
+    }
+
+    private void StopTrailEmissionAndClear()
+    {
+        if (cachedTrailRenderer == null)
+        {
+            return;
+        }
+
+        cachedTrailRenderer.emitting = false;
+        cachedTrailRenderer.Clear();
+    }
+
     private void DisableLegacyRootRenderer()
     {
         MeshRenderer rootRenderer = GetComponent<MeshRenderer>();
@@ -323,16 +376,19 @@ public class MonsterProjectile : MonoBehaviour
         }
 
         trail.time = DefaultTrailTime;
-        trail.startWidth = DefaultTrailStartWidth;
-        trail.endWidth = 0f;
+        trail.time = Mathf.Max(0.05f, trailTime > 0f ? trailTime : DefaultTrailTime);
+        trail.startWidth = Mathf.Max(0.05f, trailStartWidth > 0f ? trailStartWidth : DefaultTrailStartWidth);
+        trail.endWidth = Mathf.Max(0f, trailEndWidth);
         trail.shadowCastingMode = ShadowCastingMode.Off;
         trail.receiveShadows = false;
         trail.alignment = LineAlignment.View;
-        trail.minVertexDistance = 0.03f;
+        trail.minVertexDistance = Mathf.Max(0.01f, trailMinVertexDistance);
+        trail.textureMode = LineTextureMode.Stretch;
+        trail.numCornerVertices = 2;
+        trail.numCapVertices = 1;
         trail.sharedMaterial = ResolveTrailMaterial();
-        trail.colorGradient = CreateColorGradient(
-            new Color(0.72f, 0.96f, 0.25f, 0.55f),
-            new Color(0.2f, 0.56f, 0.15f, 0f));
+        trail.colorGradient = CreateTrailGradient();
+        trail.emitting = true;
     }
 
     private void ConfigureDropletParticle(ParticleSystem particleSystem)
@@ -616,6 +672,25 @@ public class MonsterProjectile : MonoBehaviour
             {
                 new GradientAlphaKey(startColor.a, 0f),
                 new GradientAlphaKey(endColor.a, 1f)
+            });
+        return gradient;
+    }
+
+    private Gradient CreateTrailGradient()
+    {
+        Gradient gradient = new Gradient();
+        gradient.SetKeys(
+            new[]
+            {
+                new GradientColorKey(trailStartColor, 0f),
+                new GradientColorKey(trailMidColor, 0.45f),
+                new GradientColorKey(trailEndColor, 1f)
+            },
+            new[]
+            {
+                new GradientAlphaKey(trailStartColor.a, 0f),
+                new GradientAlphaKey(trailMidColor.a, 0.45f),
+                new GradientAlphaKey(trailEndColor.a, 1f)
             });
         return gradient;
     }
