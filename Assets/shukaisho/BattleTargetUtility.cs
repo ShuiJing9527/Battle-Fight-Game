@@ -53,6 +53,58 @@ public static class BattleTargetUtility
 
     public static CombatHealth GetMonsterCombatHealth(Collider collider, Transform attacker)
     {
-        return IsMonster(collider, attacker) ? collider.GetComponentInParent<CombatHealth>() : null;
+        return TryGetMonsterCombatHealth(collider, attacker, out CombatHealth health, out _) ? health : null;
+    }
+
+    public static bool TryGetMonsterCombatHealth(Collider collider, Transform attacker, out CombatHealth health, out string rejectReason)
+    {
+        health = null;
+
+        if (collider == null)
+        {
+            rejectReason = "null-collider";
+            return false;
+        }
+
+        if (attacker != null && collider.transform.IsChildOf(attacker))
+        {
+            rejectReason = "self-collider";
+            return false;
+        }
+
+        if (IsPlayer(collider.gameObject))
+        {
+            rejectReason = "player-collider";
+            return false;
+        }
+
+        MonsterIdentity identity = collider.GetComponentInParent<MonsterIdentity>();
+        EnemyController enemyController = collider.GetComponentInParent<EnemyController>();
+        if (identity == null && enemyController == null)
+        {
+            rejectReason = "not-monster";
+            return false;
+        }
+
+        health = collider.GetComponentInParent<CombatHealth>();
+        if (health == null)
+        {
+            rejectReason = "missing-combat-health";
+            return false;
+        }
+
+        if (health.IsDead)
+        {
+            rejectReason = "target-dead";
+            return false;
+        }
+
+        rejectReason = null;
+        return true;
+    }
+
+    public static MonsterIdentity GetMonsterIdentity(Collider collider)
+    {
+        return collider != null ? collider.GetComponentInParent<MonsterIdentity>() : null;
     }
 }

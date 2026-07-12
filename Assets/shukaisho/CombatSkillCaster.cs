@@ -174,15 +174,17 @@ public class CombatSkillCaster : MonoBehaviour
         {
             Collider[] colliders = Physics.OverlapSphere(point.position, skill.attackRange, enemyLayer, QueryTriggerInteraction.Collide);
             HashSet<CombatHealth> hitTargets = new HashSet<CombatHealth>();
+            List<string> debugEntries = new List<string>();
 
             foreach (Collider collider in colliders)
             {
-                if (!BattleTargetUtility.IsMonster(collider, transform))
+                MonsterIdentity identity = BattleTargetUtility.GetMonsterIdentity(collider);
+                if (!BattleTargetUtility.TryGetMonsterCombatHealth(collider, transform, out CombatHealth health, out string rejectReason))
                 {
+                    debugEntries.Add(BuildMeleeHitDebugEntry(collider, identity, false, rejectReason, 0f, 0f, false, baseDamage, baseDamage));
                     continue;
                 }
 
-                CombatHealth health = BattleTargetUtility.GetMonsterCombatHealth(collider, transform);
                 if (health != null && hitTargets.Add(health))
                 {
                     float resolvedDamage = baseDamage;
@@ -190,10 +192,26 @@ public class CombatSkillCaster : MonoBehaviour
                     float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, resolvedDamage, out bool isCritical);
                     float beforeHealth = ResolveTargetCurrentHealth(health);
                     health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
-                    float actualDamage = Mathf.Max(0f, beforeHealth - ResolveTargetCurrentHealth(health));
+                    float afterHealth = ResolveTargetCurrentHealth(health);
+                    float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
                     runeRuntimeState?.NotifyMonsterDamagedBySkill(skillIndex, health, actualDamage);
+                    debugEntries.Add(BuildMeleeHitDebugEntry(collider, identity, true, "None", beforeHealth, afterHealth, true, resolvedDamage, finalDamage));
+                }
+                else
+                {
+                    debugEntries.Add(BuildMeleeHitDebugEntry(collider, identity, false, "duplicate-combat-health", 0f, 0f, false, baseDamage, baseDamage));
                 }
             }
+
+            Debug.Log(
+                "[PlayerMeleeHitDebug] " +
+                "skill=" + (skill != null ? skill.skillName : "UnknownSkill") +
+                " attackPosition=" + point.position +
+                " attackRadius=" + skill.attackRange.ToString("F2") +
+                " hitColliderCount=" + colliders.Length +
+                " hitIndex=" + hit +
+                " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+                this);
         }
     }
 
@@ -207,6 +225,37 @@ public class CombatSkillCaster : MonoBehaviour
         return health.resourceBank != null
             ? Mathf.Max(0f, health.resourceBank.currentHealth)
             : Mathf.Max(0f, health.currentHealth);
+    }
+
+    private static string BuildMeleeHitDebugEntry(
+        Collider collider,
+        MonsterIdentity identity,
+        bool acceptedTarget,
+        string rejectReason,
+        float beforeHealth,
+        float afterHealth,
+        bool takeDamageCalled,
+        float damageBeforeModifiers,
+        float damageAfterModifiers)
+    {
+        Transform root = collider != null ? collider.transform.root : null;
+        float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+
+        return
+            "collider=" + (collider != null ? collider.name : "null") +
+            " root=" + (root != null ? root.name : "null") +
+            " layer=" + (collider != null ? LayerMask.LayerToName(collider.gameObject.layer) : "null") +
+            " tag=" + (collider != null ? collider.tag : "null") +
+            " hasCombatHealth=" + takeDamageCalled +
+            " hasMonsterIdentity=" + (identity != null) +
+            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
+            " isBoss=" + (identity != null && identity.rank == MonsterRank.Boss) +
+            " acceptedTarget=" + acceptedTarget +
+            " rejectReason=" + rejectReason +
+            " damageBeforeModifiers=" + damageBeforeModifiers.ToString("F2") +
+            " damageAfterModifiers=" + damageAfterModifiers.ToString("F2") +
+            " TakeDamageCalled=" + takeDamageCalled +
+            " actualDamage=" + actualDamage.ToString("F2");
     }
 
     private int GetSkillIndex(BattleSkill skill)

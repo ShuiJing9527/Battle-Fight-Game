@@ -9,33 +9,36 @@ public sealed class RuneTestLoadout : MonoBehaviour
     [Serializable]
     public sealed class RuneTestEntry
     {
-        [Tooltip("要发放的符文类型。")]
         public RuneType runeType;
-
-        [Min(0)]
-        [Tooltip("开局要添加的该类型符文数量。0 表示跳过。")]
-        public int amount;
+        [Min(0)] public int amount;
     }
 
-    private const float MaxWaitSeconds = 5f;
+    private const float MaxResolveSeconds = 3f;
     private static bool grantedThisPlaySession;
 
-    [Header("测试开关")]
-    [Tooltip("开启后，在开发环境开局自动发放下面配置的测试符文。")]
+    [Header("Test Toggle")]
     [SerializeField] private bool grantRunesOnStart = false;
 
-    [Header("开局测试符文")]
-    [Tooltip("按列表配置要发放的符文类型与数量。")]
+    [Header("Test Rune Entries")]
     [SerializeField] private List<RuneTestEntry> testRunes = new List<RuneTestEntry>();
 
-    [Header("初始化设置")]
-    [Tooltip("开始查找 RuneRuntimeState 前额外等待的秒数。")]
+    [Header("Initialization")]
     [SerializeField, Min(0f)] private float initializationDelay = 0.2f;
-
-    [Tooltip("开启后，同一 Play Session 只执行一次，避免重复发放。")]
     [SerializeField] private bool grantOnlyOncePerPlaySession = true;
 
     private bool grantAttempted;
+    private Coroutine startupGrantRoutine;
+
+    private sealed class RuneGrantContext
+    {
+        public GameObject player;
+        public RuneLibrary runeLibrary;
+        public CombatSkillCaster skillCaster;
+        public RuneInventory runeInventory;
+        public RuneRuntimeState runeRuntimeState;
+        public RuneUIController runeUIController;
+        public RuneBagUI runeBagUI;
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     private static void ResetStaticState()
@@ -43,25 +46,103 @@ public sealed class RuneTestLoadout : MonoBehaviour
         grantedThisPlaySession = false;
     }
 
-    private IEnumerator Start()
+    private void Awake()
+    {
+        Debug.Log("[RuneTestLoadout] Awake", this);
+    }
+
+    private void OnEnable()
+    {
+        Debug.Log("[RuneTestLoadout] OnEnable", this);
+    }
+
+    private void Start()
     {
 #if !(UNITY_EDITOR || DEVELOPMENT_BUILD)
-        yield break;
+        return;
 #else
+        Debug.Log("[RuneTestLoadout] Start", this);
+        Debug.Log("[RuneTestLoadout] Grant Runes On Start = " + grantRunesOnStart, this);
+        Debug.Log("[RuneTestLoadout] Grant Only Once = " + grantOnlyOncePerPlaySession, this);
+        Debug.Log("[RuneTestLoadout] Initialization Delay = " + initializationDelay.ToString("F2"), this);
+        Debug.Log("[RuneTestLoadout] Test Runes Count = " + (testRunes != null ? testRunes.Count : 0), this);
+
         if (!grantRunesOnStart || grantAttempted)
         {
-            yield break;
+            return;
         }
 
         if (grantOnlyOncePerPlaySession && grantedThisPlaySession)
         {
-            yield break;
+            Debug.Log("[RuneTestLoadout] Skip auto grant because play-session one-shot already used.", this);
+            return;
         }
 
+        startupGrantRoutine = StartCoroutine(GrantRunesOnStartRoutine());
+#endif
+    }
+
+    [ContextMenu("TEST/Grant Test Runes Now")]
+    public void GrantTestRunesNow()
+    {
+#if !(UNITY_EDITOR || DEVELOPMENT_BUILD)
+        return;
+#else
+        if (startupGrantRoutine != null)
+        {
+            StopCoroutine(startupGrantRoutine);
+            startupGrantRoutine = null;
+        }
+
+        StartCoroutine(GrantTestRunesRoutine("ContextMenu"));
+#endif
+    }
+
+    [ContextMenu("TEST/Print Rune Test State")]
+    public void PrintRuneTestState()
+    {
+#if !(UNITY_EDITOR || DEVELOPMENT_BUILD)
+        return;
+#else
+        RuneGrantContext context = ResolveContext(logResolution: true);
+        int bagCount = context.runeInventory != null ? context.runeInventory.Count : -1;
+        int runtimeLuck = context.runeRuntimeState != null ? context.runeRuntimeState.GetGlobalRuneCount(RuneType.Luck) : -1;
+
+        Debug.Log(
+            "[RuneTestLoadout] Print State " +
+            "player=" + (context.player != null ? context.player.name : "null") +
+            " runeLibrary=" + (context.runeLibrary != null ? context.runeLibrary.name : "null") +
+            " runeInventory=" + (context.runeInventory != null ? context.runeInventory.name : "null") +
+            " bagCount=" + bagCount +
+            " runeRuntimeState=" + (context.runeRuntimeState != null ? context.runeRuntimeState.name : "null") +
+            " luckCount=" + runtimeLuck +
+            " runeUIController=" + (context.runeUIController != null ? context.runeUIController.name : "null") +
+            " runeBagUI=" + (context.runeBagUI != null ? context.runeBagUI.name : "null"),
+            this);
+#endif
+    }
+
+    [ContextMenu("TEST/Refresh Rune UI")]
+    public void RefreshRuneUIForTest()
+    {
+#if !(UNITY_EDITOR || DEVELOPMENT_BUILD)
+        return;
+#else
+        RuneGrantContext context = ResolveContext(logResolution: true);
+        RefreshRuneUI(context);
+#endif
+    }
+
+#if UNITY_EDITOR || DEVELOPMENT_BUILD
+    private IEnumerator GrantRunesOnStartRoutine()
+    {
         grantAttempted = true;
+        yield return GrantTestRunesRoutine("Start");
+        startupGrantRoutine = null;
+    }
 
-        yield return null;
-
+    private IEnumerator GrantTestRunesRoutine(string source)
+    {
         if (initializationDelay > 0f)
         {
             yield return new WaitForSeconds(initializationDelay);
@@ -69,15 +150,17 @@ public sealed class RuneTestLoadout : MonoBehaviour
 
         if (testRunes == null || testRunes.Count == 0)
         {
+            Debug.LogWarning("[RuneTestLoadout] Test Runes Count = 0, nothing to grant.", this);
             yield break;
         }
 
-        float deadline = Time.realtimeSinceStartup + MaxWaitSeconds;
-        RuneRuntimeState runeRuntimeState = null;
+        float deadline = Time.realtimeSinceStartup + MaxResolveSeconds;
+        RuneGrantContext context = null;
+
         while (Time.realtimeSinceStartup < deadline)
         {
-            runeRuntimeState = ResolveRuneRuntimeState();
-            if (runeRuntimeState != null)
+            context = ResolveContext(logResolution: false);
+            if (context.runeInventory != null)
             {
                 break;
             }
@@ -85,14 +168,30 @@ public sealed class RuneTestLoadout : MonoBehaviour
             yield return null;
         }
 
-        if (runeRuntimeState == null)
+        if (context == null || context.runeInventory == null)
         {
-            Debug.LogWarning("[RuneTestLoadout] RuneRuntimeState was not found within 5 seconds.", this);
+            Debug.LogWarning("[RuneTestLoadout] Failed to resolve RuneInventory within 3 seconds.", this);
+            PrintRuneTestState();
             yield break;
         }
 
+        GrantResolvedRunes(context, source);
+    }
+
+    private void GrantResolvedRunes(RuneGrantContext context, string source)
+    {
+        if (context == null || context.runeInventory == null)
+        {
+            Debug.LogWarning("[RuneTestLoadout] GrantResolvedRunes aborted because RuneInventory is null.", this);
+            return;
+        }
+
+        LogResolution(context);
+
+        int beforeCount = context.runeInventory.Count;
+        Debug.Log("[RuneTestLoadout] before grant bag count = " + beforeCount, this);
+
         Dictionary<RuneType, int> grantedCounts = new Dictionary<RuneType, int>();
-        bool anyGrantAttempted = false;
         bool anyGrantSucceeded = false;
 
         for (int i = 0; i < testRunes.Count; i++)
@@ -103,43 +202,40 @@ public sealed class RuneTestLoadout : MonoBehaviour
                 continue;
             }
 
-            anyGrantAttempted = true;
-            int grantedCount = 0;
             for (int count = 0; count < entry.amount; count++)
             {
-                if (!runeRuntimeState.TryGrantRuneForTesting(entry.runeType, "RuneTestLoadout"))
+                string reason;
+                bool success = TryGrantRuneToInventory(context, entry.runeType, source, out reason);
+                Debug.Log(
+                    "[RuneTestLoadout] grant rune type=" + entry.runeType +
+                    " amount=1 success=" + success +
+                    " reason=" + reason,
+                    this);
+
+                if (!success)
                 {
-                    break;
+                    continue;
                 }
 
-                grantedCount++;
-            }
-
-            if (grantedCount <= 0)
-            {
-                continue;
-            }
-
-            anyGrantSucceeded = true;
-            if (grantedCounts.TryGetValue(entry.runeType, out int existingCount))
-            {
-                grantedCounts[entry.runeType] = existingCount + grantedCount;
-            }
-            else
-            {
-                grantedCounts[entry.runeType] = grantedCount;
+                anyGrantSucceeded = true;
+                if (grantedCounts.TryGetValue(entry.runeType, out int currentCount))
+                {
+                    grantedCounts[entry.runeType] = currentCount + 1;
+                }
+                else
+                {
+                    grantedCounts[entry.runeType] = 1;
+                }
             }
         }
 
-        if (!anyGrantAttempted)
-        {
-            yield break;
-        }
+        int afterCount = context.runeInventory.Count;
+        Debug.Log("[RuneTestLoadout] after grant bag count = " + afterCount, this);
 
         if (!anyGrantSucceeded)
         {
-            Debug.LogWarning("[RuneTestLoadout] No test runes were granted. Check skill slots and target RuneRuntimeState initialization.", this);
-            yield break;
+            Debug.LogWarning("[RuneTestLoadout] No test runes were granted into the active RuneInventory.", this);
+            return;
         }
 
         if (grantOnlyOncePerPlaySession)
@@ -147,35 +243,174 @@ public sealed class RuneTestLoadout : MonoBehaviour
             grantedThisPlaySession = true;
         }
 
-        Debug.Log($"[RuneTestLoadout] Granted test runes: {BuildGrantSummary(grantedCounts)}", this);
-#endif
+        Debug.Log("[RuneTestLoadout] Granted test runes: " + BuildGrantSummary(grantedCounts), this);
+        RefreshRuneUI(context);
     }
 
-#if UNITY_EDITOR || DEVELOPMENT_BUILD
-    private RuneRuntimeState ResolveRuneRuntimeState()
+    private bool TryGrantRuneToInventory(RuneGrantContext context, RuneType runeType, string source, out string reason)
     {
-        RuneRuntimeState[] runtimeStates = FindObjectsOfType<RuneRuntimeState>(true);
-        if (runtimeStates == null || runtimeStates.Length == 0)
+        reason = "Unknown";
+        if (context == null)
         {
-            return null;
+            reason = "ContextNull";
+            return false;
         }
 
+        if (context.runeInventory == null)
+        {
+            reason = "RuneInventoryNull";
+            return false;
+        }
+
+        if (runeType == RuneType.None)
+        {
+            reason = "RuneTypeNone";
+            return false;
+        }
+
+        RuneDefinition runeTemplate = context.runeLibrary != null ? context.runeLibrary.Find(runeType) : null;
+        if (runeTemplate == null)
+        {
+            Debug.LogWarning("[RuneTestLoadout] RuneType " + runeType + " exists but RuneData not found.", this);
+        }
+
+        RuneDefinition runtimeRune = CloneRuneDefinition(runeTemplate) ?? RuneDefinition.CreateDefaultRune(runeType);
+        if (runtimeRune == null || runtimeRune.runeType == RuneType.None)
+        {
+            reason = "RuneDefinitionCreateFailed";
+            return false;
+        }
+
+        context.runeInventory.AddRune(runtimeRune, "RuneTestLoadout-" + source);
+        reason = "AddedToRuneInventory";
+        return true;
+    }
+
+    private RuneGrantContext ResolveContext(bool logResolution)
+    {
+        RuneGrantContext context = new RuneGrantContext();
+
+        RuneUIContextResolver.Resolve(
+            out context.player,
+            out context.runeLibrary,
+            out context.skillCaster,
+            out context.runeInventory);
+
+        context.runeRuntimeState = ResolveRuneRuntimeState(context.player, context.skillCaster);
+        context.runeUIController = FindObjectOfType<RuneUIController>(true);
+        context.runeBagUI = FindObjectOfType<RuneBagUI>(true);
+
+        if (context.runeInventory == null && context.runeBagUI != null)
+        {
+            context.runeBagUI.RefreshAll();
+            context.runeInventory = context.runeBagUI.runeInventory;
+        }
+
+        if (logResolution)
+        {
+            LogResolution(context);
+        }
+
+        return context;
+    }
+
+    private void LogResolution(RuneGrantContext context)
+    {
+        Debug.Log(
+            "[RuneTestLoadout] Resolve Target " +
+            "found RuneSystem=" + (context.runeRuntimeState != null) +
+            " found RuneInventory=" + (context.runeInventory != null) +
+            " found RuneBag=" + (context.runeBagUI != null) +
+            " found RuneBagUI=" + (context.runeBagUI != null) +
+            " found RuneUIController=" + (context.runeUIController != null) +
+            " player=" + (context.player != null ? context.player.name : "null") +
+            " runeInventoryName=" + (context.runeInventory != null ? context.runeInventory.name : "null") +
+            " runeRuntimeStateName=" + (context.runeRuntimeState != null ? context.runeRuntimeState.name : "null"),
+            this);
+    }
+
+    private void RefreshRuneUI(RuneGrantContext context)
+    {
+        bool refreshRequested = false;
+
+        if (context != null && context.runeUIController != null)
+        {
+            context.runeUIController.RefreshRuneList();
+            refreshRequested = true;
+        }
+
+        if (context != null && context.runeBagUI != null)
+        {
+            context.runeBagUI.RefreshAll();
+            refreshRequested = true;
+        }
+
+        if (refreshRequested)
+        {
+            Debug.Log("[RuneTestLoadout] UI refresh requested.", this);
+        }
+        else
+        {
+            Debug.LogWarning("[RuneTestLoadout] UI refresh skipped because RuneUIController / RuneBagUI was not found.", this);
+        }
+    }
+
+    private static RuneRuntimeState ResolveRuneRuntimeState(GameObject player, CombatSkillCaster skillCaster)
+    {
+        if (player != null)
+        {
+            RuneRuntimeState stateOnPlayer = player.GetComponent<RuneRuntimeState>() ?? player.GetComponentInChildren<RuneRuntimeState>(true);
+            if (stateOnPlayer != null)
+            {
+                return stateOnPlayer;
+            }
+        }
+
+        if (skillCaster != null)
+        {
+            RuneRuntimeState stateOnCaster = skillCaster.GetComponent<RuneRuntimeState>();
+            if (stateOnCaster != null)
+            {
+                return stateOnCaster;
+            }
+        }
+
+        RuneRuntimeState[] runtimeStates = FindObjectsOfType<RuneRuntimeState>(true);
         for (int i = 0; i < runtimeStates.Length; i++)
         {
             RuneRuntimeState candidate = runtimeStates[i];
-            if (candidate == null || !candidate.isActiveAndEnabled)
-            {
-                continue;
-            }
-
-            CombatSkillCaster skillCaster = candidate.GetComponent<CombatSkillCaster>();
-            if (skillCaster != null)
+            if (candidate != null && candidate.isActiveAndEnabled)
             {
                 return candidate;
             }
         }
 
-        return runtimeStates[0];
+        return runtimeStates != null && runtimeStates.Length > 0 ? runtimeStates[0] : null;
+    }
+
+    private static RuneDefinition CloneRuneDefinition(RuneDefinition source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        return new RuneDefinition
+        {
+            runeId = source.runeId,
+            runeName = source.runeName,
+            runeType = source.runeType,
+            rarity = source.rarity,
+            description = source.description,
+            icon = source.icon,
+            displayPrefab = source.displayPrefab,
+            tier1Effect = source.tier1Effect,
+            tier2Effect = source.tier2Effect,
+            tier3Effect = source.tier3Effect,
+            tier4Effect = source.tier4Effect,
+            tier5Effect = source.tier5Effect,
+            setBonusEffect = source.setBonusEffect
+        };
     }
 
     private static string BuildGrantSummary(Dictionary<RuneType, int> grantedCounts)
@@ -199,24 +434,11 @@ public sealed class RuneTestLoadout : MonoBehaviour
                 builder.Append(", ");
             }
 
-            builder.Append(GetRuneTypeLabel(pair.Key)).Append(" x").Append(pair.Value);
+            builder.Append(pair.Key).Append(" x").Append(pair.Value);
             first = false;
         }
 
         return first ? "None" : builder.ToString();
-    }
-
-    private static string GetRuneTypeLabel(RuneType runeType)
-    {
-        return runeType switch
-        {
-            RuneType.Life => "Life",
-            RuneType.Shield => "Shield",
-            RuneType.Mana => "Mana",
-            RuneType.Thorn => "Thorn",
-            RuneType.Luck => "Lucky",
-            _ => runeType.ToString()
-        };
     }
 #endif
 }

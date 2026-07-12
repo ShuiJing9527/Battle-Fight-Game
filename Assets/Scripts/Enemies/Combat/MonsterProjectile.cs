@@ -41,8 +41,17 @@ public class MonsterProjectile : MonoBehaviour
     [SerializeField, Min(0f)] private float bodySmoothness = 0.3f;
     [SerializeField, Min(0f)] private float bodyMetallic = 0f;
     [SerializeField] private bool debugProjectileLog = false;
+    [SerializeField] private bool useArcTrajectory = true;
+    [SerializeField] private float arcHeight = 2.0f;
+    [SerializeField] private float arcTravelTime = 0.9f;
+    [SerializeField] private float targetPredictionTime = 0.25f;
 
     private Vector3 direction = Vector3.forward;
+    private bool useArcMotion;
+    private Vector3 arcStartPoint;
+    private Vector3 arcTargetPoint;
+    private float arcConfiguredHeight;
+    private float arcConfiguredTravelTime;
     private GameObject source;
     private float spawnTime;
     private bool hasHit;
@@ -66,6 +75,7 @@ public class MonsterProjectile : MonoBehaviour
         this.damage = Mathf.Max(0f, damage);
         this.damageType = damageType;
         this.source = source;
+        useArcMotion = false;
         hitLayerMask = SanitizeHitLayerMask(hitLayerMask);
         spawnTime = Time.time;
         hasHit = false;
@@ -80,9 +90,50 @@ public class MonsterProjectile : MonoBehaviour
         }
     }
 
+    public void ConfigureArcTrajectory(Vector3 start, Vector3 target, float configuredArcHeight, float configuredTravelTime)
+    {
+        useArcMotion = useArcTrajectory;
+        arcStartPoint = start;
+        arcTargetPoint = target;
+        arcConfiguredHeight = Mathf.Max(0f, configuredArcHeight > 0f ? configuredArcHeight : arcHeight);
+        arcConfiguredTravelTime = Mathf.Max(0.1f, configuredTravelTime > 0f ? configuredTravelTime : arcTravelTime);
+        transform.position = start;
+        spawnTime = Time.time;
+
+        if (debugProjectileLog)
+        {
+            Debug.Log($"[BossProjectileArc] start={arcStartPoint} target={arcTargetPoint} arcHeight={arcConfiguredHeight:F2} travelTime={arcConfiguredTravelTime:F2} predictionTime={targetPredictionTime:F2} hit=Pending", this);
+        }
+    }
+
     private void Update()
     {
-        transform.position += direction * speed * Time.deltaTime;
+        if (useArcMotion)
+        {
+            float elapsed = Mathf.Max(0f, Time.time - spawnTime);
+            float normalizedTime = Mathf.Clamp01(elapsed / Mathf.Max(0.1f, arcConfiguredTravelTime));
+            Vector3 nextPosition = Vector3.Lerp(arcStartPoint, arcTargetPoint, normalizedTime)
+                + Vector3.up * Mathf.Sin(normalizedTime * Mathf.PI) * arcConfiguredHeight;
+
+            Vector3 movement = nextPosition - transform.position;
+            if (movement.sqrMagnitude > DirectionEpsilon)
+            {
+                direction = movement.normalized;
+            }
+
+            transform.position = nextPosition;
+            if (normalizedTime >= 1f && !hasHit)
+            {
+                hasHit = true;
+                OnHit(arcTargetPoint, Vector3.up);
+                return;
+            }
+        }
+        else
+        {
+            transform.position += direction * speed * Time.deltaTime;
+        }
+
         UpdateVisualAnimation();
 
         if (Time.time - spawnTime >= lifeTime)
@@ -679,6 +730,7 @@ public class MonsterProjectile : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[BossProjectileArc] start={arcStartPoint} target={arcTargetPoint} arcHeight={arcConfiguredHeight:F2} travelTime={arcConfiguredTravelTime:F2} hit={category}", this);
         Debug.Log($"[BossAcidProjectile] hit category={category} collider={(other != null ? other.name : "null")} point={hitPoint} source={(source != null ? source.name : "null")}", this);
     }
 

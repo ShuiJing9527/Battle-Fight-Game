@@ -72,7 +72,7 @@ Transform:
   m_GameObject: {fileID: 6283368644540404569}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.2, y: 4.5, z: 3}
+  m_LocalPosition: {x: 1.2, y: 7.5, z: 3}
   m_LocalScale: {x: 1.8750001, y: 1.8750001, z: 187.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -150,8 +150,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player2HaloRotateEffect
   spineTarget: {fileID: 6561970759161859204}
   followSpineFacingOffset: 1
-  leftFacingLocalOffset: {x: 1.2, y: 4.5, z: 3}
-  rightFacingLocalOffset: {x: -1.2, y: 4.5, z: 3}
+  leftFacingLocalOffset: {x: 1.2, y: 7.5, z: 3}
+  rightFacingLocalOffset: {x: -1.2, y: 7.5, z: 3}
   rotateSpeed: 30
   skillRotateSpeed: 260
   skillBoostDuration: 0.65
@@ -186,7 +186,7 @@ Transform:
   m_GameObject: {fileID: 7168512462412306375}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -327,7 +327,7 @@ Transform:
   m_GameObject: {fileID: 7618050150768860302}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -529,6 +529,7 @@ MonoBehaviour:
   specialDefense: 14
   speed: 14
   luck: 10
+  outgoingDamageMultiplier: 1
 --- !u!114 &4540091804298959558
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -554,19 +555,6 @@ MonoBehaviour:
   functionSoul: 0
   functionCooldownMultiplierPerSoul: 0.97
   debugGrowthSoulRollLog: 0
---- !u!114 &9135020000000000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 8605461027058166016}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  affinityType: 2
 --- !u!114 &2543590936332733996
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1264,6 +1252,7 @@ MonoBehaviour:
   qStarFallDamageMultiplier: 1
   qDamageDebugLog: 0
   debugCriticalLog: 1
+  debugRadianceMark: 0
   qSkillEffectPrefab: {fileID: 7616733904698143582, guid: ef6ee5d37eeb0a640959838d03b086af, type: 3}
   qSpawnFallTrail: 0
   qFallTrailPrefab: {fileID: 0}
@@ -1364,6 +1353,8 @@ MonoBehaviour:
   manaCost: 40
   wShieldDuration: 5
   wDamageReduction: 0.4
+  dayBuffShieldMultiplier: 1.3
+  dayBuffRemainingShieldHealRatio: 0.5
   wShieldMaxHpMultiplier: 1
   wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
@@ -1694,3 +1685,16 @@ MonoBehaviour:
   hitSfx: {fileID: 0}
   deathSfx: {fileID: 0}
   volume: 1
+--- !u!114 &9135020000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  affinityType: 2

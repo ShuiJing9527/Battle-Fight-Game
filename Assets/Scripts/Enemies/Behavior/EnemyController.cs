@@ -47,6 +47,37 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float maxVerticalAttackDifference = 0.75f;
     [SerializeField] private float maxHorizontalAttackDistance = 1.35f;
     [SerializeField, Min(0f)] private float groundedAttackGraceTime = 0f;
+    [SerializeField] private float normalMeleeHitRadius = 0.8f;
+    [SerializeField] private float eliteMeleeHitRadius = 1.2f;
+    [SerializeField] private float normalMeleeHitForwardOffset = 0.35f;
+    [SerializeField] private float eliteMeleeHitForwardOffset = 0.5f;
+    [SerializeField] private float normalMeleeHitHeight = 0.5f;
+    [SerializeField] private float eliteMeleeHitHeight = 0.6f;
+    [SerializeField] private float bossMeleeAttackRange = 2.0f;
+    [SerializeField] private float bossRangedMinRange = 3.0f;
+    [SerializeField] private float bossRangedMaxRange = 10.0f;
+    [SerializeField] private float bossRangedAttackCooldown = 3.0f;
+    [SerializeField] private float bossRangedCastTime = 0.6f;
+    [SerializeField] private float bossMeleeHitRadius = 1.8f;
+    [SerializeField] private float bossMeleeHitForwardOffset = 0.8f;
+    [SerializeField] private float bossMeleeHitHeight = 0.8f;
+    [SerializeField] private bool enableBossRangedCastAnimation = true;
+    [SerializeField] private float bossRangedCastWindupTime = 0.25f;
+    [SerializeField] private float bossRangedCastReleaseTime = 0.15f;
+    [SerializeField] private float bossRangedVisualRecoverTime = 0.25f;
+    [SerializeField] private float bossRangedWindupSquashX = 0.85f;
+    [SerializeField] private float bossRangedWindupStretchY = 1.1f;
+    [SerializeField] private float bossRangedReleaseStretchX = 1.25f;
+    [SerializeField] private float bossRangedReleaseSquashY = 0.85f;
+    [SerializeField] private float bossRangedVisualLeanDistance = 0.25f;
+    [SerializeField] private float bossProjectileSpawnForwardOffset = 0.8f;
+    [SerializeField] private float bossProjectileSpawnHeight = 0.6f;
+    [SerializeField] private Transform bossProjectileSpawnPoint;
+    [SerializeField] private ParticleSystem bossRangedMuzzleParticle;
+    [SerializeField] private bool useArcTrajectory = true;
+    [SerializeField] private float arcHeight = 2.0f;
+    [SerializeField] private float arcTravelTime = 0.9f;
+    [SerializeField] private float targetPredictionTime = 0.25f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
@@ -56,6 +87,7 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugChaseDiagnostics = true;
     [SerializeField] private bool debugAttackStateTransitions = false;
     [SerializeField] private bool debugSlimeAttackLogs = false;
+    [SerializeField] private bool debugBossMeleeHit = true;
     [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
     [SerializeField, Min(0.05f)] private float targetResolveRetryInterval = 0.25f;
@@ -78,18 +110,27 @@ public class EnemyController : MonoBehaviour
     private float nextSpeedDiagnosticTime;
     private float nextChaseDiagnosticTime;
     private float nextTargetResolveTime;
+    private float nextBossRangedDecisionLogTime;
+    private float nextBossMeleeDecisionLogTime;
+    private float nextEnemyMeleeDecisionLogTime;
     private Vector3 lastGroundProbeOrigin;
     private bool lastGroundProbeHit;
     private string lastGroundHitName = "None";
     private int lastGroundHitLayer = -1;
     private float lastGroundProbeCastDistance;
     private Collider[] separationHits;
+    private Collider[] bossMeleeHitResults;
     private static GameObject cachedDefaultProjectilePrefab;
     private float lastAttackTime = -1f;
+    private float nextBossRangedAttackTime;
     private float lastGroundedTime = float.NegativeInfinity;
     private EnemyAttackRuntimeState lastLoggedAttackState = EnemyAttackRuntimeState.None;
     private Collider lastLoggedMeleeCollider;
     private bool hasLoggedRuntimeAttackConfig;
+    private Coroutine bossRangedAttackRoutine;
+    private BossAttackKind activeBossAttackKind = BossAttackKind.None;
+    private bool attackHitFrameTriggeredThisAttack;
+    private string lastMeleeAttackResult = "none";
 
     private enum EnemyAttackRuntimeState
     {
@@ -100,6 +141,13 @@ public class EnemyController : MonoBehaviour
         AttackReady,
         AttackInProgress,
         AttackRecovery
+    }
+
+    private enum BossAttackKind
+    {
+        None,
+        Melee,
+        Ranged
     }
 
     public float BaseMoveSpeed => moveSpeed;
@@ -171,6 +219,15 @@ public class EnemyController : MonoBehaviour
         bool isAttackAnimationActive = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
         bool hasPhysicalContact = horizontalEdgeDistance <= EdgeDistanceEpsilon;
         bool insideStopDistance = horizontalEdgeDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon;
+        CombatHealth health = GetComponent<CombatHealth>();
+        bool isDead = health != null && health.IsDead;
+
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            HandleBossElementalCombat(toPlayer, horizontalCenterDistance, centerDistance, verticalDifference, grounded);
+            return;
+        }
+
         LogRuntimeAttackConfigOnce();
         LogAttackDiagnostics(
             statsSpeed,
@@ -183,6 +240,7 @@ public class EnemyController : MonoBehaviour
         // Enter attack flow as soon as the target is in range so chase does not keep pushing the player.
         if (canAttack)
         {
+            LogEnemyMeleeDecision(attackDistance, true, "None", grounded, "Melee", playerTarget != null ? playerTarget.name : "null", Mathf.Max(0f, nextAttackTime - Time.time), isAttackAnimationActive, false, isDead);
             LogChaseDiagnostics(attackDistance, false, true, false, false, false, "Attack", 0f, playerTarget != null ? playerTarget.name : "null", "InAttackRange");
             LogAttackStateChange(
                 EnemyAttackRuntimeState.AttackReady,
@@ -201,6 +259,7 @@ public class EnemyController : MonoBehaviour
         // 攻击动作进行中时，原地停住并保持当前朝向，等待攻击回调结算。
         if (isAttackAnimationActive)
         {
+            LogEnemyMeleeDecision(attackDistance, false, "AlreadyAttacking", grounded, "None", playerTarget != null ? playerTarget.name : "null", Mathf.Max(0f, nextAttackTime - Time.time), true, false, isDead);
             rb.linearVelocity = Vector3.zero;
             string chaseReason = string.IsNullOrEmpty(attackFailReason) ? "AttackInProgress" : attackFailReason;
             LogChaseDiagnostics(attackDistance, false, false, false, false, false, "AttackRecovery", 0f, playerTarget != null ? playerTarget.name : "null", chaseReason);
@@ -224,6 +283,17 @@ public class EnemyController : MonoBehaviour
         // Hold position inside stop distance to avoid face-hug jitter and constant pushing.
         if (hasPhysicalContact || insideStopDistance || centerDistance < MovementZeroEpsilon)
         {
+            LogEnemyMeleeDecision(
+                attackDistance,
+                false,
+                string.IsNullOrEmpty(attackFailReason) ? (hasPhysicalContact ? "PhysicalContact" : "StopDistance") : attackFailReason,
+                grounded,
+                "Chase",
+                playerTarget != null ? playerTarget.name : "null",
+                Mathf.Max(0f, nextAttackTime - Time.time),
+                false,
+                false,
+                isDead);
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
             string chaseReason = string.IsNullOrEmpty(attackFailReason)
@@ -275,6 +345,17 @@ public class EnemyController : MonoBehaviour
         }
 
         LogSpeedDiagnostics(statsSpeed, centerDistance, canAttack);
+        LogEnemyMeleeDecision(
+            attackDistance,
+            false,
+            string.IsNullOrEmpty(attackFailReason) ? "OutOfRange" : attackFailReason,
+            grounded,
+            UsesProjectileAttack() ? "Ranged" : "Chase",
+            playerTarget != null ? playerTarget.name : "null",
+            Mathf.Max(0f, nextAttackTime - Time.time),
+            false,
+            false,
+            isDead);
         LogChaseDiagnostics(
             attackDistance,
             currentMoveSpeed > MovementZeroEpsilon,
@@ -337,6 +418,449 @@ public class EnemyController : MonoBehaviour
         this.attackStyle = attackStyle;
         this.attackIntervalMultiplier = Mathf.Max(0.1f, attackIntervalMultiplier);
         this.outgoingDamageMultiplier = Mathf.Max(0.01f, outgoingDamageMultiplier);
+    }
+
+    private void HandleBossElementalCombat(Vector3 toPlayer, float horizontalCenterDistance, float centerDistance, float verticalDifference, bool grounded)
+    {
+        float distance = Mathf.Max(0f, horizontalCenterDistance);
+        string targetName = playerTarget != null ? playerTarget.name : "null";
+        CombatHealth health = GetComponent<CombatHealth>();
+        bool isDead = health != null && health.IsDead;
+        bool isStunned = false;
+        bool isAttacking = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
+        float meleeCooldownRemaining = Mathf.Max(0f, nextAttackTime - Time.time);
+
+        if (attackInProgress)
+        {
+            rb.linearVelocity = Vector3.zero;
+            StopMoveAnimation();
+            FaceTargetHorizontally(playerTarget);
+            LogBossMeleeDecision(distance, false, "AlreadyAttacking", grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(distance, "Ranged", "CastInProgress");
+            return;
+        }
+
+        bool inMeleeRange = distance <= Mathf.Max(0.1f, bossMeleeAttackRange);
+        bool inRangedRange = distance >= Mathf.Max(0.1f, bossRangedMinRange) && distance <= Mathf.Max(bossRangedMinRange, bossRangedMaxRange);
+
+        if (inMeleeRange)
+        {
+            string meleeFailReason = EvaluateBossMeleeFailReason(distance, verticalDifference, grounded);
+            LogBossMeleeDecision(distance, string.IsNullOrEmpty(meleeFailReason), string.IsNullOrEmpty(meleeFailReason) ? "None" : meleeFailReason, grounded, "Melee", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(distance, string.IsNullOrEmpty(meleeFailReason) ? "Melee" : "Melee", string.IsNullOrEmpty(meleeFailReason) ? "WithinMeleeRange" : meleeFailReason);
+            if (string.IsNullOrEmpty(meleeFailReason))
+            {
+                activeBossAttackKind = BossAttackKind.Melee;
+                BeginAttack();
+                return;
+            }
+
+            rb.linearVelocity = Vector3.zero;
+            StopMoveAnimation();
+            return;
+        }
+
+        if (inRangedRange)
+        {
+            string rangedFailReason = EvaluateBossRangedFailReason(distance, verticalDifference, grounded);
+            LogBossMeleeDecision(distance, false, string.IsNullOrEmpty(rangedFailReason) ? "RangedSelected" : rangedFailReason, grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(distance, string.IsNullOrEmpty(rangedFailReason) ? "Ranged" : "Ranged", string.IsNullOrEmpty(rangedFailReason) ? "WithinRangedWindow" : rangedFailReason);
+            if (string.IsNullOrEmpty(rangedFailReason))
+            {
+                BeginBossRangedAttack(playerTarget);
+                return;
+            }
+
+            if (rangedFailReason == "Cooldown")
+            {
+                LogBossMeleeDecision(distance, false, "RangedCooldownChaseToMelee", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+                ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "RangedCooldownChaseToMelee");
+                return;
+            }
+
+            rb.linearVelocity = Vector3.zero;
+            StopMoveAnimation();
+            FaceTargetHorizontally(playerTarget);
+            return;
+        }
+
+        if (distance > Mathf.Max(bossRangedMinRange, bossRangedMaxRange))
+        {
+            LogBossMeleeDecision(distance, false, "TargetOutsideRangedMax", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(distance, "Chase", "TargetOutsideRangedMax");
+            ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "TargetOutsideRangedMax");
+            return;
+        }
+
+        LogBossMeleeDecision(distance, false, "BetweenMeleeAndRangedWindow", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+        LogBossRangedDecision(distance, "Chase", "BetweenMeleeAndRangedWindow");
+        ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "BetweenMeleeAndRangedWindow");
+    }
+
+    private void ChaseTarget(Vector3 toPlayer, string currentState, string targetName, string reason)
+    {
+        if (rb == null)
+        {
+            return;
+        }
+
+        float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
+        if (horizontalCenterDistance <= MovementZeroEpsilon)
+        {
+            rb.linearVelocity = Vector3.zero;
+            StopMoveAnimation();
+            return;
+        }
+
+        Vector3 direction = toPlayer / horizontalCenterDistance;
+        if (enableEnemySoftAvoidance)
+        {
+            Vector3 separationDirection = ResolveEnemySeparationDirection();
+            Vector3 combinedDirection = direction + separationDirection * Mathf.Max(0f, enemySeparationWeight);
+            combinedDirection.y = 0f;
+            if (combinedDirection.sqrMagnitude > MovementZeroEpsilon * MovementZeroEpsilon)
+            {
+                direction = combinedDirection.normalized;
+            }
+        }
+
+        float baseMoveSpeed = moveSpeed;
+        float externalMoveMultiplier = ResolveExternalMoveMultiplier();
+        float rawMoveSpeed = BattleStatUtility.ResolveMoveSpeed(combatStats, baseMoveSpeed, externalMoveMultiplier);
+        float currentMoveSpeed = BattleStatUtility.ClampActualMoveSpeed(rawMoveSpeed, out _);
+        if (maxHorizontalMoveSpeed > 0f)
+        {
+            currentMoveSpeed = Mathf.Min(currentMoveSpeed, maxHorizontalMoveSpeed);
+        }
+
+        float verticalVelocity = rb.linearVelocity.y;
+        if (maxVerticalVelocity > 0f)
+        {
+            verticalVelocity = Mathf.Clamp(verticalVelocity, -maxVerticalVelocity, maxVerticalVelocity);
+        }
+
+        rb.linearVelocity = new Vector3(direction.x * currentMoveSpeed, verticalVelocity, direction.z * currentMoveSpeed);
+        PlayMoveAnimation(direction, currentMoveSpeed);
+        LogChaseDiagnostics(horizontalCenterDistance, currentMoveSpeed > MovementZeroEpsilon, false, false, false, externalMoveMultiplier <= 0f, currentState, currentMoveSpeed, targetName, reason);
+
+        if (faceMoveDirection)
+        {
+            transform.forward = direction;
+        }
+        else if (keepFlatRotation)
+        {
+            transform.rotation = initialRotation;
+        }
+    }
+
+    private string EvaluateBossMeleeFailReason(float distance, float verticalDifference, bool grounded)
+    {
+        if (playerTarget == null)
+        {
+            return "NoTarget";
+        }
+
+        if (attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking))
+        {
+            return "AlreadyAttacking";
+        }
+
+        if (Time.time < nextAttackTime)
+        {
+            return "Cooldown";
+        }
+
+        if (distance > Mathf.Max(0.1f, bossMeleeAttackRange))
+        {
+            return "OutOfRange";
+        }
+
+        if (verticalDifference > Mathf.Max(0f, maxVerticalAttackDifference))
+        {
+            return "OutOfRange";
+        }
+
+        if (requireGroundedToAttack && !grounded)
+        {
+            return "NotGrounded";
+        }
+
+        return string.Empty;
+    }
+
+    private string EvaluateBossRangedFailReason(float distance, float verticalDifference, bool grounded)
+    {
+        if (playerTarget == null)
+        {
+            return "NoTarget";
+        }
+
+        if (attackInProgress)
+        {
+            return "AlreadyAttacking";
+        }
+
+        if (Time.time < nextBossRangedAttackTime)
+        {
+            return "Cooldown";
+        }
+
+        if (distance < Mathf.Max(0.1f, bossRangedMinRange) || distance > Mathf.Max(bossRangedMinRange, bossRangedMaxRange))
+        {
+            return "OutOfRange";
+        }
+
+        if (verticalDifference > Mathf.Max(0f, maxVerticalTargetDifference))
+        {
+            return "OutOfRange";
+        }
+
+        if (requireGroundedToAttack && !grounded)
+        {
+            return "NotGrounded";
+        }
+
+        return string.Empty;
+    }
+
+    private void BeginBossRangedAttack(Transform target)
+    {
+        if (target == null || bossRangedAttackRoutine != null)
+        {
+            return;
+        }
+
+        activeBossAttackKind = BossAttackKind.Ranged;
+        attackInProgress = true;
+        pendingAttackTarget = target;
+        lastAttackTime = Time.time;
+        nextBossRangedAttackTime = Time.time + Mathf.Max(0.1f, bossRangedAttackCooldown);
+        nextAttackTime = nextBossRangedAttackTime;
+        rb.linearVelocity = Vector3.zero;
+        StopMoveAnimation();
+        CancelInvoke(nameof(FinishAttackRecovery));
+        bossRangedAttackRoutine = StartCoroutine(BossRangedAttackRoutine(target));
+    }
+
+    private System.Collections.IEnumerator BossRangedAttackRoutine(Transform target)
+    {
+        float configuredTotal = Mathf.Max(0.05f, bossRangedCastTime);
+        float windupDuration = Mathf.Max(0.01f, bossRangedCastWindupTime);
+        float releaseDuration = Mathf.Max(0.01f, bossRangedCastReleaseTime);
+        float recoverDuration = Mathf.Max(0.01f, bossRangedVisualRecoverTime);
+        float durationSum = windupDuration + releaseDuration + recoverDuration;
+        if (durationSum > configuredTotal && configuredTotal > 0.01f)
+        {
+            float scale = configuredTotal / durationSum;
+            windupDuration *= scale;
+            releaseDuration *= scale;
+            recoverDuration *= scale;
+        }
+
+        Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
+        Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
+        Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
+        Quaternion rootInitialRotation = transform.rotation;
+        Quaternion visualInitialLocalRotation = visual != null ? visual.localRotation : Quaternion.identity;
+
+        Vector3 targetPoint = ResolveBossProjectileTargetPoint(target);
+        Vector3 spawnPosition = ResolveProjectileSpawnPosition(target);
+        int facingSign = ResolveBossFacingSign(target);
+        string targetSide = facingSign >= 0 ? "Right" : "Left";
+        if (debugAttackDiagnostics || debugLog)
+        {
+            Debug.Log($"[BossRangedCast] start cast target position={targetPoint} cast time={configuredTotal:F2} projectile prefab={(ResolveProjectilePrefab() != null ? ResolveProjectilePrefab().name : "runtime sphere")} spawn position={spawnPosition}", this);
+            Debug.Log($"[BossRangedCastAnim] start windup visualRoot={(visual != null ? visual.name : "null")} spawnPosition={spawnPosition} targetPosition={targetPoint}", this);
+            Debug.Log($"[BossRangedCastAnim] facingSign={facingSign} targetSide={targetSide} rootRotationPreserved=true visualRotationPreserved=true usedFlipOnly=true", this);
+        }
+
+        Vector3 windupOffset = new Vector3(-facingSign * bossRangedVisualLeanDistance, 0f, 0f);
+        Vector3 releaseOffset = new Vector3(facingSign * bossRangedVisualLeanDistance, 0f, 0f);
+
+        for (float elapsed = 0f; elapsed < windupDuration; elapsed += Time.deltaTime)
+        {
+            if (rb != null)
+            {
+                rb.linearVelocity = Vector3.zero;
+            }
+
+            FaceTargetHorizontally(target);
+            transform.rotation = rootInitialRotation;
+
+            if (enableBossRangedCastAnimation && visual != null)
+            {
+                float t = Mathf.Clamp01(elapsed / windupDuration);
+                visual.localScale = Vector3.Lerp(baseScale, new Vector3(baseScale.x * bossRangedWindupSquashX, baseScale.y * bossRangedWindupStretchY, baseScale.z), t);
+                visual.localPosition = Vector3.Lerp(basePosition, basePosition + windupOffset, t);
+                visual.localRotation = visualInitialLocalRotation;
+            }
+
+            yield return null;
+        }
+
+        if (enableBossRangedCastAnimation && visual != null)
+        {
+            visual.localScale = new Vector3(baseScale.x * bossRangedWindupSquashX, baseScale.y * bossRangedWindupStretchY, baseScale.z);
+            visual.localPosition = basePosition + windupOffset;
+            visual.localRotation = visualInitialLocalRotation;
+        }
+
+        if (debugAttackDiagnostics || debugLog)
+        {
+            Debug.Log($"[BossRangedCastAnim] release projectile visualRoot={(visual != null ? visual.name : "null")} spawnPosition={spawnPosition} targetPosition={targetPoint}", this);
+        }
+
+        if (enableBossRangedCastAnimation && visual != null)
+        {
+            for (float elapsed = 0f; elapsed < releaseDuration; elapsed += Time.deltaTime)
+            {
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                }
+
+                FaceTargetHorizontally(target);
+                transform.rotation = rootInitialRotation;
+                float t = Mathf.Clamp01(elapsed / releaseDuration);
+                visual.localScale = Vector3.Lerp(
+                    new Vector3(baseScale.x * bossRangedWindupSquashX, baseScale.y * bossRangedWindupStretchY, baseScale.z),
+                    new Vector3(baseScale.x * bossRangedReleaseStretchX, baseScale.y * bossRangedReleaseSquashY, baseScale.z),
+                    t);
+                visual.localPosition = Vector3.Lerp(basePosition + windupOffset, basePosition + releaseOffset, t);
+                visual.localRotation = visualInitialLocalRotation;
+                yield return null;
+            }
+        }
+
+        PlayBossRangedMuzzleParticle();
+        ExecuteProjectileAttack(target);
+
+        if (enableBossRangedCastAnimation && visual != null)
+        {
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Debug.Log($"[BossRangedCastAnim] recover visualRoot={(visual != null ? visual.name : "null")} spawnPosition={spawnPosition} targetPosition={targetPoint}", this);
+            }
+
+            for (float elapsed = 0f; elapsed < recoverDuration; elapsed += Time.deltaTime)
+            {
+                if (rb != null)
+                {
+                    rb.linearVelocity = Vector3.zero;
+                }
+
+                FaceTargetHorizontally(target);
+                transform.rotation = rootInitialRotation;
+                float t = Mathf.Clamp01(elapsed / recoverDuration);
+                visual.localScale = Vector3.Lerp(
+                    new Vector3(baseScale.x * bossRangedReleaseStretchX, baseScale.y * bossRangedReleaseSquashY, baseScale.z),
+                    baseScale,
+                    t);
+                visual.localPosition = Vector3.Lerp(basePosition + releaseOffset, basePosition, t);
+                visual.localRotation = visualInitialLocalRotation;
+                yield return null;
+            }
+        }
+
+        transform.rotation = rootInitialRotation;
+        if (visual != null)
+        {
+            visual.localScale = baseScale;
+            visual.localPosition = basePosition;
+            visual.localRotation = visualInitialLocalRotation;
+        }
+
+        CompleteBossRangedAttack();
+    }
+
+    private void CompleteBossRangedAttack()
+    {
+        attackInProgress = false;
+        pendingAttackTarget = null;
+        activeBossAttackKind = BossAttackKind.None;
+        bossRangedAttackRoutine = null;
+    }
+
+    private void FaceTargetHorizontally(Transform target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        bool facingRight = target.position.x >= transform.position.x;
+        if (slimeAnimation != null)
+        {
+            slimeAnimation.SetFacingRight(facingRight, "BossRangedCast");
+            return;
+        }
+
+        ResolveMeleeHitSources();
+        if (meleeEnemySpriteRenderer != null)
+        {
+            meleeEnemySpriteRenderer.flipX = facingRight;
+        }
+    }
+
+    private void LogBossRangedDecision(float distance, string selectedAttack, string reason)
+    {
+        if (!(debugAttackDiagnostics || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextBossRangedDecisionLogTime)
+        {
+            return;
+        }
+
+        nextBossRangedDecisionLogTime = Time.time + 1f;
+
+        Debug.Log($"[BossRangedDecision] distance={distance:F2} meleeRange={bossMeleeAttackRange:F2} rangedMinRange={bossRangedMinRange:F2} rangedMaxRange={bossRangedMaxRange:F2} selectedAttack={selectedAttack} reason={reason}", this);
+    }
+
+    private void LogBossMeleeDecision(
+        float distanceToTarget,
+        bool canAttack,
+        string failReason,
+        bool isGrounded,
+        string selectedAttack,
+        string targetName,
+        float meleeCooldownRemaining,
+        bool isAttacking,
+        bool isStunned,
+        bool isDead)
+    {
+        if (!(debugAttackDiagnostics || debugBossMeleeHit || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextBossMeleeDecisionLogTime)
+        {
+            return;
+        }
+
+        nextBossMeleeDecisionLogTime = Time.time + 1f;
+        Debug.Log(
+            "[BossMeleeDecision] " +
+            "enemy=" + name +
+            " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+            " species=" + (monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown") +
+            " attackStyle=" + attackStyle +
+            " distanceToTarget=" + distanceToTarget.ToString("F2") +
+            " bossMeleeAttackRange=" + bossMeleeAttackRange.ToString("F2") +
+            " canAttack=" + canAttack +
+            " failReason=" + failReason +
+            " isGrounded=" + isGrounded +
+            " targetAssigned=" + (playerTarget != null) +
+            " targetName=" + targetName +
+            " selectedAttack=" + selectedAttack +
+            " meleeCooldownRemaining=" + meleeCooldownRemaining.ToString("F2") +
+            " isAttacking=" + isAttacking +
+            " isStunned=" + isStunned +
+            " isDead=" + isDead,
+            this);
     }
 
     private Vector3 ResolveEnemySeparationDirection()
@@ -416,10 +940,17 @@ public class EnemyController : MonoBehaviour
 
     private void BeginAttack()
     {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && activeBossAttackKind == BossAttackKind.None)
+        {
+            activeBossAttackKind = BossAttackKind.Melee;
+        }
+
         lastAttackTime = Time.time;
         nextAttackTime = Time.time + ResolveCurrentAttackCooldown();
         pendingAttackTarget = playerTarget;
         attackInProgress = true;
+        attackHitFrameTriggeredThisAttack = false;
+        lastMeleeAttackResult = "pending";
         CancelInvoke(nameof(FinishAttackRecovery));
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
@@ -427,6 +958,49 @@ public class EnemyController : MonoBehaviour
         {
             Debug.Log($"[EnemyAttack] StartAttack enemy={name} target={(pendingAttackTarget != null ? pendingAttackTarget.name : "null")}", this);
         }
+
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && activeBossAttackKind == BossAttackKind.Melee)
+        {
+            Vector3 attackDirection;
+            Vector3 attackOrigin = ResolveBossMeleeHitOrigin(pendingAttackTarget, out attackDirection);
+            float attackWindup = slimeAnimation != null ? slimeAnimation.AttackWindup : 0f;
+            float attackRecover = slimeAnimation != null ? slimeAnimation.AttackRecovery : AttackRecoveryDurationSeconds;
+            Debug.Log(
+                "[BossMeleeAttack] " +
+                "enemy=" + name +
+                " target=" + (pendingAttackTarget != null ? pendingAttackTarget.name : "null") +
+                " start attack" +
+                " attackWindup=" + attackWindup.ToString("F2") +
+                " attackHitTime=" + attackWindup.ToString("F2") +
+                " attackRecover=" + attackRecover.ToString("F2") +
+                " attackDamage=" + ResolveCurrentAttackDamage(ResolvePrimaryDamageType()).ToString("F2") +
+                " attackRadius=" + Mathf.Max(0.1f, bossMeleeHitRadius).ToString("F2") +
+                " attackOrigin=" + attackOrigin +
+                " attackDirection=" + attackDirection,
+                this);
+        }
+        else if (!UsesProjectileAttack())
+        {
+            Vector3 attackDirection;
+            Vector3 attackOrigin = ResolveGenericMeleeHitOrigin(pendingAttackTarget, out attackDirection);
+            float attackWindup = slimeAnimation != null ? slimeAnimation.AttackWindup : 0f;
+            float attackRecover = slimeAnimation != null ? slimeAnimation.AttackRecovery : AttackRecoveryDurationSeconds;
+            Debug.Log(
+                "[EnemyMeleeAttack] " +
+                "enemy=" + name +
+                " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                " target=" + (pendingAttackTarget != null ? pendingAttackTarget.name : "null") +
+                " start attack" +
+                " attackWindup=" + attackWindup.ToString("F2") +
+                " attackHitTime=" + attackWindup.ToString("F2") +
+                " attackRecover=" + attackRecover.ToString("F2") +
+                " attackDamage=" + ResolveCurrentAttackDamage(ResolvePrimaryDamageType()).ToString("F2") +
+                " attackOrigin=" + attackOrigin +
+                " attackRange=" + ResolveCurrentMeleeHitRadius().ToString("F2") +
+                " attackDirection=" + attackDirection,
+                this);
+        }
+
         LogSlimeAttackLifecycle("BeginAttack", pendingAttackTarget, "Triggered");
         LogAttackStateChange(
             EnemyAttackRuntimeState.AttackInProgress,
@@ -455,7 +1029,22 @@ public class EnemyController : MonoBehaviour
 
     private void FinishAttackRecovery()
     {
+        bool hadPendingAttack = attackInProgress;
+        Transform finishedTarget = pendingAttackTarget;
         attackInProgress = false;
+        activeBossAttackKind = BossAttackKind.None;
+        if (hadPendingAttack && !UsesProjectileAttack() && !attackHitFrameTriggeredThisAttack)
+        {
+            lastMeleeAttackResult = "no-hit-frame";
+            Debug.Log(
+                "[EnemyMeleeDamageFlow] " +
+                "enemy=" + name +
+                " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                " target=" + (finishedTarget != null ? finishedTarget.name : "null") +
+                " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
+                " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-hit-frame playerHpBefore=n/a playerHpAfter=n/a",
+                this);
+        }
         LogSlimeAttackLifecycle("AttackFinished", pendingAttackTarget, "RecoveryComplete");
         pendingAttackTarget = null;
         if (debugAttackDiagnostics)
@@ -477,6 +1066,7 @@ public class EnemyController : MonoBehaviour
     private void HandleAttackHit(Transform target)
     {
         Transform hitTarget = target != null ? target : pendingAttackTarget;
+        attackHitFrameTriggeredThisAttack = true;
         LogSlimeAttackLifecycle("AttackHitCallback", hitTarget, hitTarget != null ? "CallbackReceived" : "NoTarget");
         if (hitTarget == null)
         {
@@ -512,30 +1102,64 @@ public class EnemyController : MonoBehaviour
         }
         else
         {
-            bool insideHitRange = CanHitMeleeTarget(hitTarget);
+            bool insideHitRange;
+            CombatHealth combatHealth = null;
+            string meleeRejectReason = string.Empty;
+            Vector3 meleeHitOrigin = Vector3.zero;
+            Vector3 meleeAttackDirection = Vector3.zero;
+            float resolvedMeleeHitRadius = 0f;
+            int meleeHitColliderCount = 0;
+
+            insideHitRange = TryResolveMeleeHitTarget(
+                hitTarget,
+                out combatHealth,
+                out meleeRejectReason,
+                out meleeHitOrigin,
+                out meleeAttackDirection,
+                out resolvedMeleeHitRadius,
+                out meleeHitColliderCount);
+
             if (!insideHitRange)
             {
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=HitCheckFailed", this);
                 }
-                LogAttackAttempt(hitTarget, true, false, true, false, "HitCheckFailed");
+                string failureReason = string.IsNullOrEmpty(meleeRejectReason) ? "no-target-in-hit-range" : meleeRejectReason;
+                lastMeleeAttackResult = failureReason;
+                Debug.Log(
+                    "[EnemyMeleeDamageFlow] " +
+                    "enemy=" + name +
+                    " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                    " target=" + hitTarget.name +
+                    " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
+                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-target-in-hit-range playerHpBefore=n/a playerHpAfter=n/a",
+                    this);
+                LogAttackAttempt(hitTarget, true, false, true, false, failureReason);
                 FinishAttackRecovery();
                 return;
             }
 
-            if (!BattleTargetUtility.IsPlayer(hitTarget.gameObject))
+            if (combatHealth == null)
             {
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NotPlayer", this);
                 }
-                LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "NotPlayer");
+                lastMeleeAttackResult = "invalid-target";
+                Debug.Log(
+                    "[EnemyMeleeDamageFlow] " +
+                    "enemy=" + name +
+                    " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                    " target=" + hitTarget.name +
+                    " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
+                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=invalid-target playerHpBefore=n/a playerHpAfter=n/a",
+                    this);
+                LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "invalid-target");
                 FinishAttackRecovery();
                 return;
             }
 
-            CombatHealth combatHealth = hitTarget.GetComponentInParent<CombatHealth>();
             if (combatHealth != null)
             {
                 BattleDamageType damageType = ResolvePrimaryDamageType();
@@ -552,12 +1176,59 @@ public class EnemyController : MonoBehaviour
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage={currentAttackDamage:F2}", this);
                     Debug.Log($"[EnemyAttack] ApplyDamage enemy={name} target={hitTarget.name}", this);
                 }
+
+                float playerHpBefore = ResolveCombatHealthValue(combatHealth);
+                float playerShieldBefore = combatHealth.GetShield();
+                Debug.Log(
+                    "[EnemyMeleeDamageFlow] " +
+                    "enemy=" + name +
+                    " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                    " target=" + hitTarget.name +
+                    " source=EnemyMelee" +
+                    " damageBeforeModifiers=" + currentAttackDamage.ToString("F2") +
+                    " damageAfterModifiers=" + currentAttackDamage.ToString("F2") +
+                    " hitChance=see-CombatEvasion" +
+                    " missRoll=see-CombatEvasion" +
+                    " isMiss=pending" +
+                    " targetInvincible=false" +
+                    " targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true" +
+                    " TakeDamageCalled=true" +
+                    " result=pending" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=pending",
+                    this);
+
                 combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, damageType, gameObject));
+                float playerHpAfter = ResolveCombatHealthValue(combatHealth);
+                float playerShieldAfter = combatHealth.GetShield();
+                string damageResult = ResolveEnemyMeleeDamageResult(playerHpBefore, playerHpAfter, playerShieldBefore, playerShieldAfter);
+                lastMeleeAttackResult = damageResult;
+                Debug.Log(
+                    "[EnemyMeleeDamageFlow] " +
+                    "enemy=" + name +
+                    " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                    " target=" + hitTarget.name +
+                    " source=EnemyMelee" +
+                    " damageBeforeModifiers=" + currentAttackDamage.ToString("F2") +
+                    " damageAfterModifiers=" + currentAttackDamage.ToString("F2") +
+                    " hitChance=see-CombatEvasion" +
+                    " missRoll=see-CombatEvasion" +
+                    " isMiss=" + (damageResult == "miss") +
+                    " targetInvincible=" + (damageResult == "invincible") +
+                    " targetShield=" + playerShieldAfter.ToString("F2") +
+                    " targetCombatHealthFound=true" +
+                    " TakeDamageCalled=true" +
+                    " result=" + damageResult +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpAfter.ToString("F2"),
+                    this);
                 LogAttackAttempt(hitTarget, true, insideHitRange, true, true, "DamageApplied");
             }
             else if (debugAttackDiagnostics)
             {
                 Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NoCombatHealth", this);
+                lastMeleeAttackResult = "invalid-target";
                 LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "NoCombatHealth");
             }
         }
@@ -609,6 +1280,307 @@ public class EnemyController : MonoBehaviour
         }
 
         return distance <= horizontalAttackDistance;
+    }
+
+    private bool TryResolveMeleeHitTarget(
+        Transform hitTarget,
+        out CombatHealth targetCombatHealth,
+        out string rejectReason,
+        out Vector3 hitOrigin,
+        out Vector3 attackDirection,
+        out float hitRadius,
+        out int hitColliderCount)
+    {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && activeBossAttackKind == BossAttackKind.Melee)
+        {
+            return TryResolveBossMeleeHitTarget(
+                hitTarget,
+                out targetCombatHealth,
+                out rejectReason,
+                out hitOrigin,
+                out attackDirection,
+                out hitRadius,
+                out hitColliderCount);
+        }
+
+        targetCombatHealth = null;
+        rejectReason = "NoTarget";
+        hitOrigin = ResolveGenericMeleeHitOrigin(hitTarget, out attackDirection);
+        hitRadius = ResolveCurrentMeleeHitRadius();
+        EnsureBossMeleeHitResultsBuffer();
+        hitColliderCount = Physics.OverlapSphereNonAlloc(
+            hitOrigin,
+            hitRadius,
+            bossMeleeHitResults,
+            ~0,
+            QueryTriggerInteraction.Collide);
+
+        Transform targetRoot = hitTarget != null ? hitTarget.root : null;
+        System.Collections.Generic.List<string> details = new System.Collections.Generic.List<string>();
+
+        for (int i = 0; i < hitColliderCount; i++)
+        {
+            Collider collider = bossMeleeHitResults[i];
+            if (collider == null)
+            {
+                details.Add("collider=null acceptedTarget=false rejectReason=null-collider");
+                continue;
+            }
+
+            Transform colliderRoot = collider.transform.root;
+            bool isPlayer = BattleTargetUtility.IsPlayer(collider.gameObject) || (colliderRoot != null && BattleTargetUtility.IsPlayer(colliderRoot.gameObject));
+            CombatHealth combatHealth = collider.GetComponentInParent<CombatHealth>();
+            bool rootMatchesTarget = targetRoot == null || colliderRoot == targetRoot || (combatHealth != null && combatHealth.transform.root == targetRoot);
+            bool targetDead = combatHealth != null && combatHealth.IsDead;
+            bool acceptedTarget = isPlayer && combatHealth != null && rootMatchesTarget && !targetDead;
+            string currentRejectReason = acceptedTarget
+                ? "None"
+                : !isPlayer
+                    ? "WrongTag"
+                    : combatHealth == null
+                        ? "CombatHealthNotFound"
+                        : !rootMatchesTarget
+                            ? "WrongPlayerRoot"
+                            : targetDead
+                                ? "TargetDead"
+                                : "Unknown";
+
+            details.Add(
+                "collider name=" + collider.name +
+                " collider root=" + (colliderRoot != null ? colliderRoot.name : "null") +
+                " collider layer=" + LayerMask.LayerToName(collider.gameObject.layer) +
+                " collider tag=" + collider.tag +
+                " collider isTrigger=" + collider.isTrigger +
+                " has CombatHealth=" + (combatHealth != null) +
+                " isPlayer=" + isPlayer +
+                " acceptedTarget=" + acceptedTarget +
+                " rejectReason=" + currentRejectReason);
+
+            if (!acceptedTarget)
+            {
+                rejectReason = currentRejectReason;
+                continue;
+            }
+
+            targetCombatHealth = combatHealth;
+            rejectReason = string.Empty;
+            break;
+        }
+
+        if (hitColliderCount <= 0)
+        {
+            rejectReason = "NoTargetInHitRange";
+        }
+        else if (targetCombatHealth == null && string.IsNullOrEmpty(rejectReason))
+        {
+            rejectReason = "InvalidTarget";
+        }
+
+        Debug.Log(
+            "[EnemyMeleeHitCheck] " +
+            "enemy=" + name +
+            " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+            " target=" + (hitTarget != null ? hitTarget.name : "null") +
+            " hitFrameReached=true" +
+            " hitOrigin=" + hitOrigin +
+            " hitRadius=" + hitRadius.ToString("F2") +
+            " hitLayerMask=Everything" +
+            " hitColliderCount=" + hitColliderCount +
+            " attackDirection=" + attackDirection +
+            " details=" + (details.Count > 0 ? string.Join(" | ", details) : "none") +
+            " acceptedTarget=" + (targetCombatHealth != null) +
+            " rejectReason=" + (string.IsNullOrEmpty(rejectReason) ? "None" : rejectReason),
+            this);
+
+        return targetCombatHealth != null;
+    }
+
+    private bool TryResolveBossMeleeHitTarget(
+        Transform hitTarget,
+        out CombatHealth targetCombatHealth,
+        out string rejectReason,
+        out Vector3 hitOrigin,
+        out Vector3 attackDirection,
+        out float hitRadius,
+        out int hitColliderCount)
+    {
+        targetCombatHealth = null;
+        rejectReason = "NoTarget";
+        hitOrigin = ResolveBossMeleeHitOrigin(hitTarget, out attackDirection);
+        hitRadius = Mathf.Max(0.1f, bossMeleeHitRadius);
+        EnsureBossMeleeHitResultsBuffer();
+        hitColliderCount = Physics.OverlapSphereNonAlloc(
+            hitOrigin,
+            hitRadius,
+            bossMeleeHitResults,
+            ~0,
+            QueryTriggerInteraction.Collide);
+
+        Transform targetRoot = hitTarget != null ? hitTarget.root : null;
+        System.Collections.Generic.List<string> details = new System.Collections.Generic.List<string>();
+
+        for (int i = 0; i < hitColliderCount; i++)
+        {
+            Collider collider = bossMeleeHitResults[i];
+            if (collider == null)
+            {
+                details.Add("collider=null acceptedTarget=false rejectReason=null-collider");
+                continue;
+            }
+
+            Transform colliderRoot = collider.transform.root;
+            bool isPlayer = BattleTargetUtility.IsPlayer(collider.gameObject) || (colliderRoot != null && BattleTargetUtility.IsPlayer(colliderRoot.gameObject));
+            CombatHealth combatHealth = collider.GetComponentInParent<CombatHealth>();
+            bool rootMatchesTarget = targetRoot == null || colliderRoot == targetRoot || (combatHealth != null && combatHealth.transform.root == targetRoot);
+
+            bool acceptedTarget = isPlayer && combatHealth != null && rootMatchesTarget;
+            string currentRejectReason = acceptedTarget
+                ? "None"
+                : !isPlayer
+                    ? "NotPlayer"
+                    : combatHealth == null
+                        ? "NoCombatHealth"
+                        : !rootMatchesTarget
+                            ? "WrongPlayerRoot"
+                            : "Unknown";
+
+            details.Add(
+                "collider name=" + collider.name +
+                " collider root=" + (colliderRoot != null ? colliderRoot.name : "null") +
+                " collider layer=" + LayerMask.LayerToName(collider.gameObject.layer) +
+                " collider tag=" + collider.tag +
+                " collider isTrigger=" + collider.isTrigger +
+                " has CombatHealth=" + (combatHealth != null) +
+                " isPlayer=" + isPlayer +
+                " acceptedTarget=" + acceptedTarget +
+                " rejectReason=" + currentRejectReason);
+
+            if (!acceptedTarget)
+            {
+                rejectReason = currentRejectReason;
+                continue;
+            }
+
+            targetCombatHealth = combatHealth;
+            rejectReason = string.Empty;
+            break;
+        }
+
+        if (hitColliderCount <= 0)
+        {
+            rejectReason = "NoHitCollider";
+        }
+        else if (targetCombatHealth == null && string.IsNullOrEmpty(rejectReason))
+        {
+            rejectReason = "NoAcceptedPlayerCollider";
+        }
+
+        if (debugBossMeleeHit || debugAttackDiagnostics || debugLog)
+        {
+            Debug.Log(
+                "[BossMeleeHitCheck] " +
+                "enemy=" + name +
+                " target=" + (hitTarget != null ? hitTarget.name : "null") +
+                " hitOrigin=" + hitOrigin +
+                " hitRadius=" + hitRadius.ToString("F2") +
+                " hitLayerMask=Everything" +
+                " hitColliderCount=" + hitColliderCount +
+                " attackDirection=" + attackDirection +
+                " details=" + (details.Count > 0 ? string.Join(" | ", details) : "none") +
+                " finalAcceptedTarget=" + (targetCombatHealth != null) +
+                " finalRejectReason=" + (string.IsNullOrEmpty(rejectReason) ? "None" : rejectReason),
+                this);
+        }
+
+        return targetCombatHealth != null;
+    }
+
+    private Vector3 ResolveBossMeleeHitOrigin(Transform hitTarget, out Vector3 attackDirection)
+    {
+        Vector3 direction = hitTarget != null ? hitTarget.position - transform.position : Vector3.zero;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            direction = playerTarget != null ? playerTarget.position - transform.position : Vector3.right;
+            direction.y = 0f;
+        }
+
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            direction = Vector3.right;
+        }
+
+        attackDirection = direction.normalized;
+        return transform.position + attackDirection * bossMeleeHitForwardOffset + Vector3.up * bossMeleeHitHeight;
+    }
+
+    private Vector3 ResolveGenericMeleeHitOrigin(Transform hitTarget, out Vector3 attackDirection)
+    {
+        Vector3 direction = hitTarget != null ? hitTarget.position - transform.position : Vector3.zero;
+        direction.y = 0f;
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            direction = playerTarget != null ? playerTarget.position - transform.position : Vector3.right;
+            direction.y = 0f;
+        }
+
+        if (direction.sqrMagnitude <= 0.0001f)
+        {
+            direction = Vector3.right;
+        }
+
+        attackDirection = direction.normalized;
+        return transform.position + attackDirection * ResolveCurrentMeleeHitForwardOffset() + Vector3.up * ResolveCurrentMeleeHitHeight();
+    }
+
+    private void EnsureBossMeleeHitResultsBuffer()
+    {
+        if (bossMeleeHitResults == null || bossMeleeHitResults.Length < 16)
+        {
+            bossMeleeHitResults = new Collider[16];
+        }
+    }
+
+    private static float ResolveCombatHealthValue(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return 0f;
+        }
+
+        return combatHealth.resourceBank != null
+            ? Mathf.Max(0f, combatHealth.resourceBank.currentHealth)
+            : Mathf.Max(0f, combatHealth.currentHealth);
+    }
+
+    private static string ResolveBossMeleeDamageResult(float hpBefore, float hpAfter, float shieldBefore, float shieldAfter)
+    {
+        if (hpAfter < hpBefore)
+        {
+            return "applied";
+        }
+
+        if (shieldAfter < shieldBefore)
+        {
+            return "shielded";
+        }
+
+        return "no-effective-damage";
+    }
+
+    private static string ResolveEnemyMeleeDamageResult(float hpBefore, float hpAfter, float shieldBefore, float shieldAfter)
+    {
+        if (hpAfter < hpBefore)
+        {
+            return "applied";
+        }
+
+        if (shieldAfter < shieldBefore)
+        {
+            return "shielded";
+        }
+
+        return "no-effective-damage";
     }
 
     private void ResolveMeleeHitSources()
@@ -744,6 +1716,83 @@ public class EnemyController : MonoBehaviour
         return UsesProjectileAttack() ? horizontalCenterDistance : horizontalEdgeDistance;
     }
 
+    private float ResolveCurrentMeleeHitRadius()
+    {
+        MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
+        return rank switch
+        {
+            MonsterRank.Boss => Mathf.Max(0.1f, bossMeleeHitRadius),
+            MonsterRank.Elite => Mathf.Max(0.1f, eliteMeleeHitRadius),
+            _ => Mathf.Max(0.1f, normalMeleeHitRadius)
+        };
+    }
+
+    private float ResolveCurrentMeleeHitForwardOffset()
+    {
+        MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
+        return rank switch
+        {
+            MonsterRank.Boss => bossMeleeHitForwardOffset,
+            MonsterRank.Elite => eliteMeleeHitForwardOffset,
+            _ => normalMeleeHitForwardOffset
+        };
+    }
+
+    private float ResolveCurrentMeleeHitHeight()
+    {
+        MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
+        return rank switch
+        {
+            MonsterRank.Boss => bossMeleeHitHeight,
+            MonsterRank.Elite => eliteMeleeHitHeight,
+            _ => normalMeleeHitHeight
+        };
+    }
+
+    private void LogEnemyMeleeDecision(
+        float distance,
+        bool canAttack,
+        string failReason,
+        bool isGrounded,
+        string selectedAttack,
+        string targetName,
+        float meleeCooldownRemaining,
+        bool isAttacking,
+        bool isStunned,
+        bool isDead)
+    {
+        if (!(debugAttackDiagnostics || debugMeleeHitCheck || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextEnemyMeleeDecisionLogTime)
+        {
+            return;
+        }
+
+        nextEnemyMeleeDecisionLogTime = Time.time + 1f;
+        Debug.Log(
+            "[EnemyMeleeDecision] " +
+            "enemy=" + name +
+            " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+            " species=" + (monsterIdentity != null ? monsterIdentity.species.ToString() : "Unknown") +
+            " attackStyle=" + attackStyle +
+            " distanceToTarget=" + distance.ToString("F2") +
+            " meleeAttackRange=" + attackRange.ToString("F2") +
+            " canAttack=" + canAttack +
+            " failReason=" + (string.IsNullOrEmpty(failReason) ? "None" : failReason) +
+            " isGrounded=" + isGrounded +
+            " targetAssigned=" + (playerTarget != null) +
+            " targetName=" + targetName +
+            " selectedAttack=" + selectedAttack +
+            " meleeCooldownRemaining=" + meleeCooldownRemaining.ToString("F2") +
+            " isAttacking=" + isAttacking +
+            " isStunned=" + isStunned +
+            " isDead=" + isDead,
+            this);
+    }
+
     private Collider ResolvePlayerCollider(Transform hitTarget)
     {
         if (hitTarget == null)
@@ -778,7 +1827,12 @@ public class EnemyController : MonoBehaviour
 
     private bool UsesProjectileAttack()
     {
-        return attackStyle == MonsterAttackStyle.Ranged || attackStyle == MonsterAttackStyle.ElementalBoss;
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            return activeBossAttackKind == BossAttackKind.Ranged;
+        }
+
+        return attackStyle == MonsterAttackStyle.Ranged;
     }
 
     private void ExecuteProjectileAttack(Transform hitTarget)
@@ -1313,6 +2367,11 @@ public class EnemyController : MonoBehaviour
 
     private BattleDamageType ResolvePrimaryDamageType()
     {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && activeBossAttackKind == BossAttackKind.Melee)
+        {
+            return BattleDamageType.Physical;
+        }
+
         return attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
     }
 
@@ -1330,7 +2389,9 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        Vector3 direction = hitTarget.position - transform.position;
+        Vector3 spawnPosition = ResolveProjectileSpawnPosition(hitTarget);
+        Vector3 targetPoint = ResolveBossProjectileTargetPoint(hitTarget);
+        Vector3 direction = targetPoint - spawnPosition;
         direction.y = 0f;
         if (direction.sqrMagnitude < MovementZeroEpsilon)
         {
@@ -1354,7 +2415,7 @@ public class EnemyController : MonoBehaviour
         }
 
         projectile.name = attackStyle == MonsterAttackStyle.ElementalBoss ? "Boss Acid Projectile" : "Monster Projectile";
-        projectile.transform.position = transform.position + Vector3.up * ProjectileSpawnHeightOffset + direction.normalized * ProjectileSpawnForwardOffset;
+        projectile.transform.position = spawnPosition;
         projectile.transform.localScale = Vector3.one * (attackStyle == MonsterAttackStyle.ElementalBoss ? BossProjectileScale : NormalProjectileScale);
 
         if (debugAttackDiagnostics || debugLog)
@@ -1375,6 +2436,7 @@ public class EnemyController : MonoBehaviour
             projectileBody = projectile.AddComponent<Rigidbody>();
         }
         projectileBody.isKinematic = true;
+        projectileBody.useGravity = false;
 
         MonsterProjectile monsterProjectile = projectile.GetComponent<MonsterProjectile>();
         if (monsterProjectile == null)
@@ -1383,12 +2445,91 @@ public class EnemyController : MonoBehaviour
         }
         monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(damageType), damageType, gameObject);
 
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && useArcTrajectory)
+        {
+            monsterProjectile.ConfigureArcTrajectory(spawnPosition, targetPoint, Mathf.Max(0.1f, arcHeight), Mathf.Max(0.1f, arcTravelTime));
+        }
+
         Renderer renderer = projectile.GetComponentInChildren<Renderer>();
         if (renderer != null && attackStyle != MonsterAttackStyle.ElementalBoss)
         {
             renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
             renderer.material.color = ResolveProjectileColor(damageType);
         }
+    }
+
+    private Vector3 ResolveProjectileSpawnPosition(Transform hitTarget)
+    {
+        if (attackStyle == MonsterAttackStyle.ElementalBoss && bossProjectileSpawnPoint != null)
+        {
+            return bossProjectileSpawnPoint.position;
+        }
+
+        Vector3 direction = hitTarget != null ? (hitTarget.position - transform.position) : transform.forward;
+        direction.y = 0f;
+        if (direction.sqrMagnitude < MovementZeroEpsilon)
+        {
+            direction = transform.forward;
+        }
+
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            return transform.position + Vector3.up * bossProjectileSpawnHeight + direction.normalized * bossProjectileSpawnForwardOffset;
+        }
+
+        return transform.position + Vector3.up * ProjectileSpawnHeightOffset + direction.normalized * ProjectileSpawnForwardOffset;
+    }
+
+    private Vector3 ResolveBossProjectileTargetPoint(Transform hitTarget)
+    {
+        if (hitTarget == null)
+        {
+            return transform.position + transform.forward * Mathf.Max(1f, bossRangedMinRange);
+        }
+
+        Vector3 predictedPosition = hitTarget.position;
+        Rigidbody targetBody = hitTarget.GetComponentInParent<Rigidbody>();
+        if (targetBody != null)
+        {
+            predictedPosition += targetBody.linearVelocity * Mathf.Max(0f, targetPredictionTime);
+        }
+        else
+        {
+            CharacterController controller = hitTarget.GetComponentInParent<CharacterController>();
+            if (controller != null)
+            {
+                predictedPosition += controller.velocity * Mathf.Max(0f, targetPredictionTime);
+            }
+        }
+
+        Collider targetCollider = ResolvePlayerCollider(hitTarget);
+        if (targetCollider != null)
+        {
+            predictedPosition.y = targetCollider.bounds.min.y + Mathf.Min(0.2f, targetCollider.bounds.extents.y);
+        }
+
+        return predictedPosition;
+    }
+
+    private int ResolveBossFacingSign(Transform target)
+    {
+        if (target == null)
+        {
+            return 1;
+        }
+
+        return target.position.x >= transform.position.x ? 1 : -1;
+    }
+
+    private void PlayBossRangedMuzzleParticle()
+    {
+        if (bossRangedMuzzleParticle == null)
+        {
+            return;
+        }
+
+        bossRangedMuzzleParticle.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        bossRangedMuzzleParticle.Play(true);
     }
 
     private GameObject CreateProjectileObject()

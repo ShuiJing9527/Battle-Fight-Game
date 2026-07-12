@@ -394,20 +394,23 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         float finalDamage = damageResult.finalDamage;
         Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
         float totalDamageDealt = 0f;
+        System.Collections.Generic.List<string> debugEntries = new System.Collections.Generic.List<string>();
 
         foreach (Collider hit in hits)
         {
-            if (!BattleTargetUtility.IsMonster(hit, transform))
+            MonsterIdentity identity = BattleTargetUtility.GetMonsterIdentity(hit);
+            if (!BattleTargetUtility.TryGetMonsterCombatHealth(hit, transform, out CombatHealth combatHealth, out string rejectReason))
             {
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, rejectReason, false, 0f, 0f, finalDamage, finalDamage));
                 continue;
             }
 
             if (!IsInFrontSlashArea(hit, origin, facing))
             {
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, "outside-front-slash-area", false, 0f, 0f, finalDamage, finalDamage));
                 continue;
             }
 
-            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
                 float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
@@ -429,9 +432,21 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                     TryPlayQuickShearCritFlash(hit, damageResult);
                 }
                 totalDamageDealt += actualDamage;
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, true, "None", true, beforeHealth, afterHealth, resolvedDamage, resolvedDamage));
                 continue;
             }
+
+            debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, "duplicate-combat-health", false, 0f, 0f, finalDamage, finalDamage));
         }
+
+        Debug.Log(
+            "[PlayerMeleeHitDebug] " +
+            "skill=Player1Skill_Q_QuickShear " +
+            "attackPosition=" + center +
+            " attackRadius=" + Mathf.Max(0.1f, qRange).ToString("F2") +
+            " hitColliderCount=" + hits.Length +
+            " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+            this);
 
         return totalDamageDealt;
     }
@@ -719,6 +734,37 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         return combatHealth.currentHealth;
+    }
+
+    private static string BuildMeleeHitDebugEntry(
+        Collider collider,
+        MonsterIdentity identity,
+        bool acceptedTarget,
+        string rejectReason,
+        bool takeDamageCalled,
+        float beforeHealth,
+        float afterHealth,
+        float damageBeforeModifiers,
+        float damageAfterModifiers)
+    {
+        Transform root = collider != null ? collider.transform.root : null;
+        float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+
+        return
+            "collider=" + (collider != null ? collider.name : "null") +
+            " root=" + (root != null ? root.name : "null") +
+            " layer=" + (collider != null ? LayerMask.LayerToName(collider.gameObject.layer) : "null") +
+            " tag=" + (collider != null ? collider.tag : "null") +
+            " hasCombatHealth=" + takeDamageCalled +
+            " hasMonsterIdentity=" + (identity != null) +
+            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
+            " isBoss=" + (identity != null && identity.rank == MonsterRank.Boss) +
+            " acceptedTarget=" + acceptedTarget +
+            " rejectReason=" + rejectReason +
+            " damageBeforeModifiers=" + damageBeforeModifiers.ToString("F2") +
+            " damageAfterModifiers=" + damageAfterModifiers.ToString("F2") +
+            " TakeDamageCalled=" + takeDamageCalled +
+            " actualDamage=" + actualDamage.ToString("F2");
     }
 
     private float ResolvePlayerCurrentHealth()

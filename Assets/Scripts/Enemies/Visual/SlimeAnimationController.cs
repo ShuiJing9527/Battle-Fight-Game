@@ -199,6 +199,21 @@ public class SlimeAnimationController : MonoBehaviour
         currentMoveSpeed = 0f;
     }
 
+    public void SetFacingRight(bool desiredFacingRight, string source = "External")
+    {
+        if (slimeSpriteRenderer == null)
+        {
+            ResolveVisualReferences();
+        }
+
+        if (slimeSpriteRenderer == null)
+        {
+            return;
+        }
+
+        ApplyFacing(desiredFacingRight, source);
+    }
+
     public void SetVisualBaseScale(Vector3 newBaseScale)
     {
         if (visualRoot == null)
