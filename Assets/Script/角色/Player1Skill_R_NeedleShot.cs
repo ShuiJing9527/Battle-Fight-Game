@@ -570,9 +570,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         float closeRadius = Mathf.Max(0f, thrustCloseRangeRadius);
         Vector3 closeCenter = originPosition + facing * Mathf.Max(0f, thrustCloseRangeForwardOffset);
 
-        Collider[] boxHits = Physics.OverlapBox(center, halfExtents, orientation, thrustHitLayers, QueryTriggerInteraction.Collide);
+        int physicsQueryMask = ~0;
+        Collider[] boxHits = Physics.OverlapBox(center, halfExtents, orientation, physicsQueryMask, QueryTriggerInteraction.Collide);
         Collider[] closeHits = closeRadius > 0f
-            ? Physics.OverlapSphere(closeCenter, closeRadius, thrustHitLayers, QueryTriggerInteraction.Collide)
+            ? Physics.OverlapSphere(closeCenter, closeRadius, physicsQueryMask, QueryTriggerInteraction.Collide)
             : System.Array.Empty<Collider>();
         Collider[] closeHitsUnfiltered = debugRHitDetection && closeRadius > 0f
             ? Physics.OverlapSphere(closeCenter, closeRadius, ~0, QueryTriggerInteraction.Collide)
@@ -589,15 +590,15 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
                 $"[Player01RHitDetection] castId={currentCastId} event=ApplyThrustDamage entered scriptInstance={GetInstanceID()} playerPos={transform.position} " +
                 $"origin={(thrustOrigin != null ? thrustOrigin.name : "transform")} originPos={originPosition} facing={facing} boxCenter={center} hitHalfExtents={halfExtents} " +
                 $"orientationEuler={orientation.eulerAngles} originalRange={originalRange:F2} forwardOffset={forwardOffset:F2} closeCenter={closeCenter} closeRadius={closeRadius:F2} " +
-                $"layerMaskValue={thrustHitLayers.value} boxColliderCount={boxHits.Length} closeColliderCount={closeHits.Length} debugAllLayerCloseColliderCount={closeHitsUnfiltered.Length} " +
+                $"configuredTargetLayerMask={thrustHitLayers.value} physicsQueryMask={physicsQueryMask} boxColliderCount={boxHits.Length} closeColliderCount={closeHits.Length} debugAllLayerCloseColliderCount={closeHitsUnfiltered.Length} " +
                 $"thrustPhysicalTheoretical={thrustPhysicalDamage:F2} thrustSpecialTheoretical={thrustSpecialDamage:F2}",
                 this);
         }
 
         LogDiagnosticColliders(closeHitsUnfiltered, closeCenter, closeRadius);
 
-        ProcessThrustHitColliders(boxHits, "Box", thrustPhysicalDamage, thrustSpecialDamage);
-        ProcessThrustHitColliders(closeHits, "CloseRange", thrustPhysicalDamage, thrustSpecialDamage);
+        ProcessThrustHitColliders(boxHits, "Box", thrustPhysicalDamage, thrustSpecialDamage, physicsQueryMask);
+        ProcessThrustHitColliders(closeHits, "CloseRange", thrustPhysicalDamage, thrustSpecialDamage, physicsQueryMask);
 
         if (debugRHitDetection && thrustDamagedTargets.Count <= 0)
         {
@@ -671,7 +672,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         return builder.ToString();
     }
 
-    private void ProcessThrustHitColliders(Collider[] hits, string sourceLabel, float thrustPhysicalDamage, float thrustSpecialDamage)
+    private void ProcessThrustHitColliders(Collider[] hits, string sourceLabel, float thrustPhysicalDamage, float thrustSpecialDamage, int physicsQueryMask)
     {
         if (hits == null)
         {
@@ -690,7 +691,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
                 continue;
             }
 
-            bool inLayerMask = ((1 << hit.gameObject.layer) & thrustHitLayers.value) != 0;
+            bool inLayerMask = ((1 << hit.gameObject.layer) & physicsQueryMask) != 0;
             CombatHealth parentCombatHealth = hit.GetComponentInParent<CombatHealth>();
 
             if (!BattleTargetUtility.TryGetMonsterCombatHealth(hit, transform, out CombatHealth combatHealth, out string rejectReason))
@@ -699,7 +700,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
                 {
                     Debug.Log(
                         $"[Player01RHitDetection] castId={currentCastId} event=ColliderSkipped source={sourceLabel} reason={rejectReason} collider={hit.name} " +
-                        $"root={hit.transform.root.name} layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inLayerMask={inLayerMask} isTrigger={hit.isTrigger} " +
+                        $"root={hit.transform.root.name} layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inQueryMask={inLayerMask} isTrigger={hit.isTrigger} " +
                         $"activeSelf={hit.gameObject.activeSelf} activeInHierarchy={hit.gameObject.activeInHierarchy} enabled={hit.enabled} " +
                         $"parentCombatHealth={(parentCombatHealth != null ? parentCombatHealth.name : "null")} boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max}",
                         this);
@@ -722,7 +723,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             {
                 Debug.Log(
                     $"[Player01RHitDetection] castId={currentCastId} event=ColliderAccepted source={sourceLabel} collider={hit.name} target={combatHealth.name} " +
-                    $"layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inLayerMask={inLayerMask} isTrigger={hit.isTrigger} boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max}",
+                    $"layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inQueryMask={inLayerMask} isTrigger={hit.isTrigger} boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max}",
                     this);
             }
 

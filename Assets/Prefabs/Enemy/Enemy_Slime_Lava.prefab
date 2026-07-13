@@ -114,7 +114,7 @@ GameObject:
   - component: {fileID: -5952770145733681834}
   - component: {fileID: -4545700748075916047}
   - component: {fileID: 9023344556677889931}
-  m_Layer: 7
+  m_Layer: 0
   m_Name: Enemy_Slime_Lava
   m_TagString: Untagged
   m_Icon: {fileID: 0}
