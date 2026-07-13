@@ -47,10 +47,15 @@ public class RuneDropSettings : ScriptableObject
 
     public int RollRuneDropCount(MonsterRank rank, float luck)
     {
-        return RollRuneDropCount(rank, luck, out _);
+        return RollRuneDropCount(rank, luck, 0, out _);
     }
 
     public int RollRuneDropCount(MonsterRank rank, float luck, out float? eliteRoll)
+    {
+        return RollRuneDropCount(rank, luck, 0, out eliteRoll);
+    }
+
+    public int RollRuneDropCount(MonsterRank rank, float luck, int ownedRuneCount, out float? eliteRoll)
     {
         eliteRoll = null;
         if (rank == MonsterRank.Normal)
@@ -60,12 +65,12 @@ public class RuneDropSettings : ScriptableObject
 
         if (rank == MonsterRank.Elite)
         {
-            return RollEliteRuneDropCount(out eliteRoll);
+            return RollEliteRuneDropCount(ownedRuneCount, out eliteRoll);
         }
 
         int baseCount = GetBaseRuneDropCount(rank);
         int maxCount = GetMaxRuneDropCount(rank);
-        float extraChance = GetEffectiveExtraRuneDropChance(rank, luck);
+        float extraChance = GetEffectiveExtraRuneDropChance(rank, luck, ownedRuneCount);
         int count = baseCount;
         int extraRollCount = GetExtraRollCount(rank);
         for (int i = 0; i < extraRollCount && count < maxCount; i++)
@@ -141,11 +146,12 @@ public class RuneDropSettings : ScriptableObject
         return highRuneDropTestMode ? 1f : Mathf.Max(0f, normalRuneDropRateMultiplier);
     }
 
-    private float GetEffectiveExtraRuneDropChance(MonsterRank rank, float luck)
+    private float GetEffectiveExtraRuneDropChance(MonsterRank rank, float luck, int ownedRuneCount)
     {
         float rankChance = GetRankExtraChance(rank);
         float luckChance = Mathf.Min(GetExtraRuneDropChanceForLuck(luck), Mathf.Max(0f, maxExtraRuneDropChanceFromLuck));
-        return Mathf.Clamp01((rankChance + luckChance) * GetRuneDropRateMultiplier());
+        float baseChance = Mathf.Clamp01((rankChance + luckChance) * GetRuneDropRateMultiplier());
+        return ApplyOwnedRuneDropDecay(baseChance, ownedRuneCount);
     }
 
     private int GetBaseRuneDropCount(MonsterRank rank)
@@ -198,16 +204,18 @@ public class RuneDropSettings : ScriptableObject
         };
     }
 
-    private int RollEliteRuneDropCount(out float? eliteRoll)
+    private int RollEliteRuneDropCount(int ownedRuneCount, out float? eliteRoll)
     {
         float roll = Random.value;
         eliteRoll = roll;
-        if (roll < 0.05f)
+        float thirdRuneChance = ApplyOwnedRuneDropDecay(0.05f, ownedRuneCount);
+        if (roll < thirdRuneChance)
         {
             return 3;
         }
 
-        if (roll < 0.35f)
+        float secondOrThirdRuneChance = ApplyOwnedRuneDropDecay(0.35f, ownedRuneCount);
+        if (roll < secondOrThirdRuneChance)
         {
             return 2;
         }
@@ -255,5 +263,12 @@ public class RuneDropSettings : ScriptableObject
         }
 
         return RuneType.None;
+    }
+
+    private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)
+    {
+        float minimumChance = Mathf.Min(baseRuneDropChance, 0.05f);
+        float reducedChance = baseRuneDropChance - Mathf.Max(0, ownedRuneCount) * 0.05f;
+        return Mathf.Clamp(reducedChance, minimumChance, baseRuneDropChance);
     }
 }

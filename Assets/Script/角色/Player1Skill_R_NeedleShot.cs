@@ -7,6 +7,9 @@ using UnityEngine.Serialization;
 
 public class Player1Skill_R_NeedleShot : Player01SkillBase
 {
+    private const float NightBuffDamageMultiplier = 1.15f;
+    private const float NightBuffExtraCooldownRefundRatio = 0.15f;
+
     [Header("R - Resources")]
     [Tooltip("Base mana cost before any future mana cost modifiers are applied.")]
     [SerializeField, Min(0f)] private float baseManaCost = 60f;
@@ -103,6 +106,10 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private float currentTotalActualDamage;
     private float currentTotalHealAmount;
     private float currentTotalCooldownReduction;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
+    private bool nightBuffDamageLoggedThisCast;
+    private bool nightBuffExtraCooldownRefundTriggered;
 
     private void Reset()
     {
@@ -209,6 +216,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         currentTotalActualDamage = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
+        nightBuffDamageLoggedThisCast = false;
+        nightBuffExtraCooldownRefundTriggered = false;
         ClearDestroyedNeedles();
         castFacingSign = ResolveFacingSign();
         Controller?.SetMovementInputLocked(true, "Player01 R");
@@ -719,6 +729,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         currentTotalActualDamage = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
+        nightChildStateActiveThisCast = false;
+        nightBuffDamageLoggedThisCast = false;
+        nightBuffExtraCooldownRefundTriggered = false;
         castRoutine = null;
         if (destroyActiveNeedles)
         {
@@ -763,6 +776,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
         float resolvedPhysicalDamage = Mathf.Max(0f, physicalDamage + runeBonusDamage);
         float resolvedSpecialDamage = Mathf.Max(0f, specialDamage);
+        float skillDamageTakenMultiplier = PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
+        resolvedPhysicalDamage *= skillDamageTakenMultiplier;
+        resolvedSpecialDamage *= skillDamageTakenMultiplier;
+        float skillDamageMultiplier = ResolveActiveSkillDamageMultiplier();
+        resolvedPhysicalDamage *= skillDamageMultiplier;
+        resolvedSpecialDamage *= skillDamageMultiplier;
 
         if (resolvedPhysicalDamage > 0f)
         {
@@ -776,6 +795,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
         float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
         runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
+        NotifySkillDamageApplied(actualDamage, combatHealth, "R thrust");
         RegisterDamageResult(combatHealth, actualDamage, actualDamage > 0f && combatHealth.IsDead);
     }
 
@@ -810,6 +830,37 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             currentKillCount++;
             currentTotalCooldownReduction += cooldownReductionPerKill;
             ApplyKillCooldownReduction();
+            TryApplyNightBuffExtraCooldownRefund();
+        }
+    }
+
+    public float ResolveActiveSkillDamageMultiplier()
+    {
+        float multiplier = 1f;
+        if (nightChildStateActiveThisCast)
+        {
+            multiplier *= NightBuffDamageMultiplier;
+            if (!nightBuffDamageLoggedThisCast)
+            {
+                nightBuffDamageLoggedThisCast = true;
+                Debug.Log($"[SecondBuffDebug] Player01 R night buff damage bonus active x{NightBuffDamageMultiplier:F2}.", this);
+            }
+        }
+
+        PlayerTimedSkillDamageBoostStatus timedSkillDamageBoost = PlayerTimedSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
+        if (timedSkillDamageBoost != null)
+        {
+            multiplier *= timedSkillDamageBoost.Multiplier;
+        }
+
+        return multiplier;
+    }
+
+    public void NotifySkillDamageApplied(float actualDamage, CombatHealth target, string sourceLabel)
+    {
+        if (actualDamage <= 0f)
+        {
+            return;
         }
     }
 
@@ -827,6 +878,32 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         {
             Debug.Log($"[Player01 R] kill cooldown reduction applied -{cooldownReductionPerKill:F2}s => remaining={remaining:F2}", this);
         }
+    }
+
+    private void TryApplyNightBuffExtraCooldownRefund()
+    {
+        if (!nightChildStateActiveThisCast || nightBuffExtraCooldownRefundTriggered || SkillResource == null)
+        {
+            return;
+        }
+
+        float currentRemainingCooldown = SkillResource.GetCurrentSkillCD(SkillIndex);
+        if (currentRemainingCooldown <= 0f)
+        {
+            return;
+        }
+
+        float extraRefund = currentRemainingCooldown * NightBuffExtraCooldownRefundRatio;
+        if (extraRefund <= 0f)
+        {
+            return;
+        }
+
+        float remaining = SkillResource.ReduceCurrentSkillCooldown(SkillIndex, extraRefund);
+        Controller?.SyncSkillHudCooldown("R");
+        currentTotalCooldownReduction += extraRefund;
+        nightBuffExtraCooldownRefundTriggered = true;
+        Debug.Log($"[SecondBuffDebug] Player01 R night buff extra cooldown refund applied -{extraRefund:F2}s => remaining={remaining:F2}.", this);
     }
 
     private int ResolveNeedleCount()

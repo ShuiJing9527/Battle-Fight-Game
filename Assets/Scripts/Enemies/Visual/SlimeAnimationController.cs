@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using UnityEngine;
 using UnityEngine.Events;
+using UnityEngine.Serialization;
 
 [DisallowMultipleComponent]
 public class SlimeAnimationController : MonoBehaviour
@@ -11,8 +12,15 @@ public class SlimeAnimationController : MonoBehaviour
 
     [Header("Visual Binding")]
     [SerializeField] private Transform visualRoot;
-    [SerializeField] private SpriteRenderer visualSpriteRenderer;
+    [FormerlySerializedAs("visualSpriteRenderer")]
+    [SerializeField] private SpriteRenderer slimeSpriteRenderer;
     [SerializeField] private bool autoBindVisualByName = true;
+
+    [Header("Facing")]
+    [SerializeField] private bool enableAutoFlip = true;
+    [SerializeField] private bool spriteDefaultFacesLeft = true;
+    [SerializeField, Min(0f)] private float facingDeadZone = 0.05f;
+    [SerializeField] private bool debugFacing = false;
 
     [Header("Move - Slime Move Wobble")]
     [SerializeField] private float moveWobbleSpeed = 9f;
@@ -52,6 +60,44 @@ public class SlimeAnimationController : MonoBehaviour
     public AttackHitEvent onAttackHit = new AttackHitEvent();
     public bool IsAttacking => isAttacking;
     public bool IsDying => isDying;
+    public Transform VisualRoot => visualRoot != null ? visualRoot : transform;
+    public bool IsVisualPresentationVisible
+    {
+        get
+        {
+            Transform resolvedVisualRoot = VisualRoot;
+            if (resolvedVisualRoot == null || !resolvedVisualRoot.gameObject.activeInHierarchy)
+            {
+                return false;
+            }
+
+            if (slimeSpriteRenderer != null)
+            {
+                return slimeSpriteRenderer.gameObject.activeInHierarchy
+                    && slimeSpriteRenderer.enabled
+                    && slimeSpriteRenderer.color.a > 0.01f;
+            }
+
+            Renderer[] renderers = resolvedVisualRoot.GetComponentsInChildren<Renderer>(true);
+            bool hasRenderer = false;
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer renderer = renderers[i];
+                if (renderer == null)
+                {
+                    continue;
+                }
+
+                hasRenderer = true;
+                if (renderer.enabled && renderer.gameObject.activeInHierarchy)
+                {
+                    return true;
+                }
+            }
+
+            return !hasRenderer;
+        }
+    }
     public float AttackWindup => Mathf.Max(0.01f, attackChargeTime);
     public float AttackRecovery => Mathf.Max(0.01f, attackRecoverTime);
     public float AttackAnimationDuration => Mathf.Max(0.01f, attackChargeTime) + Mathf.Max(0.01f, attackJumpTime) + Mathf.Max(0.01f, attackRecoverTime);
@@ -61,8 +107,12 @@ public class SlimeAnimationController : MonoBehaviour
     public bool AllowAttackForwardLeap => allowAttackForwardLeap;
     public bool AllowAttackVerticalLeap => allowAttackVerticalLeap;
     public float MaxAttackLeapDistance => maxAttackLeapDistance;
+    public Vector3 BaseVisualLocalScale => baseVisualLocalScale;
+    public Vector3 BaseVisualLocalPosition => baseVisualLocalPosition;
 
     private CombatHealth combatHealth;
+    private Rigidbody ownerRigidbody;
+    private EnemyController ownerEnemyController;
     private bool previousCombatDestroyOnDeath = true;
     private bool hookedHealth;
 
@@ -79,6 +129,8 @@ public class SlimeAnimationController : MonoBehaviour
 
     private bool isAttacking;
     private bool isDying;
+    private bool facingRight;
+    private bool hasFacingDirection;
     private Coroutine attackRoutine;
     private Coroutine deathRoutine;
 
@@ -88,12 +140,14 @@ public class SlimeAnimationController : MonoBehaviour
     {
         ResolveVisualReferences();
         CaptureVisualBaseState();
+        CacheOwnerReferences();
         EnsureDeathParticles();
         HookHealthEvents();
     }
 
     private void OnEnable()
     {
+        CacheOwnerReferences();
         if (!hookedHealth)
         {
             HookHealthEvents();
@@ -107,6 +161,8 @@ public class SlimeAnimationController : MonoBehaviour
 
     private void Update()
     {
+        UpdateFacing();
+
         if (isDying || isAttacking || visualRoot == null)
         {
             return;
@@ -141,6 +197,48 @@ public class SlimeAnimationController : MonoBehaviour
     {
         moveActive = false;
         currentMoveSpeed = 0f;
+    }
+
+    public void SetFacingRight(bool desiredFacingRight, string source = "External")
+    {
+        if (slimeSpriteRenderer == null)
+        {
+            ResolveVisualReferences();
+        }
+
+        if (slimeSpriteRenderer == null)
+        {
+            return;
+        }
+
+        ApplyFacing(desiredFacingRight, source);
+    }
+
+    public void SetVisualBaseScale(Vector3 newBaseScale)
+    {
+        if (visualRoot == null)
+        {
+            return;
+        }
+
+        baseVisualLocalScale = newBaseScale;
+        visualRoot.localScale = newBaseScale;
+
+        if (slimeSpriteRenderer != null && slimeSpriteRenderer.sprite != null)
+        {
+            spriteHalfHeightLocal = slimeSpriteRenderer.sprite.bounds.size.y * Mathf.Abs(baseVisualLocalScale.y) * 0.5f;
+        }
+    }
+
+    public void SetVisualBasePosition(Vector3 newBasePosition)
+    {
+        if (visualRoot == null)
+        {
+            return;
+        }
+
+        baseVisualLocalPosition = newBasePosition;
+        visualRoot.localPosition = newBasePosition;
     }
 
     public void PlayAttack(Transform target)
@@ -398,24 +496,24 @@ public class SlimeAnimationController : MonoBehaviour
             }
         }
 
-        if (visualSpriteRenderer == null && visualRoot != null)
+        if (slimeSpriteRenderer == null && visualRoot != null)
         {
-            visualSpriteRenderer = visualRoot.GetComponent<SpriteRenderer>();
+            slimeSpriteRenderer = visualRoot.GetComponent<SpriteRenderer>();
         }
 
-        if (visualSpriteRenderer == null)
+        if (slimeSpriteRenderer == null)
         {
-            visualSpriteRenderer = GetComponent<SpriteRenderer>();
+            slimeSpriteRenderer = GetComponent<SpriteRenderer>();
         }
 
-        if (visualSpriteRenderer == null)
+        if (slimeSpriteRenderer == null)
         {
-            visualSpriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            slimeSpriteRenderer = GetComponentInChildren<SpriteRenderer>();
         }
 
-        if (visualRoot == null && visualSpriteRenderer != null)
+        if (visualRoot == null && slimeSpriteRenderer != null)
         {
-            visualRoot = visualSpriteRenderer.transform;
+            visualRoot = slimeSpriteRenderer.transform;
         }
 
         if (visualRoot == null)
@@ -423,7 +521,7 @@ public class SlimeAnimationController : MonoBehaviour
             visualRoot = transform;
         }
 
-        if (visualSpriteRenderer == null)
+        if (slimeSpriteRenderer == null)
         {
             Debug.LogWarning("SlimeAnimationController could not find SpriteRenderer. Create a Visual child with SpriteRenderer or add SpriteRenderer on Enemy_Slime.", this);
         }
@@ -440,13 +538,101 @@ public class SlimeAnimationController : MonoBehaviour
         baseVisualLocalPosition = visualRoot.localPosition;
         baseVisualLocalRotation = visualRoot.localRotation;
 
-        if (visualSpriteRenderer != null)
+        if (slimeSpriteRenderer != null)
         {
-            baseVisualColor = visualSpriteRenderer.color;
-            if (visualSpriteRenderer.sprite != null)
+            baseVisualColor = slimeSpriteRenderer.color;
+            if (slimeSpriteRenderer.sprite != null)
             {
-                spriteHalfHeightLocal = visualSpriteRenderer.sprite.bounds.size.y * Mathf.Abs(baseVisualLocalScale.y) * 0.5f;
+                spriteHalfHeightLocal = slimeSpriteRenderer.sprite.bounds.size.y * Mathf.Abs(baseVisualLocalScale.y) * 0.5f;
             }
+        }
+    }
+
+    private void CacheOwnerReferences()
+    {
+        if (ownerRigidbody == null)
+        {
+            ownerRigidbody = GetComponent<Rigidbody>();
+        }
+
+        if (ownerEnemyController == null)
+        {
+            ownerEnemyController = GetComponent<EnemyController>();
+        }
+    }
+
+    private void UpdateFacing()
+    {
+        if (!enableAutoFlip || slimeSpriteRenderer == null)
+        {
+            return;
+        }
+
+        CacheOwnerReferences();
+
+        if (TryResolveFacingFromMoveDirection(out bool moveFacingRight))
+        {
+            ApplyFacing(moveFacingRight, "MoveDirection");
+            return;
+        }
+
+        if (TryResolveFacingFromTarget(out bool targetFacingRight))
+        {
+            ApplyFacing(targetFacingRight, "Target");
+        }
+    }
+
+    private bool TryResolveFacingFromMoveDirection(out bool desiredFacingRight)
+    {
+        desiredFacingRight = facingRight;
+        if (ownerRigidbody == null)
+        {
+            return false;
+        }
+
+        float horizontalVelocity = ownerRigidbody.linearVelocity.x;
+        if (Mathf.Abs(horizontalVelocity) <= Mathf.Max(0f, facingDeadZone))
+        {
+            return false;
+        }
+
+        desiredFacingRight = horizontalVelocity > 0f;
+        return true;
+    }
+
+    private bool TryResolveFacingFromTarget(out bool desiredFacingRight)
+    {
+        desiredFacingRight = facingRight;
+        Transform target = ownerEnemyController != null ? ownerEnemyController.CurrentTarget : null;
+        if (target == null)
+        {
+            return false;
+        }
+
+        float deltaX = target.position.x - transform.position.x;
+        if (Mathf.Abs(deltaX) <= Mathf.Max(0f, facingDeadZone))
+        {
+            return false;
+        }
+
+        desiredFacingRight = deltaX > 0f;
+        return true;
+    }
+
+    private void ApplyFacing(bool desiredFacingRight, string source)
+    {
+        if (hasFacingDirection && facingRight == desiredFacingRight)
+        {
+            return;
+        }
+
+        facingRight = desiredFacingRight;
+        hasFacingDirection = true;
+        slimeSpriteRenderer.flipX = spriteDefaultFacesLeft ? facingRight : !facingRight;
+
+        if (debugFacing)
+        {
+            Debug.Log($"[SlimeFacing] name={name} facingRight={facingRight} source={source}", this);
         }
     }
 
@@ -522,7 +708,7 @@ public class SlimeAnimationController : MonoBehaviour
 
     private void SetVisualAlpha(float alpha)
     {
-        if (visualSpriteRenderer == null)
+        if (slimeSpriteRenderer == null)
         {
             return;
         }
@@ -533,7 +719,7 @@ public class SlimeAnimationController : MonoBehaviour
             return;
         }
 
-        Color color = visualSpriteRenderer.color;
+        Color color = slimeSpriteRenderer.color;
         float clampedAlpha = Mathf.Clamp01(alpha);
         if (!isDying)
         {
@@ -541,17 +727,17 @@ public class SlimeAnimationController : MonoBehaviour
         }
 
         color.a = clampedAlpha;
-        visualSpriteRenderer.color = color;
+        slimeSpriteRenderer.color = color;
     }
 
     private float GetVisualAlpha()
     {
-        if (visualSpriteRenderer == null)
+        if (slimeSpriteRenderer == null)
         {
             return 1f;
         }
 
-        return visualSpriteRenderer.color.a;
+        return slimeSpriteRenderer.color.a;
     }
 
     private void RaiseAttackHit(Transform target)

@@ -7,6 +7,8 @@ using UnityEngine.Serialization;
 public class Player1Skill_E_BrokenDash : Player01SkillBase
 {
     private const float MoveSpeedEpsilon = 0.001f;
+    private const float NightBuffDurationMultiplier = 1.2f;
+    private const float NightBuffHealMultiplier = 1.5f;
     private static readonly string[] GroundLikeKeywords = { "ground", "floor", "terrain", "platform" };
     private static readonly string[] TerrainObstacleKeywords = { "wall", "airwall", "obstacle", "barrier", "block" };
     private static readonly string[] EnemyLikeKeywords = { "enemy", "monster", "elite", "boss", "slime" };
@@ -23,6 +25,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField, Min(0f)] private float eHealPerTick = 0f;
     [SerializeField, Range(0f, 1f)] private float eHealPercentPerSecond = 0.10f;
     [SerializeField, Min(0.01f)] private float eHealTickInterval = 0.5f;
+    [Header("E - Night Child Skill Boost")]
+    [SerializeField, Min(1f)] private float nightBuffPostDashSkillDamageMultiplier = 1.2f;
+    [SerializeField, Min(0f)] private float nightBuffPostDashSkillDamageBoostDuration = 5f;
 
     [Header("E - 灵体疾行 / 灵体状态")]
     [FormerlySerializedAs("ignoreObstacleCollision")]
@@ -64,6 +69,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private RigidbodyConstraints cachedRigidbodyConstraints;
     private float cachedGhostStartY;
     private bool hasGroundSafetyLock;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
 
     private void LateUpdate()
     {
@@ -87,6 +94,8 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         eDuration = 3f;
         eManaCost = 30f;
         eMoveSpeedMultiplier = 2.25f;
+        nightBuffPostDashSkillDamageMultiplier = 1.2f;
+        nightBuffPostDashSkillDamageBoostDuration = 5f;
         eHealPercentPerSecond = 0.10f;
         eHealTickInterval = 0.5f;
         eIgnoreTerrainCollision = true;
@@ -158,7 +167,9 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     {
         ResolvePlayerRuneRuntimeState();
         IsRunningBoost = true;
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
         SyncEStateConfig();
+        duration = Mathf.Max(0f, nightChildStateActiveThisCast ? eDuration * NightBuffDurationMultiplier : eDuration);
         BeginGroundSafetyLock();
         ApplySpeedBoost();
         ApplyTerrainCollisionIgnore(true);
@@ -166,6 +177,10 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostStateVisible(true);
         SetGhostShadowVisible(true);
         SetGhostParticlesVisible(true);
+        if (nightChildStateActiveThisCast)
+        {
+            Debug.Log($"[SecondBuffDebug] Player01 E night buff active. duration x{NightBuffDurationMultiplier:F2}, heal x{NightBuffHealMultiplier:F2}.", this);
+        }
         Debug.Log(
             $"Player01 E 灵体疾行：持续={eDuration:F2}，移速倍率={eMoveSpeedMultiplier:F2}，每秒回血={eHealPercentPerSecond:P0} MaxHP，免疫怪物物理攻击={eImmuneToMonsterPhysicalDamage}，CD={eCooldown:F2}，蓝耗={eManaCost:F2}",
             this);
@@ -204,6 +219,16 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         SetGhostStateVisible(false);
         SetGhostShadowVisible(false);
         SetGhostParticlesVisible(false);
+        if (nightChildStateActiveThisCast)
+        {
+            PlayerTimedSkillDamageBoostStatus.ApplyOrRefresh(
+                Controller != null ? Controller.gameObject : gameObject,
+                nightBuffPostDashSkillDamageMultiplier,
+                nightBuffPostDashSkillDamageBoostDuration);
+            Debug.Log($"[SecondBuffDebug] Player01 E granted timed skill damage boost x{nightBuffPostDashSkillDamageMultiplier:F2} for {nightBuffPostDashSkillDamageBoostDuration:F2}s.", this);
+        }
+
+        nightChildStateActiveThisCast = false;
         Debug.Log("Player01 E 灵体疾行结束，已恢复移动速度/碰撞/受击状态", this);
     }
 
@@ -333,6 +358,11 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         }
 
         float healAmount = maxHealth * eHealPercentPerSecond * deltaTime;
+        if (nightChildStateActiveThisCast)
+        {
+            healAmount *= NightBuffHealMultiplier;
+        }
+
         if (healAmount > 0f)
         {
             cachedCombatHealth.Heal(healAmount);
@@ -693,7 +723,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
         cachedRigidbodyConstraints = cachedRigidbody.constraints;
         cachedRigidbody.constraints = cachedRigidbodyConstraints | RigidbodyConstraints.FreezePositionY;
-        cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+        Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+        cachedRigidbody.linearVelocity = velocityAfterWrite;
+        PlayerMovement.LogVelocityWrite(
+            this,
+            nameof(Player1Skill_E_BrokenDash),
+            nameof(BeginGroundSafetyLock),
+            cachedRigidbody,
+            velocityBeforeWrite,
+            velocityAfterWrite,
+            "begin-ground-safety-lock",
+            "broken-dash-ground-lock",
+            "none",
+            "runtime");
         cachedRigidbody.angularVelocity = Vector3.zero;
     }
 
@@ -713,7 +756,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
 
         if (cachedRigidbody != null)
         {
-            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+            Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            cachedRigidbody.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player1Skill_E_BrokenDash),
+                nameof(EnforceGroundSafetyLock),
+                cachedRigidbody,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "enforce-ground-safety-lock",
+                "broken-dash-ground-lock",
+                "none",
+                "runtime");
         }
     }
 
@@ -729,7 +785,20 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
         if (cachedRigidbody != null)
         {
             cachedRigidbody.constraints = cachedRigidbodyConstraints;
-            cachedRigidbody.linearVelocity = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            Vector3 velocityBeforeWrite = cachedRigidbody.linearVelocity;
+            Vector3 velocityAfterWrite = new Vector3(cachedRigidbody.linearVelocity.x, 0f, cachedRigidbody.linearVelocity.z);
+            cachedRigidbody.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player1Skill_E_BrokenDash),
+                nameof(EndGroundSafetyLock),
+                cachedRigidbody,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "end-ground-safety-lock",
+                "broken-dash-ground-lock",
+                "none",
+                "runtime");
         }
 
         hasGroundSafetyLock = false;

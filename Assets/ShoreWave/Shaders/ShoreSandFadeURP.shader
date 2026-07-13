@@ -28,6 +28,14 @@ Shader "ShoreWave/Sand Fade URP"
         _ReceiveShadows ("Receive Shadows", Range(0.0, 1.0)) = 1.0
         _LightingStrength ("Lighting Strength", Range(0.0, 1.5)) = 1.0
         _MinimumAmbient ("Minimum Ambient", Range(0.0, 1.0)) = 0.08
+        _SpecularStrength ("Specular Strength", Range(0.0, 1.0)) = 0.24
+        _WetSmoothness ("Wet Smoothness", Range(0.0, 1.0)) = 0.78
+        _WetSpecularStrength ("Wet Specular Strength", Range(0.0, 2.0)) = 1.0
+        _SunGlintStrength ("Sun Glint Strength", Range(0.0, 3.0)) = 1.3
+        _NormalWetReflectionStrength ("Normal Wet Reflection Strength", Range(0.0, 1.0)) = 0.52
+        _WetColorStrength ("Wet Color Strength", Range(0.0, 0.25)) = 0.05
+        _BaseSandReflectionStrength ("Base Sand Reflection Strength", Range(0.0, 1.0)) = 0.36
+        _CoastalReflectionBoost ("Coastal Reflection Boost", Range(0.0, 1.0)) = 0.28
         _GrassBlendColor ("Grass Blend Color", Color) = (0.86, 0.84, 0.68, 1)
         _GrassBlendWidth ("Grass Blend Width", Range(0.0, 1.0)) = 0.0
         _GrassBlendStrength ("Grass Blend Strength", Range(0.0, 1.0)) = 0.0
@@ -107,6 +115,14 @@ Shader "ShoreWave/Sand Fade URP"
                 float _ReceiveShadows;
                 float _LightingStrength;
                 float _MinimumAmbient;
+                float _SpecularStrength;
+                float _WetSmoothness;
+                float _WetSpecularStrength;
+                float _SunGlintStrength;
+                float _NormalWetReflectionStrength;
+                float _WetColorStrength;
+                float _BaseSandReflectionStrength;
+                float _CoastalReflectionBoost;
                 float4 _GrassBlendColor;
                 float _GrassBlendWidth;
                 float _GrassBlendStrength;
@@ -149,10 +165,16 @@ Shader "ShoreWave/Sand Fade URP"
                 fade = smoothstep(0.0, 1.0, fade);
 
                 float edgeProximity = 1.0 - smoothstep(fadeStart - _FadeSoftness, fadeEnd + _FadeSoftness, distortedFadeAxis);
-                float wetMask = saturate((1.0 - fade) * 1.15 + edgeProximity * 0.45) * shoreFadeEnabled;
+                float wetMaskFromFade = saturate((1.0 - fade) * 1.15 + edgeProximity * 0.45);
+                // No-fade mode has no reliable shoreline axis, so keep a weak uniform wet mask
+                // instead of reusing distorted fade UV/noise, which creates repeating diagonal bands.
+                float wetMaskWithoutFade = 0.28;
+                float oceanSideMask = lerp(wetMaskWithoutFade, wetMaskFromFade, shoreFadeEnabled);
+                float coastalReflectionBoost = saturate(oceanSideMask * _CoastalReflectionBoost);
+                float wetSpecMask = saturate(_BaseSandReflectionStrength + coastalReflectionBoost);
 
                 float3 surfaceColor = sand.rgb * _SandTint.rgb * _Brightness;
-                float wetBlend = saturate(_WetSandStrength * wetMask);
+                float wetBlend = 0.0;
                 surfaceColor = lerp(surfaceColor, surfaceColor * _WetSandColor.rgb, wetBlend);
 
                 float grassTransitionSample = SAMPLE_TEXTURE2D(_GrassTransitionTex, sampler_GrassTransitionTex, input.uv).r;
@@ -171,29 +193,63 @@ Shader "ShoreWave/Sand Fade URP"
                 half3 normalWS = input.normalWS;
                 half normalLenSq = dot(normalWS, normalWS);
                 normalWS = (normalLenSq > 1e-4h) ? normalize(normalWS) : half3(0.0h, 1.0h, 0.0h);
-                normalWS = normalize(lerp(half3(0.0h, 1.0h, 0.0h), normalWS, saturate(_NormalStrength)));
+                half effectiveNormalStrength = saturate(lerp(_NormalStrength, _NormalStrength * 0.25h, wetSpecMask));
+                normalWS = normalize(lerp(half3(0.0h, 1.0h, 0.0h), normalWS, effectiveNormalStrength));
 
                 float4 shadowCoord = TransformWorldToShadowCoord(input.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
 
+                half3 lightDirWS = SafeNormalize(mainLight.direction);
+                half3 viewDirWS = SafeNormalize(GetWorldSpaceViewDir(input.positionWS));
+                half3 halfDirWS = SafeNormalize(lightDirWS + viewDirWS);
+
                 half receiveShadows = saturate(_ReceiveShadows);
                 half shadowAttenuation = lerp(1.0h, mainLight.shadowAttenuation, receiveShadows);
-                half3 ambient = SampleSH(normalWS);
-                ambient = max(ambient, surfaceColor * _MinimumAmbient);
-                half ndotl = saturate(dot(normalWS, mainLight.direction));
-                half3 diffuse = mainLight.color * ndotl * shadowAttenuation * saturate(_LightingStrength);
+                half lightAttenuation = mainLight.distanceAttenuation * shadowAttenuation;
 
-                half3 viewDir = normalize(_WorldSpaceCameraPos.xyz - input.positionWS);
-                half3 halfDir = normalize(mainLight.direction + viewDir);
-                half wetSmoothnessBoost = wetBlend * 0.08h;
-                half effectiveSmoothness = saturate(_Smoothness + wetSmoothnessBoost);
+                half3 indirectLighting = max(SampleSH(normalWS), half3(_MinimumAmbient, _MinimumAmbient, _MinimumAmbient));
+                half ndotl = saturate(dot(normalWS, lightDirWS));
+                half3 diffuseLighting =
+                    surfaceColor
+                    * mainLight.color
+                    * ndotl
+                    * lightAttenuation
+                    * saturate(_LightingStrength);
+
+                half effectiveSmoothness = saturate(lerp(_Smoothness, _WetSmoothness, wetSpecMask));
                 half effectiveMetallic = saturate(_Metallic);
-                half specPower = lerp(8.0h, 64.0h, effectiveSmoothness);
-                half specular = pow(saturate(dot(normalWS, halfDir)), specPower) * effectiveSmoothness;
-                half3 specularColor = lerp(half3(0.02h, 0.02h, 0.02h), surfaceColor, effectiveMetallic);
+                half drySpecularStrength = saturate(lerp(_SpecularStrength, _WetSpecularStrength, wetSpecMask));
+                half drySpecPower = lerp(8.0h, 96.0h, effectiveSmoothness);
+                half ndoth = saturate(dot(normalWS, halfDirWS));
+                half drySpecTerm = pow(ndoth, drySpecPower);
+                half3 specularColor = lerp(half3(0.10h, 0.09h, 0.075h), surfaceColor, effectiveMetallic);
+                half3 drySpecularLighting =
+                    mainLight.color
+                    * drySpecTerm
+                    * specularColor
+                    * drySpecularStrength
+                    * lightAttenuation;
 
-                half3 finalColor = surfaceColor * (ambient + diffuse);
-                finalColor += specularColor * specular * mainLight.color * shadowAttenuation * 0.08h;
+                half3 reflectedLightWS = reflect(-lightDirWS, normalWS);
+                half reflectionAlignment = saturate(dot(reflectedLightWS, viewDirWS));
+                half broadReflection =
+                    pow(reflectionAlignment, lerp(3.0h, 18.0h, saturate(_WetSmoothness)));
+                half sharpGlint =
+                    pow(reflectionAlignment, lerp(24.0h, 96.0h, saturate(_WetSmoothness)));
+                half wetSunGlintTerm = broadReflection * 0.85h + sharpGlint * 0.15h;
+                half3 wetSunReflection =
+                    mainLight.color
+                    * wetSunGlintTerm
+                    * wetSpecMask
+                    * _WetSpecularStrength
+                    * _SunGlintStrength
+                    * lightAttenuation;
+
+                half3 finalColor =
+                    surfaceColor * indirectLighting
+                    + diffuseLighting
+                    + drySpecularLighting
+                    + wetSunReflection;
                 return half4(finalColor, alpha);
             }
             ENDHLSL

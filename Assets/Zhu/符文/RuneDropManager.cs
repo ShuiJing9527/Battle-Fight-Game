@@ -91,30 +91,32 @@ public class RuneDropManager : MonoBehaviour
         return dropSettings != null ? dropSettings.GetRandomRune(runeLibrary) : runeLibrary.GetRandomRune();
     }
 
-    public int RollRuneDropCount(MonsterRank rank, float luck)
+    public int RollRuneDropCount(MonsterRank rank, float luck, int ownedRuneCount)
     {
         if (dropSettings != null)
         {
             float? eliteRoll;
-            int settingsCount = NormalizeDropCount(rank, dropSettings.RollRuneDropCount(rank, luck, out eliteRoll));
+            int settingsCount = NormalizeDropCount(rank, dropSettings.RollRuneDropCount(rank, luck, ownedRuneCount, out eliteRoll));
             Debug.Log(
-                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={settingsCount} eliteRoll={(eliteRoll.HasValue ? eliteRoll.Value.ToString("F4") : "n/a")} settings={(dropSettings != null ? dropSettings.name : "null")} highRuneDropTestMode={(dropSettings != null ? dropSettings.IsHighRuneDropTestMode : false)}",
+                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={settingsCount} eliteRoll={(eliteRoll.HasValue ? eliteRoll.Value.ToString("F4") : "n/a")} settings={(dropSettings != null ? dropSettings.name : "null")} highRuneDropTestMode={(dropSettings != null ? dropSettings.IsHighRuneDropTestMode : false)}",
                 this);
             return settingsCount;
         }
 
         if (rank == MonsterRank.Normal)
         {
-            Debug.Log("[RuneDropManagerDiag] rank=Normal luck=0.00 finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true", this);
+            Debug.Log($"[RuneDropManagerDiag] rank=Normal luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true", this);
             return 0;
         }
 
         if (rank == MonsterRank.Elite)
         {
             float eliteRoll = Random.value;
-            int eliteCount = NormalizeDropCount(rank, eliteRoll < 0.05f ? 3 : (eliteRoll < 0.35f ? 2 : 1));
+            float thirdRuneChance = ApplyOwnedRuneDropDecay(0.05f, ownedRuneCount);
+            float secondOrThirdRuneChance = ApplyOwnedRuneDropDecay(0.35f, ownedRuneCount);
+            int eliteCount = NormalizeDropCount(rank, eliteRoll < thirdRuneChance ? 3 : (eliteRoll < secondOrThirdRuneChance ? 2 : 1));
             Debug.Log(
-                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={eliteCount} eliteRoll={eliteRoll:F4} settings=null highRuneDropTestMode=true",
+                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={eliteCount} eliteRoll={eliteRoll:F4} settings=null highRuneDropTestMode=true",
                 this);
             return eliteCount;
         }
@@ -122,7 +124,8 @@ public class RuneDropManager : MonoBehaviour
         int baseCount = 2;
         int maxCount = 6;
         int extraRollCount = 4;
-        float extraChance = Mathf.Clamp01(Mathf.Max(0f, luck - 1f) * 0.03f);
+        float baseExtraChance = Mathf.Clamp01(Mathf.Max(0f, luck - 1f) * 0.03f);
+        float extraChance = ApplyOwnedRuneDropDecay(baseExtraChance, ownedRuneCount);
         int count = baseCount;
         for (int i = 0; i < extraRollCount && count < maxCount; i++)
         {
@@ -140,7 +143,7 @@ public class RuneDropManager : MonoBehaviour
 
         int finalCount = NormalizeDropCount(rank, ClampRuneDropCountByRank(rank, count));
         Debug.Log(
-            $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} finalRuneCount={finalCount} eliteRoll=n/a settings=null highRuneDropTestMode=true",
+            $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={finalCount} eliteRoll=n/a settings=null highRuneDropTestMode=true",
             this);
         return finalCount;
     }
@@ -163,6 +166,13 @@ public class RuneDropManager : MonoBehaviour
             MonsterRank.Elite => Mathf.Clamp(count, 1, 3),
             _ => 0
         };
+    }
+
+    private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)
+    {
+        float minimumChance = Mathf.Min(baseRuneDropChance, 0.05f);
+        float reducedChance = baseRuneDropChance - Mathf.Max(0, ownedRuneCount) * 0.05f;
+        return Mathf.Clamp(reducedChance, minimumChance, baseRuneDropChance);
     }
 
     private GameObject GetDropPrefabObjectForRune(RuneDefinition rune)

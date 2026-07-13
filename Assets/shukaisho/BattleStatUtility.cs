@@ -5,8 +5,10 @@ public static class BattleStatUtility
     public const float ActualMoveSpeedCap = 30f;
     public const float PlayerExcessMoveSpeedDamageBonusPerPoint = 0.01f;
     public const float MaxFinalEvasionChance = 0.50f;
-    public const float MinFinalHitChance = 0.50f;
-    public const float MinBossFinalHitChance = 0.60f;
+    public const float MinNormalMonsterHitChanceAgainstPlayer = 0.65f;
+    public const float MinEliteMonsterHitChanceAgainstPlayer = 0.75f;
+    public const float MinBossMonsterHitChanceAgainstPlayer = 0.85f;
+    public const float MinFinalBossHitChanceAgainstPlayer = 0.90f;
     public const float MaxFinalHitChance = 0.95f;
     private const float BaseEvasionChance = 0.05f;
     private const float SpeedMoveBonusPerPoint = 0.0075f;
@@ -321,7 +323,7 @@ public static class BattleStatUtility
 
         if (attacker == null)
         {
-            return MinFinalHitChance;
+            return MinNormalMonsterHitChanceAgainstPlayer;
         }
 
         if (!BattleTargetUtility.IsMonster(attacker))
@@ -329,7 +331,52 @@ public static class BattleStatUtility
             return 0f;
         }
 
-        return IsBossLikeMonster(attacker) ? MinBossFinalHitChance : MinFinalHitChance;
+        return ResolveMonsterMinimumHitChanceAgainstPlayer(attacker);
+    }
+
+    private static float ResolveMonsterMinimumHitChanceAgainstPlayer(GameObject attacker)
+    {
+        if (attacker == null)
+        {
+            return MinNormalMonsterHitChanceAgainstPlayer;
+        }
+
+        MonsterIdentity identity = attacker.GetComponent<MonsterIdentity>();
+        if (identity == null)
+        {
+            identity = attacker.GetComponentInParent<MonsterIdentity>();
+        }
+
+        if (IsFinalBossMonster(attacker))
+        {
+            return MinFinalBossHitChanceAgainstPlayer;
+        }
+
+        if (identity == null)
+        {
+            return MinNormalMonsterHitChanceAgainstPlayer;
+        }
+
+        switch (identity.rank)
+        {
+            case MonsterRank.Boss:
+                return MinBossMonsterHitChanceAgainstPlayer;
+            case MonsterRank.Elite:
+                return MinEliteMonsterHitChanceAgainstPlayer;
+            default:
+                return MinNormalMonsterHitChanceAgainstPlayer;
+        }
+    }
+
+    private static bool IsFinalBossMonster(GameObject owner)
+    {
+        if (owner == null)
+        {
+            return false;
+        }
+
+        return owner.GetComponent<CleanupBossPhaseSplit>() != null
+               || owner.GetComponentInParent<CleanupBossPhaseSplit>() != null;
     }
 
     public static bool IsBossLikeMonster(GameObject owner)

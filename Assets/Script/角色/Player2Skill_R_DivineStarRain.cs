@@ -5,6 +5,9 @@ using UnityEngine.Serialization;
 
 public class Player2Skill_R_DivineStarRain : PlayerSkillBase
 {
+    private const float DayBuffDamageMultiplier = 1.15f;
+    private const float DayBuffAuraHealMultiplier = 1.3f;
+    private const float DayBuffMarkedDamageMultiplier = 1.2f;
     [Header("R - 神眷剑涌 / 核心参数")]
     [SerializeField, Min(0f)] private float cooldown = 15f;
     [SerializeField, Min(0f)] private float manaCost = 60f;
@@ -258,6 +261,10 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private int currentROverflowStarBladeCount;
     private int currentROverflowBonusDamage;
     private int remainingRVisibleStarBladeSpawnBudget;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
+    private bool dayBuffDamageLoggedThisCast;
+    private bool dayBuffAuraHealLoggedThisCast;
     protected override int SkillIndex => 3;
 
     public override float CooldownSeconds => cooldown;
@@ -303,6 +310,9 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         currentROverflowBonusDamage = 0;
         remainingRVisibleStarBladeSpawnBudget = 0;
         activeRuneCastId = -1;
+        dayChildStateActiveThisCast = false;
+        dayBuffDamageLoggedThisCast = false;
+        dayBuffAuraHealLoggedThisCast = false;
         ResetRuneCastContext();
         CleanupRSwarmVisuals();
         CleanupRStarRainVisuals();
@@ -353,6 +363,9 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float finalDuration = ResolveFinalSwarmDuration(totalStarBladeCount);
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
+        dayBuffDamageLoggedThisCast = false;
+        dayBuffAuraHealLoggedThisCast = false;
         PrepareRuneCastContext();
         activeRuneCastId = CurrentRuneCastId;
         if (rSwarmDebugLog)
@@ -978,6 +991,15 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         }
 
         float healValue = maxHp * Mathf.Max(0f, rAuraHealPercentOfMaxHp);
+        if (dayChildStateActiveThisCast)
+        {
+            healValue *= DayBuffAuraHealMultiplier;
+            if (!dayBuffAuraHealLoggedThisCast)
+            {
+                dayBuffAuraHealLoggedThisCast = true;
+                Debug.Log($"[SecondBuffDebug] Player02 R day buff aura heal bonus active x{DayBuffAuraHealMultiplier:F2}.", this);
+            }
+        }
         int healAmount = Mathf.Max(1, Mathf.RoundToInt(healValue));
 
         if (rAuraHealCanOverMaxHp)
@@ -1132,6 +1154,22 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                     specialFromSpecialAttackScaling,
                     damageMultiplier);
                 damageAmount += ConsumeRuneFirstHitBonusDamage();
+                if (dayChildStateActiveThisCast)
+                {
+                    damageAmount *= DayBuffDamageMultiplier;
+                    if (!dayBuffDamageLoggedThisCast)
+                    {
+                        dayBuffDamageLoggedThisCast = true;
+                        Debug.Log($"[SecondBuffDebug] Player02 R day buff damage bonus active x{DayBuffDamageMultiplier:F2}.", this);
+                    }
+                }
+
+                if (dayChildStateActiveThisCast && RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus radianceMark) && radianceMark.Consume())
+                {
+                    damageAmount *= DayBuffMarkedDamageMultiplier;
+                    Debug.Log($"[SecondBuffDebug] Player02 R consumed RadianceMark on {targetRoot.name} and applied x{DayBuffMarkedDamageMultiplier:F2}.", this);
+                }
+
                 float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
                 if (debugCriticalLog)
                 {

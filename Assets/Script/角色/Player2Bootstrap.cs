@@ -294,7 +294,20 @@ public class Player2Bootstrap : MonoBehaviour
         Rigidbody nextRb = nextActive.GetComponent<Rigidbody>();
         if (nextRb != null)
         {
-            nextRb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = nextRb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            nextRb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player2Bootstrap),
+                nameof(SetActivePlayer),
+                nextRb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "switch-sync-zero-velocity",
+                "no-active-skill",
+                "switching-active-player",
+                "runtime");
             nextRb.angularVelocity = Vector3.zero;
         }
 

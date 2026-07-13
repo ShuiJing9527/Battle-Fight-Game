@@ -2,6 +2,8 @@ using UnityEngine;
 
 public class EliteSlimeSplitOnDeath : MonoBehaviour
 {
+    private const string TestMonsterSuffixToken = "[MonsterTest_";
+
     [Header("Elite Split")]
     [Tooltip("How many normal slime children an elite slime spawns on death. 0 disables elite splitting.")]
     [SerializeField, Min(0)] private int splitCount = 2;
@@ -36,9 +38,15 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
     [Tooltip("Print a one-shot [BossSplit] log when boss split is evaluated or triggered.")]
     [SerializeField] private bool debugSplitLogs = false;
 
+    private EnemySpawner spawner;
     private CombatHealth combatHealth;
     private bool deathBound;
     private bool splitTriggered;
+
+    public void Initialize(EnemySpawner owner)
+    {
+        spawner = owner;
+    }
 
     private void OnEnable()
     {
@@ -95,9 +103,37 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
             return;
         }
 
-        EnemySpawner spawner = FindObjectOfType<EnemySpawner>();
-        if (spawner == null)
+        EnemySpawner resolvedSpawner = spawner;
+        if (resolvedSpawner == null)
         {
+            resolvedSpawner = FindObjectOfType<EnemySpawner>();
+            spawner = resolvedSpawner;
+        }
+
+        EnemyDeathNotifier notifier = GetComponent<EnemyDeathNotifier>();
+        bool isTestMonster = name.Contains(TestMonsterSuffixToken);
+        bool hasDeathNotifier = notifier != null;
+        bool registeredToSpawner = notifier != null && notifier.HasSpawner;
+        bool splitEnabled = identity.rank == MonsterRank.Elite ? splitCount > 0 : bossCanSplit && bossSplitCount > 0;
+        int resolvedSplitCount = identity.rank == MonsterRank.Elite ? splitCount : bossSplitCount;
+        MonsterRank resolvedChildRank = identity.rank == MonsterRank.Elite ? MonsterRank.Normal : bossSplitChildRank;
+
+        if (resolvedSpawner == null)
+        {
+            Debug.Log(
+                "[EliteSplitDebug] " +
+                "enemy=" + name +
+                " rank=" + identity.rank +
+                " isTestMonster=" + isTestMonster +
+                " death notifier exists=" + hasDeathNotifier +
+                " registered to spawner=" + registeredToSpawner +
+                " split enabled=" + splitEnabled +
+                " split count=" + resolvedSplitCount +
+                " split child rank=" + resolvedChildRank +
+                " externalTestPauseActive=false" +
+                " willSpawnSplitChildren=false" +
+                " blockReason=SpawnerMissing",
+                this);
             Debug.LogWarning($"[EliteSlimeSplitOnDeath] No EnemySpawner found. Elite slime '{name}' could not split.", this);
             return;
         }
@@ -106,11 +142,40 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
         {
             if (splitCount <= 0)
             {
+                Debug.Log(
+                    "[EliteSplitDebug] " +
+                    "enemy=" + name +
+                    " rank=" + identity.rank +
+                    " isTestMonster=" + isTestMonster +
+                    " death notifier exists=" + hasDeathNotifier +
+                    " registered to spawner=" + registeredToSpawner +
+                    " split enabled=" + splitEnabled +
+                    " split count=" + resolvedSplitCount +
+                    " split child rank=" + resolvedChildRank +
+                    " externalTestPauseActive=" + resolvedSpawner.IsExternalTestPauseActive +
+                    " willSpawnSplitChildren=false" +
+                    " blockReason=SplitCountZero",
+                    this);
                 return;
             }
 
+            Debug.Log(
+                "[EliteSplitDebug] " +
+                "enemy=" + name +
+                " rank=" + identity.rank +
+                " isTestMonster=" + isTestMonster +
+                " death notifier exists=" + hasDeathNotifier +
+                " registered to spawner=" + registeredToSpawner +
+                " split enabled=" + splitEnabled +
+                " split count=" + resolvedSplitCount +
+                " split child rank=" + resolvedChildRank +
+                " externalTestPauseActive=" + resolvedSpawner.IsExternalTestPauseActive +
+                " willSpawnSplitChildren=true" +
+                " blockReason=None",
+                this);
+
             splitTriggered = true;
-            spawner.SpawnSplitNormalsFromElite(gameObject, splitCount, splitScatterRadius);
+            resolvedSpawner.SpawnSplitNormalsFromElite(gameObject, splitCount, splitScatterRadius, allowDuringExternalTest: true);
             return;
         }
 
@@ -131,7 +196,22 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
         }
 
         splitTriggered = true;
-        spawner.SpawnSplitChildren(
+        Debug.Log(
+            "[EliteSplitDebug] " +
+            "enemy=" + name +
+            " rank=" + identity.rank +
+            " isTestMonster=" + isTestMonster +
+            " death notifier exists=" + hasDeathNotifier +
+            " registered to spawner=" + registeredToSpawner +
+            " split enabled=" + splitEnabled +
+            " split count=" + resolvedSplitCount +
+            " split child rank=" + resolvedChildRank +
+            " externalTestPauseActive=" + resolvedSpawner.IsExternalTestPauseActive +
+            " willSpawnSplitChildren=true" +
+            " blockReason=None",
+            this);
+
+        resolvedSpawner.SpawnSplitChildren(
             gameObject,
             bossSplitCount,
             bossSplitScatterRadius,
@@ -143,7 +223,8 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
             bossSplitScaleRatio,
             bossChildrenCanSplit,
             isCleanupBoss,
-            debugSplitLogs);
+            debugSplitLogs,
+            allowDuringExternalTest: true);
     }
 
     private static bool IsSlime(MonsterSpecies species)

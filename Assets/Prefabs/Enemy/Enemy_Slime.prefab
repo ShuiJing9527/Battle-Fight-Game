@@ -111,6 +111,9 @@ GameObject:
   - component: {fileID: 7001000000000000001}
   - component: {fileID: -1639656773854988091}
   - component: {fileID: -3701539833070586107}
+  - component: {fileID: -4093800141867408178}
+  - component: {fileID: 8611158825158774867}
+  - component: {fileID: 9023344556677889901}
   m_Layer: 0
   m_Name: Enemy_Slime
   m_TagString: Untagged
@@ -132,7 +135,39 @@ Transform:
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1458015244971175668}
+  - {fileID: 9023344556677889902}
   m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &9023344556677889900
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 9023344556677889902}
+  m_Layer: 0
+  m_Name: RadianceMarkAnchor
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &9023344556677889902
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 9023344556677889900}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.85, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 6587736263089903195}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!54 &7990415199108324068
 Rigidbody:
@@ -217,7 +252,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::EnemyController
   playerTarget: {fileID: 0}
   playerTag: Player
-  moveSpeed: 2.5
+  moveSpeed: 2.2
   stopDistance: 0.8
   maxHorizontalMoveSpeed: 2.6
   faceMoveDirection: 0
@@ -244,10 +279,17 @@ MonoBehaviour:
   groundedProbeDistance: 0.2
   maxVerticalAttackDifference: 0.75
   maxHorizontalAttackDistance: 1.35
+  groundedAttackGraceTime: 0
   debugLog: 0
   debugMeleeHitCheck: 0
+  debugAttackDiagnostics: 0
   debugSpeedDiagnostics: 0
+  debugChaseDiagnostics: 1
+  debugAttackStateTransitions: 0
+  debugSlimeAttackLogs: 0
+  debugAttackLogInterval: 0.3
   debugSpeedLogInterval: 1
+  targetResolveRetryInterval: 0.25
 --- !u!114 &2725362885038075655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -305,10 +347,10 @@ MonoBehaviour:
   soulPrefab: {fileID: 1140000000000000000, guid: 4275944075694a6d9bcbeeb73ca1b2c6, type: 3}
   dropYOffset: 0.5
   dropScatterRadius: 0.8
-  lifeSoulWeight: 25
-  energySoulWeight: 20
-  functionSoulWeight: 15
-  growthSoulWeight: 40
+  lifeSoulWeight: 30
+  energySoulWeight: 25
+  functionSoulWeight: 20
+  growthSoulWeight: 25
   resourcePoint1Weight: 50
   resourcePoint2Weight: 25
   resourcePoint3Weight: 15
@@ -321,10 +363,14 @@ MonoBehaviour:
   growthPoint5Weight: 1
   extraSoulDropChancePerLuck: 0.01
   maxExtraSoulDropChance: 0.5
-  runePickupPrefab: {fileID: 1140000000000000000, guid: 4e2f6c0a5d3c4a9b8f1e7c2d5a6b8c9d, type: 3}
+  runePickupPrefab: {fileID: 0}
   runeDropYOffset: 0.25
   extraRuneDropChancePerLuck: 0.005
   maxExtraRuneDropChance: 0.3
+  highRuneDropTestMode: 1
+  normalRuneDropRateMultiplier: 0.25
+  debugLuckDropLog: 0
+  debugRuneDropDiagLog: 1
 --- !u!114 &5420526972999163506
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -340,6 +386,7 @@ MonoBehaviour:
   species: 0
   rank: 0
   attackStyle: 0
+  suppressRuneDrop: 0
 --- !u!114 &1144444444444444441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -487,3 +534,64 @@ MonoBehaviour:
   delayBeforeDestroy: 0
   includeRendererRoots: []
   excludeRendererRoots: []
+--- !u!114 &-4093800141867408178
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 56f5fa6a33375474db32bdf0e6fddc6a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeMoveSFX
+  moveSfx:
+  - {fileID: 8300000, guid: 2839060380126f14bbac0ec9c437c4d6, type: 3}
+  rb: {fileID: 7990415199108324068}
+  minMoveSpeed: 0.1
+  soundInterval: 0.45
+  volume: 0.7
+--- !u!114 &8611158825158774867
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7c5aeaf494db384a901d2c322c383b9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SlimeJumpAttackSFX
+  rb: {fileID: 7990415199108324068}
+  playerTag: Player
+  detectPlayerDistance: 2
+  jumpVelocityThreshold: 2
+  jumpSfx: {fileID: 0}
+  landSfx: {fileID: 8300000, guid: 064c65941bacb944b9a5b87ec6ebaa61, type: 3}
+  volume: 0.8
+  jumpCooldown: 0.8
+  groundCheck: {fileID: 0}
+  groundCheckRadius: 0.25
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 0
+--- !u!114 &9023344556677889901
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f3d4ad19f2b4bf9b2d1c2c4f5a6b7c8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::RadianceMarkVisualHost
+  radianceMarkAnchor: {fileID: 9023344556677889902}
+  localPositionOffset: {x: 0, y: 0, z: 0}
+  localRotationOffset: {x: 0, y: 0, z: 0}
+  localScale: {x: 0.6, y: 0.6, z: 0.6}
+  defaultMarkVisualPrefab: {fileID: 0}
+  debugRadianceMarkVisual: 0

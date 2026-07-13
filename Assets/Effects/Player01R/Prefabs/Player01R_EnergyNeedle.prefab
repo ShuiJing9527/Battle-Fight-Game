@@ -386,6 +386,7 @@ GameObject:
   - component: {fileID: 3047257983462122654}
   - component: {fileID: 6835697170326777978}
   - component: {fileID: 508769082471274979}
+  - component: {fileID: -1821628461162517840}
   m_Layer: 0
   m_Name: Player01R_EnergyNeedle
   m_TagString: Untagged
@@ -561,6 +562,22 @@ TrailRenderer:
   m_Autodestruct: 0
   m_Emitting: 1
   m_ApplyActiveColorSpace: 1
+--- !u!114 &-1821628461162517840
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6860482820014089041}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d10864ca5ad23044a9c9364857d5a888, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AutoPlaySFX
+  appearSfx: {fileID: 0}
+  hitSfx: {fileID: 0}
+  hitTags: []
+  volume: 1
 --- !u!1 &7328273441092685401
 GameObject:
   m_ObjectHideFlags: 0

@@ -831,6 +831,8 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
+            NotifyDayNightGaugeSkillCast(0, "Player02 Q");
+
             if (skillHud != null)
             {
                 if (debugSkillCooldownFlow)
@@ -893,6 +895,8 @@ public class Player2PrototypeController : MonoBehaviour
                 cooldownManager?.RefundSkillResource(1);
                 return;
             }
+
+            NotifyDayNightGaugeSkillCast(1, "Player02 W");
 
             if (skillHud != null)
             {
@@ -957,6 +961,8 @@ public class Player2PrototypeController : MonoBehaviour
                 return;
             }
 
+            NotifyDayNightGaugeSkillCast(2, "Player02 E");
+
             if (skillHud != null)
             {
                 if (debugSkillCooldownFlow)
@@ -1019,6 +1025,8 @@ public class Player2PrototypeController : MonoBehaviour
                 cooldownManager?.RefundSkillResource(3);
                 return;
             }
+
+            NotifyDayNightGaugeSkillCast(3, "Player02 R");
 
             if (skillHud != null)
             {
@@ -1458,7 +1466,20 @@ public class Player2PrototypeController : MonoBehaviour
         if (rb != null)
         {
             rb.position = worldPosition;
-            rb.linearVelocity = Vector3.zero;
+            Vector3 velocityBeforeWrite = rb.linearVelocity;
+            Vector3 velocityAfterWrite = Vector3.zero;
+            rb.linearVelocity = velocityAfterWrite;
+            PlayerMovement.LogVelocityWrite(
+                this,
+                nameof(Player2PrototypeController),
+                nameof(MoveRootToGroundPosition),
+                rb,
+                velocityBeforeWrite,
+                velocityAfterWrite,
+                "move-root-to-ground-position",
+                "MoveRootToGroundPosition",
+                "none",
+                enableSpawnUnstuck ? "spawn-unstuck-enabled" : "spawn-unstuck-disabled");
             rb.angularVelocity = Vector3.zero;
             rb.WakeUp();
         }
@@ -4074,6 +4095,15 @@ public class Player2PrototypeController : MonoBehaviour
     {
         if (cooldownManager == null) return 0f;
         return cooldownManager.GetSkillManaCost(index);
+    }
+
+    private void NotifyDayNightGaugeSkillCast(int skillIndex, string skillLabel)
+    {
+        DayNightAffinityDamageModifier.NotifySuccessfulSkillCast(
+            gameObject,
+            GetSkillManaCost(skillIndex),
+            GetSkillMaxCD(skillIndex),
+            skillLabel);
     }
 
     public float GetCurrentMana()

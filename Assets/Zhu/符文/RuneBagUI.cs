@@ -54,6 +54,7 @@ public class RuneBagUI : MonoBehaviour
     [SerializeField, Min(1f)] private float runeTextFontSize = 20f;
     [SerializeField, Min(1f)] private float slotTextFontSize = 20f;
     [SerializeField, Min(1f)] private float selectedRuneFontSize = 22f;
+    [SerializeField] private bool applyPanelLayoutAtRuntime = false;
 
     private RuneDefinition selectedRune;
     private Player2Bootstrap cachedBootstrap;
@@ -79,7 +80,10 @@ public class RuneBagUI : MonoBehaviour
         CacheBootstrap();
         CapturePanelBaseScale();
         ResolveRuntimeReferences();
-        ApplyPanelScale();
+        if (applyPanelLayoutAtRuntime)
+        {
+            ApplyPanelScale();
+        }
         BindSkillSlotButtons();
         RefreshAll();
         ClearSelectedRune();
@@ -587,11 +591,14 @@ public class RuneBagUI : MonoBehaviour
 
         if (panelRectTransform != null)
         {
-            panelRectTransform.anchoredPosition = Vector2.zero;
-            panelRectTransform.localScale = Vector3.one;
+            if (applyPanelLayoutAtRuntime)
+            {
+                panelRectTransform.anchoredPosition = Vector2.zero;
+                panelRectTransform.localScale = Vector3.one;
+            }
         }
 
-        if (visible)
+        if (visible && applyPanelLayoutAtRuntime)
         {
             ApplyPanelScale();
         }

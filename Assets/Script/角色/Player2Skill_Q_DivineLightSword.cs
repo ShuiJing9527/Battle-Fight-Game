@@ -10,6 +10,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField, Min(0f)] private float manaCost = 10f;
     [InspectorName("Q Delay")]
     [SerializeField] private float qDelay = 0.35f;
+    [Header("Day Buff")]
+    [SerializeField, Min(0f)] private float dayBuffRadianceMarkDuration = 3f;
+    [SerializeField] private GameObject dayBuffRadianceMarkVisualPrefab;
+    [SerializeField] private Sprite dayBuffRadianceMarkIconSprite;
     [Header("Q - 旧伤害参数（当前直伤公式未使用）")]
     [FormerlySerializedAs("qStarFallDamage")]
     [HideInInspector]
@@ -40,6 +44,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField, Min(0f)] private float qStarFallDamageMultiplier = 1f;
     [SerializeField] private bool qDamageDebugLog = false;
     [SerializeField] private bool debugCriticalLog = false;
+    [SerializeField] private bool debugRadianceMark = false;
 
     [Header("Q - 神圣星刃 / 预制体")]
     [InspectorName("Q Skill Effect Prefab")]
@@ -242,10 +247,35 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float qVisualYawJitter = 10f;
 
     private readonly List<GameObject> activeQBlades = new List<GameObject>();
+    private readonly HashSet<int> radianceMarkedCastIds = new HashSet<int>();
+    private readonly Dictionary<int, PendingRadianceMarkSelection> pendingRadianceMarkSelections = new Dictionary<int, PendingRadianceMarkSelection>();
     private int activeQWaveCount;
     protected override int SkillIndex => 0;
     private Coroutine qCastRoutine;
     private RuneRuntimeState runeRuntimeState;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
+    private int nextRadianceMarkCastId = 1;
+
+    private sealed class PendingRadianceMarkSelection
+    {
+        public int ImpactOrder;
+        public CombatHealth NewTarget;
+        public int NewTargetImpactOrder = int.MaxValue;
+        public float NewTargetDistanceSqr = float.MaxValue;
+        public RadianceMarkStatus RefreshTarget;
+        public float RefreshRemainingDuration = float.MaxValue;
+        public long RefreshAppliedSequence = long.MaxValue;
+        public int RefreshImpactOrder = int.MaxValue;
+        public float RefreshDistanceSqr = float.MaxValue;
+        public int TotalOverlapHitCount;
+        public int UniqueTargetRootCount;
+        public int ValidEnemyCount;
+        public int CandidateCount;
+        public int UnmarkedCandidateCount;
+        public int MarkedCandidateCount;
+        public readonly List<string> ExcludedReasons = new List<string>();
+    }
 
     public override float CooldownSeconds => cooldown;
     public override float ManaCost => manaCost;
@@ -299,8 +329,10 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         runeRuntimeState = debugRuneState;
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
+        int radianceMarkCastId = AllocateRadianceMarkCastId();
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(0) : -1;
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, 1f));
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, radianceMarkCastId, 1f));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         if (debugThornCounter)
         {
@@ -332,10 +364,12 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
+        int radianceMarkCastId = AllocateRadianceMarkCastId();
         PrepareRuneCastContext();
         int runeCastId = CurrentRuneCastId;
         float manaRuneDamageMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
-        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, manaRuneDamageMultiplier));
+        qCastRoutine = StartCoroutine(QStarFallRoutine(sourcePrefab, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier));
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
     }
@@ -345,6 +379,9 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         StopAllCoroutines();
         qCastRoutine = null;
         activeQWaveCount = 0;
+        dayChildStateActiveThisCast = false;
+        radianceMarkedCastIds.Clear();
+        pendingRadianceMarkSelections.Clear();
         ResetRuneCastContext();
 
         for (int i = 0; i < activeQBlades.Count; i++)
@@ -370,7 +407,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 #endif
     }
 
-    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId, float manaRuneDamageMultiplier)
+    private IEnumerator QStarFallRoutine(GameObject sourcePrefab, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         activeQWaveCount++;
         try
@@ -452,7 +489,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     waveBlades.Add(blade);
                     activeQBlades.Add(blade);
                     AccumulateDivineSealFromQBladeSpawn(1);
-                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId, manaRuneDamageMultiplier));
+                    StartCoroutine(QStarFallBladeRoutine(blade, waveBlades, targetPos, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier));
                 }
 
                 if (qStarFallSequentialDelay > 0f)
@@ -464,9 +501,17 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                     yield return null;
                 }
             }
+
+            while (waveBlades.Count > 0)
+            {
+                yield return null;
+            }
         }
         finally
         {
+            CommitPendingRadianceMark(radianceMarkCastId);
+            pendingRadianceMarkSelections.Remove(radianceMarkCastId);
+            radianceMarkedCastIds.Remove(radianceMarkCastId);
             activeQWaveCount = Mathf.Max(0, activeQWaveCount - 1);
             qCastRoutine = null;
         }
@@ -496,7 +541,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         return bladeRoot;
     }
 
-    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId, float manaRuneDamageMultiplier)
+    private IEnumerator QStarFallBladeRoutine(GameObject bladeRoot, List<GameObject> waveBlades, Vector3 targetPos, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         while (bladeRoot != null && Vector3.Distance(bladeRoot.transform.position, targetPos) > 0.05f)
         {
@@ -510,7 +555,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         if (bladeRoot != null)
         {
             bladeRoot.transform.position = targetPos;
-            ApplyQStarFallDamage(targetPos, runeCastId, manaRuneDamageMultiplier);
+            ApplyQStarFallDamage(targetPos, runeCastId, radianceMarkCastId, manaRuneDamageMultiplier);
 
             SpawnQImpactDust(targetPos);
             activeQBlades.Remove(bladeRoot);
@@ -522,16 +567,18 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         }
     }
 
-    private void ApplyQStarFallDamage(Vector3 center, int runeCastId, float manaRuneDamageMultiplier)
+    private void ApplyQStarFallDamage(Vector3 center, int runeCastId, int radianceMarkCastId, float manaRuneDamageMultiplier)
     {
         if (qStarFallDamageRadius <= 0f)
         {
+            LogRadianceMarkDebug($"castId={radianceMarkCastId} skipped reason=damage-radius<=0");
             return;
         }
 
         float damageRadius = Mathf.Max(1.2f, qStarFallDamageRadius);
         Collider[] hits = Physics.OverlapSphere(center, damageRadius);
         HashSet<GameObject> damagedRoots = new HashSet<GameObject>();
+        List<CombatHealth> markCandidates = null;
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
         bool hitAnyEnemy = false;
         CombatStats attackerStats = Owner != null ? Owner.GetComponent<CombatStats>() : GetComponent<CombatStats>();
@@ -541,50 +588,272 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             Debug.Log($"[Player02 Q] damage check center={center}, radius={damageRadius:F2}", this);
         }
 
+        PendingRadianceMarkSelection pendingSelection = GetOrCreatePendingRadianceMarkSelection(radianceMarkCastId);
+        pendingSelection.TotalOverlapHitCount += hits != null ? hits.Length : 0;
+
         for (int i = 0; i < hits.Length; i++)
         {
             Collider hit = hits[i];
             if (hit == null)
             {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider=<null> reason=null-collider impactCenter={center}");
                 continue;
             }
 
             Transform targetRoot = hit.transform.root;
-            if (targetRoot == null || (Owner != null && targetRoot.gameObject == Owner.gameObject) || !damagedRoots.Add(targetRoot.gameObject))
+            if (targetRoot == null)
             {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider={hit.name} reason=missing-root");
                 continue;
             }
 
+            if (Owner != null && targetRoot.gameObject == Owner.gameObject)
+            {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider={hit.name} target={targetRoot.name} reason=self");
+                continue;
+            }
+
+            if (!damagedRoots.Add(targetRoot.gameObject))
+            {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider={hit.name} target={targetRoot.name} reason=duplicate-root");
+                continue;
+            }
+
+            pendingSelection.UniqueTargetRootCount++;
             CombatHealth combatHealth = targetRoot.GetComponentInParent<CombatHealth>();
-            if (combatHealth != null && (Owner == null || combatHealth.gameObject != Owner.gameObject))
+            if (combatHealth == null)
             {
-                float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source, manaRuneDamageMultiplier);
-                if (damageAmount <= 0f)
-                {
-                    continue;
-                }
-
-                damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
-                float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
-                if (debugCriticalLog)
-                {
-                    float critRate = BattleStatUtility.GetCritRate(attackerStats);
-                    Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
-                }
-
-                float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
-                float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
-                runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
-                hitAnyEnemy = true;
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider={hit.name} target={targetRoot.name} reason=missing-combat-health");
                 continue;
             }
+
+            if (Owner != null && combatHealth.gameObject == Owner.gameObject)
+            {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude collider={hit.name} target={combatHealth.name} id={combatHealth.GetInstanceID()} reason=self-combat-health");
+                continue;
+            }
+
+            pendingSelection.ValidEnemyCount++;
+            float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source, manaRuneDamageMultiplier);
+            if (damageAmount <= 0f)
+            {
+                AddRadianceMarkExcludedReason(pendingSelection, $"exclude target={combatHealth.name} id={combatHealth.GetInstanceID()} reason=damage<=0");
+                continue;
+            }
+
+            damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
+            float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
+            if (debugCriticalLog)
+            {
+                float critRate = BattleStatUtility.GetCritRate(attackerStats);
+                Debug.Log($"[CritDebug] Attacker={source.name} Luck={(attackerStats != null ? attackerStats.luck : 0f):F2} CritRate={critRate:P0} IsCrit={isCritical} Damage={finalDamage:F2} Type=Special Target={combatHealth.name}", this);
+            }
+
+            float beforeHealth = ResolveCurrentHealth(combatHealth);
+            combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
+            float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+            runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
+            if (markCandidates == null)
+            {
+                markCandidates = new List<CombatHealth>();
+            }
+
+            markCandidates.Add(combatHealth);
+            pendingSelection.CandidateCount++;
+            hitAnyEnemy = true;
         }
+
+        RegisterRadianceMarkCandidates(markCandidates, center, radianceMarkCastId);
 
         if (!hitAnyEnemy && qDamageDebugLog)
         {
             Debug.Log("[Player02 Q] no enemy hit", this);
         }
+    }
+
+    private void RegisterRadianceMarkCandidates(List<CombatHealth> markCandidates, Vector3 impactCenter, int radianceMarkCastId)
+    {
+        if (!dayChildStateActiveThisCast || radianceMarkedCastIds.Contains(radianceMarkCastId) || markCandidates == null || markCandidates.Count == 0)
+        {
+            if (debugRadianceMark)
+            {
+                string reason = !dayChildStateActiveThisCast
+                    ? "day-buff-inactive"
+                    : radianceMarkedCastIds.Contains(radianceMarkCastId)
+                        ? "cast-already-marked"
+                        : "candidate-list-empty";
+                LogRadianceMarkDebug($"castId={radianceMarkCastId} RegisterRadianceMarkCandidates skipped reason={reason}");
+            }
+            return;
+        }
+
+        RadianceMarkStatus.CleanupInvalidActiveMarks();
+        PendingRadianceMarkSelection pendingSelection = GetOrCreatePendingRadianceMarkSelection(radianceMarkCastId);
+        pendingSelection.ImpactOrder++;
+        int impactOrder = pendingSelection.ImpactOrder;
+
+        for (int i = 0; i < markCandidates.Count; i++)
+        {
+            CombatHealth combatHealth = markCandidates[i];
+            if (!RadianceMarkStatus.IsValidMarkTarget(combatHealth))
+            {
+                AddRadianceMarkExcludedReason(
+                    pendingSelection,
+                    $"exclude target={(combatHealth != null ? combatHealth.name : "<null>")} id={(combatHealth != null ? combatHealth.GetInstanceID() : 0)} reason=invalid-mark-target");
+                continue;
+            }
+
+            float distanceSqr = (combatHealth.transform.position - impactCenter).sqrMagnitude;
+            if (!RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus activeStatus))
+            {
+                pendingSelection.UnmarkedCandidateCount++;
+                bool shouldUseAsNewTarget =
+                    impactOrder < pendingSelection.NewTargetImpactOrder
+                    || (impactOrder == pendingSelection.NewTargetImpactOrder && distanceSqr < pendingSelection.NewTargetDistanceSqr);
+
+                if (shouldUseAsNewTarget)
+                {
+                    pendingSelection.NewTarget = combatHealth;
+                    pendingSelection.NewTargetImpactOrder = impactOrder;
+                    pendingSelection.NewTargetDistanceSqr = distanceSqr;
+                }
+
+                continue;
+            }
+
+            pendingSelection.MarkedCandidateCount++;
+            float remainingDuration = activeStatus.RemainingDuration;
+            long appliedSequence = activeStatus.AppliedSequence;
+            bool shouldRefreshCurrent =
+                remainingDuration < pendingSelection.RefreshRemainingDuration
+                || (Mathf.Approximately(remainingDuration, pendingSelection.RefreshRemainingDuration) && appliedSequence < pendingSelection.RefreshAppliedSequence)
+                || (Mathf.Approximately(remainingDuration, pendingSelection.RefreshRemainingDuration)
+                    && appliedSequence == pendingSelection.RefreshAppliedSequence
+                    && impactOrder < pendingSelection.RefreshImpactOrder)
+                || (Mathf.Approximately(remainingDuration, pendingSelection.RefreshRemainingDuration)
+                    && appliedSequence == pendingSelection.RefreshAppliedSequence
+                    && impactOrder == pendingSelection.RefreshImpactOrder
+                    && distanceSqr < pendingSelection.RefreshDistanceSqr);
+
+            if (!shouldRefreshCurrent)
+            {
+                continue;
+            }
+
+            pendingSelection.RefreshTarget = activeStatus;
+            pendingSelection.RefreshRemainingDuration = remainingDuration;
+            pendingSelection.RefreshAppliedSequence = appliedSequence;
+            pendingSelection.RefreshImpactOrder = impactOrder;
+            pendingSelection.RefreshDistanceSqr = distanceSqr;
+        }
+    }
+
+    private void CommitPendingRadianceMark(int radianceMarkCastId)
+    {
+        if (!dayChildStateActiveThisCast || radianceMarkedCastIds.Contains(radianceMarkCastId))
+        {
+            if (debugRadianceMark)
+            {
+                string reason = !dayChildStateActiveThisCast ? "day-child-state-inactive" : "cast-already-marked";
+                LogRadianceMarkDebug($"castId={radianceMarkCastId} CommitPendingRadianceMark skipped reason={reason}");
+            }
+            return;
+        }
+
+        if (!pendingRadianceMarkSelections.TryGetValue(radianceMarkCastId, out PendingRadianceMarkSelection pendingSelection) || pendingSelection == null)
+        {
+            LogRadianceMarkDebug($"castId={radianceMarkCastId} CommitPendingRadianceMark skipped reason=no-pending-selection");
+            return;
+        }
+
+        float markDuration = Mathf.Max(0f, dayBuffRadianceMarkDuration);
+        if (RadianceMarkStatus.IsValidMarkTarget(pendingSelection.NewTarget))
+        {
+            RadianceMarkStatus.ApplyOrRefresh(
+                pendingSelection.NewTarget.gameObject,
+                markDuration,
+                dayBuffRadianceMarkVisualPrefab,
+                dayBuffRadianceMarkIconSprite,
+                debugRadianceMark);
+            radianceMarkedCastIds.Add(radianceMarkCastId);
+            LogRadianceMarkSelection("new", pendingSelection.NewTarget, radianceMarkCastId, pendingSelection);
+            return;
+        }
+
+        if (pendingSelection.RefreshTarget == null || !pendingSelection.RefreshTarget.IsMarked)
+        {
+            LogRadianceMarkSelection("none", null, radianceMarkCastId, pendingSelection, "no-valid-new-target-and-no-valid-refresh-target");
+            return;
+        }
+
+        pendingSelection.RefreshTarget.SetDebugLifecycle(debugRadianceMark);
+        pendingSelection.RefreshTarget.ConfigureVisual(dayBuffRadianceMarkVisualPrefab, dayBuffRadianceMarkIconSprite);
+        pendingSelection.RefreshTarget.ApplyOrRefresh(markDuration);
+        radianceMarkedCastIds.Add(radianceMarkCastId);
+        LogRadianceMarkSelection("refresh", pendingSelection.RefreshTarget.GetComponent<CombatHealth>(), radianceMarkCastId, pendingSelection);
+    }
+
+    private PendingRadianceMarkSelection GetOrCreatePendingRadianceMarkSelection(int radianceMarkCastId)
+    {
+        if (!pendingRadianceMarkSelections.TryGetValue(radianceMarkCastId, out PendingRadianceMarkSelection pendingSelection) || pendingSelection == null)
+        {
+            pendingSelection = new PendingRadianceMarkSelection();
+            pendingRadianceMarkSelections[radianceMarkCastId] = pendingSelection;
+        }
+
+        return pendingSelection;
+    }
+
+    private int AllocateRadianceMarkCastId()
+    {
+        int castId = nextRadianceMarkCastId++;
+        if (nextRadianceMarkCastId >= int.MaxValue)
+        {
+            nextRadianceMarkCastId = 1;
+        }
+
+        radianceMarkedCastIds.Remove(castId);
+        return castId;
+    }
+
+    private void AddRadianceMarkExcludedReason(PendingRadianceMarkSelection pendingSelection, string reason)
+    {
+        if (!debugRadianceMark || pendingSelection == null || string.IsNullOrWhiteSpace(reason))
+        {
+            return;
+        }
+
+        pendingSelection.ExcludedReasons.Add(reason);
+    }
+
+    private void LogRadianceMarkSelection(string mode, CombatHealth target, int castId, PendingRadianceMarkSelection pendingSelection, string extraReason = null)
+    {
+        if (!debugRadianceMark || pendingSelection == null)
+        {
+            return;
+        }
+
+        string targetName = target != null ? target.name : "<none>";
+        int targetId = target != null ? target.GetInstanceID() : 0;
+        string reason = string.IsNullOrWhiteSpace(extraReason) ? "<none>" : extraReason;
+        Debug.Log(
+            $"[Q RadianceMark] castId={castId} result={mode} target={targetName} targetId={targetId} overlapHits={pendingSelection.TotalOverlapHitCount} uniqueRoots={pendingSelection.UniqueTargetRootCount} validEnemies={pendingSelection.ValidEnemyCount} candidates={pendingSelection.CandidateCount} unmarked={pendingSelection.UnmarkedCandidateCount} marked={pendingSelection.MarkedCandidateCount} reason={reason}",
+            this);
+
+        for (int i = 0; i < pendingSelection.ExcludedReasons.Count; i++)
+        {
+            Debug.Log($"[Q RadianceMark] castId={castId} detail[{i}]={pendingSelection.ExcludedReasons[i]}", this);
+        }
+    }
+
+    private void LogRadianceMarkDebug(string message)
+    {
+        if (!debugRadianceMark)
+        {
+            return;
+        }
+
+        Debug.Log($"[Q RadianceMark] {message}", this);
     }
 
     private float ConsumeRuneFirstHitBonusDamage(int runeCastId)

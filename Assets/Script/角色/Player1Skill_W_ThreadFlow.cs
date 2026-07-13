@@ -25,6 +25,9 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     [SerializeField, Min(1f)] private float wEnemyAttackIntervalMultiplier = 1.5f;
     [SerializeField, Range(0f, 1f)] private float wEnemyDamageMultiplier = 0.5f;
     [SerializeField, Min(0.01f)] private float enemyDebuffRefreshInterval = 0.1f;
+    [Header("Night Buff")]
+    [SerializeField, Min(1f)] private float nightBuffDurationMultiplier = 1.25f;
+    [SerializeField, Min(1f)] private float nightBuffPlayer01SkillDamageTakenMultiplier = 1.15f;
 
     [Header("W - Veil Barrier / Visual")]
     [SerializeField] private GameObject veilBarrierPrefab;
@@ -49,6 +52,8 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
     private readonly HashSet<EnemyDebuffReceiver> activeDebuffedEnemies = new HashSet<EnemyDebuffReceiver>();
     private readonly HashSet<EnemyDebuffReceiver> currentDebuffedEnemies = new HashSet<EnemyDebuffReceiver>();
+    private readonly HashSet<PlayerSkillDamageTakenDebuffReceiver> activeNightSkillDamageReceivers = new HashSet<PlayerSkillDamageTakenDebuffReceiver>();
+    private readonly HashSet<PlayerSkillDamageTakenDebuffReceiver> currentNightSkillDamageReceivers = new HashSet<PlayerSkillDamageTakenDebuffReceiver>();
     private CombatHealth cachedCombatHealth;
     private GameObject activeBarrierInstance;
     private Renderer[] activeBarrierRenderers;
@@ -62,6 +67,9 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private RuneRuntimeState runeRuntimeState;
     private bool playerDamageModifierApplied;
     private Vector3 barrierCenterWorld;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
+    private const string VeilNightSkillDamageKey = "Player01_W_ThreadFlow_NightSkillDamageTaken";
 
     private void Reset()
     {
@@ -78,6 +86,8 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         wEnemyAttackIntervalMultiplier = 1.5f;
         wEnemyDamageMultiplier = 0.5f;
         enemyDebuffRefreshInterval = 0.1f;
+        nightBuffDurationMultiplier = 1.25f;
+        nightBuffPlayer01SkillDamageTakenMultiplier = 1.15f;
         wDissolveInDuration = 0.4f;
         wDissolveOutDuration = 0.45f;
         wDissolveStartValue = 1f;
@@ -127,6 +137,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     protected override void OnCastStarted()
     {
         runeRuntimeState = ResolvePlayerRuneRuntimeState();
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
         IsDefending = true;
         SyncSkillTiming();
         CacheReferences();
@@ -136,6 +147,8 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         ClearEnemyDebuffs();
         activeDebuffedEnemies.Clear();
         currentDebuffedEnemies.Clear();
+        activeNightSkillDamageReceivers.Clear();
+        currentNightSkillDamageReceivers.Clear();
         barrierCenterWorld = transform.position + transform.TransformVector(veilBarrierLocalOffset);
         CreateBarrierInstance();
         StartEnemyDebuffRoutine();
@@ -170,6 +183,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         StopEnemyDebuffRoutine();
         RemovePlayerDamageModifier();
         int restoredEnemyCount = ClearEnemyDebuffs();
+        nightChildStateActiveThisCast = false;
         StartBarrierDissolveOut();
 
         Debug.Log($"Player01 W 星辰帷幕结束，已恢复受影响敌人数量={restoredEnemyCount}", this);
@@ -181,6 +195,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         StopEnemyDebuffRoutine();
         RemovePlayerDamageModifier();
         ClearEnemyDebuffs();
+        nightChildStateActiveThisCast = false;
         CleanupBarrierVisualImmediate();
     }
 
@@ -190,6 +205,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
         StopEnemyDebuffRoutine();
         RemovePlayerDamageModifier();
         ClearEnemyDebuffs();
+        nightChildStateActiveThisCast = false;
         CleanupBarrierVisualImmediate();
     }
 
@@ -202,7 +218,13 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
 
     private void SyncSkillTiming()
     {
-        duration = Mathf.Max(0f, wDuration);
+        float resolvedDuration = Mathf.Max(0f, wDuration);
+        if (nightChildStateActiveThisCast)
+        {
+            resolvedDuration *= Mathf.Max(1f, nightBuffDurationMultiplier);
+        }
+
+        duration = resolvedDuration;
         cooldown = Mathf.Max(0f, wCooldown);
     }
 
@@ -761,6 +783,7 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
     private void RefreshEnemyDebuffs()
     {
         currentDebuffedEnemies.Clear();
+        currentNightSkillDamageReceivers.Clear();
         float barrierRadius = Mathf.Max(0.1f, wFieldRadius);
         Vector3 barrierCenter = ResolveBarrierCenterWorld();
         Collider[] hits = Physics.OverlapSphere(barrierCenter, barrierRadius, ~0, QueryTriggerInteraction.Collide);
@@ -814,6 +837,20 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             receiver.ApplyOutgoingDamageMultiplier(damageModifierKey, Mathf.Clamp01(wEnemyDamageMultiplier));
             currentDebuffedEnemies.Add(receiver);
 
+            if (nightChildStateActiveThisCast)
+            {
+                PlayerSkillDamageTakenDebuffReceiver damageTakenReceiver = enemyController.GetComponentInParent<PlayerSkillDamageTakenDebuffReceiver>();
+                if (damageTakenReceiver == null)
+                {
+                    damageTakenReceiver = enemyController.gameObject.AddComponent<PlayerSkillDamageTakenDebuffReceiver>();
+                }
+
+                damageTakenReceiver.ApplyPlayer01SkillDamageMultiplier(
+                    VeilNightSkillDamageKey,
+                    Mathf.Max(1f, nightBuffPlayer01SkillDamageTakenMultiplier));
+                currentNightSkillDamageReceivers.Add(damageTakenReceiver);
+            }
+
             if (debugLog)
             {
                 Debug.Log($"[EnemyDebuff] Apply key={damageModifierKey} move={Mathf.Clamp01(wEnemyMoveSpeedMultiplier):F2} attackInterval={Mathf.Max(1f, wEnemyAttackIntervalMultiplier):F2} damage={Mathf.Clamp01(wEnemyDamageMultiplier):F2} enemy={enemyController.name}", enemyController);
@@ -833,6 +870,16 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             if (receiver != null)
             {
                 activeDebuffedEnemies.Add(receiver);
+            }
+        }
+
+        RemoveLostNightSkillDamageDebuffs();
+        activeNightSkillDamageReceivers.Clear();
+        foreach (PlayerSkillDamageTakenDebuffReceiver receiver in currentNightSkillDamageReceivers)
+        {
+            if (receiver != null)
+            {
+                activeNightSkillDamageReceivers.Add(receiver);
             }
         }
     }
@@ -873,9 +920,34 @@ public class Player1Skill_W_ThreadFlow : Player01SkillBase
             restoredCount++;
         }
 
+        foreach (PlayerSkillDamageTakenDebuffReceiver receiver in activeNightSkillDamageReceivers)
+        {
+            if (receiver == null)
+            {
+                continue;
+            }
+
+            receiver.RemovePlayer01SkillDamageMultiplier(VeilNightSkillDamageKey);
+        }
+
         activeDebuffedEnemies.Clear();
         currentDebuffedEnemies.Clear();
+        activeNightSkillDamageReceivers.Clear();
+        currentNightSkillDamageReceivers.Clear();
         return restoredCount;
+    }
+
+    private void RemoveLostNightSkillDamageDebuffs()
+    {
+        foreach (PlayerSkillDamageTakenDebuffReceiver receiver in activeNightSkillDamageReceivers)
+        {
+            if (receiver == null || currentNightSkillDamageReceivers.Contains(receiver))
+            {
+                continue;
+            }
+
+            receiver.RemovePlayer01SkillDamageMultiplier(VeilNightSkillDamageKey);
+        }
     }
 
     private static bool IsEnemyWithinBarrierRange(Transform enemyTransform, Vector3 barrierCenter, float barrierRadius)

@@ -4,6 +4,7 @@ Shader "Spine/PlayerLit"
     {
         [NoScaleOffset] _MainTex ("Main Texture", 2D) = "white" {}
         _Color ("Color", Color) = (1,1,1,1)
+        _Cutoff ("Shadow Alpha Cutoff", Range(0,1)) = 0.2
 
         _LightInfluence ("Light Influence", Range(0, 2)) = 0.45
         _MinBrightness ("Min Brightness", Range(0, 2)) = 0.55
@@ -113,6 +114,90 @@ Shader "Spine/PlayerLit"
                 finalRgb = MixFog(finalRgb, IN.fogFactor);
 
                 return half4(finalRgb, spriteColor.a);
+            }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+
+            ZWrite On
+            ColorMask 0
+            Cull Off
+
+            HLSLPROGRAM
+            #pragma vertex ShadowPassVertex
+            #pragma fragment ShadowPassFragment
+            #pragma target 3.0
+            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
+
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
+            #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Shadows.hlsl"
+
+            struct ShadowAttributes
+            {
+                float4 positionOS : POSITION;
+                float3 normalOS : NORMAL;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+            };
+
+            struct ShadowVaryings
+            {
+                float4 positionHCS : SV_POSITION;
+                float2 uv : TEXCOORD0;
+                float4 color : COLOR;
+            };
+
+            TEXTURE2D(_MainTex);
+            SAMPLER(sampler_MainTex);
+
+            CBUFFER_START(UnityPerMaterial)
+                float4 _MainTex_ST;
+                float4 _Color;
+                float _Cutoff;
+            CBUFFER_END
+
+            float4 GetShadowPositionHClip(ShadowAttributes IN)
+            {
+                VertexPositionInputs vertexInput = GetVertexPositionInputs(IN.positionOS.xyz);
+                float3 positionWS = vertexInput.positionWS;
+                float3 normalWS = TransformObjectToWorldNormal(IN.normalOS);
+
+                #if _CASTING_PUNCTUAL_LIGHT_SHADOW
+                    float3 lightDirectionWS = normalize(_LightPosition - positionWS);
+                #else
+                    float3 lightDirectionWS = _MainLightPosition.xyz;
+                #endif
+
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
+
+                #if UNITY_REVERSED_Z
+                    positionCS.z = min(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
+                #else
+                    positionCS.z = max(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
+                #endif
+
+                return positionCS;
+            }
+
+            ShadowVaryings ShadowPassVertex(ShadowAttributes IN)
+            {
+                ShadowVaryings OUT;
+                OUT.positionHCS = GetShadowPositionHClip(IN);
+                OUT.uv = TRANSFORM_TEX(IN.uv, _MainTex);
+                OUT.color = IN.color;
+                return OUT;
+            }
+
+            half4 ShadowPassFragment(ShadowVaryings IN) : SV_TARGET
+            {
+                half4 texColor = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv);
+                half alpha = texColor.a * IN.color.a * _Color.a;
+                clip(alpha - _Cutoff);
+                return 0;
             }
             ENDHLSL
         }

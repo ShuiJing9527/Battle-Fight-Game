@@ -37,6 +37,10 @@ public class CombatHealth : MonoBehaviour
     private readonly Dictionary<string, float> incomingDamageMultipliers = new Dictionary<string, float>();
     private RuneRuntimeState runeRuntimeState;
     private bool warnedMissingDamagePopupPrefab;
+    private float lastIncomingDamageFinalHitChance = 1f;
+    private float lastIncomingDamageFinalEvasionChance;
+    private float lastIncomingDamageMissRoll = -1f;
+    private bool lastIncomingDamageWasMiss;
     private static DamagePopupFloatingText defaultDamagePopupPrefab;
     private static bool attemptedLoadDefaultDamagePopupPrefab;
 
@@ -138,44 +142,131 @@ public class CombatHealth : MonoBehaviour
 
     public void TakeDamage(BattleDamage damage)
     {
+        bool logBossPlayerDamage = ShouldLogBossPlayerDamageFlow(damage.source);
+        float playerHpBefore = ResolveCurrentHealthForDebug();
+        float playerShieldBefore = GetShield();
+        bool shouldLogDamageApply = BattleTargetUtility.IsPlayer(gameObject) || logBossPlayerDamage;
+        float combatHealthCurrentBefore = currentHealth;
+        float resourceBankCurrentBefore = resourceBank != null ? resourceBank.currentHealth : -1f;
+        string noEffectiveDamageReason = string.Empty;
+
         if (dead)
         {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + damage.amount.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=" + lastIncomingDamageWasMiss +
+                    " targetInvincible=false targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=false result=target-dead" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpBefore.ToString("F2"),
+                    gameObject);
+            }
+            DayNightGaugeHitFlowLog("TakeDamage(BattleDamage) skipped reason=target-dead", gameObject);
             return;
         }
 
         if (ShouldIgnoreDamageFrom(damage.source))
         {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + damage.amount.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=false targetInvincible=false targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=ignored-source" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpBefore.ToString("F2"),
+                    gameObject);
+            }
+            DayNightGaugeHitFlowLog($"TakeDamage(BattleDamage) skipped reason=ignored-source source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
         if (TryEvadeDamage(damage.source, out _))
         {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + damage.amount.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=" + lastIncomingDamageWasMiss +
+                    " targetInvincible=false targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=miss" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpBefore.ToString("F2"),
+                    gameObject);
+            }
             ShowMissPopup();
+            DayNightGaugeHitFlowLog($"TakeDamage(BattleDamage) skipped reason=miss source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
         Player01SkillController player1 = GetComponent<Player01SkillController>();
         if (player1 != null && player1.ShouldIgnoreIncomingDamage(damage))
         {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + damage.amount.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=false targetInvincible=true targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=invincible" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpBefore.ToString("F2"),
+                    gameObject);
+            }
+            DayNightGaugeHitFlowLog($"TakeDamage(BattleDamage) skipped reason=player01-ignored-damage source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
         float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
+        CombatStats attackerStats = BattleStatUtility.GetCombatStats(damage.source);
+        if (attackerStats != null)
+        {
+            outgoingDamage *= Mathf.Max(0f, attackerStats.outgoingDamageMultiplier);
+        }
         damage.amount = outgoingDamage;
-        float finalDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
+        float reducedDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
+        float finalDamage = reducedDamage;
+        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _);
+        float afterAffinityDamage = finalDamage;
         GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
         {
             finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
         }
+        float afterRuneDamage = finalDamage;
         finalDamage *= GetIncomingDamageMultiplier();
+        float afterIncomingMultiplierDamage = finalDamage;
+        float resolvedDamageBeforeShieldAndGuard = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
+        float afterShieldDamage = finalDamage;
         Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
         if (player2 != null)
         {
             finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
         }
+        float afterGuardDamage = finalDamage;
 
         if (resourceBank != null)
         {
@@ -185,6 +276,107 @@ public class CombatHealth : MonoBehaviour
         else
         {
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
+        }
+
+        float combatHealthCurrentAfter = currentHealth;
+        float resourceBankCurrentAfter = resourceBank != null ? resourceBank.currentHealth : -1f;
+        bool damageApplied = combatHealthCurrentAfter < combatHealthCurrentBefore || (resourceBank != null && resourceBankCurrentAfter < resourceBankCurrentBefore);
+
+        if (finalDamage <= 0f)
+        {
+            if (outgoingDamage <= 0f)
+            {
+                noEffectiveDamageReason = "OutgoingDamageZero";
+            }
+            else if (reducedDamage <= 0f)
+            {
+                noEffectiveDamageReason = "DefenseReducedToZero";
+            }
+            else if (afterAffinityDamage <= 0f)
+            {
+                noEffectiveDamageReason = "DayNightModifierReducedToZero";
+            }
+            else if (afterRuneDamage <= 0f)
+            {
+                noEffectiveDamageReason = "RuneIncomingMultiplierReducedToZero";
+            }
+            else if (afterIncomingMultiplierDamage <= 0f)
+            {
+                noEffectiveDamageReason = "IncomingDamageMultiplierReducedToZero";
+            }
+            else if (afterShieldDamage <= 0f && playerShieldBefore > 0f)
+            {
+                noEffectiveDamageReason = "AbsorbedByShield";
+            }
+            else if (afterGuardDamage <= 0f && player2 != null)
+            {
+                noEffectiveDamageReason = "ReducedToZeroByWGuard";
+            }
+            else
+            {
+                noEffectiveDamageReason = "FinalDamageClampedToZero";
+            }
+        }
+        else if (!damageApplied)
+        {
+            noEffectiveDamageReason = "HealthWritebackUnchanged";
+        }
+
+        if (shouldLogDamageApply)
+        {
+            Debug.Log(
+                "[CombatHealthDamageApply] " +
+                "target=" + name +
+                " incomingDamage=" + damage.amount.ToString("F2") +
+                " outgoingDamage=" + outgoingDamage.ToString("F2") +
+                " reducedDamage=" + reducedDamage.ToString("F2") +
+                " afterAffinityDamage=" + afterAffinityDamage.ToString("F2") +
+                " afterRuneDamage=" + afterRuneDamage.ToString("F2") +
+                " afterIncomingMultiplierDamage=" + afterIncomingMultiplierDamage.ToString("F2") +
+                " afterShieldDamage=" + afterShieldDamage.ToString("F2") +
+                " finalDamage=" + finalDamage.ToString("F2") +
+                " resourceBank exists=" + (resourceBank != null) +
+                " currentHealth before=" + combatHealthCurrentBefore.ToString("F2") +
+                " resourceBank currentHealth before=" + (resourceBank != null ? resourceBankCurrentBefore.ToString("F2") : "n/a") +
+                " currentHealth after=" + combatHealthCurrentAfter.ToString("F2") +
+                " resourceBank currentHealth after=" + (resourceBank != null ? resourceBankCurrentAfter.ToString("F2") : "n/a") +
+                " damageApplied=" + damageApplied +
+                " noEffectiveDamageReason=" + (string.IsNullOrEmpty(noEffectiveDamageReason) ? "None" : noEffectiveDamageReason),
+                gameObject);
+        }
+
+        bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(damage.amount, outgoingDamage, resolvedDamageBeforeShieldAndGuard);
+        if (shouldNotifyGaugeHit)
+        {
+            bool notifiedGauge = DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(damage.source, gameObject);
+            if (!notifiedGauge)
+            {
+                DayNightGaugeHitFlowLog(
+                    $"TakeDamage(BattleDamage) gauge-notified=False source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} outgoingDamage={outgoingDamage:F2} preShieldDamage={resolvedDamageBeforeShieldAndGuard:F2} finalDamage={finalDamage:F2}",
+                    gameObject);
+            }
+        }
+        else
+        {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + finalDamage.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=false targetInvincible=false targetShield=" + GetShield().ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=no-effective-damage" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + ResolveCurrentHealthForDebug().ToString("F2") +
+                    " noEffectiveDamageReason=" + (string.IsNullOrEmpty(noEffectiveDamageReason) ? "Unknown" : noEffectiveDamageReason),
+                    gameObject);
+            }
+            DayNightGaugeHitFlowLog(
+                $"TakeDamage(BattleDamage) skipped reason=no-effective-damage-resolution source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} inputDamage={damage.amount:F2} outgoingDamage={outgoingDamage:F2} preShieldDamage={resolvedDamageBeforeShieldAndGuard:F2} finalDamage={finalDamage:F2}",
+                gameObject);
         }
 
         if (finalDamage > 0f)
@@ -217,12 +409,39 @@ public class CombatHealth : MonoBehaviour
             Damaged?.Invoke(finalDamage, damage.source);
             ShowDamagePopup(finalDamage, ResolvePopupType(damage.damageType), damage.isCritical);
             TriggerAnimation(hitTrigger);
+
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=" + finalDamage.ToString("F2") +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=false targetInvincible=false targetShield=" + GetShield().ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=applied" +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + ResolveCurrentHealthForDebug().ToString("F2"),
+                    gameObject);
+            }
         }
 
         if (currentHealth <= 0f)
         {
             Die(damage.source);
         }
+    }
+
+    private bool ShouldLogBossPlayerDamageFlow(GameObject source)
+    {
+        if (!BattleTargetUtility.IsPlayer(gameObject))
+        {
+            return false;
+        }
+
+        MonsterIdentity sourceIdentity = source != null ? source.GetComponentInParent<MonsterIdentity>() : null;
+        return sourceIdentity != null && sourceIdentity.rank == MonsterRank.Boss;
     }
 
     public void ApplyDirectDamage(float amount, GameObject source)
@@ -234,21 +453,25 @@ public class CombatHealth : MonoBehaviour
     {
         if (dead)
         {
+            DayNightGaugeHitFlowLog("ApplyDirectDamage skipped reason=target-dead", gameObject);
             return;
         }
 
         if (ShouldIgnoreDamageFrom(source))
         {
+            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=ignored-source source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
         if (TryEvadeDamage(source, out _))
         {
             ShowMissPopup();
+            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=miss source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
         float finalDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(source, amount);
+        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(source, gameObject, finalDamage, out _);
         GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(source);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
@@ -256,6 +479,7 @@ public class CombatHealth : MonoBehaviour
             finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
         }
         finalDamage *= GetIncomingDamageMultiplier();
+        float resolvedDamageBeforeShield = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
 
         if (resourceBank != null)
@@ -266,6 +490,24 @@ public class CombatHealth : MonoBehaviour
         else
         {
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
+        }
+
+        bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(amount, amount, resolvedDamageBeforeShield);
+        if (shouldNotifyGaugeHit)
+        {
+            bool notifiedGauge = DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(source, gameObject);
+            if (!notifiedGauge)
+            {
+                DayNightGaugeHitFlowLog(
+                    $"ApplyDirectDamage gauge-notified=False source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)} inputDamage={amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
+                    gameObject);
+            }
+        }
+        else
+        {
+            DayNightGaugeHitFlowLog(
+                $"ApplyDirectDamage skipped reason=no-effective-damage-resolution source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)} inputDamage={amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
+                gameObject);
         }
 
         if (finalDamage > 0f)
@@ -477,6 +719,11 @@ public class CombatHealth : MonoBehaviour
         return source is string stringKey ? stringKey : source.GetHashCode().ToString();
     }
 
+    private static bool ShouldCountAsSuccessfulHit(float inputDamage, float outgoingDamage, float preShieldDamage)
+    {
+        return inputDamage > 0f || outgoingDamage > 0f || preShieldDamage > 0f;
+    }
+
     private static GameObject ResolveIncomingMonsterSource(GameObject source)
     {
         if (source == null)
@@ -563,6 +810,10 @@ public class CombatHealth : MonoBehaviour
             out float finalHitChance);
         float randomRoll = UnityEngine.Random.value;
         bool evaded = finalEvasionChance > 0f && randomRoll < finalEvasionChance;
+        lastIncomingDamageFinalHitChance = finalHitChance;
+        lastIncomingDamageFinalEvasionChance = finalEvasionChance;
+        lastIncomingDamageMissRoll = randomRoll;
+        lastIncomingDamageWasMiss = evaded;
         Debug.Log(
             $"[CombatEvasion] attacker={(source != null ? source.name : "null")} attackerRank={BattleStatUtility.GetAttackerRankLabel(source)} defender={name} defenderSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} defenderLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} rawEvasionChance={rawEvasionChance:F4} clampedEvasionChance={clampedEvasionChance:F4} accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F2} finalEvasionChance={finalEvasionChance:F4} finalHitChance={finalHitChance:F4} randomRoll={randomRoll:F4} result={(evaded ? "Miss" : "Hit")}",
             this);
@@ -578,6 +829,13 @@ public class CombatHealth : MonoBehaviour
         }
 
         return true;
+    }
+
+    private float ResolveCurrentHealthForDebug()
+    {
+        return resourceBank != null
+            ? Mathf.Max(0f, resourceBank.currentHealth)
+            : Mathf.Max(0f, currentHealth);
     }
 
     private void ShowDamagePopup(float damage, DamagePopupType popupType, bool isCritical)
@@ -720,5 +978,47 @@ public class CombatHealth : MonoBehaviour
     private void ThornCounterNotifySkippedLog(string reason)
     {
         Debug.Log($"[ThornCounter] Notify skipped. reason={reason}", this);
+    }
+
+    private void DayNightGaugeHitFlowLog(string message, UnityEngine.Object context)
+    {
+        if (!IsDayNightGaugeDebugEnabled())
+        {
+            return;
+        }
+
+        Debug.Log($"[DayNightHitFlow] {message}", context);
+    }
+
+    private static bool IsDayNightGaugeDebugEnabled()
+    {
+        return DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge) && gauge != null && gauge.DebugHitFlowEnabled;
+    }
+
+    private static string GetDebugObjectName(GameObject target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        return $"{target.name} ({GetHierarchyPath(target.transform)})";
+    }
+
+    private static string GetHierarchyPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        string path = target.name;
+        while (target.parent != null)
+        {
+            target = target.parent;
+            path = target.name + "/" + path;
+        }
+
+        return path;
     }
 }

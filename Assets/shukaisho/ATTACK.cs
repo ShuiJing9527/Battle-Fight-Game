@@ -104,19 +104,38 @@ public class ATTACK : MonoBehaviour
             enemyLayer
         );
 
+        System.Collections.Generic.HashSet<CombatHealth> hitTargets = new System.Collections.Generic.HashSet<CombatHealth>();
+        System.Collections.Generic.List<string> debugEntries = new System.Collections.Generic.List<string>();
+
         foreach (Collider enemy in hitEnemies)
         {
-            if (!BattleTargetUtility.IsMonster(enemy, transform))
+            MonsterIdentity identity = BattleTargetUtility.GetMonsterIdentity(enemy);
+            if (!BattleTargetUtility.TryGetMonsterCombatHealth(enemy, transform, out CombatHealth combatHealth, out string rejectReason))
             {
+                debugEntries.Add(BuildMeleeHitDebugEntry(enemy, identity, false, rejectReason, false, 0f, 0f, attackDamage, attackDamage));
                 continue;
             }
 
-            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(enemy, transform);
-            if (combatHealth != null)
+            if (!hitTargets.Add(combatHealth))
             {
-                combatHealth.TakeDamage(new BattleDamage(attackDamage, BattleDamageType.Physical, gameObject));
+                debugEntries.Add(BuildMeleeHitDebugEntry(enemy, identity, false, "duplicate-combat-health", false, 0f, 0f, attackDamage, attackDamage));
+                continue;
             }
+
+            float beforeHealth = ResolveTargetCurrentHealth(combatHealth);
+            combatHealth.TakeDamage(new BattleDamage(attackDamage, BattleDamageType.Physical, gameObject));
+            float afterHealth = ResolveTargetCurrentHealth(combatHealth);
+            debugEntries.Add(BuildMeleeHitDebugEntry(enemy, identity, true, "None", true, beforeHealth, afterHealth, attackDamage, attackDamage));
         }
+
+        Debug.Log(
+            "[PlayerMeleeHitDebug] " +
+            "skill=ATTACK " +
+            "attackPosition=" + attackPoint.position +
+            " attackRadius=" + attackRange.ToString("F2") +
+            " hitColliderCount=" + hitEnemies.Length +
+            " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+            this);
     }
 
     void HandleAnimation()
@@ -136,5 +155,48 @@ public class ATTACK : MonoBehaviour
 
         Gizmos.color = Color.red;
         Gizmos.DrawWireSphere(attackPoint.position, attackRange);
+    }
+
+    private static float ResolveTargetCurrentHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return health.resourceBank != null
+            ? Mathf.Max(0f, health.resourceBank.currentHealth)
+            : Mathf.Max(0f, health.currentHealth);
+    }
+
+    private static string BuildMeleeHitDebugEntry(
+        Collider collider,
+        MonsterIdentity identity,
+        bool acceptedTarget,
+        string rejectReason,
+        bool takeDamageCalled,
+        float beforeHealth,
+        float afterHealth,
+        float damageBeforeModifiers,
+        float damageAfterModifiers)
+    {
+        Transform root = collider != null ? collider.transform.root : null;
+        float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+
+        return
+            "collider=" + (collider != null ? collider.name : "null") +
+            " root=" + (root != null ? root.name : "null") +
+            " layer=" + (collider != null ? LayerMask.LayerToName(collider.gameObject.layer) : "null") +
+            " tag=" + (collider != null ? collider.tag : "null") +
+            " hasCombatHealth=" + takeDamageCalled +
+            " hasMonsterIdentity=" + (identity != null) +
+            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
+            " isBoss=" + (identity != null && identity.rank == MonsterRank.Boss) +
+            " acceptedTarget=" + acceptedTarget +
+            " rejectReason=" + rejectReason +
+            " damageBeforeModifiers=" + damageBeforeModifiers.ToString("F2") +
+            " damageAfterModifiers=" + damageAfterModifiers.ToString("F2") +
+            " TakeDamageCalled=" + takeDamageCalled +
+            " actualDamage=" + actualDamage.ToString("F2");
     }
 }

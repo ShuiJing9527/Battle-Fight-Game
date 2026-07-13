@@ -5,6 +5,7 @@ using Spine.Unity;
 using UnityEngine.Serialization;
 public class Player2Skill_E_CelestialShift : PlayerSkillBase
 {
+    private const float DayBuffMarkedDamageMultiplier = 1.2f;
     [Header("E - 星痕瞬移 / 核心参数")]
     [SerializeField, Min(0f)] private float cooldown = 8f;
     [SerializeField, Min(0f)] private float manaCost = 20f;
@@ -101,6 +102,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     private readonly HashSet<int> hitEnemiesThisDash = new HashSet<int>();
     private RuneRuntimeState runeRuntimeState;
     private int currentDashHitCount;
+    // Day Child state is independent from day/night phase.
+    private bool dayChildStateActiveThisCast;
     protected override int SkillIndex => 2;
 
     public override float CooldownSeconds => cooldown;
@@ -119,6 +122,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         runeRuntimeState = ResolveRuneRuntimeState();
+        dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         PrepareRuneCastContext();
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
@@ -131,6 +135,7 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         isDashing = false;
         currentDashHitCount = 0;
         hitEnemiesThisDash.Clear();
+        dayChildStateActiveThisCast = false;
         ResetRuneCastContext();
 
         for (int i = 0; i < activeAfterimageGhosts.Count; i++)
@@ -375,6 +380,15 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         float outgoingDamageMultiplier = Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier());
         float physicalFinal = Mathf.Max(1f, (physicalRaw - targetPhysicalDefense) * Mathf.Max(0f, ePhysicalDamageMultiplier) * outgoingDamageMultiplier);
         float specialFinal = Mathf.Max(1f, (specialRaw - targetSpecialDefense) * Mathf.Max(0f, eSpecialDamageMultiplier) * outgoingDamageMultiplier);
+        if (dayChildStateActiveThisCast && RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus radianceMark))
+        {
+            if (radianceMark.Consume())
+            {
+                physicalFinal *= DayBuffMarkedDamageMultiplier;
+                specialFinal *= DayBuffMarkedDamageMultiplier;
+                Debug.Log($"[SecondBuffDebug] Player02 E consumed RadianceMark on {targetRoot.name} and applied x{DayBuffMarkedDamageMultiplier:F2}.", this);
+            }
+        }
 
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
         float beforeHealth = ResolveCurrentHealth(combatHealth);

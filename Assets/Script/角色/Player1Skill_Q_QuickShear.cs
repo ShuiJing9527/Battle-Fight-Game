@@ -36,6 +36,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [InspectorName("Mana Cost")]
     [SerializeField, Min(0f)] private float manaCost = 10f;
     [SerializeField, Range(0f, 1f)] private float quickShearLifeStealRatio = 0.5f;
+    [Header("Night Buff")]
+    [SerializeField, Min(1f)] private float nightBuffLifeStealMultiplier = 1.5f;
+    [SerializeField, Range(0f, 1f)] private float nightBuffSlowMoveSpeedMultiplier = 0.8f;
+    [SerializeField, Min(0f)] private float nightBuffSlowDuration = 1.5f;
 
     [Header("Q - Scissor Effects")]
     [SerializeField] private GameObject scissorCutEffectPrefab;
@@ -91,6 +95,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     private int currentRuneCastId = -1;
     private int qMovementLockToken;
     private float qMovementLockEndTime;
+    // Night Child state is independent from day/night phase.
+    private bool nightChildStateActiveThisCast;
 
     private void Reset()
     {
@@ -113,6 +119,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         enemyLayer = ~0;
         manaCost = 10f;
         quickShearLifeStealRatio = 0.5f;
+        nightBuffLifeStealMultiplier = 1.5f;
+        nightBuffSlowMoveSpeedMultiplier = 0.8f;
+        nightBuffSlowDuration = 1.5f;
         scissorCutEffectOffset = new Vector3(0.9f, 0.15f, 0f);
         scissorSlashWaveEffectOffset = new Vector3(1.35f, 0.15f, 0f);
         scissorEndEffectOffset = new Vector3(0.95f, 0.15f, 0f);
@@ -246,6 +255,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         SyncQuickShearSkillConfig();
         runeRuntimeState = ResolvePlayerRuneRuntimeState();
         currentRuneCastId = CurrentRuneCastId;
+        nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
 
         if (Controller != null && Controller.IsVeilBarrierActive())
         {
@@ -384,23 +394,33 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         float finalDamage = damageResult.finalDamage;
         Collider[] hits = Physics.OverlapSphere(center, Mathf.Max(0.1f, qRange), enemyLayer, QueryTriggerInteraction.Collide);
         float totalDamageDealt = 0f;
+        System.Collections.Generic.List<string> debugEntries = new System.Collections.Generic.List<string>();
 
         foreach (Collider hit in hits)
         {
-            if (!BattleTargetUtility.IsMonster(hit, transform))
+            MonsterIdentity identity = BattleTargetUtility.GetMonsterIdentity(hit);
+            if (!BattleTargetUtility.TryGetMonsterCombatHealth(hit, transform, out CombatHealth combatHealth, out string rejectReason))
             {
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, rejectReason, false, 0f, 0f, finalDamage, finalDamage));
                 continue;
             }
 
             if (!IsInFrontSlashArea(hit, origin, facing))
             {
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, "outside-front-slash-area", false, 0f, 0f, finalDamage, finalDamage));
                 continue;
             }
 
-            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
             if (combatHealth != null && castDamagedCombatTargets.Add(combatHealth))
             {
                 float resolvedDamage = finalDamage + ConsumeRuneFirstHitBonusDamage();
+                resolvedDamage *= PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
+                PlayerTimedSkillDamageBoostStatus timedSkillDamageBoost = PlayerTimedSkillDamageBoostStatus.Resolve(Controller != null ? Controller.gameObject : gameObject);
+                if (timedSkillDamageBoost != null)
+                {
+                    resolvedDamage *= timedSkillDamageBoost.Multiplier;
+                }
+
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
                 float afterHealth = ResolveCurrentHealth(combatHealth);
@@ -408,12 +428,25 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
                 if (actualDamage > 0f)
                 {
+                    ApplyNightBuffSlow(combatHealth);
                     TryPlayQuickShearCritFlash(hit, damageResult);
                 }
                 totalDamageDealt += actualDamage;
+                debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, true, "None", true, beforeHealth, afterHealth, resolvedDamage, resolvedDamage));
                 continue;
             }
+
+            debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, "duplicate-combat-health", false, 0f, 0f, finalDamage, finalDamage));
         }
+
+        Debug.Log(
+            "[PlayerMeleeHitDebug] " +
+            "skill=Player1Skill_Q_QuickShear " +
+            "attackPosition=" + center +
+            " attackRadius=" + Mathf.Max(0.1f, qRange).ToString("F2") +
+            " hitColliderCount=" + hits.Length +
+            " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+            this);
 
         return totalDamageDealt;
     }
@@ -626,7 +659,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     private void ApplyQLifeSteal(float damageDealt)
     {
-        float healAmount = Mathf.Max(0f, damageDealt) * Mathf.Max(0f, quickShearLifeStealRatio);
+        float lifeStealRatio = Mathf.Max(0f, quickShearLifeStealRatio);
+        if (nightChildStateActiveThisCast)
+        {
+            lifeStealRatio *= Mathf.Max(1f, nightBuffLifeStealMultiplier);
+        }
+
+        float healAmount = Mathf.Max(0f, damageDealt) * lifeStealRatio;
         if (healAmount <= 0f)
         {
             return;
@@ -652,6 +691,36 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
     }
 
+    private void ApplyNightBuffSlow(CombatHealth combatHealth)
+    {
+        if (!nightChildStateActiveThisCast || combatHealth == null)
+        {
+            return;
+        }
+
+        TimedEnemyMoveSpeedDebuff.ApplyOrRefresh(
+            ResolveNightBuffSlowTarget(combatHealth),
+            $"{nameof(Player1Skill_Q_QuickShear)}_{GetInstanceID()}",
+            Mathf.Clamp01(nightBuffSlowMoveSpeedMultiplier),
+            Mathf.Max(0f, nightBuffSlowDuration));
+    }
+
+    private static GameObject ResolveNightBuffSlowTarget(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return null;
+        }
+
+        EnemyController enemyController = combatHealth.GetComponent<EnemyController>();
+        if (enemyController == null)
+        {
+            enemyController = combatHealth.GetComponentInChildren<EnemyController>(true);
+        }
+
+        return enemyController != null ? enemyController.gameObject : combatHealth.gameObject;
+    }
+
     private float ResolveCurrentHealth(CombatHealth combatHealth)
     {
         if (combatHealth == null)
@@ -665,6 +734,37 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         }
 
         return combatHealth.currentHealth;
+    }
+
+    private static string BuildMeleeHitDebugEntry(
+        Collider collider,
+        MonsterIdentity identity,
+        bool acceptedTarget,
+        string rejectReason,
+        bool takeDamageCalled,
+        float beforeHealth,
+        float afterHealth,
+        float damageBeforeModifiers,
+        float damageAfterModifiers)
+    {
+        Transform root = collider != null ? collider.transform.root : null;
+        float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+
+        return
+            "collider=" + (collider != null ? collider.name : "null") +
+            " root=" + (root != null ? root.name : "null") +
+            " layer=" + (collider != null ? LayerMask.LayerToName(collider.gameObject.layer) : "null") +
+            " tag=" + (collider != null ? collider.tag : "null") +
+            " hasCombatHealth=" + takeDamageCalled +
+            " hasMonsterIdentity=" + (identity != null) +
+            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
+            " isBoss=" + (identity != null && identity.rank == MonsterRank.Boss) +
+            " acceptedTarget=" + acceptedTarget +
+            " rejectReason=" + rejectReason +
+            " damageBeforeModifiers=" + damageBeforeModifiers.ToString("F2") +
+            " damageAfterModifiers=" + damageAfterModifiers.ToString("F2") +
+            " TakeDamageCalled=" + takeDamageCalled +
+            " actualDamage=" + actualDamage.ToString("F2");
     }
 
     private float ResolvePlayerCurrentHealth()

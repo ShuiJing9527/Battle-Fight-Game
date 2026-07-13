@@ -72,7 +72,7 @@ Transform:
   m_GameObject: {fileID: 6283368644540404569}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 1.2, y: 4.5, z: 3}
+  m_LocalPosition: {x: 1.2, y: 7.5, z: 3}
   m_LocalScale: {x: 1.8750001, y: 1.8750001, z: 187.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -150,8 +150,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Player2HaloRotateEffect
   spineTarget: {fileID: 6561970759161859204}
   followSpineFacingOffset: 1
-  leftFacingLocalOffset: {x: 1.2, y: 4.5, z: 3}
-  rightFacingLocalOffset: {x: -1.2, y: 4.5, z: 3}
+  leftFacingLocalOffset: {x: 1.2, y: 7.5, z: 3}
+  rightFacingLocalOffset: {x: -1.2, y: 7.5, z: 3}
   rotateSpeed: 30
   skillRotateSpeed: 260
   skillBoostDuration: 0.65
@@ -186,7 +186,7 @@ Transform:
   m_GameObject: {fileID: 7168512462412306375}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -327,7 +327,7 @@ Transform:
   m_GameObject: {fileID: 7618050150768860302}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -414,6 +414,9 @@ GameObject:
   - component: {fileID: 5650248378318002330}
   - component: {fileID: 1446829692210700123}
   - component: {fileID: 9102200000000000001}
+  - component: {fileID: 4060893002195802195}
+  - component: {fileID: 7052170241724997631}
+  - component: {fileID: 9135020000000000001}
   m_Layer: 0
   m_Name: Player02
   m_TagString: Player
@@ -500,10 +503,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 6921b5d015ae9f44f974c895dd534729, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
-  moveSpeed: 4.5
+  moveSpeed: 4.8
   playerBaseMoveSpeedScale: 1
-  speedStatMoveRatio: 0.005
-  maxActualMoveSpeed: 12
+  speedStatMoveRatio: 0.0025
+  maxActualMoveSpeed: 10
   rb: {fileID: 4389982266256825078}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1
@@ -526,6 +529,7 @@ MonoBehaviour:
   specialDefense: 14
   speed: 14
   luck: 10
+  outgoingDamageMultiplier: 1
 --- !u!114 &4540091804298959558
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1231,6 +1235,9 @@ MonoBehaviour:
   cooldown: 0.8
   manaCost: 10
   qDelay: 0.35
+  dayBuffRadianceMarkDuration: 3
+  dayBuffRadianceMarkVisualPrefab: {fileID: 100000, guid: 9c09baa69c174af1aa66722d7f7bc1d0, type: 3}
+  dayBuffRadianceMarkIconSprite: {fileID: 21300000, guid: 74d7b55c98bd4552971e305a10083d02, type: 3}
   baseDamage: 10
   physicalScaling: 0.8
   specialScaling: 1
@@ -1245,6 +1252,7 @@ MonoBehaviour:
   qStarFallDamageMultiplier: 1
   qDamageDebugLog: 0
   debugCriticalLog: 1
+  debugRadianceMark: 0
   qSkillEffectPrefab: {fileID: 7616733904698143582, guid: ef6ee5d37eeb0a640959838d03b086af, type: 3}
   qSpawnFallTrail: 0
   qFallTrailPrefab: {fileID: 0}
@@ -1345,6 +1353,8 @@ MonoBehaviour:
   manaCost: 40
   wShieldDuration: 5
   wDamageReduction: 0.4
+  dayBuffShieldMultiplier: 1.3
+  dayBuffRemainingShieldHealRatio: 0.5
   wShieldMaxHpMultiplier: 1
   wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
@@ -1639,3 +1649,52 @@ MonoBehaviour:
   includeRendererRoots:
   - {fileID: 9205788309606312631}
   excludeRendererRoots: []
+--- !u!114 &4060893002195802195
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8e460e6726d33df43b1f64f24d871930, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SkillSFXByKey
+  flashKey: 113
+  flashSfx: {fileID: 0}
+  dashKey: 101
+  dashSfx: {fileID: 8300000, guid: 3e3c13bba6eb5d74791cbbcc84c5b99b, type: 3}
+  skillKey: 0
+  skillSfx: {fileID: 0}
+  volume: 1
+--- !u!114 &7052170241724997631
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 13e64e5ecb621e847bf1418bdfca965a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HealthAudioWatcher
+  healthScript: {fileID: 0}
+  healthFieldName: currentHP
+  hitSfx: {fileID: 0}
+  deathSfx: {fileID: 0}
+  volume: 1
+--- !u!114 &9135020000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8605461027058166016}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  affinityType: 2

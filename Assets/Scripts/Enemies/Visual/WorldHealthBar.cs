@@ -4,6 +4,11 @@ public class WorldHealthBar : MonoBehaviour
 {
     public Vector3 offset = new Vector3(0f, 1.4f, 0f);
     public Vector2 size = new Vector2(1.4f, 0.12f);
+    [Header("Rank Offsets")]
+    [SerializeField] private float normalHealthBarOffsetY = 0.25f;
+    [SerializeField] private float eliteHealthBarOffsetY = 0.3f;
+    [SerializeField] private float bossHealthBarOffsetY = 0.45f;
+    [SerializeField] private bool debugHealthBarAnchor = false;
     public Color backgroundColor = new Color(0.05f, 0.05f, 0.05f, 0.85f);
     public Color fillColor = new Color(0.9f, 0.15f, 0.12f, 0.95f);
     public int sortingOrder = 200;
@@ -17,14 +22,18 @@ public class WorldHealthBar : MonoBehaviour
     private static Sprite whiteSprite;
 
     private CombatHealth combatHealth;
+    private MonsterIdentity monsterIdentity;
+    private MonsterRankVisual rankVisual;
     private Transform cameraTransform;
     private bool initialized;
     private bool usingFallbackBar;
     private float backgroundLocalZ;
     private float fillLocalZ;
+    private string configSource = "Default";
     private void Awake()
     {
         RefreshHealthBindings();
+        RefreshVisualBindings();
         EnsureBarInitialized();
     }
 
@@ -41,7 +50,8 @@ public class WorldHealthBar : MonoBehaviour
             cameraTransform = Camera.main.transform;
         }
 
-        barInstanceRoot.position = transform.position + offset;
+        Vector3 anchorPosition = ResolveHealthBarWorldPosition(forceLog: false);
+        barInstanceRoot.position = anchorPosition;
         if (cameraTransform != null)
         {
             barInstanceRoot.rotation = cameraTransform.rotation;
@@ -50,6 +60,37 @@ public class WorldHealthBar : MonoBehaviour
         RefreshHealthBindings();
         float ratio = ResolveHealthRatio();
         ApplyBarSize(ratio);
+    }
+
+    public void RefreshWorldPositionForDebug()
+    {
+        EnsureBarInitialized();
+        if (barInstanceRoot == null)
+        {
+            return;
+        }
+
+        Vector3 anchorPosition = ResolveHealthBarWorldPosition(forceLog: true);
+        barInstanceRoot.position = anchorPosition;
+    }
+
+    public void ApplyHealthBarConfig(
+        float normalOffsetY,
+        float eliteOffsetY,
+        float bossOffsetY,
+        bool debug,
+        string source = "Default")
+    {
+        normalHealthBarOffsetY = normalOffsetY;
+        eliteHealthBarOffsetY = eliteOffsetY;
+        bossHealthBarOffsetY = bossOffsetY;
+        debugHealthBarAnchor = debug;
+        configSource = string.IsNullOrWhiteSpace(source) ? "Default" : source;
+
+        if (barInstanceRoot != null)
+        {
+            barInstanceRoot.position = ResolveHealthBarWorldPosition(forceLog: debug);
+        }
     }
 
     private void EnsureBarInitialized()
@@ -264,6 +305,112 @@ public class WorldHealthBar : MonoBehaviour
                 combatHealth = GetComponentInChildren<CombatHealth>(true);
             }
         }
+    }
+
+    private void RefreshVisualBindings()
+    {
+        if (monsterIdentity == null)
+        {
+            monsterIdentity = GetComponent<MonsterIdentity>();
+            if (monsterIdentity == null)
+            {
+                monsterIdentity = GetComponentInParent<MonsterIdentity>();
+            }
+        }
+
+        if (rankVisual == null)
+        {
+            rankVisual = GetComponent<MonsterRankVisual>();
+            if (rankVisual == null)
+            {
+                rankVisual = GetComponentInParent<MonsterRankVisual>();
+            }
+        }
+    }
+
+    private Vector3 ResolveHealthBarWorldPosition(bool forceLog)
+    {
+        RefreshVisualBindings();
+
+        Renderer visualRenderer = ResolveVisualRenderer();
+        float healthBarOffsetY = ResolveRankHealthBarOffsetY();
+        Vector3 positionBefore = barInstanceRoot != null ? barInstanceRoot.position : transform.position + offset;
+        Vector3 resolvedPosition = transform.position + offset;
+
+        if (visualRenderer != null)
+        {
+            Bounds bounds = visualRenderer.bounds;
+            resolvedPosition = new Vector3(
+                bounds.center.x,
+                bounds.max.y + healthBarOffsetY,
+                bounds.center.z);
+
+            if (debugHealthBarAnchor || forceLog)
+            {
+                Debug.Log(
+                    "[MonsterHealthBarDebug] " +
+                    "object=" + name +
+                    " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                    " source=" + configSource +
+                    " visualRoot=" + (rankVisual != null && rankVisual.RuntimeVisualRoot != null ? rankVisual.RuntimeVisualRoot.name : "null") +
+                    " renderer bounds maxY=" + bounds.max.y.ToString("F2") +
+                    " healthBar=" + (barInstanceRoot != null ? barInstanceRoot.name : "null") +
+                    " healthBar position before=" + positionBefore +
+                    " healthBar position after=" + resolvedPosition +
+                    " healthBarOffsetY=" + healthBarOffsetY.ToString("F2") +
+                    " healthBar active=" + (barInstanceRoot != null && barInstanceRoot.gameObject.activeInHierarchy),
+                    this);
+            }
+        }
+        else if (debugHealthBarAnchor || forceLog)
+        {
+            Debug.Log(
+                "[MonsterHealthBarDebug] " +
+                "object=" + name +
+                " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
+                " source=" + configSource +
+                " visualRoot=" + (rankVisual != null && rankVisual.RuntimeVisualRoot != null ? rankVisual.RuntimeVisualRoot.name : "null") +
+                " renderer bounds maxY=n/a" +
+                " healthBar=" + (barInstanceRoot != null ? barInstanceRoot.name : "null") +
+                " healthBar position before=" + positionBefore +
+                " healthBar position after=" + resolvedPosition +
+                " healthBarOffsetY=" + healthBarOffsetY.ToString("F2") +
+                " healthBar active=" + (barInstanceRoot != null && barInstanceRoot.gameObject.activeInHierarchy),
+                this);
+        }
+
+        return resolvedPosition;
+    }
+
+    private float ResolveRankHealthBarOffsetY()
+    {
+        MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
+        return rank switch
+        {
+            MonsterRank.Boss => bossHealthBarOffsetY,
+            MonsterRank.Elite => eliteHealthBarOffsetY,
+            _ => normalHealthBarOffsetY
+        };
+    }
+
+    private Renderer ResolveVisualRenderer()
+    {
+        Transform visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : null;
+        if (visualRoot == null)
+        {
+            visualRoot = transform.Find("Visual_Slime");
+        }
+
+        if (visualRoot != null)
+        {
+            Renderer renderer = visualRoot.GetComponentInChildren<Renderer>(true);
+            if (renderer != null)
+            {
+                return renderer;
+            }
+        }
+
+        return GetComponentInChildren<Renderer>(true);
     }
 
     private static Sprite GetWhiteSprite()

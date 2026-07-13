@@ -5,6 +5,9 @@ using AHD2TimeOfDay;
 
 public class EnemySpawner : MonoBehaviour
 {
+    private const string EliteSplitFromTestSuffix = "[EliteSplit_FromTest]";
+    private const string GroundSnapVersion = "BodyRendererDirect_20260713_01";
+
     private struct MonsterBaseSnapshot
     {
         public bool initialized;
@@ -25,6 +28,10 @@ public class EnemySpawner : MonoBehaviour
     public GameObject[] eliteEnemyPrefabs;
     public GameObject[] bossEnemyPrefabs;
     public bool useRuntimeRankOverride = true;
+
+    [SerializeField] private Transform bossSpawnPoint;
+    [SerializeField] private Transform[] enemySpawnPoints;
+    [SerializeField] private bool debugMonsterSpawnState = true;
 
     [Header("Legacy Spawn")]
     [Tooltip("Base refill check interval used when alive normal monsters fall below the base amount.")]
@@ -78,6 +85,10 @@ public class EnemySpawner : MonoBehaviour
     public float normalResistanceMultiplier = 1f;
     [Tooltip("Normal monster speed multiplier after base and time growth. 1 means unchanged.")]
     public float normalSpeedMultiplier = 1f;
+    [Header("Normal Visual Config")]
+    [SerializeField] private bool enableNormalVisualGroundOffset = true;
+    [SerializeField] private float normalVisualGroundOffsetY = -0.05f;
+    [SerializeField] private float normalHealthBarOffsetY = 0.25f;
 
     [Header("Rank Multipliers - Elite")]
     [Tooltip("Elite monster HP multiplier after base and time growth. 1 means unchanged.")]
@@ -96,6 +107,12 @@ public class EnemySpawner : MonoBehaviour
     public float eliteAttackIntervalMultiplier = 1.1f;
     [Tooltip("Elite outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float eliteOutgoingDamageMultiplier = 1f;
+    [SerializeField] private bool enableEliteVisualScale = true;
+    [SerializeField] private float eliteVisualScaleMultiplier = 1.5f;
+    [SerializeField] private bool enableEliteVisualGroundOffset = true;
+    [SerializeField] private float eliteVisualGroundOffsetY = 0.25f;
+    [SerializeField] private float eliteHealthBarOffsetY = 0.3f;
+    [SerializeField] private bool debugEliteVisualConfig = true;
 
     [Header("Rank Multipliers - Boss")]
     [Tooltip("Boss HP multiplier after base and time growth. 1 means unchanged.")]
@@ -114,6 +131,17 @@ public class EnemySpawner : MonoBehaviour
     public float bossAttackIntervalMultiplier = 1.8f;
     [Tooltip("Boss outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float bossOutgoingDamageMultiplier = 1.5f;
+    [SerializeField] private bool enableBossVisualScale = true;
+    [SerializeField] private float bossVisualScaleMultiplier = 4.0f;
+    [SerializeField] private bool enableBossVisualGroundOffset = true;
+    [SerializeField] private float bossVisualGroundOffsetY = 0.85f;
+    [SerializeField] private float bossVisibleGroundContactLocalYOffset = 1.0625f;
+    [SerializeField] private float bossHealthBarOffsetY = 0.45f;
+    [SerializeField] private bool debugBossVisualGroundOffset = true;
+    [SerializeField] private bool enableBossHurtboxScale = true;
+    [SerializeField] private float bossHurtboxRadiusMultiplier = 3.0f;
+    [SerializeField] private float bossHurtboxCenterYOffset = 0f;
+    [SerializeField] private bool debugBossHurtbox = true;
 
     [Header("Elite")]
     public float eliteSpawnIntervalMin = 10f;
@@ -216,6 +244,13 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private bool ignoreEnemySelfCollision = true;
     [SerializeField] private bool freezeEnemyVerticalPosition = false;
 
+    [Header("Ground Snap")]
+    [SerializeField] private LayerMask enemyGroundSnapLayerMask = 1;
+    [SerializeField, Min(1f)] private float enemyGroundSnapRayStartHeight = 20f;
+    [SerializeField, Min(1f)] private float enemyGroundSnapRayDistance = 80f;
+    [SerializeField, Min(0f)] private float enemyGroundSnapTolerance = 0.01f;
+    [SerializeField] private bool debugBossGroundSnap = true;
+
     [Header("Timed Difficulty")]
     [SerializeField] private EnemyDifficultyDirector difficultyDirector;
     [SerializeField] private bool debugDifficultySpawnLogs = false;
@@ -241,6 +276,13 @@ public class EnemySpawner : MonoBehaviour
     private bool spawnStoppedResolutionTriggered;
     private DifficultyPhase lastObservedDifficultyPhase = DifficultyPhase.Normal;
     private GameObject cleanupBossInstance;
+    private Coroutine initialNormalSpawnCoroutine;
+    private Coroutine normalBaseMaintenanceCoroutine;
+    private Coroutine normalReinforcementCoroutine;
+    private Coroutine eliteSpawnCoroutine;
+    private Coroutine monsterGrowthCoroutine;
+    private bool externalTestPauseActive;
+    public bool IsExternalTestPauseActive => externalTestPauseActive;
 
     private struct UltimateBossModifiers
     {
@@ -261,67 +303,191 @@ public class EnemySpawner : MonoBehaviour
         ConfigureEnemyLayerCollision();
         ResolvePlayerTarget();
         InitializeTodTracking();
-        StartCoroutine(InitialNormalSpawnRoutine());
-        StartCoroutine(NormalBaseMaintenanceRoutine());
-        StartCoroutine(NormalReinforcementRoutine());
-        StartCoroutine(EliteSpawnRoutine());
-        StartCoroutine(MonsterGrowthRoutine());
+        EnsureSpawnerCoroutinesRunning();
+    }
+
+    public void PauseSpawningForExternalTest()
+    {
+        if (externalTestPauseActive)
+        {
+            Debug.Log("[EnemySpawner] PauseSpawningForExternalTest ignored because spawner is already paused.", this);
+            return;
+        }
+
+        externalTestPauseActive = true;
+        StopSpawnerCoroutinesForExternalPause();
+        CancelInvoke();
+        Debug.Log("[EnemySpawner] PauseSpawningForExternalTest applied. Formal spawn loops paused for external testing.", this);
+    }
+
+    public void ResumeSpawningAfterExternalTest()
+    {
+        if (!externalTestPauseActive)
+        {
+            Debug.Log("[EnemySpawner] ResumeSpawningAfterExternalTest ignored because spawner is not paused.", this);
+            return;
+        }
+
+        externalTestPauseActive = false;
+        EnsureSpawnerCoroutinesRunning();
+        Debug.Log("[EnemySpawner] ResumeSpawningAfterExternalTest applied. Formal spawn loops resumed.", this);
     }
 
     private void Update()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         ResolvePlayerTarget();
         CheckBossSpawnByGameHours();
         CheckFinalMomentBossTrigger();
         CheckSpawnStoppedUltimateBossResolution();
     }
 
+    private void EnsureSpawnerCoroutinesRunning()
+    {
+        if (externalTestPauseActive || !enabled)
+        {
+            return;
+        }
+
+        EnsureNormalSpawnCoroutinesRunning();
+
+        if (eliteSpawnCoroutine == null)
+        {
+            eliteSpawnCoroutine = StartCoroutine(EliteSpawnRoutine());
+        }
+
+        if (monsterGrowthCoroutine == null)
+        {
+            monsterGrowthCoroutine = StartCoroutine(MonsterGrowthRoutine());
+        }
+    }
+
+    private void EnsureNormalSpawnCoroutinesRunning()
+    {
+        if (!Application.isPlaying || externalTestPauseActive || !enabled)
+        {
+            return;
+        }
+
+        if (initialNormalSpawnCoroutine == null)
+        {
+            initialNormalSpawnCoroutine = StartCoroutine(InitialNormalSpawnRoutine());
+        }
+
+        if (normalBaseMaintenanceCoroutine == null)
+        {
+            normalBaseMaintenanceCoroutine = StartCoroutine(NormalBaseMaintenanceRoutine());
+        }
+
+        if (normalReinforcementCoroutine == null)
+        {
+            normalReinforcementCoroutine = StartCoroutine(NormalReinforcementRoutine());
+        }
+    }
+
+    private void StopSpawnerCoroutinesForExternalPause()
+    {
+        if (initialNormalSpawnCoroutine != null)
+        {
+            StopCoroutine(initialNormalSpawnCoroutine);
+            initialNormalSpawnCoroutine = null;
+        }
+
+        if (normalBaseMaintenanceCoroutine != null)
+        {
+            StopCoroutine(normalBaseMaintenanceCoroutine);
+            normalBaseMaintenanceCoroutine = null;
+        }
+
+        if (normalReinforcementCoroutine != null)
+        {
+            StopCoroutine(normalReinforcementCoroutine);
+            normalReinforcementCoroutine = null;
+        }
+
+        if (eliteSpawnCoroutine != null)
+        {
+            StopCoroutine(eliteSpawnCoroutine);
+            eliteSpawnCoroutine = null;
+        }
+
+        if (monsterGrowthCoroutine != null)
+        {
+            StopCoroutine(monsterGrowthCoroutine);
+            monsterGrowthCoroutine = null;
+        }
+    }
+
     private IEnumerator InitialNormalSpawnRoutine()
     {
-        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
-        SpawnNormalEnemiesUpTo(baseNormalMonsterCount);
+        try
+        {
+            yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
+            SpawnNormalEnemiesUpTo(baseNormalMonsterCount);
+        }
+        finally
+        {
+            initialNormalSpawnCoroutine = null;
+        }
     }
 
     private IEnumerator NormalBaseMaintenanceRoutine()
     {
-        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
-
-        while (true)
+        try
         {
-            CleanupTrackedEnemies();
-            ResolvePlayerTarget();
-            SpawnNormalEnemiesUpTo(ResolveDifficultyTargetNormalCount());
-            yield return new WaitForSeconds(ResolveDifficultyAdjustedInterval(spawnInterval, 0.25f));
+            yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
+
+            while (true)
+            {
+                CleanupTrackedEnemies();
+                ResolvePlayerTarget();
+                SpawnNormalEnemiesUpTo(ResolveDifficultyTargetNormalCount());
+                yield return new WaitForSeconds(ResolveDifficultyAdjustedInterval(spawnInterval, 0.25f));
+            }
+        }
+        finally
+        {
+            normalBaseMaintenanceCoroutine = null;
         }
     }
 
     private IEnumerator NormalReinforcementRoutine()
     {
-        yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
-
-        while (true)
+        try
         {
-            float baseWaitSeconds = Random.Range(
-                Mathf.Max(0.1f, Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax)),
-                Mathf.Max(Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax) + 0.1f, Mathf.Max(normalReinforceIntervalMin, normalReinforceIntervalMax)));
-            float waitSeconds = ResolveDifficultyAdjustedInterval(baseWaitSeconds, 0.1f);
+            yield return new WaitForSeconds(Mathf.Max(0f, startDelay));
 
-            yield return new WaitForSeconds(waitSeconds);
-
-            CleanupTrackedEnemies();
-            ResolvePlayerTarget();
-
-            int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
-            int capacity = Mathf.Max(0, ResolveDifficultyAdjustedMaxNormalMonsterCount() - aliveNormal);
-            if (capacity <= 0)
+            while (true)
             {
-                continue;
-            }
+                float baseWaitSeconds = Random.Range(
+                    Mathf.Max(0.1f, Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax)),
+                    Mathf.Max(Mathf.Min(normalReinforceIntervalMin, normalReinforceIntervalMax) + 0.1f, Mathf.Max(normalReinforceIntervalMin, normalReinforceIntervalMax)));
+                float waitSeconds = ResolveDifficultyAdjustedInterval(baseWaitSeconds, 0.1f);
 
-            int reinforceMin = Mathf.Max(1, Mathf.Min(normalReinforceCountMin, normalReinforceCountMax));
-            int reinforceMax = Mathf.Max(reinforceMin, Mathf.Max(normalReinforceCountMin, normalReinforceCountMax));
-            int reinforceCount = Mathf.Min(capacity, Mathf.Max(Random.Range(reinforceMin, reinforceMax + 1), ResolveDifficultySpawnBatchCount()));
-            SpawnMultipleNormals(reinforceCount);
+                yield return new WaitForSeconds(waitSeconds);
+
+                CleanupTrackedEnemies();
+                ResolvePlayerTarget();
+                int aliveNormal = CountAliveEnemies(MonsterRank.Normal);
+                int capacity = Mathf.Max(0, ResolveDifficultyAdjustedMaxNormalMonsterCount() - aliveNormal);
+                if (capacity <= 0)
+                {
+                    continue;
+                }
+
+                int reinforceMin = Mathf.Max(1, Mathf.Min(normalReinforceCountMin, normalReinforceCountMax));
+                int reinforceMax = Mathf.Max(reinforceMin, Mathf.Max(normalReinforceCountMin, normalReinforceCountMax));
+                int reinforceCount = Mathf.Min(capacity, Mathf.Max(Random.Range(reinforceMin, reinforceMax + 1), ResolveDifficultySpawnBatchCount()));
+                SpawnMultipleNormals(reinforceCount);
+            }
+        }
+        finally
+        {
+            normalReinforcementCoroutine = null;
         }
     }
 
@@ -392,6 +558,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void SpawnNormalEnemiesUpTo(int targetCount)
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         if (!CanSpawnByDifficulty("NormalBase"))
         {
             return;
@@ -406,6 +577,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void SpawnMultipleNormals(int count)
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         count = Mathf.Max(0, count);
         for (int i = 0; i < count; i++)
         {
@@ -425,21 +601,41 @@ public class EnemySpawner : MonoBehaviour
 
     private GameObject SpawnNormalEnemy()
     {
+        if (externalTestPauseActive)
+        {
+            return null;
+        }
+
         return SpawnFromPool(ResolvePool(normalEnemyPrefabs, fallbackNormalEnemyPrefabs), MonsterRank.Normal);
     }
 
     private GameObject SpawnEliteEnemy()
     {
+        if (externalTestPauseActive)
+        {
+            return null;
+        }
+
         return SpawnFromPool(ResolvePool(eliteEnemyPrefabs, fallbackEliteEnemyPrefabs), MonsterRank.Elite);
     }
 
     private GameObject SpawnBossEnemy()
     {
+        if (externalTestPauseActive)
+        {
+            return null;
+        }
+
         return SpawnFromPool(ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs), MonsterRank.Boss);
     }
 
     private GameObject SpawnFromPool(List<GameObject> sourcePool, MonsterRank forcedRank)
     {
+        if (externalTestPauseActive)
+        {
+            return null;
+        }
+
         if (!CanSpawnByDifficulty(forcedRank.ToString()))
         {
             return null;
@@ -462,8 +658,18 @@ public class EnemySpawner : MonoBehaviour
         MonsterRank runtimeRank = forcedRank;
 
         Vector3 spawnPosition = ResolveSpawnPosition(selectedEnemy);
+        if (runtimeRank == MonsterRank.Boss)
+        {
+            LogBossSpawnYDiagnostics(selectedEnemy, spawnPosition, runtimeRank, prefabIdentity);
+        }
 
         GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
+        if (runtimeRank == MonsterRank.Boss)
+        {
+            Debug.Log(
+                $"[BossSpawnY] prefab={selectedEnemy.name} root position after Instantiate={spawnedEnemy.transform.position} rank={runtimeRank} attackStyle={(prefabIdentity != null ? prefabIdentity.attackStyle.ToString() : "Unknown")}",
+                spawnedEnemy);
+        }
         MonsterIdentity cloneIdentity = spawnedEnemy.GetComponent<MonsterIdentity>();
         if (cloneIdentity == null)
         {
@@ -477,29 +683,26 @@ public class EnemySpawner : MonoBehaviour
 
         cloneIdentity.rank = runtimeRank;
 
-        MonsterCombatAutoSetup.Configure(spawnedEnemy, runtimeSpecies, runtimeRank);
-        ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
-
-        RegisterSpawnedEnemy(spawnedEnemy);
-
-        EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
-        if (notifier == null)
-        {
-            notifier = spawnedEnemy.AddComponent<EnemyDeathNotifier>();
-        }
-        notifier.Initialize(this);
-
-        EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
-        if (enemyController != null)
-        {
-            enemyController.SetTarget(ResolveActivePlayerTarget(), "Spawner");
-        }
+        ApplyOfficialMonsterRuntimeSetup(
+            spawnedEnemy,
+            runtimeSpecies,
+            runtimeRank,
+            ResolveActivePlayerTarget(),
+            trackAsAlive: true,
+            initializeDeathNotifier: true,
+            source: "EnemySpawner");
 
         return spawnedEnemy;
     }
 
-    public void SpawnSplitNormalsFromElite(GameObject eliteSource, int count, float scatterRadius)
+    public void SpawnSplitNormalsFromElite(GameObject eliteSource, int count, float scatterRadius, bool allowDuringExternalTest = false)
     {
+        if (externalTestPauseActive && !allowDuringExternalTest)
+        {
+            Debug.Log("[EliteSplitDebug] split blocked by external test pause.", eliteSource != null ? eliteSource : this);
+            return;
+        }
+
         if (eliteSource == null || count <= 0 || !CanSpawnByDifficulty("EliteSplit"))
         {
             return;
@@ -532,6 +735,7 @@ public class EnemySpawner : MonoBehaviour
             false,
             true,
             false,
+            allowDuringExternalTest,
             "EliteDeathSplit");
     }
 
@@ -547,7 +751,8 @@ public class EnemySpawner : MonoBehaviour
         float scaleRatio,
         bool childrenCanSplit,
         bool isCleanupBoss,
-        bool debugLog)
+        bool debugLog,
+        bool allowDuringExternalTest = false)
     {
         SpawnSplitChildrenAndCollect(
             bossSource,
@@ -562,7 +767,8 @@ public class EnemySpawner : MonoBehaviour
             childrenCanSplit,
             isCleanupBoss,
             debugLog,
-            "Death");
+            "Death",
+            allowDuringExternalTest);
     }
 
     public List<GameObject> SpawnSplitChildrenAndCollect(
@@ -578,7 +784,8 @@ public class EnemySpawner : MonoBehaviour
         bool childrenCanSplit,
         bool isCleanupBoss,
         bool debugLog,
-        string splitTriggerLabel = "Death")
+        string splitTriggerLabel = "Death",
+        bool allowDuringExternalTest = false)
     {
         if (bossSource == null || count <= 0 || !CanSpawnByDifficulty("BossSplit"))
         {
@@ -620,6 +827,7 @@ public class EnemySpawner : MonoBehaviour
             childrenCanSplit,
             true,
             false,
+            allowDuringExternalTest,
             isCleanupBoss ? $"CleanupBoss{splitTriggerLabel}Split" : $"Boss{splitTriggerLabel}Split");
     }
 
@@ -637,8 +845,15 @@ public class EnemySpawner : MonoBehaviour
         bool childrenCanSplit,
         bool suppressRuneDrop,
         bool keepAsCleanupBoss,
+        bool allowDuringExternalTest,
         string splitSource)
     {
+        if (externalTestPauseActive && !allowDuringExternalTest)
+        {
+            Debug.Log("[EliteSplitDebug] split blocked by external test pause.", sourceEnemy != null ? sourceEnemy : this);
+            return new List<GameObject>();
+        }
+
         List<GameObject> sourcePool = ResolveSplitPoolForRank(childRank);
         if (sourceEnemy == null || count <= 0 || sourcePool == null || sourcePool.Count == 0)
         {
@@ -669,6 +884,8 @@ public class EnemySpawner : MonoBehaviour
             cloneIdentity.suppressRuneDrop = suppressRuneDrop;
 
             MonsterCombatAutoSetup.Configure(spawnedEnemy, species, childRank);
+            ApplyBossVisualExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
+            ApplyHealthBarExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
             ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
             ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
             RegisterSpawnedEnemy(spawnedEnemy);
@@ -680,6 +897,12 @@ public class EnemySpawner : MonoBehaviour
             }
             notifier.Initialize(this);
 
+            EliteSlimeSplitOnDeath splitComponentOnChild = spawnedEnemy.GetComponent<EliteSlimeSplitOnDeath>();
+            if (splitComponentOnChild != null)
+            {
+                splitComponentOnChild.Initialize(this);
+            }
+
             EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
             if (enemyController != null)
             {
@@ -688,11 +911,15 @@ public class EnemySpawner : MonoBehaviour
 
             if (!childrenCanSplit)
             {
-                EliteSlimeSplitOnDeath splitComponent = spawnedEnemy.GetComponent<EliteSlimeSplitOnDeath>();
-                if (splitComponent != null)
+                if (splitComponentOnChild != null)
                 {
-                    splitComponent.enabled = false;
+                    splitComponentOnChild.enabled = false;
                 }
+            }
+
+            if (sourceEnemy.name.Contains("[MonsterTest_") || sourceEnemy.name.Contains(EliteSplitFromTestSuffix))
+            {
+                spawnedEnemy.name = AppendSplitTestSuffix(spawnedEnemy.name);
             }
 
             if (!keepAsCleanupBoss && spawnedEnemy == cleanupBossInstance)
@@ -704,6 +931,11 @@ public class EnemySpawner : MonoBehaviour
         }
 
         return spawnedChildren;
+    }
+
+    private static string AppendSplitTestSuffix(string baseName)
+    {
+        return baseName.Contains(EliteSplitFromTestSuffix) ? baseName : baseName + EliteSplitFromTestSuffix;
     }
 
     private List<GameObject> ResolveSplitPoolForRank(MonsterRank rank)
@@ -838,6 +1070,262 @@ public class EnemySpawner : MonoBehaviour
         CacheMonsterBaseSnapshot(enemy);
         ConfigureSpawnedEnemyPhysics(enemy);
         ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
+        if (debugMonsterSpawnState)
+        {
+            Transform activePlayer = ResolveActivePlayerTarget();
+            if (activePlayer == null)
+            {
+                ResolvePlayerTarget();
+                activePlayer = ResolveActivePlayerTarget();
+            }
+
+            Debug.Log(BuildMonsterPrefabAndRuntimeSummary(enemy, activePlayer), enemy);
+        }
+    }
+
+    public void ApplyOfficialMonsterRuntimeSetup(
+        GameObject enemy,
+        MonsterSpecies? runtimeSpecies,
+        MonsterRank runtimeRank,
+        Transform targetOverride,
+        bool trackAsAlive,
+        bool initializeDeathNotifier,
+        string source)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        MonsterIdentity cloneIdentity = enemy.GetComponent<MonsterIdentity>();
+        if (cloneIdentity == null)
+        {
+            cloneIdentity = enemy.AddComponent<MonsterIdentity>();
+        }
+
+        if (runtimeSpecies.HasValue)
+        {
+            cloneIdentity.species = runtimeSpecies.Value;
+        }
+
+        cloneIdentity.rank = runtimeRank;
+
+        MonsterCombatAutoSetup.Configure(enemy, runtimeSpecies, runtimeRank);
+        ApplyRankVisualExternalConfig(enemy, runtimeRank, source);
+        ApplyHealthBarExternalConfig(enemy, runtimeRank, source);
+        ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(enemy);
+
+        if (trackAsAlive)
+        {
+            RegisterSpawnedEnemy(enemy);
+        }
+        else
+        {
+            CacheMonsterBaseSnapshot(enemy);
+            ConfigureSpawnedEnemyPhysics(enemy);
+            ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
+        }
+
+        if (runtimeRank == MonsterRank.Boss)
+        {
+            SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
+        }
+
+        if (initializeDeathNotifier)
+        {
+            EnemyDeathNotifier notifier = enemy.GetComponent<EnemyDeathNotifier>();
+            if (notifier == null)
+            {
+                notifier = enemy.AddComponent<EnemyDeathNotifier>();
+            }
+
+            notifier.Initialize(this);
+        }
+
+        EliteSlimeSplitOnDeath splitOnDeath = enemy.GetComponent<EliteSlimeSplitOnDeath>();
+        if (splitOnDeath != null)
+        {
+            splitOnDeath.Initialize(this);
+        }
+
+        EnemyController enemyController = enemy.GetComponent<EnemyController>();
+        if (enemyController != null)
+        {
+            enemyController.enabled = true;
+            enemyController.SetTarget(targetOverride != null ? targetOverride : ResolveActivePlayerTarget(), source);
+        }
+
+        if (debugMonsterSpawnState && !trackAsAlive)
+        {
+            Debug.Log(BuildMonsterPrefabAndRuntimeSummary(enemy, targetOverride != null ? targetOverride : ResolveActivePlayerTarget()), enemy);
+        }
+    }
+
+    private void ApplyRankVisualExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        if (rank == MonsterRank.Normal)
+        {
+            ApplyNormalVisualExternalConfig(enemy, source);
+            return;
+        }
+
+        if (rank == MonsterRank.Elite)
+        {
+            ApplyEliteVisualExternalConfig(enemy, source);
+            return;
+        }
+
+        ApplyBossVisualExternalConfig(enemy, rank, source);
+    }
+
+    private void ApplyNormalVisualExternalConfig(GameObject enemy, string source)
+    {
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        if (rankVisual == null)
+        {
+            return;
+        }
+
+        rankVisual.ApplyNormalVisualConfig(
+            enableNormalVisualGroundOffset,
+            normalVisualGroundOffsetY,
+            source);
+    }
+
+    private void ApplyEliteVisualExternalConfig(GameObject enemy, string source)
+    {
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        if (rankVisual == null)
+        {
+            return;
+        }
+
+        rankVisual.ApplyEliteVisualConfig(
+            enableEliteVisualScale,
+            eliteVisualScaleMultiplier,
+            enableEliteVisualGroundOffset,
+            eliteVisualGroundOffsetY,
+            debugEliteVisualConfig,
+            source);
+
+        if (debugEliteVisualConfig)
+        {
+            Debug.Log(
+                "[EliteSpawnDebug] " +
+                "source=" + source +
+                " prefab=" + enemy.name +
+                " rank=Elite" +
+                " visual scale applied=" + enableEliteVisualScale +
+                " final visual scale=" + rankVisual.RuntimeVisualRoot.localScale +
+                " elite visual scale multiplier=" + eliteVisualScaleMultiplier.ToString("F2"),
+                enemy);
+        }
+    }
+
+    private void ApplyBossVisualExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    {
+        if (enemy == null || rank != MonsterRank.Boss)
+        {
+            return;
+        }
+
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        if (rankVisual != null)
+        {
+            rankVisual.ApplyBossVisualConfig(
+                enableBossVisualScale,
+                bossVisualScaleMultiplier,
+                enableBossVisualGroundOffset,
+                bossVisualGroundOffsetY,
+                debugBossVisualGroundOffset,
+                source);
+
+            Debug.Log(
+                $"[BossVisualExternalConfig] scaleMultiplier={bossVisualScaleMultiplier:F2} groundOffsetY={bossVisualGroundOffsetY:F2} source={source}",
+                enemy);
+        }
+
+        ApplyBossHurtboxExternalConfig(enemy, rank, source);
+    }
+
+    private void ApplyHealthBarExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        WorldHealthBar healthBar = enemy.GetComponent<WorldHealthBar>();
+        if (healthBar == null)
+        {
+            return;
+        }
+
+        bool debug = debugMonsterSpawnState
+            || (rank == MonsterRank.Elite && debugEliteVisualConfig)
+            || (rank == MonsterRank.Boss && debugBossVisualGroundOffset);
+
+        healthBar.ApplyHealthBarConfig(
+            normalHealthBarOffsetY,
+            eliteHealthBarOffsetY,
+            bossHealthBarOffsetY,
+            debug,
+            source);
+    }
+
+    private void ApplyBossHurtboxExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    {
+        if (enemy == null || rank != MonsterRank.Boss || !enableBossHurtboxScale)
+        {
+            return;
+        }
+
+        Collider mainCollider = ResolveBossPrimaryBodyCollider(enemy);
+        if (mainCollider == null)
+        {
+            Debug.LogWarning("[BossHurtboxDebug] missing main body collider for boss hurtbox scaling.", enemy);
+            return;
+        }
+
+        Collider hurtboxCollider = EnsureBossScaledHurtbox(enemy, mainCollider);
+        if (hurtboxCollider == null)
+        {
+            Debug.LogWarning("[BossHurtboxDebug] failed to create scaled hurtbox collider.", enemy);
+            return;
+        }
+
+        if (!debugBossHurtbox)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        Transform visualTransform = ResolveBossVisualTransform(enemy);
+        Renderer visualRenderer = ResolveBossVisualRenderer(visualTransform);
+
+        Debug.Log(
+            "[BossHurtboxDebug] " +
+            "object=" + enemy.name +
+            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
+            " visualScale=" + (visualTransform != null ? visualTransform.localScale.ToString() : "null") +
+            " visualBounds=" + (visualRenderer != null ? visualRenderer.bounds.ToString() : "null") +
+            " mainCollider=" + mainCollider.name +
+            " mainColliderIsTrigger=" + mainCollider.isTrigger +
+            " mainColliderBounds=" + mainCollider.bounds +
+            " hurtboxCollider=" + hurtboxCollider.name +
+            " hurtboxIsTrigger=" + hurtboxCollider.isTrigger +
+            " hurtboxBounds=" + hurtboxCollider.bounds +
+            " layer=" + LayerMask.LayerToName(hurtboxCollider.gameObject.layer) +
+            " tag=" + hurtboxCollider.gameObject.tag +
+            " source=" + source,
+            enemy);
+
+        LogBossHurtboxShapeDetails(enemy, mainCollider, hurtboxCollider);
     }
 
     private void CacheMonsterBaseSnapshot(GameObject enemy)
@@ -867,6 +1355,46 @@ public class EnemySpawner : MonoBehaviour
             hasScaleTarget = hasScaleTarget,
             scaleTargetLocalScale = scaleTarget != null ? scaleTarget.localScale : Vector3.one
         };
+    }
+
+    private string BuildMonsterPrefabAndRuntimeSummary(GameObject enemy, Transform activePlayer)
+    {
+        MonsterIdentity identity = enemy != null ? enemy.GetComponent<MonsterIdentity>() : null;
+        EnemyController controller = enemy != null ? enemy.GetComponent<EnemyController>() : null;
+        Rigidbody body = enemy != null ? enemy.GetComponent<Rigidbody>() : null;
+        Collider[] colliders = enemy != null ? enemy.GetComponentsInChildren<Collider>(true) : null;
+        Collider primaryCollider = null;
+        if (colliders != null)
+        {
+            for (int i = 0; i < colliders.Length; i++)
+            {
+                Collider candidate = colliders[i];
+                if (candidate != null && candidate.enabled && !candidate.isTrigger)
+                {
+                    primaryCollider = candidate;
+                    break;
+                }
+            }
+        }
+
+        CombatHealth health = enemy != null ? enemy.GetComponent<CombatHealth>() : null;
+        Transform visualSlime = enemy != null ? enemy.transform.Find("Visual_Slime") : null;
+        WorldHealthBar healthBar = enemy != null ? enemy.GetComponent<WorldHealthBar>() : null;
+        string prefabSource = enemy != null ? enemy.name.Replace("(Clone)", string.Empty).Trim() : "null";
+        string runtimeSummary = controller != null
+            ? controller.BuildRuntimeDebugSummary(activePlayer)
+            : "[MonsterDebug] enemyControllerExists=false";
+
+        return
+            "[MonsterPrefabDebug] " +
+            $"prefabSource={prefabSource} rootName={(enemy != null ? enemy.name : "null")} rootPosition={(enemy != null ? enemy.transform.position.ToString() : "null")} " +
+            $"hasEnemyController={(controller != null)} hasMonsterIdentity={(identity != null)} " +
+            $"rank={(identity != null ? identity.rank.ToString() : "Unknown")} species={(identity != null ? identity.species.ToString() : "Unknown")} attackStyle={(identity != null ? identity.attackStyle.ToString() : "Unknown")} " +
+            $"hasRigidbody={(body != null)} rigidbodyConstraints={(body != null ? body.constraints.ToString() : "None")} " +
+            $"hasCollider={(primaryCollider != null)} colliderType={(primaryCollider != null ? primaryCollider.GetType().Name : "None")} colliderIsTrigger={(primaryCollider != null && primaryCollider.isTrigger)} " +
+            $"hasVisualSlime={(visualSlime != null)} visualLocalPosition={(visualSlime != null ? visualSlime.localPosition.ToString() : "null")} visualLocalScale={(visualSlime != null ? visualSlime.localScale.ToString() : "null")} " +
+            $"hasShadow=false hasHealthBar={(healthBar != null)} health={(health != null ? health.currentHealth.ToString("F1") : "n/a")}/{(health != null ? health.MaxHealthValue.ToString("F1") : "n/a")} " +
+            $"{runtimeSummary}";
     }
 
     private void ApplyMonsterGrowthRoll()
@@ -1088,7 +1616,7 @@ public class EnemySpawner : MonoBehaviour
                 range = 1.6f;
                 hitRange = 1.8f;
                 cooldown = 1.5f;
-                identity.attackStyle = MonsterAttackStyle.Melee;
+                identity.attackStyle = MonsterAttackStyle.ElementalBoss;
             }
             else
             {
@@ -1130,6 +1658,7 @@ public class EnemySpawner : MonoBehaviour
         }
 
         scaleTarget.localScale = Vector3.Scale(snapshot.scaleTargetLocalScale, Vector3.one * Mathf.Max(0.01f, cleanupBossScaleMultiplier));
+        AlignBossVisualToGround(enemy);
     }
 
     private static bool TryGetEnemyScaleTarget(GameObject enemy, out Transform scaleTarget)
@@ -1306,10 +1835,7 @@ public class EnemySpawner : MonoBehaviour
             }
 
             Vector3 spawnPosition = activePlayer.position + new Vector3(offset2D.x, 0f, offset2D.y);
-            if (selectedEnemyPrefab != null)
-            {
-                spawnPosition.y = selectedEnemyPrefab.transform.position.y;
-            }
+            spawnPosition.y = activePlayer.position.y;
 
             return spawnPosition;
         }
@@ -1318,10 +1844,7 @@ public class EnemySpawner : MonoBehaviour
         float randomX = Random.Range(-fallbackSpawnRadiusX, fallbackSpawnRadiusX);
         float randomZ = Random.Range(-fallbackSpawnRadiusZ, fallbackSpawnRadiusZ);
         fallbackPosition += new Vector3(randomX, 0f, randomZ);
-        if (selectedEnemyPrefab != null)
-        {
-            fallbackPosition.y = selectedEnemyPrefab.transform.position.y;
-        }
+        fallbackPosition.y = transform.position.y;
 
         return fallbackPosition;
     }
@@ -1398,7 +1921,25 @@ public class EnemySpawner : MonoBehaviour
         {
             RigidbodyConstraints constraints = body.constraints;
             constraints |= RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
-            constraints &= ~RigidbodyConstraints.FreezePositionY;
+            MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+            bool shouldFreezeVerticalPosition = freezeEnemyVerticalPosition ||
+                                                (identity != null && identity.rank == MonsterRank.Boss);
+            if (shouldFreezeVerticalPosition)
+            {
+                if (identity != null && identity.rank == MonsterRank.Boss)
+                {
+                    AlignBossVisualToGround(enemy);
+                }
+
+                constraints |= RigidbodyConstraints.FreezePositionY;
+                Vector3 velocity = body.linearVelocity;
+                velocity.y = 0f;
+                body.linearVelocity = velocity;
+            }
+            else
+            {
+                constraints &= ~RigidbodyConstraints.FreezePositionY;
+            }
 
             body.constraints = constraints;
         }
@@ -1420,6 +1961,324 @@ public class EnemySpawner : MonoBehaviour
             Collider[] otherColliders = otherEnemy.GetComponentsInChildren<Collider>(true);
             IgnoreColliderPairs(newEnemyColliders, otherColliders);
         }
+    }
+
+    private static void AlignBossVisualToGround(GameObject enemy)
+    {
+        // Boss visual grounding is now handled by MonsterRankVisual using a stable local offset.
+        // Keep root / rigidbody / collider anchored to gameplay ground.
+    }
+
+    public void SnapEnemyToGround(GameObject enemy, LayerMask groundMask, string spawnSource)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        Transform visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : enemy.transform.Find("Visual_Slime");
+        Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
+        Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
+        Transform groundContact = EnsureBossGroundContactTransform(visualRoot);
+        EnemyController enemyController = enemy.GetComponent<EnemyController>();
+        Transform target = ResolveActivePlayerTarget();
+
+        Vector3 positionBeforeSnap = enemy.transform.position;
+        Vector3 finalScale = visualRoot != null ? visualRoot.localScale : enemy.transform.localScale;
+        Vector3 visualRootLocalPosition = visualRoot != null ? visualRoot.localPosition : Vector3.zero;
+
+        Physics.SyncTransforms();
+
+        float colliderMinY = primaryCollider != null ? primaryCollider.bounds.min.y : float.PositiveInfinity;
+        float rendererMinY = visualRenderer != null ? visualRenderer.bounds.min.y : float.PositiveInfinity;
+        float groundContactY = groundContact != null ? groundContact.position.y : float.PositiveInfinity;
+        float chosenBottomY = groundContactY;
+        string chosenGroundingSource = groundContact != null ? "GroundContact" : "RootFallback";
+        float chosenBottomYImmediatelyAfterAssignment = chosenBottomY;
+        string scenePath = BuildScenePath(enemy.transform);
+        int scriptInstanceId = GetInstanceID();
+        int visualRendererInstanceId = visualRenderer != null ? visualRenderer.GetInstanceID() : 0;
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundTrace-A] " +
+                "version=" + GroundSnapVersion +
+                " scriptInstanceId=" + scriptInstanceId +
+                " gameObjectScenePath=" + scenePath +
+                " rendererMinY=" + rendererMinY.ToString("F3") +
+                " groundContactY=" + groundContactY.ToString("F3") +
+                " chosenBottomY=" + chosenBottomY.ToString("F3") +
+                " chosenGroundingSource=" + chosenGroundingSource +
+                " chosenBottomYImmediatelyAfterAssignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " visualRendererInstanceId=" + visualRendererInstanceId,
+                enemy);
+        }
+
+        if (float.IsInfinity(chosenBottomY))
+        {
+            chosenBottomY = enemy.transform.position.y;
+            chosenGroundingSource = "RootFallback";
+        }
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundTrace-B] " +
+                "version=" + GroundSnapVersion +
+                " scriptInstanceId=" + scriptInstanceId +
+                " gameObjectScenePath=" + scenePath +
+                " rendererMinY=" + rendererMinY.ToString("F3") +
+                " groundContactY=" + groundContactY.ToString("F3") +
+                " chosenBottomY=" + chosenBottomY.ToString("F3") +
+                " chosenGroundingSource=" + chosenGroundingSource +
+                " chosenBottomYImmediatelyAfterAssignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " visualRendererInstanceId=" + visualRendererInstanceId,
+                enemy);
+        }
+
+        float boundsTopY = Mathf.Max(
+            primaryCollider != null ? primaryCollider.bounds.max.y : enemy.transform.position.y,
+            visualRenderer != null ? visualRenderer.bounds.max.y : enemy.transform.position.y);
+
+        Vector3 rayOrigin = new Vector3(
+            enemy.transform.position.x,
+            Mathf.Max(enemy.transform.position.y, boundsTopY) + Mathf.Max(1f, enemyGroundSnapRayStartHeight),
+            enemy.transform.position.z);
+
+        if (!TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), groundMask, out RaycastHit groundHit))
+        {
+            if (debugBossGroundSnap)
+            {
+                Debug.LogWarning(
+                    "[BossGroundDebug] " +
+                    "version=" + GroundSnapVersion +
+                    " script instance id=" + scriptInstanceId +
+                    " gameObject scene path=" + scenePath +
+                    "boss name=" + enemy.name +
+                    " spawn source=" + spawnSource +
+                    " position before snap=" + positionBeforeSnap +
+                    " position after snap=" + enemy.transform.position +
+                    " final scale=" + finalScale +
+                    " visual root local position=" + visualRootLocalPosition +
+                    " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
+                    " ground contact world y=" + groundContactY.ToString("F3") +
+                    " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                    " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
+                    " rendererMinY raw=" + rendererMinY.ToString("F3") +
+                    " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                    " collider bottom y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                    " chosenBottomY immediately after assignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                    " chosen bottom y=" + chosenBottomY.ToString("F3") +
+                    " chosen grounding source=" + chosenGroundingSource +
+                    " visualRenderer instance id=" + visualRendererInstanceId +
+                    " collider type=" + (primaryCollider != null ? primaryCollider.GetType().Name : "None") +
+                    " collider center=" + ResolveColliderCenter(primaryCollider) +
+                    " collider radius/size=" + ResolveColliderSize(primaryCollider) +
+                    " collider bounds min y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                    " renderer bounds min y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                    " ground hit object=None ground hit layer=None ground hit y=n/a calculated correction y=0.000" +
+                    " vertical distance to target=" + (target != null ? Mathf.Abs(target.position.y - enemy.transform.position.y).ToString("F3") : "n/a") +
+                    " isGrounded=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                    " canAttack=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                    " rigidbody useGravity=" + (body != null && body.useGravity) +
+                    " rigidbody isKinematic=" + (body != null && body.isKinematic),
+                    enemy);
+            }
+
+            return;
+        }
+
+        float correctionY = groundHit.point.y - chosenBottomY;
+        if (Mathf.Abs(correctionY) > Mathf.Max(0f, enemyGroundSnapTolerance))
+        {
+            Vector3 snappedPosition = enemy.transform.position + Vector3.up * correctionY;
+            enemy.transform.position = snappedPosition;
+            if (body != null)
+            {
+                body.position = snappedPosition;
+                Vector3 velocity = body.linearVelocity;
+                velocity.y = 0f;
+                body.linearVelocity = velocity;
+            }
+        }
+
+        Physics.SyncTransforms();
+
+        if (debugBossGroundSnap)
+        {
+            Debug.Log(
+                "[BossGroundDebug] " +
+                "version=" + GroundSnapVersion +
+                " script instance id=" + scriptInstanceId +
+                " gameObject scene path=" + scenePath +
+                "boss name=" + enemy.name +
+                " spawn source=" + spawnSource +
+                " position before snap=" + positionBeforeSnap +
+                " position after snap=" + enemy.transform.position +
+                " final scale=" + finalScale +
+                " visual root local position=" + visualRootLocalPosition +
+                " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
+                " ground contact world y=" + groundContactY.ToString("F3") +
+                " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
+                " rendererMinY raw=" + rendererMinY.ToString("F3") +
+                " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                " collider bottom y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                " chosenBottomY immediately after assignment=" + chosenBottomYImmediatelyAfterAssignment.ToString("F3") +
+                " chosen bottom y=" + chosenBottomY.ToString("F3") +
+                " chosen grounding source=" + chosenGroundingSource +
+                " chosenBottomY before correction=" + chosenBottomY.ToString("F3") +
+                " visualRenderer instance id=" + visualRendererInstanceId +
+                " collider type=" + (primaryCollider != null ? primaryCollider.GetType().Name : "None") +
+                " collider center=" + ResolveColliderCenter(primaryCollider) +
+                " collider radius/size=" + ResolveColliderSize(primaryCollider) +
+                " collider bounds min y=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+                " renderer bounds min y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+                " ground hit object=" + groundHit.collider.name +
+                " ground hit layer=" + LayerMask.LayerToName(groundHit.collider.gameObject.layer) +
+                " ground hit y=" + groundHit.point.y.ToString("F3") +
+                " calculated correction y=" + correctionY.ToString("F3") +
+                " vertical distance to target=" + (target != null ? Mathf.Abs(target.position.y - enemy.transform.position.y).ToString("F3") : "n/a") +
+                " isGrounded=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                " canAttack=" + (enemyController != null ? "see EnemyChaseDiag" : "n/a") +
+                " rigidbody useGravity=" + (body != null && body.useGravity) +
+                " rigidbody isKinematic=" + (body != null && body.isKinematic),
+                enemy);
+        }
+    }
+
+    private Transform EnsureBossGroundContactTransform(Transform visualRoot)
+    {
+        if (visualRoot == null)
+        {
+            return null;
+        }
+
+        Transform groundContact = visualRoot.Find("GroundContact");
+        if (groundContact == null)
+        {
+            GameObject groundContactObject = new GameObject("GroundContact");
+            groundContact = groundContactObject.transform;
+            groundContact.SetParent(visualRoot, false);
+        }
+
+        Vector3 localPosition = groundContact.localPosition;
+        localPosition.x = 0f;
+        localPosition.y = bossVisibleGroundContactLocalYOffset;
+        localPosition.z = 0f;
+        groundContact.localPosition = localPosition;
+        groundContact.localRotation = Quaternion.identity;
+        groundContact.localScale = Vector3.one;
+        return groundContact;
+    }
+
+    private static string BuildScenePath(Transform target)
+    {
+        if (target == null)
+        {
+            return "null";
+        }
+
+        string path = target.name;
+        Transform current = target.parent;
+        while (current != null)
+        {
+            path = current.name + "/" + path;
+            current = current.parent;
+        }
+
+        return path;
+    }
+
+    private void LogBossSpawnYDiagnostics(GameObject prefab, Vector3 spawnPosition, MonsterRank rank, MonsterIdentity prefabIdentity)
+    {
+        Transform activePlayer = ResolveActivePlayerTarget();
+        Debug.Log(
+            $"[BossSpawnY] prefab={(prefab != null ? prefab.name : "null")} prefab.transform.position.y={(prefab != null ? prefab.transform.position.y.ToString("F2") : "n/a")} " +
+            $"requested spawnPosition.y={spawnPosition.y:F2} final spawnPosition.y before Instantiate={spawnPosition.y:F2} player.position.y={(activePlayer != null ? activePlayer.position.y.ToString("F2") : "n/a")} " +
+            $"spawner.position.y={transform.position.y:F2} rank={rank} attackStyle={(prefabIdentity != null ? prefabIdentity.attackStyle.ToString() : "Unknown")}",
+            this);
+    }
+
+    private static bool TryRaycastGroundBelow(GameObject enemy, Vector3 rayOrigin, float rayDistance, LayerMask groundMask, out RaycastHit selectedHit)
+    {
+        RaycastHit[] hits = Physics.RaycastAll(
+            rayOrigin,
+            Vector3.down,
+            Mathf.Max(1f, rayDistance),
+            groundMask,
+            QueryTriggerInteraction.Ignore);
+
+        if (hits == null || hits.Length == 0)
+        {
+            selectedHit = default;
+            return false;
+        }
+
+        System.Array.Sort(hits, (left, right) => left.distance.CompareTo(right.distance));
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            Collider hitCollider = hit.collider;
+            if (hitCollider == null || hitCollider.isTrigger)
+            {
+                continue;
+            }
+
+            if (enemy != null && (hitCollider.transform == enemy.transform || hitCollider.transform.IsChildOf(enemy.transform)))
+            {
+                continue;
+            }
+
+            selectedHit = hit;
+            return true;
+        }
+
+        selectedHit = default;
+        return false;
+    }
+
+    private static string ResolveColliderCenter(Collider collider)
+    {
+        if (collider is SphereCollider sphere)
+        {
+            return sphere.center.ToString();
+        }
+
+        if (collider is CapsuleCollider capsule)
+        {
+            return capsule.center.ToString();
+        }
+
+        if (collider is BoxCollider box)
+        {
+            return box.center.ToString();
+        }
+
+        return "n/a";
+    }
+
+    private static string ResolveColliderSize(Collider collider)
+    {
+        if (collider is SphereCollider sphere)
+        {
+            return "radius=" + sphere.radius.ToString("F3");
+        }
+
+        if (collider is CapsuleCollider capsule)
+        {
+            return "radius=" + capsule.radius.ToString("F3") + " height=" + capsule.height.ToString("F3");
+        }
+
+        if (collider is BoxCollider box)
+        {
+            return "size=" + box.size;
+        }
+
+        return "n/a";
     }
 
     private static void IgnoreColliderPairs(Collider[] first, Collider[] second)
@@ -1545,6 +2404,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void CheckBossSpawnByGameHours()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         if (todController == null)
         {
             todController = FindObjectOfType<TODController>();
@@ -1584,6 +2448,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void CheckFinalMomentBossTrigger()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         EnemyDifficultyDirector director = ResolveDifficultyDirector();
         DifficultyPhase currentPhase = director != null ? director.CurrentPhase : DifficultyPhase.Normal;
         bool enteredFinalRush = currentPhase == DifficultyPhase.FinalRush &&
@@ -1601,6 +2470,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void CheckSpawnStoppedUltimateBossResolution()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         EnemyDifficultyDirector director = ResolveDifficultyDirector();
         if (director == null || director.CurrentPhase != DifficultyPhase.SpawnStopped || spawnStoppedResolutionTriggered)
         {
@@ -1613,6 +2487,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void ResolveUltimateBossAfterCountdown()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         CleanupTrackedEnemies();
 
         int remainingNonBossEnemyCount = CountAliveNonBossEnemies();
@@ -1640,6 +2519,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void EnsureFinalMomentBoss()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         CleanupTrackedEnemies();
 
         GameObject existingBoss = FindAliveBossEnemy();
@@ -1840,29 +2724,25 @@ public class EnemySpawner : MonoBehaviour
         }
 
         cloneIdentity.rank = MonsterRank.Boss;
-        MonsterCombatAutoSetup.Configure(spawnedEnemy, runtimeSpecies, MonsterRank.Boss);
-        ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
-        RegisterSpawnedEnemy(spawnedEnemy);
-
-        EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
-        if (notifier == null)
-        {
-            notifier = spawnedEnemy.AddComponent<EnemyDeathNotifier>();
-        }
-
-        notifier.Initialize(this);
-
-        EnemyController enemyController = spawnedEnemy.GetComponent<EnemyController>();
-        if (enemyController != null)
-        {
-            enemyController.SetTarget(ResolveActivePlayerTarget(), "UltimateBossResolution");
-        }
+        ApplyOfficialMonsterRuntimeSetup(
+            spawnedEnemy,
+            runtimeSpecies,
+            MonsterRank.Boss,
+            ResolveActivePlayerTarget(),
+            trackAsAlive: true,
+            initializeDeathNotifier: true,
+            source: "EnemySpawner");
 
         return spawnedEnemy;
     }
 
     private void TrySpawnBossFromTimedCheck()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         if (!CanSpawnByDifficulty("BossTimed"))
         {
             return;
@@ -1905,6 +2785,11 @@ public class EnemySpawner : MonoBehaviour
 
     private bool TrySpawnEliteIfAvailable()
     {
+        if (externalTestPauseActive)
+        {
+            return false;
+        }
+
         if (!CanSpawnByDifficulty("Elite"))
         {
             return false;
@@ -2125,6 +3010,11 @@ public class EnemySpawner : MonoBehaviour
 
     private void TrySpawnBossFromKillCount()
     {
+        if (externalTestPauseActive)
+        {
+            return;
+        }
+
         if (!CanSpawnByDifficulty("BossByKills"))
         {
             return;
@@ -2168,6 +3058,364 @@ public class EnemySpawner : MonoBehaviour
         }
 
         return ResolveSpawnPosition(bossPool[0]).ToString("F2");
+    }
+
+    private Transform ResolveBossVisualTransform(GameObject boss)
+    {
+        if (boss == null)
+        {
+            return null;
+        }
+
+        SlimeAnimationController slimeAnimation = boss.GetComponent<SlimeAnimationController>();
+        if (slimeAnimation != null && slimeAnimation.VisualRoot != null)
+        {
+            return slimeAnimation.VisualRoot;
+        }
+
+        Transform namedVisual = boss.transform.Find("Visual_Slime");
+        if (namedVisual != null)
+        {
+            return namedVisual;
+        }
+
+        SpriteRenderer spriteRenderer = boss.GetComponentInChildren<SpriteRenderer>(true);
+        if (spriteRenderer != null)
+        {
+            return spriteRenderer.transform;
+        }
+
+        Renderer renderer = boss.GetComponentInChildren<Renderer>(true);
+        return renderer != null ? renderer.transform : boss.transform;
+    }
+
+    private Renderer ResolveBossVisualRenderer(Transform visualTransform)
+    {
+        if (visualTransform == null)
+        {
+            return null;
+        }
+
+        Renderer directRenderer = visualTransform.GetComponent<Renderer>();
+        if (IsValidBossBodyRenderer(directRenderer))
+        {
+            return directRenderer;
+        }
+
+        MeshRenderer[] meshRenderers = visualTransform.GetComponentsInChildren<MeshRenderer>(true);
+        Renderer bestRenderer = SelectBestBossBodyRenderer(meshRenderers);
+        if (bestRenderer != null)
+        {
+            return bestRenderer;
+        }
+
+        SpriteRenderer[] spriteRenderers = visualTransform.GetComponentsInChildren<SpriteRenderer>(true);
+        bestRenderer = SelectBestBossBodyRenderer(spriteRenderers);
+        if (bestRenderer != null)
+        {
+            return bestRenderer;
+        }
+
+        Renderer[] renderers = visualTransform.GetComponentsInChildren<Renderer>(true);
+        return SelectBestBossBodyRenderer(renderers);
+    }
+
+    private Collider ResolveBossPrimaryBodyCollider(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        Collider[] colliders = enemy.GetComponentsInChildren<Collider>(true);
+        Collider bestCollider = null;
+        float bestScore = float.MinValue;
+
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null || !collider.enabled || collider.isTrigger)
+            {
+                continue;
+            }
+
+            if (ShouldIgnoreBossBodyColliderTransform(collider.transform))
+            {
+                continue;
+            }
+
+            float volume = collider.bounds.size.x * collider.bounds.size.y * collider.bounds.size.z;
+            float score = volume;
+            if (collider.transform == enemy.transform)
+            {
+                score += 1000f;
+            }
+
+            if (score > bestScore)
+            {
+                bestScore = score;
+                bestCollider = collider;
+            }
+        }
+
+        return bestCollider;
+    }
+
+    private static Renderer SelectBestBossBodyRenderer(Renderer[] renderers)
+    {
+        if (renderers == null || renderers.Length == 0)
+        {
+            return null;
+        }
+
+        Renderer bestRenderer = null;
+        float bestArea = float.MinValue;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            Renderer renderer = renderers[i];
+            if (!IsValidBossBodyRenderer(renderer))
+            {
+                continue;
+            }
+
+            Bounds bounds = renderer.bounds;
+            float areaScore = bounds.size.x * bounds.size.y;
+            if (bestRenderer == null || areaScore > bestArea)
+            {
+                bestRenderer = renderer;
+                bestArea = areaScore;
+            }
+        }
+
+        return bestRenderer;
+    }
+
+    private static bool IsValidBossBodyRenderer(Renderer renderer)
+    {
+        if (renderer == null || !renderer.enabled)
+        {
+            return false;
+        }
+
+        if (renderer is TrailRenderer || renderer is ParticleSystemRenderer || renderer is LineRenderer)
+        {
+            return false;
+        }
+
+        Transform target = renderer.transform;
+        string name = target.name.ToLowerInvariant();
+        if (name.Contains("shadow") ||
+            name.Contains("healthbar") ||
+            name.Contains("hpbar") ||
+            name.Contains("trail") ||
+            name.Contains("particle") ||
+            name.Contains("effect") ||
+            name.Contains("aura") ||
+            name.Contains("warning") ||
+            name.Contains("indicator"))
+        {
+            return false;
+        }
+
+        if (target.GetComponentInParent<Canvas>(true) != null)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private Collider EnsureBossScaledHurtbox(GameObject enemy, Collider sourceCollider)
+    {
+        Transform hurtboxRoot = enemy.transform.Find("BossScaledHurtbox");
+        if (hurtboxRoot == null)
+        {
+            GameObject hurtboxObject = new GameObject("BossScaledHurtbox");
+            hurtboxRoot = hurtboxObject.transform;
+            hurtboxRoot.SetParent(enemy.transform, false);
+        }
+
+        hurtboxRoot.gameObject.layer = enemy.layer;
+        hurtboxRoot.gameObject.tag = enemy.tag;
+        hurtboxRoot.localPosition = Vector3.zero;
+        hurtboxRoot.localRotation = Quaternion.identity;
+        hurtboxRoot.localScale = Vector3.one;
+
+        float radiusMultiplier = Mathf.Max(1f, bossHurtboxRadiusMultiplier);
+
+        if (sourceCollider is SphereCollider sourceSphere)
+        {
+            RemoveColliderComponentsExcept<SphereCollider>(hurtboxRoot);
+            SphereCollider hurtbox = hurtboxRoot.GetComponent<SphereCollider>();
+            if (hurtbox == null)
+            {
+                hurtbox = hurtboxRoot.gameObject.AddComponent<SphereCollider>();
+            }
+
+            hurtbox.isTrigger = true;
+            hurtbox.center = sourceSphere.center + Vector3.up * bossHurtboxCenterYOffset;
+            hurtbox.radius = Mathf.Max(0.05f, sourceSphere.radius * radiusMultiplier);
+            return hurtbox;
+        }
+
+        if (sourceCollider is CapsuleCollider sourceCapsule)
+        {
+            RemoveColliderComponentsExcept<CapsuleCollider>(hurtboxRoot);
+            CapsuleCollider hurtbox = hurtboxRoot.GetComponent<CapsuleCollider>();
+            if (hurtbox == null)
+            {
+                hurtbox = hurtboxRoot.gameObject.AddComponent<CapsuleCollider>();
+            }
+
+            hurtbox.isTrigger = true;
+            hurtbox.direction = sourceCapsule.direction;
+            hurtbox.center = sourceCapsule.center + Vector3.up * bossHurtboxCenterYOffset;
+            hurtbox.radius = Mathf.Max(0.05f, sourceCapsule.radius * radiusMultiplier);
+            hurtbox.height = Mathf.Max(hurtbox.radius * 2f, sourceCapsule.height * radiusMultiplier);
+            return hurtbox;
+        }
+
+        if (sourceCollider is BoxCollider sourceBox)
+        {
+            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
+            BoxCollider hurtbox = hurtboxRoot.GetComponent<BoxCollider>();
+            if (hurtbox == null)
+            {
+                hurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
+            }
+
+            hurtbox.isTrigger = true;
+            hurtbox.center = sourceBox.center + Vector3.up * bossHurtboxCenterYOffset;
+            hurtbox.size = sourceBox.size * radiusMultiplier;
+            return hurtbox;
+        }
+
+        return null;
+    }
+
+    private static void RemoveColliderComponentsExcept<T>(Transform root) where T : Collider
+    {
+        Collider[] colliders = root.GetComponents<Collider>();
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null || collider is T)
+            {
+                continue;
+            }
+
+            Object.Destroy(collider);
+        }
+    }
+
+    private void LogBossHurtboxShapeDetails(GameObject enemy, Collider mainCollider, Collider hurtboxCollider)
+    {
+        Debug.Log(
+            "[BossHurtboxDebug] " +
+            "object=" + enemy.name +
+            " mainDetails=" + ResolveColliderShapeDetails(mainCollider) +
+            " hurtboxDetails=" + ResolveColliderShapeDetails(hurtboxCollider),
+            enemy);
+    }
+
+    private static string ResolveColliderShapeDetails(Collider collider)
+    {
+        if (collider == null)
+        {
+            return "null";
+        }
+
+        if (collider is SphereCollider sphere)
+        {
+            return "center=" + sphere.center + " radius=" + sphere.radius.ToString("F2");
+        }
+
+        if (collider is CapsuleCollider capsule)
+        {
+            return "center=" + capsule.center + " radius=" + capsule.radius.ToString("F2") + " height=" + capsule.height.ToString("F2");
+        }
+
+        if (collider is BoxCollider box)
+        {
+            return "center=" + box.center + " size=" + box.size;
+        }
+
+        return collider.GetType().Name;
+    }
+
+    private static bool ShouldIgnoreBossBodyColliderTransform(Transform target)
+    {
+        if (target == null)
+        {
+            return true;
+        }
+
+        string path = target.name.ToLowerInvariant();
+        Transform current = target.parent;
+        while (current != null)
+        {
+            path += "/" + current.name.ToLowerInvariant();
+            current = current.parent;
+        }
+
+        string[] ignoredKeywords =
+        {
+            "hitbox",
+            "attack",
+            "detect",
+            "range",
+            "sensor",
+            "skill",
+            "canvas",
+            "healthbar",
+            "ui",
+            "bossscaledhurtbox"
+        };
+
+        for (int i = 0; i < ignoredKeywords.Length; i++)
+        {
+            if (path.Contains(ignoredKeywords[i]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public float GetConfiguredVisualScaleMultiplier(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => enableBossVisualScale ? bossVisualScaleMultiplier : 1f,
+            MonsterRank.Elite => enableEliteVisualScale ? eliteVisualScaleMultiplier : 1f,
+            _ => 1f
+        };
+    }
+
+    public float GetConfiguredVisualGroundOffsetY(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => enableBossVisualGroundOffset ? bossVisualGroundOffsetY : 0f,
+            MonsterRank.Elite => enableEliteVisualGroundOffset ? eliteVisualGroundOffsetY : 0f,
+            _ => enableNormalVisualGroundOffset ? normalVisualGroundOffsetY : 0f
+        };
+    }
+
+    public float GetConfiguredHealthBarOffsetY(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => bossHealthBarOffsetY,
+            MonsterRank.Elite => eliteHealthBarOffsetY,
+            _ => normalHealthBarOffsetY
+        };
+    }
+
+    public float GetConfiguredBossHurtboxRadiusMultiplier()
+    {
+        return Mathf.Max(1f, bossHurtboxRadiusMultiplier);
     }
 
     private static float RoundToDecimals(float value, int decimals)
