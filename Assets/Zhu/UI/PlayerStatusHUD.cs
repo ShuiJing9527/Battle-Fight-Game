@@ -27,6 +27,12 @@ public class PlayerStatusHUD : MonoBehaviour
     private CombatStats cachedCombatStats;
     private float nextBootstrapLookupTime;
 
+    public void SetDisplayVisible(bool visible)
+    {
+        if (root != null)
+            root.SetActive(visible);
+    }
+
     private void Awake()
     {
         EnsureAttributePanelController();
@@ -37,6 +43,7 @@ public class PlayerStatusHUD : MonoBehaviour
 
     private void OnEnable()
     {
+        GameLocalization.LanguageChanged += OnLanguageChanged;
         EnsureAttributePanelController();
         ApplyStaticTexts();
         RefreshPlayerCache(force: true);
@@ -53,18 +60,40 @@ public class PlayerStatusHUD : MonoBehaviour
     {
         if (switchHintText != null)
         {
-            switchHintText.text = "T: Switch Player";
+            SetStaticText(switchHintText, "T: Switch Player");
         }
 
         if (runeHintText != null)
         {
-            runeHintText.text = "K: Rune Panel";
+            SetStaticText(runeHintText, "K: Rune Panel");
         }
 
         if (characterPanelHintText != null)
         {
-            characterPanelHintText.text = "I: Character Panel";
+            SetStaticText(characterPanelHintText, "I: Character Panel");
         }
+    }
+
+    private void OnDisable()
+    {
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(GameLanguage language)
+    {
+        ApplyStaticTexts();
+    }
+
+    private static void SetStaticText(TextMeshProUGUI text, string key)
+    {
+        if (GameLocalization.Instance == null)
+        {
+            text.text = key;
+            return;
+        }
+
+        text.text = GameLocalization.Instance.Translate(key);
+        GameLocalization.Instance.ApplyToText(text, key);
     }
 
     private void RefreshPlayerCache(bool force)
