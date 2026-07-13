@@ -1327,7 +1327,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         ShowSharedDescription(
-            string.IsNullOrWhiteSpace(entry.displayName) ? normalizedKey : entry.displayName,
+            SkillUIDefinitionDatabase.GetLocalizedTitle(entry),
             SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
             true);
     }
