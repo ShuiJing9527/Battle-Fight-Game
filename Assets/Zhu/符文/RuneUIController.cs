@@ -219,6 +219,7 @@ public class RuneUIController : MonoBehaviour
 
     private void OnEnable()
     {
+        GameLocalization.LanguageChanged += OnLanguageChanged;
         if (!Application.isPlaying)
         {
             return;
@@ -246,6 +247,7 @@ public class RuneUIController : MonoBehaviour
 
     private void OnDisable()
     {
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
         if (!Application.isPlaying)
         {
             return;
@@ -256,12 +258,31 @@ public class RuneUIController : MonoBehaviour
 
     private void OnDestroy()
     {
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
         if (!Application.isPlaying)
         {
             return;
         }
 
         RestoreState();
+    }
+
+    private void OnLanguageChanged(GameLanguage language)
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        RefreshRuneList();
+        RefreshSkillSlots();
+        SetSelectedRune(selectedRune);
+        RefreshSkillInfoVisuals();
+    }
+
+    private static string Localize(string text)
+    {
+        return GameLocalization.Instance != null ? GameLocalization.Instance.Translate(text) : text;
     }
 
     public void TogglePanel()
@@ -352,7 +373,7 @@ public class RuneUIController : MonoBehaviour
         if (noRuneText != null)
         {
             noRuneText.gameObject.SetActive(!hasRuneEntries);
-            noRuneText.text = hasRuneEntries ? string.Empty : LabelNoRune;
+            noRuneText.text = hasRuneEntries ? string.Empty : Localize(LabelNoRune);
         }
 
         for (int i = 0; i < childCount; i++)
@@ -381,7 +402,7 @@ public class RuneUIController : MonoBehaviour
                 }
                 else
                 {
-                    label.text = LabelEmpty;
+                    label.text = Localize(LabelEmpty);
                 }
             }
 
@@ -516,7 +537,7 @@ public class RuneUIController : MonoBehaviour
             }
 
             RuneDefinition rune = GetEquippedRune(skillIndex, i);
-            slotView.label.text = rune != null ? GetRuneName(rune) : LabelEmpty;
+            slotView.label.text = rune != null ? GetRuneName(rune) : Localize(LabelEmpty);
             if (slotView.button != null)
             {
                 BindEquippedSlotHoverEvents(slotView.button, skillIndex, rune);
@@ -615,7 +636,7 @@ public class RuneUIController : MonoBehaviour
         selectedRune = rune;
         if (selectedRuneText != null)
         {
-            selectedRuneText.text = selectedRune != null ? $"Selected Rune: {GetRuneName(selectedRune)}" : LabelSelectedRuneNone;
+            selectedRuneText.text = selectedRune != null ? $"{Localize("Selected Rune")}: {GetRuneName(selectedRune)}" : Localize(LabelSelectedRuneNone);
         }
 
         RefreshSelectedRuneDetails(selectedRune);
@@ -964,15 +985,15 @@ public class RuneUIController : MonoBehaviour
     {
         if (rune == null)
         {
-            return LabelEmpty;
+            return Localize(LabelEmpty);
         }
 
         if (!string.IsNullOrEmpty(rune.runeName))
         {
-            return rune.runeName;
+            return Localize(rune.runeName);
         }
 
-        return LabelRuneFallback;
+        return Localize(LabelRuneFallback);
     }
 
     private string GetSkillKeyName(int skillIndex)
@@ -1198,7 +1219,7 @@ public class RuneUIController : MonoBehaviour
         {
             if (runeNameText != null)
             {
-                runeNameText.text = LabelRuneNameNone;
+                runeNameText.text = Localize(LabelRuneNameNone);
             }
 
             if (runeTypeText != null)
@@ -1222,7 +1243,7 @@ public class RuneUIController : MonoBehaviour
 
         if (runeNameText != null)
         {
-            runeNameText.text = $"Selected Rune: {GetRuneName(rune)}";
+            runeNameText.text = $"{Localize("Selected Rune")}: {GetRuneName(rune)}";
         }
 
         if (runeTypeText != null)
@@ -1251,12 +1272,13 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        string rarityText = rune.rarity.ToString();
-        string typeText = rune.GetTypeDisplayName();
-        string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : rune.description.Trim();
+        string rarityText = Localize(rune.rarity.ToString());
+        string typeText = Localize(rune.GetTypeDisplayName());
+        string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : Localize(rune.description.Trim());
         string effectText = rune.GetFullEffectDescription();
-        string body = $"Type: {typeText} / {rarityText}\n\nDescription:\n{description}\n\nEffect:\n{(string.IsNullOrWhiteSpace(effectText) ? $"ID: {rune.runeId}" : effectText)}";
-        ShowSharedDescription($"Rune Name: {GetRuneName(rune)}", body, false);
+        effectText = string.IsNullOrWhiteSpace(effectText) ? $"ID: {rune.runeId}" : Localize(effectText);
+        string body = $"{Localize("Type")}: {typeText} / {rarityText}\n\n{Localize("Description")}:\n{description}\n\n{Localize("Effect")}:\n{effectText}";
+        ShowSharedDescription($"{Localize("Rune Name")}: {GetRuneName(rune)}", body, false);
     }
 
     private void ShowEquippedSlotDescription(int skillIndex, RuneDefinition rune)
@@ -1305,7 +1327,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         ShowSharedDescription(
-            string.IsNullOrWhiteSpace(entry.displayName) ? normalizedKey : entry.displayName,
+            SkillUIDefinitionDatabase.GetLocalizedTitle(entry),
             SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
             true);
     }
@@ -1372,7 +1394,14 @@ public class RuneUIController : MonoBehaviour
 
     private void SetOldHudVisible(bool visible)
     {
-        // Keep Player2Bootstrap enabled so T character switching remains available while the rune panel is open.
+        // Keep Player2Bootstrap enabled so input remains available while the rune panel is open,
+        // but hide the visible combat HUD to prevent it from overlapping the modal panel.
+        PlayerStatusHUD[] statusHuds = FindObjectsOfType<PlayerStatusHUD>();
+        foreach (PlayerStatusHUD statusHud in statusHuds)
+        {
+            if (statusHud != null)
+                statusHud.SetDisplayVisible(visible);
+        }
     }
 
     private bool IsMainPanelVisible()
@@ -1587,7 +1616,7 @@ public class RuneUIController : MonoBehaviour
         attributePanelTitleText.fontSize = 24f;
         attributePanelTitleText.alignment = TextAlignmentOptions.MidlineLeft;
         attributePanelTitleText.enableWordWrapping = false;
-        attributePanelTitleText.text = "Attributes";
+        attributePanelTitleText.text = Localize("Attributes");
 
         CreateAttributeRow(panel.transform, "HP");
         CreateAttributeRow(panel.transform, "ATK");
@@ -2148,7 +2177,7 @@ public class RuneUIController : MonoBehaviour
         CombatStats stats = currentPlayer != null ? BattleStatUtility.GetCombatStats(currentPlayer) : null;
         if (attributePanelTitleText != null)
         {
-            attributePanelTitleText.text = "Attributes";
+            attributePanelTitleText.text = Localize("Attributes");
         }
 
         RefreshAttributeBar("HP", stats != null ? stats.maxHealth : 0f, attributeHpDisplayMax);

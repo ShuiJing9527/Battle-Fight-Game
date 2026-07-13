@@ -52,6 +52,40 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         SetBalance(BalanceValue - clampedAmount, "AddTwilight", clampedAmount);
     }
 
+    public bool TryConsumeRadiance(float amount)
+    {
+        float clampedAmount = Mathf.Max(0f, amount);
+        if (clampedAmount <= 0f)
+        {
+            return true;
+        }
+
+        if (RadianceValue + activationEpsilon < clampedAmount)
+        {
+            return false;
+        }
+
+        SetBalance(BalanceValue - clampedAmount, "ConsumeRadiance", clampedAmount);
+        return true;
+    }
+
+    public bool TryConsumeTwilight(float amount)
+    {
+        float clampedAmount = Mathf.Max(0f, amount);
+        if (clampedAmount <= 0f)
+        {
+            return true;
+        }
+
+        if (TwilightValue + activationEpsilon < clampedAmount)
+        {
+            return false;
+        }
+
+        SetBalance(BalanceValue + clampedAmount, "ConsumeTwilight", clampedAmount);
+        return true;
+    }
+
     public void ResetGauge()
     {
         SetBalance(initialBalanceValue, "ResetGauge", Mathf.Abs(initialBalanceValue - BalanceValue));

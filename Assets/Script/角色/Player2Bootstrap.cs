@@ -28,6 +28,16 @@ public class Player2Bootstrap : MonoBehaviour
     [Header("Player Health")]
     [SerializeField] private float playerStartHealth = 100f;
 
+    [Header("Twin Shift")]
+    [SerializeField, Min(0f)] private float twinShiftRequiredGaugeCost = 30f;
+    [SerializeField, Min(0f)] private float twinShiftNewGaugeGain = 15f;
+    [SerializeField, Min(0f)] private float twinShiftHealMaxHpRatio = 0.1f;
+    [SerializeField, Min(0f)] private float twinShiftShieldMaxHpRatio = 0.1f;
+    [SerializeField, Min(0f)] private float twinShiftShieldDuration = 5f;
+    [SerializeField, Min(0f)] private float twinShiftRewardCooldown = 8f;
+    [SerializeField] private TwinShiftVfxPlayer twinShiftVfxPlayer;
+    [SerializeField] private bool debugTwinShiftBuff = false;
+
     public GameObject CurrentPlayer { get; private set; }
     public Transform CurrentPlayerTransform => CurrentPlayer != null ? CurrentPlayer.transform : null;
     public GameObject PartyLeader => IsValidSceneObject(partyLeader) ? partyLeader : (IsValidSceneObject(player01) ? player01 : null);
@@ -45,6 +55,8 @@ public class Player2Bootstrap : MonoBehaviour
     private Texture2D shieldBarFillTexture;
     private GUIStyle switchHintStyle;
     private GUIStyle healthBarLabelStyle;
+    private float nextTwinShiftRewardTime;
+    private bool warnedMissingTwinShiftVfxPlayer;
 
     private void Start()
     {
@@ -267,6 +279,12 @@ public class Player2Bootstrap : MonoBehaviour
             return;
         }
 
+        GameObject previousPlayer = CurrentPlayer;
+        if (previousPlayer == nextActive)
+        {
+            return;
+        }
+
         Vector3 basePosition;
         if (CurrentPlayer != null && CurrentPlayer != nextActive)
         {
@@ -314,6 +332,217 @@ public class Player2Bootstrap : MonoBehaviour
         SafeAssignCameraTarget(nextActive);
         SafeRefreshSkillHud(nextActive);
         nextInactive.SetActive(false);
+        Vector3 switchPosition = nextActive.transform.position;
+        PlayBasicSwitchVfx(switchPosition);
+        TryApplyTwinShiftBuff(previousPlayer, nextActive, switchPosition);
+    }
+
+    private void TryApplyTwinShiftBuff(GameObject previousPlayer, GameObject newPlayer, Vector3 switchPosition)
+    {
+        if (previousPlayer == null || newPlayer == null || previousPlayer == newPlayer)
+        {
+            DebugTwinShift($"skip reason=invalid-switch previous={GetObjectName(previousPlayer)} new={GetObjectName(newPlayer)}");
+            return;
+        }
+
+        DayNightGaugeRuntimeState gauge = DayNightGaugeRuntimeState.Instance;
+        if (gauge == null)
+        {
+            DebugTwinShift($"skip reason=gauge-missing previous={previousPlayer.name} new={newPlayer.name}");
+            return;
+        }
+
+        bool cooldownReady = Time.time >= nextTwinShiftRewardTime;
+        float radiance = gauge.RadianceValue;
+        float twilight = gauge.TwilightValue;
+        PlayerDayNightAffinityType previousAffinity = ResolveAffinityType(previousPlayer);
+        PlayerDayNightAffinityType newAffinity = ResolveAffinityType(newPlayer);
+
+        DebugTwinShift(
+            $"evaluate previous={previousPlayer.name} new={newPlayer.name} previousAffinity={previousAffinity} newAffinity={newAffinity} radiance={radiance:F2} twilight={twilight:F2} cooldownReady={cooldownReady} nextReadyAt={nextTwinShiftRewardTime:F2}");
+
+        if (!cooldownReady)
+        {
+            return;
+        }
+
+        bool triggered = false;
+        if (previousAffinity == PlayerDayNightAffinityType.DayChild && newAffinity == PlayerDayNightAffinityType.NightChild)
+        {
+            triggered = TryApplyRadianceToTwilightTwinShift(gauge, newPlayer, switchPosition);
+        }
+        else if (previousAffinity == PlayerDayNightAffinityType.NightChild && newAffinity == PlayerDayNightAffinityType.DayChild)
+        {
+            triggered = TryApplyTwilightToRadianceTwinShift(gauge, newPlayer, switchPosition);
+        }
+
+        if (triggered)
+        {
+            nextTwinShiftRewardTime = Time.time + twinShiftRewardCooldown;
+            DebugTwinShift($"trigger success nextReadyAt={nextTwinShiftRewardTime:F2}");
+        }
+    }
+
+    private bool TryApplyRadianceToTwilightTwinShift(DayNightGaugeRuntimeState gauge, GameObject newPlayer, Vector3 switchPosition)
+    {
+        float beforeRadiance = gauge.RadianceValue;
+        if (beforeRadiance + gauge.ActivationEpsilon < twinShiftRequiredGaugeCost)
+        {
+            DebugTwinShift($"skip reason=radiance-insufficient current={beforeRadiance:F2} required={twinShiftRequiredGaugeCost:F2}");
+            return false;
+        }
+
+        if (!gauge.TryConsumeRadiance(twinShiftRequiredGaugeCost))
+        {
+            DebugTwinShift($"skip reason=radiance-consume-failed current={beforeRadiance:F2} required={twinShiftRequiredGaugeCost:F2}");
+            return false;
+        }
+
+        gauge.AddTwilight(twinShiftNewGaugeGain);
+
+        float healAmount = 0f;
+        CombatHealth combatHealth = newPlayer.GetComponent<CombatHealth>();
+        if (combatHealth != null && !combatHealth.IsDead)
+        {
+            float maxHp = Mathf.Max(0f, combatHealth.MaxHealthValue);
+            healAmount = maxHp * twinShiftHealMaxHpRatio;
+            if (healAmount > 0f)
+            {
+                combatHealth.Heal(healAmount);
+            }
+        }
+
+        DebugTwinShift(
+            $"trigger type=RadianceToTwilight consumed=Radiance:{twinShiftRequiredGaugeCost:F2} gained=Twilight:{twinShiftNewGaugeGain:F2} heal={healAmount:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
+        PlayRadianceToTwilightRewardVfx(switchPosition);
+        return true;
+    }
+
+    private bool TryApplyTwilightToRadianceTwinShift(DayNightGaugeRuntimeState gauge, GameObject newPlayer, Vector3 switchPosition)
+    {
+        float beforeTwilight = gauge.TwilightValue;
+        if (beforeTwilight + gauge.ActivationEpsilon < twinShiftRequiredGaugeCost)
+        {
+            DebugTwinShift($"skip reason=twilight-insufficient current={beforeTwilight:F2} required={twinShiftRequiredGaugeCost:F2}");
+            return false;
+        }
+
+        if (!gauge.TryConsumeTwilight(twinShiftRequiredGaugeCost))
+        {
+            DebugTwinShift($"skip reason=twilight-consume-failed current={beforeTwilight:F2} required={twinShiftRequiredGaugeCost:F2}");
+            return false;
+        }
+
+        gauge.AddRadiance(twinShiftNewGaugeGain);
+
+        float shieldAmount = 0f;
+        CombatHealth combatHealth = newPlayer.GetComponent<CombatHealth>();
+        if (combatHealth != null && !combatHealth.IsDead)
+        {
+            float maxHp = Mathf.Max(0f, combatHealth.MaxHealthValue);
+            shieldAmount = maxHp * twinShiftShieldMaxHpRatio;
+            if (shieldAmount > 0f)
+            {
+                PlayerTimedShieldStatus timedShield = newPlayer.GetComponent<PlayerTimedShieldStatus>();
+                if (timedShield == null)
+                {
+                    timedShield = newPlayer.AddComponent<PlayerTimedShieldStatus>();
+                }
+
+                timedShield.ApplyShield(shieldAmount, twinShiftShieldDuration);
+            }
+        }
+
+        DebugTwinShift(
+            $"trigger type=TwilightToRadiance consumed=Twilight:{twinShiftRequiredGaugeCost:F2} gained=Radiance:{twinShiftNewGaugeGain:F2} shield={shieldAmount:F2} shieldDuration={twinShiftShieldDuration:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
+        PlayTwilightToRadianceRewardVfx(switchPosition);
+        return true;
+    }
+
+    private void PlayBasicSwitchVfx(Vector3 switchPosition)
+    {
+        TwinShiftVfxPlayer vfxPlayer = ResolveTwinShiftVfxPlayer();
+        if (vfxPlayer == null)
+        {
+            return;
+        }
+
+        vfxPlayer.PlayBasicSwitchVfx(switchPosition);
+    }
+
+    private void PlayRadianceToTwilightRewardVfx(Vector3 switchPosition)
+    {
+        TwinShiftVfxPlayer vfxPlayer = ResolveTwinShiftVfxPlayer();
+        if (vfxPlayer == null)
+        {
+            return;
+        }
+
+        vfxPlayer.PlayRadianceToTwilightRewardVfx(switchPosition);
+    }
+
+    private void PlayTwilightToRadianceRewardVfx(Vector3 switchPosition)
+    {
+        TwinShiftVfxPlayer vfxPlayer = ResolveTwinShiftVfxPlayer();
+        if (vfxPlayer == null)
+        {
+            return;
+        }
+
+        vfxPlayer.PlayTwilightToRadianceRewardVfx(switchPosition);
+    }
+
+    private TwinShiftVfxPlayer ResolveTwinShiftVfxPlayer()
+    {
+        if (twinShiftVfxPlayer != null)
+        {
+            return twinShiftVfxPlayer;
+        }
+
+        twinShiftVfxPlayer = GetComponent<TwinShiftVfxPlayer>();
+        if (twinShiftVfxPlayer == null)
+        {
+            twinShiftVfxPlayer = GetComponentInChildren<TwinShiftVfxPlayer>(true);
+        }
+
+        if (twinShiftVfxPlayer == null && debugTwinShiftBuff && !warnedMissingTwinShiftVfxPlayer)
+        {
+            warnedMissingTwinShiftVfxPlayer = true;
+            Debug.Log("[TwinShift] TwinShiftVfxPlayer is not assigned on this bootstrap object or its children. VFX will be skipped.", this);
+        }
+
+        return twinShiftVfxPlayer;
+    }
+
+    private static PlayerDayNightAffinityType ResolveAffinityType(GameObject player)
+    {
+        if (player == null)
+        {
+            return PlayerDayNightAffinityType.None;
+        }
+
+        PlayerDayNightAffinity affinity = player.GetComponent<PlayerDayNightAffinity>();
+        if (affinity == null)
+        {
+            affinity = player.GetComponentInParent<PlayerDayNightAffinity>();
+        }
+
+        return affinity != null ? affinity.AffinityType : PlayerDayNightAffinityType.None;
+    }
+
+    private void DebugTwinShift(string message)
+    {
+        if (!debugTwinShiftBuff)
+        {
+            return;
+        }
+
+        Debug.Log($"[TwinShift] {message}", this);
+    }
+
+    private static string GetObjectName(GameObject target)
+    {
+        return target != null ? target.name : "null";
     }
 
     private void SafeAssignCameraTarget(GameObject nextActive)
