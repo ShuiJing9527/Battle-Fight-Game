@@ -11,12 +11,19 @@ public class GameManager : MonoBehaviour
         if (Instance == null)
         {
             Instance = this;
+            EnsureLocalizationService();
             DontDestroyOnLoad(gameObject);
         }
         else
         {
             Destroy(gameObject);
         }
+    }
+
+    private void EnsureLocalizationService()
+    {
+        if (GetComponent<GameLocalization>() == null)
+            gameObject.AddComponent<GameLocalization>();
     }
 
     void Start()
