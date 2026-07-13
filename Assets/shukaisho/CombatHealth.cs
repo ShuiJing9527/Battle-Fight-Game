@@ -599,7 +599,7 @@ public class CombatHealth : MonoBehaviour
 
         localShield = amount;
         localMaxShield = amount;
-        OnShieldChanged?.Invoke(localShield, localMaxShield);
+        NotifyShieldStateChanged();
     }
 
     public void ClearShield()
@@ -612,22 +612,41 @@ public class CombatHealth : MonoBehaviour
 
         localShield = 0f;
         localMaxShield = 0f;
-        OnShieldChanged?.Invoke(localShield, localMaxShield);
+        NotifyShieldStateChanged();
     }
 
     public float GetShield()
     {
-        return resourceBank != null ? resourceBank.CurrentShield : localShield;
+        float totalShield = GetBaseShield();
+        PlayerTimedShieldStatus[] timedShields = GetComponents<PlayerTimedShieldStatus>();
+        for (int i = 0; i < timedShields.Length; i++)
+        {
+            if (timedShields[i] == null)
+            {
+                continue;
+            }
+
+            totalShield += Mathf.Max(0f, timedShields[i].CurrentShield);
+        }
+
+        return totalShield;
     }
 
     public float GetMaxShield()
     {
-        if (resourceBank != null)
+        float totalMaxShield = GetBaseMaxShield();
+        PlayerTimedShieldStatus[] timedShields = GetComponents<PlayerTimedShieldStatus>();
+        for (int i = 0; i < timedShields.Length; i++)
         {
-            return resourceBank.MaxShield;
+            if (timedShields[i] == null)
+            {
+                continue;
+            }
+
+            totalMaxShield += Mathf.Max(0f, timedShields[i].MaxShield);
         }
 
-        return localMaxShield;
+        return totalMaxShield;
     }
 
     public bool HasActiveShield()
@@ -642,6 +661,11 @@ public class CombatHealth : MonoBehaviour
     public float GetCurrentShield()
     {
         return GetShield();
+    }
+
+    public void NotifyShieldStateChanged()
+    {
+        OnShieldChanged?.Invoke(GetShield(), GetMaxShield());
     }
 
     public void AddDamageReductionModifier(string key, float multiplier)
@@ -677,13 +701,29 @@ public class CombatHealth : MonoBehaviour
     private float AbsorbShieldDamage(float amount)
     {
         amount = Mathf.Max(0f, amount);
-        float shieldUsed = Mathf.Min(GetShield(), amount);
+        PlayerTimedShieldStatus[] timedShields = GetComponents<PlayerTimedShieldStatus>();
+        for (int i = 0; i < timedShields.Length; i++)
+        {
+            if (timedShields[i] == null)
+            {
+                continue;
+            }
+
+            amount = timedShields[i].AbsorbDamage(amount);
+            if (amount <= 0f)
+            {
+                return 0f;
+            }
+        }
+
+        float baseShield = GetBaseShield();
+        float shieldUsed = Mathf.Min(baseShield, amount);
         if (shieldUsed <= 0f)
         {
             return amount;
         }
 
-        float remainingShield = GetShield() - shieldUsed;
+        float remainingShield = baseShield - shieldUsed;
         if (resourceBank != null)
         {
             resourceBank.SetShieldCurrent(remainingShield);
@@ -692,10 +732,20 @@ public class CombatHealth : MonoBehaviour
         {
             localShield = remainingShield;
             localMaxShield = Mathf.Max(localMaxShield, localShield);
-            OnShieldChanged?.Invoke(localShield, localMaxShield);
+            NotifyShieldStateChanged();
         }
 
         return amount - shieldUsed;
+    }
+
+    private float GetBaseShield()
+    {
+        return resourceBank != null ? resourceBank.CurrentShield : localShield;
+    }
+
+    private float GetBaseMaxShield()
+    {
+        return resourceBank != null ? resourceBank.MaxShield : localMaxShield;
     }
 
     private float GetIncomingDamageMultiplier()
@@ -788,7 +838,7 @@ public class CombatHealth : MonoBehaviour
 
     private void HandleResourceBankOnShieldChanged(float currentShield, float maxShield)
     {
-        OnShieldChanged?.Invoke(currentShield, maxShield);
+        NotifyShieldStateChanged();
     }
 
     private DamagePopupType ResolvePopupType(BattleDamageType damageType)
