@@ -266,6 +266,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         Initialize();
+        GameLocalization.LanguageChanged += OnLanguageChanged;
         TryWarmupAttributeBaseSnapshot(forceBootstrapRefresh: true);
     }
 
@@ -277,6 +278,16 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         RestoreTimeScaleIfNeeded();
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged(GameLanguage language)
+    {
+        if (primaryInstance != this || !isVisible)
+            return;
+
+        RefreshPanel();
+        ApplyLanguageFontToPanel();
     }
 
     private void OnDestroy()
@@ -287,6 +298,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
         RestoreTimeScaleIfNeeded();
         if (previewRenderTexture != null)
         {
@@ -1156,22 +1168,24 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (titleText != null)
         {
-            titleText.text = cachedPlayer != null ? cachedPlayer.name + " Attributes" : "Character Attributes";
+            titleText.text = cachedPlayer != null
+                ? cachedPlayer.name + " " + Localize("Attributes")
+                : Localize("Character Attributes");
         }
 
         if (previewText != null)
         {
-            previewText.text = "Character Preview";
+            previewText.text = Localize("Character Preview");
         }
 
         if (playerNameText != null)
         {
-            playerNameText.text = cachedPlayer != null ? cachedPlayer.name : "Player";
+            playerNameText.text = cachedPlayer != null ? cachedPlayer.name : Localize("Player");
         }
 
         if (characterPreviewText != null)
         {
-            characterPreviewText.text = "Character Preview";
+            characterPreviewText.text = Localize("Character Preview");
         }
 
         RefreshPreview(force: false);
@@ -1190,38 +1204,54 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (luckText != null)
         {
-            luckText.text = "LUCK " + luck.ToString("0");
+            luckText.text = Localize("LUCK") + " " + luck.ToString("0");
         }
 
         if (critRateText != null)
         {
-            critRateText.text = "Crit Rate " + critRate.ToString("0.#") + "%";
+            critRateText.text = Localize("Crit Rate") + " " + critRate.ToString("0.#") + "%";
         }
 
         if (extraSoulDropText != null)
         {
-            extraSoulDropText.text = "Extra Soul Drop " + extraSoulDrop.ToString("0.#") + "%";
+            extraSoulDropText.text = Localize("Extra Soul Drop") + " " + extraSoulDrop.ToString("0.#") + "%";
         }
 
         if (extraRuneDropText != null)
         {
-            extraRuneDropText.text = "Extra Rune Drop " + extraRuneDrop.ToString("0.#") + "%";
+            extraRuneDropText.text = Localize("Extra Rune Drop") + " " + extraRuneDrop.ToString("0.#") + "%";
         }
 
         if (reserveText != null)
         {
-            reserveText.text = "Buff / Rune / Skill Info Reserved";
+            reserveText.text = Localize("Buff / Rune / Skill Info Reserved");
         }
 
         if (footerText != null && spdText == null && luckText == null && critRateText == null && extraSoulDropText == null && extraRuneDropText == null)
         {
             footerText.text =
-                "LUCK " + luck.ToString("0") + "\n" +
-                "Crit Rate        " + critRate.ToString("0.#") + "%\n" +
-                "Extra Soul Drop  " + extraSoulDrop.ToString("0.#") + "%\n" +
-                "Extra Rune Drop  " + extraRuneDrop.ToString("0.#") + "%\n" +
-                "Buff / Rune / Skill Info Reserved";
+                Localize("LUCK") + " " + luck.ToString("0") + "\n" +
+                Localize("Crit Rate") + " " + critRate.ToString("0.#") + "%\n" +
+                Localize("Extra Soul Drop") + " " + extraSoulDrop.ToString("0.#") + "%\n" +
+                Localize("Extra Rune Drop") + " " + extraRuneDrop.ToString("0.#") + "%\n" +
+                Localize("Buff / Rune / Skill Info Reserved");
         }
+
+        ApplyLanguageFontToPanel();
+    }
+
+    private static string Localize(string key)
+    {
+        return GameLocalization.Instance != null ? GameLocalization.Instance.Translate(key) : key;
+    }
+
+    private void ApplyLanguageFontToPanel()
+    {
+        if (panelRoot == null || GameLocalization.Instance == null)
+            return;
+
+        foreach (TextMeshProUGUI text in panelRoot.GetComponentsInChildren<TextMeshProUGUI>(true))
+            GameLocalization.Instance.ApplyFontForLanguage(text);
     }
 
     private float ResolveCurrentHealth()
