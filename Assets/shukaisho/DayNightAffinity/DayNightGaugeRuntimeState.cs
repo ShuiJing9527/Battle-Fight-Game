@@ -3,6 +3,8 @@ using UnityEngine;
 public class DayNightGaugeRuntimeState : MonoBehaviour
 {
     private const string RuntimeObjectName = "DayNightGaugeRuntimeState";
+    private const string TwinShiftRadianceToTwilightSource = "TwinShiftRadianceToTwilight";
+    private const string TwinShiftTwilightToRadianceSource = "TwinShiftTwilightToRadiance";
 
     private static DayNightGaugeRuntimeState instance;
 
@@ -26,11 +28,13 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     public bool DebugLogEnabled => debugLog;
     public bool DebugHitFlowEnabled => debugHitFlow;
     public bool DebugAffinityDamageEnabled => debugAffinityDamage;
+    public string DebugInstanceLabel => $"{name}#{GetInstanceID()}";
 
     private void Awake()
     {
         if (instance != null && instance != this)
         {
+            LogLifecycle($"Awake duplicate-destroy existing={instance.DebugInstanceLabel} duplicate={DebugInstanceLabel}");
             Destroy(gameObject);
             return;
         }
@@ -38,6 +42,12 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         instance = this;
         BalanceValue = Mathf.Clamp(initialBalanceValue, 0f, 100f);
         DontDestroyOnLoad(gameObject);
+        LogLifecycle($"Awake set-instance balance={BalanceValue:F2} twilight={TwilightValue:F2} radiance={RadianceValue:F2}");
+    }
+
+    private void OnEnable()
+    {
+        LogLifecycle($"OnEnable balance={BalanceValue:F2} twilight={TwilightValue:F2} radiance={RadianceValue:F2}");
     }
 
     public void AddRadiance(float amount)
@@ -86,9 +96,46 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         return true;
     }
 
+    public bool TryShiftRadianceToTwilight(float requiredRadiance, float twilightGain)
+    {
+        float requiredAmount = Mathf.Max(0f, requiredRadiance);
+        float gainAmount = Mathf.Max(0f, twilightGain);
+
+        if (requiredAmount > 0f && RadianceValue + activationEpsilon < requiredAmount)
+        {
+            LogLifecycle(
+                $"TryShiftRadianceToTwilight failed requiredRadiance={requiredAmount:F2} currentRadiance={RadianceValue:F2} currentTwilight={TwilightValue:F2}");
+            return false;
+        }
+
+        SetBalance(BalanceValue - gainAmount, TwinShiftRadianceToTwilightSource, gainAmount);
+        return true;
+    }
+
+    public bool TryShiftTwilightToRadiance(float requiredTwilight, float radianceGain)
+    {
+        float requiredAmount = Mathf.Max(0f, requiredTwilight);
+        float gainAmount = Mathf.Max(0f, radianceGain);
+
+        if (requiredAmount > 0f && TwilightValue + activationEpsilon < requiredAmount)
+        {
+            LogLifecycle(
+                $"TryShiftTwilightToRadiance failed requiredTwilight={requiredAmount:F2} currentRadiance={RadianceValue:F2} currentTwilight={TwilightValue:F2}");
+            return false;
+        }
+
+        SetBalance(BalanceValue + gainAmount, TwinShiftTwilightToRadianceSource, gainAmount);
+        return true;
+    }
+
     public void ResetGauge()
     {
         SetBalance(initialBalanceValue, "ResetGauge", Mathf.Abs(initialBalanceValue - BalanceValue));
+    }
+
+    public void SetDebugLogEnabled(bool enabled)
+    {
+        debugLog = enabled;
     }
 
     // Radiance/Twilight state is earned by filling the corresponding gauge to the threshold.
@@ -131,6 +178,7 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         if (instance != null)
         {
             gauge = instance;
+            gauge.LogLifecycle("TryGetExistingInstance reuse-static-instance");
             return true;
         }
 
@@ -138,6 +186,7 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         if (gauge != null)
         {
             instance = gauge;
+            gauge.LogLifecycle("TryGetExistingInstance found-scene-instance");
             return true;
         }
 
@@ -154,12 +203,24 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         instance = Object.FindObjectOfType<DayNightGaugeRuntimeState>();
         if (instance != null)
         {
+            instance.LogLifecycle("ResolveInstance found-scene-instance");
             return instance;
         }
 
         GameObject runtimeObject = new GameObject(RuntimeObjectName);
         instance = runtimeObject.AddComponent<DayNightGaugeRuntimeState>();
+        instance.LogLifecycle("ResolveInstance created-runtime-instance");
         return instance;
+    }
+
+    private void LogLifecycle(string message)
+    {
+        if (!debugLog)
+        {
+            return;
+        }
+
+        Debug.Log($"[DayNightGaugeLifecycle] instance={DebugInstanceLabel} path={GetHierarchyPath(gameObject)} {message}", this);
     }
 
     private static string GetHierarchyPath(GameObject target)

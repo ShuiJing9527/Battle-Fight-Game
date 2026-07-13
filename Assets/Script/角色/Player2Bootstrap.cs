@@ -29,12 +29,10 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField] private float playerStartHealth = 100f;
 
     [Header("Twin Shift")]
-    [SerializeField, Min(0f)] private float twinShiftRequiredGaugeCost = 30f;
-    [SerializeField, Min(0f)] private float twinShiftNewGaugeGain = 15f;
+    [SerializeField, Min(0f)] private float twinShiftGaugeShiftAmount = 15f;
     [SerializeField, Min(0f)] private float twinShiftHealMaxHpRatio = 0.1f;
     [SerializeField, Min(0f)] private float twinShiftShieldMaxHpRatio = 0.1f;
     [SerializeField, Min(0f)] private float twinShiftShieldDuration = 5f;
-    [SerializeField, Min(0f)] private float twinShiftRewardCooldown = 8f;
     [SerializeField] private TwinShiftVfxPlayer twinShiftVfxPlayer;
     [SerializeField] private bool debugTwinShiftBuff = false;
 
@@ -55,7 +53,6 @@ public class Player2Bootstrap : MonoBehaviour
     private Texture2D shieldBarFillTexture;
     private GUIStyle switchHintStyle;
     private GUIStyle healthBarLabelStyle;
-    private float nextTwinShiftRewardTime;
     private bool warnedMissingTwinShiftVfxPlayer;
 
     private void Start()
@@ -352,19 +349,18 @@ public class Player2Bootstrap : MonoBehaviour
             return;
         }
 
-        bool cooldownReady = Time.time >= nextTwinShiftRewardTime;
+        if (debugTwinShiftBuff && !gauge.DebugLogEnabled)
+        {
+            gauge.SetDebugLogEnabled(true);
+        }
+
         float radiance = gauge.RadianceValue;
         float twilight = gauge.TwilightValue;
         PlayerDayNightAffinityType previousAffinity = ResolveAffinityType(previousPlayer);
         PlayerDayNightAffinityType newAffinity = ResolveAffinityType(newPlayer);
 
         DebugTwinShift(
-            $"evaluate previous={previousPlayer.name} new={newPlayer.name} previousAffinity={previousAffinity} newAffinity={newAffinity} radiance={radiance:F2} twilight={twilight:F2} cooldownReady={cooldownReady} nextReadyAt={nextTwinShiftRewardTime:F2}");
-
-        if (!cooldownReady)
-        {
-            return;
-        }
+            $"evaluate previous={previousPlayer.name} new={newPlayer.name} previousAffinity={previousAffinity} newAffinity={newAffinity} gauge={GetGaugeDebugLabel(gauge)} radianceBefore={radiance:F2} twilightBefore={twilight:F2}");
 
         bool triggered = false;
         if (previousAffinity == PlayerDayNightAffinityType.DayChild && newAffinity == PlayerDayNightAffinityType.NightChild)
@@ -376,29 +372,25 @@ public class Player2Bootstrap : MonoBehaviour
             triggered = TryApplyTwilightToRadianceTwinShift(gauge, newPlayer, switchPosition);
         }
 
-        if (triggered)
-        {
-            nextTwinShiftRewardTime = Time.time + twinShiftRewardCooldown;
-            DebugTwinShift($"trigger success nextReadyAt={nextTwinShiftRewardTime:F2}");
-        }
+        DebugTwinShift(triggered ? "trigger success" : "no reward trigger");
     }
 
     private bool TryApplyRadianceToTwilightTwinShift(DayNightGaugeRuntimeState gauge, GameObject newPlayer, Vector3 switchPosition)
     {
+        float beforeBalance = gauge.BalanceValue;
         float beforeRadiance = gauge.RadianceValue;
-        if (beforeRadiance + gauge.ActivationEpsilon < twinShiftRequiredGaugeCost)
+        float beforeTwilight = gauge.TwilightValue;
+        if (!gauge.HasRadianceState())
         {
-            DebugTwinShift($"skip reason=radiance-insufficient current={beforeRadiance:F2} required={twinShiftRequiredGaugeCost:F2}");
+            DebugTwinShift($"skip reason=radiance-not-full current={beforeRadiance:F2} twilight={beforeTwilight:F2}");
             return false;
         }
 
-        if (!gauge.TryConsumeRadiance(twinShiftRequiredGaugeCost))
+        if (!gauge.TryShiftRadianceToTwilight(gauge.BuffActivationThreshold, twinShiftGaugeShiftAmount))
         {
-            DebugTwinShift($"skip reason=radiance-consume-failed current={beforeRadiance:F2} required={twinShiftRequiredGaugeCost:F2}");
+            DebugTwinShift($"skip reason=radiance-shift-failed current={beforeRadiance:F2} threshold={gauge.BuffActivationThreshold:F2} shift={twinShiftGaugeShiftAmount:F2}");
             return false;
         }
-
-        gauge.AddTwilight(twinShiftNewGaugeGain);
 
         float healAmount = 0f;
         CombatHealth combatHealth = newPlayer.GetComponent<CombatHealth>();
@@ -413,27 +405,27 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         DebugTwinShift(
-            $"trigger type=RadianceToTwilight consumed=Radiance:{twinShiftRequiredGaugeCost:F2} gained=Twilight:{twinShiftNewGaugeGain:F2} heal={healAmount:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
+            $"trigger type=RadianceToTwilight gauge={GetGaugeDebugLabel(gauge)} balanceBefore={beforeBalance:F2} balanceAfter={gauge.BalanceValue:F2} radianceBefore={beforeRadiance:F2} twilightBefore={beforeTwilight:F2} shiftAmount={twinShiftGaugeShiftAmount:F2} heal={healAmount:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
         PlayRadianceToTwilightRewardVfx(switchPosition);
         return true;
     }
 
     private bool TryApplyTwilightToRadianceTwinShift(DayNightGaugeRuntimeState gauge, GameObject newPlayer, Vector3 switchPosition)
     {
+        float beforeBalance = gauge.BalanceValue;
+        float beforeRadiance = gauge.RadianceValue;
         float beforeTwilight = gauge.TwilightValue;
-        if (beforeTwilight + gauge.ActivationEpsilon < twinShiftRequiredGaugeCost)
+        if (!gauge.HasTwilightState())
         {
-            DebugTwinShift($"skip reason=twilight-insufficient current={beforeTwilight:F2} required={twinShiftRequiredGaugeCost:F2}");
+            DebugTwinShift($"skip reason=twilight-not-full current={beforeTwilight:F2} radiance={beforeRadiance:F2}");
             return false;
         }
 
-        if (!gauge.TryConsumeTwilight(twinShiftRequiredGaugeCost))
+        if (!gauge.TryShiftTwilightToRadiance(gauge.BuffActivationThreshold, twinShiftGaugeShiftAmount))
         {
-            DebugTwinShift($"skip reason=twilight-consume-failed current={beforeTwilight:F2} required={twinShiftRequiredGaugeCost:F2}");
+            DebugTwinShift($"skip reason=twilight-shift-failed current={beforeTwilight:F2} threshold={gauge.BuffActivationThreshold:F2} shift={twinShiftGaugeShiftAmount:F2}");
             return false;
         }
-
-        gauge.AddRadiance(twinShiftNewGaugeGain);
 
         float shieldAmount = 0f;
         CombatHealth combatHealth = newPlayer.GetComponent<CombatHealth>();
@@ -454,7 +446,7 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         DebugTwinShift(
-            $"trigger type=TwilightToRadiance consumed=Twilight:{twinShiftRequiredGaugeCost:F2} gained=Radiance:{twinShiftNewGaugeGain:F2} shield={shieldAmount:F2} shieldDuration={twinShiftShieldDuration:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
+            $"trigger type=TwilightToRadiance gauge={GetGaugeDebugLabel(gauge)} balanceBefore={beforeBalance:F2} balanceAfter={gauge.BalanceValue:F2} radianceBefore={beforeRadiance:F2} twilightBefore={beforeTwilight:F2} shiftAmount={twinShiftGaugeShiftAmount:F2} shield={shieldAmount:F2} shieldDuration={twinShiftShieldDuration:F2} radianceAfter={gauge.RadianceValue:F2} twilightAfter={gauge.TwilightValue:F2}");
         PlayTwilightToRadianceRewardVfx(switchPosition);
         return true;
     }
@@ -538,6 +530,11 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         Debug.Log($"[TwinShift] {message}", this);
+    }
+
+    private static string GetGaugeDebugLabel(DayNightGaugeRuntimeState gauge)
+    {
+        return gauge != null ? gauge.DebugInstanceLabel : "null";
     }
 
     private static string GetObjectName(GameObject target)

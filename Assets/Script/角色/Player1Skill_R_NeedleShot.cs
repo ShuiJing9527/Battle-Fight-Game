@@ -40,9 +40,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField, Min(0.1f)] private float thrustWidth = 1.2f;
     [SerializeField, Min(0.1f)] private float thrustHeight = 1.4f;
     [SerializeField] private float thrustForwardOffset = 1.2f;
+    [SerializeField, Min(0f)] private float thrustCloseRangeRadius = 0.8f;
+    [SerializeField, Min(0f)] private float thrustCloseRangeForwardOffset = 0.2f;
     [FormerlySerializedAs("enemyLayer")]
     [SerializeField] private LayerMask thrustHitLayers = ~0;
     [SerializeField] private bool debugDrawThrustHitbox;
+    [SerializeField] private bool debugRHitDetection;
 
     [Header("R - Needle Setup")]
     [FormerlySerializedAs("needlePrefab")]
@@ -98,12 +101,16 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     private System.Random randomGenerator;
     private bool thrustVfxTriggered;
     private bool thrustHitTriggered;
+    private bool thrustDamageAppliedThisCast;
     private bool needlePhaseTriggered;
     private Coroutine releaseRoutine;
     private float castFacingSign = 1f;
+    private int currentCastId;
+    private static int nextCastId = 1;
     private int currentNeedleCount;
     private int currentKillCount;
     private float currentTotalActualDamage;
+    private float currentMeleeActualDamageThisCast;
     private float currentTotalHealAmount;
     private float currentTotalCooldownReduction;
     // Night Child state is independent from day/night phase.
@@ -210,12 +217,15 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         preferredNeedleTarget = null;
         thrustVfxTriggered = false;
         thrustHitTriggered = false;
+        thrustDamageAppliedThisCast = false;
         needlePhaseTriggered = false;
         currentNeedleCount = 0;
         currentKillCount = 0;
         currentTotalActualDamage = 0f;
+        currentMeleeActualDamageThisCast = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
+        currentCastId = nextCastId++;
         nightChildStateActiveThisCast = DayNightAffinityDamageModifier.HasNightChildState(Controller != null ? Controller.gameObject : gameObject);
         nightBuffDamageLoggedThisCast = false;
         nightBuffExtraCooldownRefundTriggered = false;
@@ -242,7 +252,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
                 $"[Player01 R] Cast success MP={ResolveManaCost():F2} PATK={physicalAttack:F2} SATK={specialAttack:F2} " +
                 $"thrustPhysical={thrustPhysicalDamage:F2} thrustSpecial={thrustSpecialDamage:F2} " +
                 $"needlePhysical={needlePhysicalDamage:F2} needleSpecial={needleSpecialDamage:F2} " +
-                $"cooldown={ResolveRuntimeCooldownSeconds():F2} castFacingSign={castFacingSign:F2}",
+                $"cooldown={ResolveRuntimeCooldownSeconds():F2} castFacingSign={castFacingSign:F2} castId={currentCastId}",
                 this);
         }
     }
@@ -398,7 +408,26 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private void TriggerThrustHit()
     {
+        Debug.Log(
+            $"[Player1R-Melee] TriggerThrustHit CALLED castId={currentCastId} frame={Time.frameCount} " +
+            $"skillInstance={GetInstanceID()} thrustHitTriggered={thrustHitTriggered} thrustDamageAppliedThisCast={thrustDamageAppliedThisCast}",
+            this);
+
+        if (thrustDamageAppliedThisCast)
+        {
+            if (debugRHitDetection)
+            {
+                Debug.Log(
+                    $"[Player1R-Melee] skipped reason=AlreadyApplied castId={currentCastId} frame={Time.frameCount}",
+                    this);
+            }
+
+            thrustHitTriggered = true;
+            return;
+        }
+
         thrustHitTriggered = true;
+        thrustDamageAppliedThisCast = true;
         ApplyThrustDamage();
     }
 
@@ -465,7 +494,16 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         }
 
         ResolveCurrentStats(out float physicalAttack, out float specialAttack);
-        ResolveNeedleDamageValues(physicalAttack, specialAttack, out float needlePhysicalDamage, out float needleSpecialDamage);
+        ResolveNeedleDamageValues(physicalAttack, specialAttack, out float theoreticalNeedlePhysicalDamage, out float theoreticalNeedleSpecialDamage);
+        float combatHealthAttackerMultiplier = ResolveNeedleCombatHealthAttackerMultiplier();
+        ResolveActualNeedleDamageValues(
+            theoreticalNeedlePhysicalDamage,
+            theoreticalNeedleSpecialDamage,
+            currentMeleeActualDamageThisCast,
+            combatHealthAttackerMultiplier,
+            out float needlePhysicalDamage,
+            out float needleSpecialDamage);
+        float finalNeedleDamage = needlePhysicalDamage + needleSpecialDamage;
 
         needle.name = needle.name + "_R_" + index;
         needle.Launch(
@@ -493,36 +531,199 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             needleHitRadius);
 
         activeNeedles.Add(needle);
+
+        if (debugRHitDetection)
+        {
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=SpawnNeedle index={index} meleeActualDamageCache={currentMeleeActualDamageThisCast:F2} " +
+                $"combatHealthAttackerMultiplier={combatHealthAttackerMultiplier:F2} " +
+                $"needleDamageMultiplier={needleDamageMultiplier:F2} theoreticalNeedlePhysical={theoreticalNeedlePhysicalDamage:F2} theoreticalNeedleSpecial={theoreticalNeedleSpecialDamage:F2} " +
+                $"finalNeedlePhysical={needlePhysicalDamage:F2} finalNeedleSpecial={needleSpecialDamage:F2} finalNeedleDamage={finalNeedleDamage:F2} " +
+                $"zeroBecauseNoMeleeDamage={(currentMeleeActualDamageThisCast <= 0f)}",
+                this);
+        }
     }
 
     private void ApplyThrustDamage()
     {
+        Debug.Log(
+            $"[Player1R-Melee] ApplyThrustDamage CALLED castId={currentCastId} frame={Time.frameCount} " +
+            $"skillInstance={GetInstanceID()}",
+            this);
+
         thrustDamagedTargets.Clear();
 
+        Transform thrustOrigin = ResolveThrustOrigin();
+        Vector3 originPosition = thrustOrigin != null ? thrustOrigin.position : transform.position;
         Vector3 facing = ResolveFacingFlatDirection();
         Quaternion orientation = Quaternion.LookRotation(facing, Vector3.up);
+        float width = Mathf.Max(0.05f, thrustWidth);
+        float height = Mathf.Max(0.05f, thrustHeight);
+        float originalRange = Mathf.Max(0.05f, thrustRange);
+        float forwardOffset = Mathf.Max(0f, thrustForwardOffset);
+        float farReach = forwardOffset + originalRange;
         Vector3 halfExtents = new Vector3(
-            Mathf.Max(0.05f, thrustWidth) * 0.5f,
-            Mathf.Max(0.05f, thrustHeight) * 0.5f,
-            Mathf.Max(0.05f, thrustRange) * 0.5f);
-        Vector3 center = transform.position + facing * (Mathf.Max(0.05f, thrustForwardOffset) + halfExtents.z);
+            width * 0.5f,
+            height * 0.5f,
+            Mathf.Max(originalRange * 0.5f, farReach * 0.5f));
+        Vector3 center = originPosition + facing * halfExtents.z;
+        float closeRadius = Mathf.Max(0f, thrustCloseRangeRadius);
+        Vector3 closeCenter = originPosition + facing * Mathf.Max(0f, thrustCloseRangeForwardOffset);
 
-        Collider[] hits = Physics.OverlapBox(center, halfExtents, orientation, thrustHitLayers, QueryTriggerInteraction.Collide);
+        Collider[] boxHits = Physics.OverlapBox(center, halfExtents, orientation, thrustHitLayers, QueryTriggerInteraction.Collide);
+        Collider[] closeHits = closeRadius > 0f
+            ? Physics.OverlapSphere(closeCenter, closeRadius, thrustHitLayers, QueryTriggerInteraction.Collide)
+            : System.Array.Empty<Collider>();
+        Collider[] closeHitsUnfiltered = debugRHitDetection && closeRadius > 0f
+            ? Physics.OverlapSphere(closeCenter, closeRadius, ~0, QueryTriggerInteraction.Collide)
+            : System.Array.Empty<Collider>();
         ResolveCurrentStats(out float physicalAttack, out float specialAttack);
         ResolveThrustDamageValues(physicalAttack, specialAttack, out float thrustPhysicalDamage, out float thrustSpecialDamage);
+
+        if (debugRHitDetection)
+        {
+            Debug.DrawLine(originPosition, originPosition + facing * 0.8f, Color.cyan, 1.5f);
+            Debug.DrawLine(originPosition, center - facing * halfExtents.z, Color.green, 1.5f);
+            Debug.DrawLine(originPosition, center + facing * halfExtents.z, Color.red, 1.5f);
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=ApplyThrustDamage entered scriptInstance={GetInstanceID()} playerPos={transform.position} " +
+                $"origin={(thrustOrigin != null ? thrustOrigin.name : "transform")} originPos={originPosition} facing={facing} boxCenter={center} hitHalfExtents={halfExtents} " +
+                $"orientationEuler={orientation.eulerAngles} originalRange={originalRange:F2} forwardOffset={forwardOffset:F2} closeCenter={closeCenter} closeRadius={closeRadius:F2} " +
+                $"layerMaskValue={thrustHitLayers.value} boxColliderCount={boxHits.Length} closeColliderCount={closeHits.Length} debugAllLayerCloseColliderCount={closeHitsUnfiltered.Length} " +
+                $"thrustPhysicalTheoretical={thrustPhysicalDamage:F2} thrustSpecialTheoretical={thrustSpecialDamage:F2}",
+                this);
+        }
+
+        LogDiagnosticColliders(closeHitsUnfiltered, closeCenter, closeRadius);
+
+        ProcessThrustHitColliders(boxHits, "Box", thrustPhysicalDamage, thrustSpecialDamage);
+        ProcessThrustHitColliders(closeHits, "CloseRange", thrustPhysicalDamage, thrustSpecialDamage);
+
+        if (debugRHitDetection && thrustDamagedTargets.Count <= 0)
+        {
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=ThrustNoDamage cachedMeleeActualDamage={currentMeleeActualDamageThisCast:F2}",
+                this);
+        }
+    }
+
+    private void LogDiagnosticColliders(Collider[] hits, Vector3 closeCenter, float closeRadius)
+    {
+        if (!debugRHitDetection || hits == null)
+        {
+            return;
+        }
+
+        if (hits.Length <= 0)
+        {
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=DiagnosticOverlapSphereAll result=NoColliders closeCenter={closeCenter} closeRadius={closeRadius:F2}",
+                this);
+            return;
+        }
 
         for (int i = 0; i < hits.Length; i++)
         {
             Collider hit = hits[i];
-            if (hit == null || !BattleTargetUtility.IsMonster(hit, transform))
+            if (hit == null)
             {
+                Debug.Log(
+                    $"[Player01RHitDetection] castId={currentCastId} event=DiagnosticOverlapSphereAll result=NullCollider index={i}",
+                    this);
                 continue;
             }
 
-            CombatHealth combatHealth = BattleTargetUtility.GetMonsterCombatHealth(hit, transform);
-            if (combatHealth == null || combatHealth.IsDead || !thrustDamagedTargets.Add(combatHealth))
+            CombatHealth combatHealth = hit.GetComponentInParent<CombatHealth>();
+            EnemyController enemyController = hit.GetComponentInParent<EnemyController>();
+            string hierarchyPath = BuildHierarchyPath(hit.transform);
+            string layerName = LayerMask.LayerToName(hit.gameObject.layer);
+            string combatHealthName = combatHealth != null
+                ? combatHealth.name + "#" + combatHealth.GetInstanceID()
+                : "null";
+            string enemyControllerName = enemyController != null
+                ? enemyController.name + "#" + enemyController.GetInstanceID()
+                : "null";
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=DiagnosticOverlapSphereAll index={i} collider={hit.name} " +
+                $"path={hierarchyPath} layer={hit.gameObject.layer} layerName={layerName} " +
+                $"isTrigger={hit.isTrigger} enabled={hit.enabled} activeInHierarchy={hit.gameObject.activeInHierarchy} " +
+                $"boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max} " +
+                $"combatHealth={combatHealthName} enemyController={enemyControllerName}",
+                this);
+        }
+    }
+
+    private static string BuildHierarchyPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "null";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder(target.name);
+        Transform current = target.parent;
+        while (current != null)
+        {
+            builder.Insert(0, current.name + "/");
+            current = current.parent;
+        }
+
+        return builder.ToString();
+    }
+
+    private void ProcessThrustHitColliders(Collider[] hits, string sourceLabel, float thrustPhysicalDamage, float thrustSpecialDamage)
+    {
+        if (hits == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < hits.Length; i++)
+        {
+            Collider hit = hits[i];
+            if (hit == null)
             {
+                if (debugRHitDetection)
+                {
+                    Debug.Log($"[Player01RHitDetection] castId={currentCastId} event=ColliderSkipped source={sourceLabel} reason=NullCollider index={i}", this);
+                }
                 continue;
+            }
+
+            bool inLayerMask = ((1 << hit.gameObject.layer) & thrustHitLayers.value) != 0;
+            CombatHealth parentCombatHealth = hit.GetComponentInParent<CombatHealth>();
+
+            if (!BattleTargetUtility.TryGetMonsterCombatHealth(hit, transform, out CombatHealth combatHealth, out string rejectReason))
+            {
+                if (debugRHitDetection)
+                {
+                    Debug.Log(
+                        $"[Player01RHitDetection] castId={currentCastId} event=ColliderSkipped source={sourceLabel} reason={rejectReason} collider={hit.name} " +
+                        $"root={hit.transform.root.name} layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inLayerMask={inLayerMask} isTrigger={hit.isTrigger} " +
+                        $"activeSelf={hit.gameObject.activeSelf} activeInHierarchy={hit.gameObject.activeInHierarchy} enabled={hit.enabled} " +
+                        $"parentCombatHealth={(parentCombatHealth != null ? parentCombatHealth.name : "null")} boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max}",
+                        this);
+                }
+                continue;
+            }
+
+            if (!thrustDamagedTargets.Add(combatHealth))
+            {
+                if (debugRHitDetection)
+                {
+                    Debug.Log(
+                        $"[Player01RHitDetection] castId={currentCastId} event=ColliderSkipped source={sourceLabel} reason=DuplicateTarget collider={hit.name} target={combatHealth.name}",
+                        this);
+                }
+                continue;
+            }
+
+            if (debugRHitDetection)
+            {
+                Debug.Log(
+                    $"[Player01RHitDetection] castId={currentCastId} event=ColliderAccepted source={sourceLabel} collider={hit.name} target={combatHealth.name} " +
+                    $"layer={LayerMask.LayerToName(hit.gameObject.layer)}({hit.gameObject.layer}) inLayerMask={inLayerMask} isTrigger={hit.isTrigger} boundsCenter={hit.bounds.center} boundsMin={hit.bounds.min} boundsMax={hit.bounds.max}",
+                    this);
             }
 
             thrustPhaseTargets.Add(combatHealth);
@@ -650,6 +851,22 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         return mirrorScaleX < 0f ? 1f : -1f;
     }
 
+    private Transform ResolveThrustOrigin()
+    {
+        ATTACK basicAttack = GetComponent<ATTACK>();
+        if (basicAttack != null && basicAttack.attackPoint != null)
+        {
+            return basicAttack.attackPoint;
+        }
+
+        if (thrustVfxAnchor != null)
+        {
+            return thrustVfxAnchor;
+        }
+
+        return transform;
+    }
+
     private float NextRange(float min, float max)
     {
         if (randomGenerator == null)
@@ -723,10 +940,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         currentRuneCastId = -1;
         thrustVfxTriggered = false;
         thrustHitTriggered = false;
+        thrustDamageAppliedThisCast = false;
         needlePhaseTriggered = false;
         currentNeedleCount = 0;
         currentKillCount = 0;
         currentTotalActualDamage = 0f;
+        currentMeleeActualDamageThisCast = 0f;
         currentTotalHealAmount = 0f;
         currentTotalCooldownReduction = 0f;
         nightChildStateActiveThisCast = false;
@@ -769,10 +988,18 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     {
         if (combatHealth == null || combatHealth.IsDead)
         {
+            if (debugRHitDetection)
+            {
+                Debug.Log(
+                    $"[Player1R-Melee] skipped reason={(combatHealth == null ? "TargetNull" : "TargetDead")} castId={currentCastId}",
+                    this);
+            }
             return;
         }
 
+        float beforeEffectiveHealth = ResolveCurrentEffectiveHealth(combatHealth);
         float beforeHealth = ResolveCurrentHealth(combatHealth);
+        float beforeShield = Mathf.Max(0f, combatHealth.GetCurrentShield());
         float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
         float resolvedPhysicalDamage = Mathf.Max(0f, physicalDamage + runeBonusDamage);
         float resolvedSpecialDamage = Mathf.Max(0f, specialDamage);
@@ -793,9 +1020,23 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, gameObject));
         }
 
-        float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+        float afterEffectiveHealth = ResolveCurrentEffectiveHealth(combatHealth);
+        float afterHealth = ResolveCurrentHealth(combatHealth);
+        float afterShield = Mathf.Max(0f, combatHealth.GetCurrentShield());
+        float actualDamage = Mathf.Max(0f, beforeEffectiveHealth - afterEffectiveHealth);
+
+        if (debugRHitDetection)
+        {
+            Debug.Log(
+                $"[Player1R-Melee] castId={currentCastId} target={combatHealth.name} targetId={combatHealth.GetInstanceID()} " +
+                $"physicalDamage={resolvedPhysicalDamage:F2} specialDamage={resolvedSpecialDamage:F2} " +
+                $"hpBefore={beforeHealth:F2} shieldBefore={beforeShield:F2} hpAfter={afterHealth:F2} shieldAfter={afterShield:F2} actualDamage={actualDamage:F2}",
+                this);
+        }
+
         runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
         NotifySkillDamageApplied(actualDamage, combatHealth, "R thrust");
+        UpdateMeleeDamageCache(actualDamage, combatHealth, resolvedPhysicalDamage + resolvedSpecialDamage);
         RegisterDamageResult(combatHealth, actualDamage, actualDamage > 0f && combatHealth.IsDead);
     }
 
@@ -861,6 +1102,20 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         if (actualDamage <= 0f)
         {
             return;
+        }
+    }
+
+    private void UpdateMeleeDamageCache(float actualDamage, CombatHealth target, float theoreticalDamage)
+    {
+        float previous = currentMeleeActualDamageThisCast;
+        currentMeleeActualDamageThisCast = Mathf.Max(currentMeleeActualDamageThisCast, Mathf.Max(0f, actualDamage));
+
+        if (debugRHitDetection)
+        {
+            Debug.Log(
+                $"[Player01RHitDetection] castId={currentCastId} event=MeleeDamageResolved target={(target != null ? target.name : "null")} " +
+                $"theoreticalMeleeDamage={theoreticalDamage:F2} actualMeleeDamage={actualDamage:F2} cachedActualMeleeDamage={currentMeleeActualDamageThisCast:F2} previousCache={previous:F2}",
+                this);
         }
     }
 
@@ -953,6 +1208,60 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         float multiplier = Mathf.Max(0f, needleDamageMultiplier);
         physicalDamage = thrustPhysicalDamage * multiplier;
         specialDamage = thrustSpecialDamage * multiplier;
+    }
+
+    private void ResolveActualNeedleDamageValues(
+        float theoreticalPhysicalDamage,
+        float theoreticalSpecialDamage,
+        float actualMeleeDamageThisCast,
+        float combatHealthAttackerMultiplier,
+        out float physicalDamage,
+        out float specialDamage)
+    {
+        float normalizedActualMeleeDamage = Mathf.Max(0f, actualMeleeDamageThisCast);
+        float safeCombatHealthAttackerMultiplier = Mathf.Max(0.0001f, combatHealthAttackerMultiplier);
+        normalizedActualMeleeDamage /= safeCombatHealthAttackerMultiplier;
+        float projectileTotalDamage = normalizedActualMeleeDamage * Mathf.Max(0f, needleDamageMultiplier);
+        float theoreticalTotalDamage = Mathf.Max(0f, theoreticalPhysicalDamage) + Mathf.Max(0f, theoreticalSpecialDamage);
+        if (projectileTotalDamage <= 0f || theoreticalTotalDamage <= 0f)
+        {
+            physicalDamage = 0f;
+            specialDamage = 0f;
+            return;
+        }
+
+        float physicalRatio = Mathf.Max(0f, theoreticalPhysicalDamage) / theoreticalTotalDamage;
+        physicalDamage = projectileTotalDamage * physicalRatio;
+        specialDamage = projectileTotalDamage - physicalDamage;
+    }
+
+    private float ResolveNeedleCombatHealthAttackerMultiplier()
+    {
+        GameObject attacker = Controller != null ? Controller.gameObject : gameObject;
+        float multiplier = BattleStatUtility.GetPlayerExcessMoveSpeedDamageMultiplier(attacker);
+        CombatStats attackerStats = BattleStatUtility.GetCombatStats(attacker);
+        if (attackerStats != null)
+        {
+            multiplier *= Mathf.Max(0f, attackerStats.outgoingDamageMultiplier);
+        }
+
+        if (DayNightAffinityDamageModifier.IsNightChildFavorableTime(attacker)
+            || DayNightAffinityDamageModifier.IsDayChildFavorableTime(attacker))
+        {
+            multiplier *= 1.5f;
+        }
+
+        return Mathf.Max(1f, multiplier);
+    }
+
+    private float ResolveCurrentEffectiveHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return ResolveCurrentHealth(health) + Mathf.Max(0f, health.GetCurrentShield());
     }
 
     private List<CombatHealth> FindLivingTargetsInSearchRadius()

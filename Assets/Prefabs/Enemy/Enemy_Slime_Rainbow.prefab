@@ -114,7 +114,7 @@ GameObject:
   - component: {fileID: -8609501882762248427}
   - component: {fileID: -1158828784750518386}
   - component: {fileID: 9023344556677889911}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Enemy_Slime_Rainbow
   m_TagString: Untagged
   m_Icon: {fileID: 0}

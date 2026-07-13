@@ -114,7 +114,7 @@ GameObject:
   - component: {fileID: 47422418825983060}
   - component: {fileID: 5557483866425931479}
   - component: {fileID: 9023344556677889921}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Enemy_Slime_Poison
   m_TagString: Untagged
   m_Icon: {fileID: 0}

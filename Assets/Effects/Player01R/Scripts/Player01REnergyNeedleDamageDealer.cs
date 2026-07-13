@@ -83,12 +83,11 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
                 continue;
             }
 
-            float beforeHealth = ResolveCurrentHealth(combatHealth);
+            float beforeEffectiveHealth = ResolveCurrentEffectiveHealth(combatHealth);
             float runeBonusDamage = ConsumeRuneFirstHitBonusDamage();
             float skillDamageTakenMultiplier = PlayerSkillDamageTakenDebuffReceiver.ResolvePlayer01SkillDamageMultiplier(combatHealth.gameObject);
-            float skillDamageMultiplier = ownerSkill != null ? ownerSkill.ResolveActiveSkillDamageMultiplier() : 1f;
-            float resolvedPhysicalDamage = (physicalDamageAmount + runeBonusDamage) * skillDamageTakenMultiplier * skillDamageMultiplier;
-            float resolvedSpecialDamage = specialDamageAmount * skillDamageTakenMultiplier * skillDamageMultiplier;
+            float resolvedPhysicalDamage = (physicalDamageAmount + runeBonusDamage) * skillDamageTakenMultiplier;
+            float resolvedSpecialDamage = specialDamageAmount * skillDamageTakenMultiplier;
             if (resolvedPhysicalDamage > 0f)
             {
                 combatHealth.TakeDamage(new BattleDamage(resolvedPhysicalDamage, BattleDamageType.Physical, source));
@@ -99,7 +98,7 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
                 combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, source));
             }
 
-            float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
+            float actualDamage = Mathf.Max(0f, beforeEffectiveHealth - ResolveCurrentEffectiveHealth(combatHealth));
             bool killedByThisHit = actualDamage > 0f && combatHealth.IsDead;
             ResolveRuneRuntimeState()?.NotifyMonsterDamagedBySkill(skillSlotIndex, combatHealth, actualDamage);
 
@@ -147,6 +146,16 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
         return health.resourceBank != null
             ? Mathf.Max(0f, health.resourceBank.currentHealth)
             : Mathf.Max(0f, health.currentHealth);
+    }
+
+    private static float ResolveCurrentEffectiveHealth(CombatHealth health)
+    {
+        if (health == null)
+        {
+            return 0f;
+        }
+
+        return ResolveCurrentHealth(health) + Mathf.Max(0f, health.GetCurrentShield());
     }
 
     private void HealSource(float amount)

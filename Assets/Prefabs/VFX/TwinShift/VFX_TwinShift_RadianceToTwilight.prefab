@@ -320,8 +320,8 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.8
-      minScalar: 0.6
+      scalar: 0.55
+      minScalar: 0.4
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -4992,7 +4992,7 @@ ParticleSystem:
   startDelay:
     serializedVersion: 2
     minMaxState: 0
-    scalar: 0
+    scalar: 0.08
     minScalar: 0
     maxCurve:
       serializedVersion: 2
@@ -5105,8 +5105,8 @@ ParticleSystem:
     startSpeed:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 5.2
-      minScalar: 4.5
+      scalar: 3.8
+      minScalar: 3.2
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -5223,8 +5223,8 @@ ParticleSystem:
     startSize:
       serializedVersion: 2
       minMaxState: 3
-      scalar: 0.65
-      minScalar: 0.5
+      scalar: 0.42
+      minScalar: 0.28
       maxCurve:
         serializedVersion: 2
         m_Curve:
@@ -5687,7 +5687,7 @@ ParticleSystem:
     sphericalDirectionAmount: 0
     randomPositionAmount: 0
     radius:
-      value: 0.65
+      value: 0.7
       mode: 0
       spread: 0
       speed:
@@ -5916,7 +5916,7 @@ ParticleSystem:
       countCurve:
         serializedVersion: 2
         minMaxState: 0
-        scalar: 35
+        scalar: 40
         minScalar: 30
         maxCurve:
           serializedVersion: 2
@@ -6311,8 +6311,8 @@ ParticleSystem:
       maxColor: {r: 1, g: 1, b: 1, a: 1}
       maxGradient:
         serializedVersion: 2
-        key0: {r: 1, g: 0.9, b: 0.35, a: 1}
-        key1: {r: 1, g: 0.98, b: 0.78, a: 0.7125}
+        key0: {r: 1, g: 0.9, b: 0.35, a: 0.7058824}
+        key1: {r: 1, g: 0.98, b: 0.78, a: 0.8627451}
         key2: {r: 1, g: 0.98, b: 0.78, a: 0}
         key3: {r: 0, g: 0, b: 0, a: 0}
         key4: {r: 0, g: 0, b: 0, a: 0}
@@ -6320,7 +6320,7 @@ ParticleSystem:
         key6: {r: 0, g: 0, b: 0, a: 0}
         key7: {r: 0, g: 0, b: 0, a: 0}
         ctime0: 0
-        ctime1: 32768
+        ctime1: 26214
         ctime2: 65535
         ctime3: 0
         ctime4: 0
@@ -6328,7 +6328,7 @@ ParticleSystem:
         ctime6: 0
         ctime7: 0
         atime0: 0
-        atime1: 32768
+        atime1: 26214
         atime2: 65535
         atime3: 65535
         atime4: 0

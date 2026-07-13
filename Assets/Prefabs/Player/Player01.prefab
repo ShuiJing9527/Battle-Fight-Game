@@ -1467,10 +1467,13 @@ MonoBehaviour:
   thrustWidth: 1.2
   thrustHeight: 1.4
   thrustForwardOffset: 1.2
+  thrustCloseRangeRadius: 0.8
+  thrustCloseRangeForwardOffset: 0.2
   thrustHitLayers:
     serializedVersion: 2
     m_Bits: 128
   debugDrawThrustHitbox: 0
+  debugRHitDetection: 0
   needlePrefab: {fileID: 6860482820014089041, guid: 2782e2742c693e3459f55aaec3c41f7f, type: 3}
   minNeedleCount: 4
   maxNeedleCount: 12
@@ -1484,7 +1487,7 @@ MonoBehaviour:
   minVisibleAngle: 12
   useRandomSeed: 1
   randomSeed: 101
-  needleDamageMultiplier: 50
+  needleDamageMultiplier: 0.5
   travelSpeed: 14
   passThroughDistance: 4.5
   fadeDuration: 0.3
