@@ -8,7 +8,7 @@ public class MonsterProjectile : MonoBehaviour
     private const float DefaultTrailTime = 0.32f;
     private const float DefaultTrailStartWidth = 0.35f;
     private const float DefaultTrailEndWidth = 0f;
-    private const float DefaultTrailMinVertexDistance = 0.06f;
+    private const float DefaultTrailMinVertexDistance = 0.025f;
     private const float DefaultDropletRate = 10f;
     private const float DefaultDropletLifetime = 0.22f;
     private const float DefaultDropletSpeed = 0.55f;
@@ -38,18 +38,21 @@ public class MonsterProjectile : MonoBehaviour
     [SerializeField] private float squashStretchAmount = 0.08f;
     [SerializeField] private float squashStretchSpeed = 6f;
     [SerializeField] private Vector3 bodyBaseScale = new Vector3(0.75f, 0.6f, 0.92f);
-    [SerializeField] private Color bodyColor = new Color(0.64f, 0.93f, 0.22f, 0.78f);
-    [SerializeField] private Color bodyEdgeColor = new Color(0.24f, 0.55f, 0.12f, 0.72f);
+    [SerializeField] private Color bodyColor = new Color(0.45f, 0.85f, 0.18f, 0.86f);
+    [SerializeField] private Color bodyEdgeColor = new Color(0.20f, 0.48f, 0.10f, 0.82f);
     [SerializeField, Min(0f)] private float bodySmoothness = 0.3f;
     [SerializeField, Min(0f)] private float bodyMetallic = 0f;
     [Header("Trail")]
-    [SerializeField, Min(0.05f)] private float trailTime = 0.38f;
+    [SerializeField, Min(0.05f)] private float trailTime = 0.5f;
     [SerializeField, Min(0.05f)] private float trailStartWidth = DefaultTrailStartWidth;
     [SerializeField, Min(0f)] private float trailEndWidth = DefaultTrailEndWidth;
-    [SerializeField, Min(0.01f)] private float trailMinVertexDistance = DefaultTrailMinVertexDistance;
-    [SerializeField] private Color trailStartColor = new Color(0.72f, 0.97f, 0.34f, 0.58f);
-    [SerializeField] private Color trailMidColor = new Color(0.43f, 0.82f, 0.26f, 0.32f);
-    [SerializeField] private Color trailEndColor = new Color(0.18f, 0.42f, 0.12f, 0f);
+    [SerializeField, Range(0, 12)] private int trailCornerVertices = 6;
+    [SerializeField, Range(0, 8)] private int trailCapVertices = 3;
+    [SerializeField, Min(0.005f)] private float trailMinVertexDistance = DefaultTrailMinVertexDistance;
+    [SerializeField] private Color trailStartColor = new Color(0.6588f, 1f, 0.1569f, 0.95f);
+    [SerializeField] private Color trailMidColor = new Color(0.4510f, 0.9098f, 0.0902f, 0.80f);
+    [SerializeField] private Color trailLateColor = new Color(0.2275f, 0.6588f, 0.0549f, 0.50f);
+    [SerializeField] private Color trailEndColor = new Color(0.1451f, 0.4196f, 0.0314f, 0.10f);
     [SerializeField] private bool debugProjectileLog = false;
     [SerializeField] private bool useArcTrajectory = true;
     [SerializeField] private float arcHeight = 2.0f;
@@ -382,10 +385,10 @@ public class MonsterProjectile : MonoBehaviour
         trail.shadowCastingMode = ShadowCastingMode.Off;
         trail.receiveShadows = false;
         trail.alignment = LineAlignment.View;
-        trail.minVertexDistance = Mathf.Max(0.01f, trailMinVertexDistance);
+        trail.minVertexDistance = Mathf.Max(0.005f, trailMinVertexDistance);
         trail.textureMode = LineTextureMode.Stretch;
-        trail.numCornerVertices = 2;
-        trail.numCapVertices = 1;
+        trail.numCornerVertices = Mathf.Clamp(trailCornerVertices, 0, 12);
+        trail.numCapVertices = Mathf.Clamp(trailCapVertices, 0, 8);
         trail.sharedMaterial = ResolveTrailMaterial();
         trail.colorGradient = CreateTrailGradient();
         trail.emitting = true;
@@ -565,7 +568,7 @@ public class MonsterProjectile : MonoBehaviour
             return runtimeTrailMaterial;
         }
 
-        runtimeTrailMaterial = CreateParticleTransparentMaterial(new Color(0.65f, 0.95f, 0.28f, 0.45f));
+        runtimeTrailMaterial = CreateParticleTransparentMaterial(new Color(0.4510f, 0.9098f, 0.0902f, 0.95f));
         ApplyMaterialTexture(runtimeTrailMaterial, trailTexture);
         return runtimeTrailMaterial;
     }
@@ -683,13 +686,15 @@ public class MonsterProjectile : MonoBehaviour
             new[]
             {
                 new GradientColorKey(trailStartColor, 0f),
-                new GradientColorKey(trailMidColor, 0.45f),
+                new GradientColorKey(trailMidColor, 0.35f),
+                new GradientColorKey(trailLateColor, 0.7f),
                 new GradientColorKey(trailEndColor, 1f)
             },
             new[]
             {
                 new GradientAlphaKey(trailStartColor.a, 0f),
-                new GradientAlphaKey(trailMidColor.a, 0.45f),
+                new GradientAlphaKey(trailMidColor.a, 0.35f),
+                new GradientAlphaKey(trailLateColor.a, 0.7f),
                 new GradientAlphaKey(trailEndColor.a, 1f)
             });
         return gradient;

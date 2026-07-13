@@ -173,17 +173,20 @@ MonoBehaviour:
   squashStretchAmount: 0.08
   squashStretchSpeed: 6
   bodyBaseScale: {x: 0.75, y: 0.6, z: 0.92}
-  bodyColor: {r: 0.64, g: 0.93, b: 0.22, a: 0.78}
-  bodyEdgeColor: {r: 0.24, g: 0.55, b: 0.12, a: 0.72}
+  bodyColor: {r: 0.45, g: 0.85, b: 0.18, a: 0.74509805}
+  bodyEdgeColor: {r: 0.2, g: 0.48, b: 0.1, a: 0.7058824}
   bodySmoothness: 0.3
   bodyMetallic: 0
   trailTime: 0.5
   trailStartWidth: 0.5
   trailEndWidth: 0
-  trailMinVertexDistance: 0.05
-  trailStartColor: {r: 0.72, g: 0.97, b: 0.34, a: 0.58}
-  trailMidColor: {r: 0.43, g: 0.82, b: 0.26, a: 0.32}
-  trailEndColor: {r: 0.18, g: 0.42, b: 0.12, a: 0}
+  trailCornerVertices: 6
+  trailCapVertices: 3
+  trailMinVertexDistance: 0.025
+  trailStartColor: {r: 0.6588, g: 1, b: 0.1569, a: 0.74509805}
+  trailMidColor: {r: 0.451, g: 0.9098, b: 0.0902, a: 0.54901963}
+  trailLateColor: {r: 0.2275, g: 0.6588, b: 0.0549, a: 0.47058824}
+  trailEndColor: {r: 0.1451, g: 0.4196, b: 0.0314, a: 0.11764706}
   debugProjectileLog: 1
   useArcTrajectory: 1
   arcHeight: 2
