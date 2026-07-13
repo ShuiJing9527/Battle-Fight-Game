@@ -76,12 +76,19 @@ public class MonsterTestSpawner : MonoBehaviour
     private const float FallbackBossHealthBarOffsetY = 0.45f;
     private const bool FallbackDebugBossVisualGroundOffset = true;
     private const bool FallbackEnableBossHurtboxScale = true;
+    private const bool FallbackUseBossVisualBoundsHurtbox = true;
     private const float FallbackBossHurtboxRadiusMultiplier = 3.0f;
     private const float FallbackBossHurtboxCenterYOffset = 0f;
+    private const float FallbackBossHurtboxSizeMultiplier = 1f;
+    private static readonly Vector3 FallbackBossHurtboxExtraPadding = Vector3.zero;
+    private static readonly Vector3 FallbackBossHurtboxCenterOffset = Vector3.zero;
+    private const float FallbackBossHurtboxMinimumDepth = 0.2f;
     private const bool FallbackDebugBossHurtbox = true;
     private bool sharedEnemySpawnerPausedByTest;
     private string lastPlayerResolveFailureReason = "NotResolved";
     private Coroutine autoSpawnRoutine;
+    private float nextBossHurtboxRuntimeRefreshTime;
+    private int lastSharedBossHurtboxConfigHash;
 
     private void Awake()
     {
@@ -112,6 +119,11 @@ public class MonsterTestSpawner : MonoBehaviour
         }
 
         autoSpawnRoutine = StartCoroutine(SpawnSelectedTypeOnStartRoutine());
+    }
+
+    private void Update()
+    {
+        RefreshSpawnedBossHurtboxesIfSharedConfigChanged();
     }
 
     [ContextMenu("TEST/Spawn Selected Monster Type")]
@@ -1033,7 +1045,12 @@ public class MonsterTestSpawner : MonoBehaviour
             monster,
             mainCollider,
             FallbackBossHurtboxRadiusMultiplier,
-            FallbackBossHurtboxCenterYOffset);
+            FallbackBossHurtboxCenterYOffset,
+            FallbackUseBossVisualBoundsHurtbox,
+            FallbackBossHurtboxSizeMultiplier,
+            FallbackBossHurtboxExtraPadding,
+            FallbackBossHurtboxCenterOffset,
+            FallbackBossHurtboxMinimumDepth);
 
         if (hurtboxCollider == null || !FallbackDebugBossHurtbox)
         {
@@ -1054,6 +1071,11 @@ public class MonsterTestSpawner : MonoBehaviour
             " mainColliderBounds=" + mainCollider.bounds +
             " hurtboxCollider=" + hurtboxCollider.name +
             " hurtboxBounds=" + hurtboxCollider.bounds +
+            " useVisualBoundsHurtbox=" + FallbackUseBossVisualBoundsHurtbox +
+            " sizeMultiplier=" + FallbackBossHurtboxSizeMultiplier +
+            " extraPadding=" + FallbackBossHurtboxExtraPadding +
+            " centerOffset=" + FallbackBossHurtboxCenterOffset +
+            " minimumDepth=" + FallbackBossHurtboxMinimumDepth +
             " source=MonsterTestSpawnerFallback",
             monster);
     }
@@ -1094,7 +1116,16 @@ public class MonsterTestSpawner : MonoBehaviour
         return bestCollider;
     }
 
-    private Collider EnsureBossScaledHurtbox(GameObject monster, Collider sourceCollider, float radiusMultiplierValue, float centerYOffset)
+    private Collider EnsureBossScaledHurtbox(
+        GameObject monster,
+        Collider sourceCollider,
+        float radiusMultiplierValue,
+        float centerYOffset,
+        bool useVisualBounds,
+        float sizeMultiplierValue,
+        Vector3 extraPadding,
+        Vector3 centerOffset,
+        float minimumDepth)
     {
         Transform hurtboxRoot = monster.transform.Find("BossScaledHurtbox");
         if (hurtboxRoot == null)
@@ -1110,7 +1141,34 @@ public class MonsterTestSpawner : MonoBehaviour
         hurtboxRoot.localRotation = Quaternion.identity;
         hurtboxRoot.localScale = Vector3.one;
 
-        float radiusMultiplier = Mathf.Max(1f, radiusMultiplierValue);
+        Renderer visualRenderer = useVisualBounds
+            ? ResolveBossVisualRenderer(ResolveBossVisualTransform(monster))
+            : null;
+        if (visualRenderer != null)
+        {
+            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
+            BoxCollider visualBoundsHurtbox = hurtboxRoot.GetComponent<BoxCollider>();
+            if (visualBoundsHurtbox == null)
+            {
+                visualBoundsHurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
+            }
+
+            ConfigureBossVisualBoundsHurtbox(
+                monster.transform,
+                visualRenderer.bounds,
+                visualBoundsHurtbox,
+                radiusMultiplierValue,
+                centerYOffset,
+                sizeMultiplierValue,
+                extraPadding,
+                centerOffset,
+                minimumDepth);
+            return visualBoundsHurtbox;
+        }
+
+        float radiusMultiplier = Mathf.Max(1f, radiusMultiplierValue) * Mathf.Max(0.1f, sizeMultiplierValue);
+        Vector3 colliderCenterOffset = centerOffset + Vector3.up * centerYOffset;
+        Vector3 colliderPadding = AbsVector3(extraPadding);
 
         if (sourceCollider is SphereCollider sourceSphere)
         {
@@ -1122,8 +1180,8 @@ public class MonsterTestSpawner : MonoBehaviour
             }
 
             hurtbox.isTrigger = true;
-            hurtbox.center = sourceSphere.center + Vector3.up * centerYOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceSphere.radius * radiusMultiplier);
+            hurtbox.center = sourceSphere.center + colliderCenterOffset;
+            hurtbox.radius = Mathf.Max(0.05f, sourceSphere.radius * radiusMultiplier + MaxComponent(colliderPadding) * 0.5f);
             return hurtbox;
         }
 
@@ -1138,9 +1196,9 @@ public class MonsterTestSpawner : MonoBehaviour
 
             hurtbox.isTrigger = true;
             hurtbox.direction = sourceCapsule.direction;
-            hurtbox.center = sourceCapsule.center + Vector3.up * centerYOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceCapsule.radius * radiusMultiplier);
-            hurtbox.height = Mathf.Max(hurtbox.radius * 2f, sourceCapsule.height * radiusMultiplier);
+            hurtbox.center = sourceCapsule.center + colliderCenterOffset;
+            hurtbox.radius = Mathf.Max(0.05f, sourceCapsule.radius * radiusMultiplier + Mathf.Max(colliderPadding.x, colliderPadding.z) * 0.5f);
+            hurtbox.height = Mathf.Max(hurtbox.radius * 2f, sourceCapsule.height * radiusMultiplier + colliderPadding.y);
             return hurtbox;
         }
 
@@ -1154,12 +1212,64 @@ public class MonsterTestSpawner : MonoBehaviour
             }
 
             hurtbox.isTrigger = true;
-            hurtbox.center = sourceBox.center + Vector3.up * centerYOffset;
-            hurtbox.size = sourceBox.size * radiusMultiplier;
+            hurtbox.center = sourceBox.center + colliderCenterOffset;
+            hurtbox.size = sourceBox.size * radiusMultiplier + colliderPadding;
             return hurtbox;
         }
 
         return null;
+    }
+
+    private static void ConfigureBossVisualBoundsHurtbox(
+        Transform monsterRoot,
+        Bounds visualBounds,
+        BoxCollider hurtbox,
+        float radiusMultiplierValue,
+        float centerYOffset,
+        float sizeMultiplierValue,
+        Vector3 extraPadding,
+        Vector3 centerOffset,
+        float minimumDepth)
+    {
+        if (monsterRoot == null || hurtbox == null)
+        {
+            return;
+        }
+
+        Vector3 localMin = monsterRoot.InverseTransformPoint(visualBounds.min);
+        Vector3 localMax = monsterRoot.InverseTransformPoint(visualBounds.max);
+        Vector3 localCenter = (localMin + localMax) * 0.5f;
+        Vector3 localSize = new Vector3(
+            Mathf.Abs(localMax.x - localMin.x),
+            Mathf.Abs(localMax.y - localMin.y),
+            Mathf.Abs(localMax.z - localMin.z));
+
+        float minDepth = Mathf.Max(minimumDepth, Mathf.Max(localSize.x, localSize.y) * 0.35f);
+        if (localSize.z < minDepth)
+        {
+            localSize.z = minDepth;
+        }
+
+        float sizeMultiplier = Mathf.Max(0.1f, sizeMultiplierValue);
+        Vector3 legacyPadding = localSize * Mathf.Max(0f, radiusMultiplierValue - 1f) * 0.05f;
+        Vector3 customPadding = AbsVector3(extraPadding);
+        localCenter += centerOffset + Vector3.up * centerYOffset;
+        hurtbox.isTrigger = true;
+        hurtbox.center = localCenter;
+        hurtbox.size = new Vector3(
+            Mathf.Max(0.1f, localSize.x * sizeMultiplier + legacyPadding.x + customPadding.x),
+            Mathf.Max(0.1f, localSize.y * sizeMultiplier + legacyPadding.y + customPadding.y),
+            Mathf.Max(0.1f, localSize.z * sizeMultiplier + legacyPadding.z + customPadding.z));
+    }
+
+    private static Vector3 AbsVector3(Vector3 value)
+    {
+        return new Vector3(Mathf.Abs(value.x), Mathf.Abs(value.y), Mathf.Abs(value.z));
+    }
+
+    private static float MaxComponent(Vector3 value)
+    {
+        return Mathf.Max(value.x, Mathf.Max(value.y, value.z));
     }
 
     private static void RemoveColliderComponentsExcept<T>(Transform root) where T : Collider
@@ -1266,6 +1376,37 @@ public class MonsterTestSpawner : MonoBehaviour
             {
                 spawnedTestMonsters.RemoveAt(i);
             }
+        }
+    }
+
+    private void RefreshSpawnedBossHurtboxesIfSharedConfigChanged()
+    {
+        if (enemySpawner == null || Time.unscaledTime < nextBossHurtboxRuntimeRefreshTime)
+        {
+            return;
+        }
+
+        nextBossHurtboxRuntimeRefreshTime = Time.unscaledTime + 0.25f;
+
+        int configHash = enemySpawner.GetConfiguredBossHurtboxConfigHash();
+        if (configHash == lastSharedBossHurtboxConfigHash)
+        {
+            return;
+        }
+
+        lastSharedBossHurtboxConfigHash = configHash;
+        CleanupTrackedMonsters();
+
+        for (int i = 0; i < spawnedTestMonsters.Count; i++)
+        {
+            GameObject monster = spawnedTestMonsters[i];
+            MonsterIdentity identity = monster != null ? monster.GetComponent<MonsterIdentity>() : null;
+            if (identity == null || identity.rank != MonsterRank.Boss)
+            {
+                continue;
+            }
+
+            enemySpawner.RefreshBossHurtboxForRuntime(monster, "MonsterTestSpawnerRuntimeRefresh");
         }
     }
 

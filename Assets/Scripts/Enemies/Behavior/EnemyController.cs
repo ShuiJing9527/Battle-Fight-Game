@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class EnemyController : MonoBehaviour
@@ -79,6 +80,45 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float arcTravelTime = 0.9f;
     [SerializeField] private float targetPredictionTime = 0.25f;
 
+    [Header("Boss Skill - Leap Slam")]
+    [SerializeField] private bool enableBossLeapSlam = true;
+    [SerializeField] private float bossLeapInitialDelay = 2.0f;
+    [SerializeField] private float bossLeapCooldown = 6.0f;
+    [SerializeField, Range(0f, 1f)] private float bossLeapTriggerChance = 0.45f;
+    [SerializeField] private float bossLeapMinRange = 2.0f;
+    [SerializeField] private float bossLeapMaxRange = 8.0f;
+    [SerializeField] private float bossLeapWindupTime = 0.35f;
+    [SerializeField] private float bossLeapTravelTime = 0.65f;
+    [SerializeField] private float bossLeapRecoverTime = 0.45f;
+    [SerializeField] private float bossLeapHeight = 3.0f;
+    [SerializeField] private float bossLeapLandingRadius = 2.2f;
+    [SerializeField] private float bossLeapDamageMultiplier = 1.8f;
+
+    [Header("Boss Skill - Split Merge")]
+    [SerializeField] private bool enableBossTimedSplit = true;
+    [SerializeField] private float bossSplitInitialDelay = 4.0f;
+    [SerializeField] private float bossSplitCooldown = 14.0f;
+    [SerializeField, Range(0f, 1f)] private float bossSplitTriggerChance = 0.30f;
+    [SerializeField] private int bossSplitChildCount = 2;
+    [SerializeField] private float bossSplitScatterRadius = 2.0f;
+    [SerializeField] private float bossSplitDuration = 8.0f;
+    [SerializeField, Range(0.01f, 1f)] private float bossSplitChildHealthPercentOfBoss = 0.65f;
+    [SerializeField] private float bossSplitWindupTime = 0.35f;
+    [SerializeField] private float bossSplitMergeRecoverTime = 0.35f;
+
+    [Header("Boss Skill - Devour")]
+    [SerializeField] private bool enableBossDevour = true;
+    [SerializeField] private float bossDevourInitialDelay = 3.0f;
+    [SerializeField] private float bossDevourCooldown = 10.0f;
+    [SerializeField, Range(0f, 1f)] private float bossDevourTriggerChance = 0.35f;
+    [SerializeField] private float bossDevourRange = 2.2f;
+    [SerializeField] private float bossDevourWindupTime = 0.25f;
+    [SerializeField] private float bossDevourDuration = 3.0f;
+    [SerializeField] private float bossDevourDamagePerSecond = 4.0f;
+    [SerializeField] private float bossDevourTickInterval = 0.5f;
+    [SerializeField] private Color bossDevourDarkTint = new Color(0.35f, 0.35f, 0.35f, 1f);
+    [SerializeField] private Vector3 bossDevourHoldOffset = new Vector3(0f, 0.3f, 0f);
+
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
     [SerializeField] private bool debugMeleeHitCheck = false;
@@ -128,9 +168,20 @@ public class EnemyController : MonoBehaviour
     private Collider lastLoggedMeleeCollider;
     private bool hasLoggedRuntimeAttackConfig;
     private Coroutine bossRangedAttackRoutine;
+    private Coroutine bossSpecialAttackRoutine;
     private BossAttackKind activeBossAttackKind = BossAttackKind.None;
     private bool attackHitFrameTriggeredThisAttack;
     private string lastMeleeAttackResult = "none";
+    private float nextBossLeapAttackTime;
+    private float nextBossSplitAttackTime;
+    private float nextBossDevourAttackTime;
+    private readonly List<GameObject> activeBossSplitChildren = new List<GameObject>();
+    private Renderer[] bossSplitRenderers;
+    private Collider[] bossSplitColliders;
+    private bool[] bossSplitRendererEnabledStates;
+    private bool[] bossSplitColliderEnabledStates;
+    private bool bossBodyHiddenForSplit;
+    private bool bossRigidbodyWasKinematicBeforeSplit;
 
     private enum EnemyAttackRuntimeState
     {
@@ -147,7 +198,10 @@ public class EnemyController : MonoBehaviour
     {
         None,
         Melee,
-        Ranged
+        Ranged,
+        LeapSlam,
+        TimedSplit,
+        Devour
     }
 
     public float BaseMoveSpeed => moveSpeed;
@@ -164,6 +218,7 @@ public class EnemyController : MonoBehaviour
         ResolveMeleeHitSources();
         initialRotation = transform.rotation;
         ResolvePlayerTarget();
+        InitializeBossSkillTimers();
 
         if (slimeAnimation != null)
         {
@@ -179,6 +234,8 @@ public class EnemyController : MonoBehaviour
         {
             slimeAnimation.OnAttackHit -= HandleAttackHit;
         }
+
+        RestoreBossBodyAfterSplit();
     }
 
     private void Update()
@@ -420,6 +477,19 @@ public class EnemyController : MonoBehaviour
         this.outgoingDamageMultiplier = Mathf.Max(0.01f, outgoingDamageMultiplier);
     }
 
+    private void InitializeBossSkillTimers()
+    {
+        if (attackStyle != MonsterAttackStyle.ElementalBoss)
+        {
+            return;
+        }
+
+        float now = Time.time;
+        nextBossLeapAttackTime = now + Mathf.Max(0f, bossLeapInitialDelay);
+        nextBossSplitAttackTime = now + Mathf.Max(0f, bossSplitInitialDelay);
+        nextBossDevourAttackTime = now + Mathf.Max(0f, bossDevourInitialDelay);
+    }
+
     private void HandleBossElementalCombat(Vector3 toPlayer, float horizontalCenterDistance, float centerDistance, float verticalDifference, bool grounded)
     {
         float distance = Mathf.Max(0f, horizontalCenterDistance);
@@ -437,6 +507,18 @@ public class EnemyController : MonoBehaviour
             FaceTargetHorizontally(playerTarget);
             LogBossMeleeDecision(distance, false, "AlreadyAttacking", grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
             LogBossRangedDecision(distance, "Ranged", "CastInProgress");
+            return;
+        }
+
+        if (bossBodyHiddenForSplit)
+        {
+            rb.linearVelocity = Vector3.zero;
+            StopMoveAnimation();
+            return;
+        }
+
+        if (TryBeginBossSpecialSkill(distance, verticalDifference, grounded))
+        {
             return;
         }
 
@@ -495,6 +577,627 @@ public class EnemyController : MonoBehaviour
         LogBossMeleeDecision(distance, false, "BetweenMeleeAndRangedWindow", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
         LogBossRangedDecision(distance, "Chase", "BetweenMeleeAndRangedWindow");
         ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "BetweenMeleeAndRangedWindow");
+    }
+
+    private bool TryBeginBossSpecialSkill(float distance, float verticalDifference, bool grounded)
+    {
+        if (playerTarget == null || attackInProgress || bossSpecialAttackRoutine != null)
+        {
+            return false;
+        }
+
+        if (enableBossTimedSplit && Time.time >= nextBossSplitAttackTime)
+        {
+            if (CanUseBossSplitSkill() && RollBossSkillChance(bossSplitTriggerChance))
+            {
+                BeginBossSplitSkill();
+                return true;
+            }
+
+            nextBossSplitAttackTime = Time.time + Mathf.Max(0.1f, bossSplitCooldown);
+        }
+
+        if (enableBossDevour && Time.time >= nextBossDevourAttackTime)
+        {
+            if (CanUseBossDevourSkill(distance, verticalDifference, grounded) && RollBossSkillChance(bossDevourTriggerChance))
+            {
+                BeginBossDevourSkill(playerTarget);
+                return true;
+            }
+
+            nextBossDevourAttackTime = Time.time + Mathf.Max(0.1f, bossDevourCooldown);
+        }
+
+        if (enableBossLeapSlam && Time.time >= nextBossLeapAttackTime)
+        {
+            if (CanUseBossLeapSkill(distance, verticalDifference, grounded) && RollBossSkillChance(bossLeapTriggerChance))
+            {
+                BeginBossLeapSlam(playerTarget);
+                return true;
+            }
+
+            nextBossLeapAttackTime = Time.time + Mathf.Max(0.1f, bossLeapCooldown);
+        }
+
+        return false;
+    }
+
+    private bool CanUseBossLeapSkill(float distance, float verticalDifference, bool grounded)
+    {
+        if (playerTarget == null)
+        {
+            return false;
+        }
+
+        if (distance < Mathf.Max(0.1f, bossLeapMinRange) || distance > Mathf.Max(bossLeapMinRange, bossLeapMaxRange))
+        {
+            return false;
+        }
+
+        if (verticalDifference > Mathf.Max(0f, maxVerticalTargetDifference))
+        {
+            return false;
+        }
+
+        return !requireGroundedToAttack || grounded;
+    }
+
+    private bool CanUseBossSplitSkill()
+    {
+        MonsterIdentity identity = monsterIdentity != null ? monsterIdentity : GetComponent<MonsterIdentity>();
+        if (identity == null || identity.rank != MonsterRank.Boss || !IsSlimeIdentity())
+        {
+            return false;
+        }
+
+        EnemySpawner spawner = FindObjectOfType<EnemySpawner>();
+        return spawner != null && Mathf.Max(0, bossSplitChildCount) > 0;
+    }
+
+    private bool CanUseBossDevourSkill(float distance, float verticalDifference, bool grounded)
+    {
+        if (playerTarget == null)
+        {
+            return false;
+        }
+
+        if (distance > Mathf.Max(0.1f, bossDevourRange))
+        {
+            return false;
+        }
+
+        if (verticalDifference > Mathf.Max(0f, maxVerticalAttackDifference))
+        {
+            return false;
+        }
+
+        return !requireGroundedToAttack || grounded;
+    }
+
+    private static bool RollBossSkillChance(float chance)
+    {
+        return Random.value <= Mathf.Clamp01(chance);
+    }
+
+    private void BeginBossLeapSlam(Transform target)
+    {
+        if (target == null || bossSpecialAttackRoutine != null)
+        {
+            return;
+        }
+
+        activeBossAttackKind = BossAttackKind.LeapSlam;
+        attackInProgress = true;
+        pendingAttackTarget = target;
+        lastAttackTime = Time.time;
+        nextBossLeapAttackTime = Time.time + Mathf.Max(0.1f, bossLeapCooldown);
+        nextAttackTime = Mathf.Max(nextAttackTime, nextBossLeapAttackTime);
+        rb.linearVelocity = Vector3.zero;
+        StopMoveAnimation();
+        CancelInvoke(nameof(FinishAttackRecovery));
+        bossSpecialAttackRoutine = StartCoroutine(BossLeapSlamRoutine(target));
+    }
+
+    private System.Collections.IEnumerator BossLeapSlamRoutine(Transform target)
+    {
+        Vector3 startPosition = transform.position;
+        Vector3 landingPosition = target != null ? target.position : startPosition;
+        landingPosition.y = startPosition.y;
+        Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
+        Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
+        Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
+
+        for (float elapsed = 0f; elapsed < Mathf.Max(0.01f, bossLeapWindupTime); elapsed += Time.deltaTime)
+        {
+            rb.linearVelocity = Vector3.zero;
+            FaceTargetHorizontally(target);
+            if (visual != null)
+            {
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, bossLeapWindupTime));
+                visual.localScale = Vector3.Lerp(baseScale, new Vector3(baseScale.x * 1.18f, baseScale.y * 0.82f, baseScale.z), t);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        float travelTime = Mathf.Max(0.01f, bossLeapTravelTime);
+        for (float elapsed = 0f; elapsed < travelTime; elapsed += Time.deltaTime)
+        {
+            float t = Mathf.Clamp01(elapsed / travelTime);
+            float arcY = Mathf.Sin(t * Mathf.PI) * Mathf.Max(0f, bossLeapHeight);
+            Vector3 nextPosition = Vector3.Lerp(startPosition, landingPosition, t) + Vector3.up * arcY;
+            MoveBossBody(nextPosition);
+            FaceTargetHorizontally(target);
+            if (visual != null)
+            {
+                visual.localScale = Vector3.Lerp(new Vector3(baseScale.x * 1.18f, baseScale.y * 0.82f, baseScale.z), baseScale, t);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        MoveBossBody(landingPosition);
+        ApplyBossLeapLandingDamage(target, landingPosition);
+
+        for (float elapsed = 0f; elapsed < Mathf.Max(0.01f, bossLeapRecoverTime); elapsed += Time.deltaTime)
+        {
+            rb.linearVelocity = Vector3.zero;
+            if (visual != null)
+            {
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, bossLeapRecoverTime));
+                visual.localScale = Vector3.Lerp(new Vector3(baseScale.x * 1.25f, baseScale.y * 0.75f, baseScale.z), baseScale, t);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        if (visual != null)
+        {
+            visual.localScale = baseScale;
+            visual.localPosition = basePosition;
+        }
+
+        CompleteBossSpecialAttack();
+    }
+
+    private void ApplyBossLeapLandingDamage(Transform target, Vector3 landingPosition)
+    {
+        CombatHealth targetHealth = target != null ? target.GetComponentInParent<CombatHealth>() : null;
+        if (targetHealth == null || targetHealth.IsDead)
+        {
+            return;
+        }
+
+        Vector3 targetPosition = target.position;
+        targetPosition.y = landingPosition.y;
+        float distance = Vector3.Distance(targetPosition, landingPosition);
+        if (distance > Mathf.Max(0.1f, bossLeapLandingRadius))
+        {
+            return;
+        }
+
+        float damage = ResolveCurrentAttackDamage(BattleDamageType.Physical) * Mathf.Max(0f, bossLeapDamageMultiplier);
+        targetHealth.TakeDamage(new BattleDamage(damage, BattleDamageType.Physical, gameObject));
+    }
+
+    private void BeginBossSplitSkill()
+    {
+        if (bossSpecialAttackRoutine != null)
+        {
+            return;
+        }
+
+        activeBossAttackKind = BossAttackKind.TimedSplit;
+        attackInProgress = true;
+        pendingAttackTarget = playerTarget;
+        lastAttackTime = Time.time;
+        nextBossSplitAttackTime = Time.time + Mathf.Max(0.1f, bossSplitCooldown);
+        nextAttackTime = Mathf.Max(nextAttackTime, nextBossSplitAttackTime);
+        rb.linearVelocity = Vector3.zero;
+        StopMoveAnimation();
+        CancelInvoke(nameof(FinishAttackRecovery));
+        bossSpecialAttackRoutine = StartCoroutine(BossTimedSplitRoutine());
+    }
+
+    private System.Collections.IEnumerator BossTimedSplitRoutine()
+    {
+        Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
+        Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
+        Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
+
+        for (float elapsed = 0f; elapsed < Mathf.Max(0.01f, bossSplitWindupTime); elapsed += Time.deltaTime)
+        {
+            rb.linearVelocity = Vector3.zero;
+            FaceTargetHorizontally(playerTarget);
+            if (visual != null)
+            {
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, bossSplitWindupTime));
+                visual.localScale = Vector3.Lerp(baseScale, baseScale * Mathf.Lerp(1f, 0.72f, t), t);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        HideBossBodyForSplit();
+        SpawnBossSplitChildren();
+
+        float elapsedSplit = 0f;
+        float splitDuration = Mathf.Max(0.1f, bossSplitDuration);
+        while (elapsedSplit < splitDuration)
+        {
+            rb.linearVelocity = Vector3.zero;
+            if (CountAliveBossSplitChildren() < Mathf.Max(1, bossSplitChildCount))
+            {
+                break;
+            }
+
+            elapsedSplit += Time.deltaTime;
+            yield return null;
+        }
+
+        bool fullMerge = CountAliveBossSplitChildren() >= Mathf.Max(1, bossSplitChildCount);
+        Vector3 mergePosition = ResolveBossSplitMergePosition();
+        DestroyActiveBossSplitChildren();
+        MoveBossBody(mergePosition);
+        RestoreBossBodyAfterSplit();
+
+        if (fullMerge && visual != null)
+        {
+            visual.localScale = baseScale * 1.2f;
+            for (float elapsed = 0f; elapsed < Mathf.Max(0.01f, bossSplitMergeRecoverTime); elapsed += Time.deltaTime)
+            {
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, bossSplitMergeRecoverTime));
+                visual.localScale = Vector3.Lerp(baseScale * 1.2f, baseScale, t);
+                visual.localPosition = basePosition;
+                yield return null;
+            }
+        }
+
+        if (visual != null)
+        {
+            visual.localScale = baseScale;
+            visual.localPosition = basePosition;
+        }
+
+        CompleteBossSpecialAttack();
+    }
+
+    private void BeginBossDevourSkill(Transform target)
+    {
+        if (target == null || bossSpecialAttackRoutine != null)
+        {
+            return;
+        }
+
+        activeBossAttackKind = BossAttackKind.Devour;
+        attackInProgress = true;
+        pendingAttackTarget = target;
+        lastAttackTime = Time.time;
+        nextBossDevourAttackTime = Time.time + Mathf.Max(0.1f, bossDevourCooldown);
+        nextAttackTime = Mathf.Max(nextAttackTime, nextBossDevourAttackTime);
+        rb.linearVelocity = Vector3.zero;
+        StopMoveAnimation();
+        CancelInvoke(nameof(FinishAttackRecovery));
+        bossSpecialAttackRoutine = StartCoroutine(BossDevourRoutine(target));
+    }
+
+    private System.Collections.IEnumerator BossDevourRoutine(Transform target)
+    {
+        Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
+        Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
+        Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
+
+        for (float elapsed = 0f; elapsed < Mathf.Max(0.01f, bossDevourWindupTime); elapsed += Time.deltaTime)
+        {
+            rb.linearVelocity = Vector3.zero;
+            FaceTargetHorizontally(target);
+            if (visual != null)
+            {
+                float t = Mathf.Clamp01(elapsed / Mathf.Max(0.01f, bossDevourWindupTime));
+                visual.localScale = Vector3.Lerp(baseScale, new Vector3(baseScale.x * 1.25f, baseScale.y * 1.12f, baseScale.z), t);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        CombatHealth targetHealth = target != null ? target.GetComponentInParent<CombatHealth>() : null;
+        if (targetHealth != null && !targetHealth.IsDead)
+        {
+            BossSlimeDevourStatus status = BossSlimeDevourStatus.ResolveOrAdd(targetHealth.gameObject);
+            float tickInterval = Mathf.Max(0.05f, bossDevourTickInterval);
+            status.Apply(gameObject, transform, Mathf.Max(0.1f, bossDevourDuration), tickInterval, Mathf.Max(0f, bossDevourDamagePerSecond) * tickInterval, bossDevourDarkTint, bossDevourHoldOffset);
+        }
+
+        float duration = Mathf.Max(0.1f, bossDevourDuration);
+        for (float elapsed = 0f; elapsed < duration; elapsed += Time.deltaTime)
+        {
+            rb.linearVelocity = Vector3.zero;
+            FaceTargetHorizontally(target);
+            if (visual != null)
+            {
+                float pulse = 1f + Mathf.Sin(elapsed * 10f) * 0.04f;
+                visual.localScale = new Vector3(baseScale.x * 1.12f * pulse, baseScale.y * 1.08f / pulse, baseScale.z);
+                visual.localPosition = basePosition;
+            }
+
+            yield return null;
+        }
+
+        if (visual != null)
+        {
+            visual.localScale = baseScale;
+            visual.localPosition = basePosition;
+        }
+
+        CompleteBossSpecialAttack();
+    }
+
+    private void CompleteBossSpecialAttack()
+    {
+        attackInProgress = false;
+        pendingAttackTarget = null;
+        activeBossAttackKind = BossAttackKind.None;
+        bossSpecialAttackRoutine = null;
+    }
+
+    private void MoveBossBody(Vector3 position)
+    {
+        if (rb != null)
+        {
+            rb.position = position;
+            rb.linearVelocity = Vector3.zero;
+        }
+
+        transform.position = position;
+    }
+
+    private void HideBossBodyForSplit()
+    {
+        if (bossBodyHiddenForSplit)
+        {
+            return;
+        }
+
+        bossSplitRenderers = GetComponentsInChildren<Renderer>(true);
+        bossSplitColliders = GetComponentsInChildren<Collider>(true);
+        bossSplitRendererEnabledStates = new bool[bossSplitRenderers.Length];
+        bossSplitColliderEnabledStates = new bool[bossSplitColliders.Length];
+
+        for (int i = 0; i < bossSplitRenderers.Length; i++)
+        {
+            Renderer renderer = bossSplitRenderers[i];
+            bossSplitRendererEnabledStates[i] = renderer != null && renderer.enabled;
+            if (renderer != null)
+            {
+                renderer.enabled = false;
+            }
+        }
+
+        for (int i = 0; i < bossSplitColliders.Length; i++)
+        {
+            Collider collider = bossSplitColliders[i];
+            bossSplitColliderEnabledStates[i] = collider != null && collider.enabled;
+            if (collider != null)
+            {
+                collider.enabled = false;
+            }
+        }
+
+        if (rb != null)
+        {
+            bossRigidbodyWasKinematicBeforeSplit = rb.isKinematic;
+            rb.linearVelocity = Vector3.zero;
+            rb.isKinematic = true;
+        }
+
+        bossBodyHiddenForSplit = true;
+    }
+
+    private void RestoreBossBodyAfterSplit()
+    {
+        if (!bossBodyHiddenForSplit)
+        {
+            return;
+        }
+
+        if (bossSplitRenderers != null)
+        {
+            for (int i = 0; i < bossSplitRenderers.Length; i++)
+            {
+                Renderer renderer = bossSplitRenderers[i];
+                if (renderer != null)
+                {
+                    bool wasEnabled = bossSplitRendererEnabledStates != null && i < bossSplitRendererEnabledStates.Length && bossSplitRendererEnabledStates[i];
+                    renderer.enabled = wasEnabled;
+                }
+            }
+        }
+
+        if (bossSplitColliders != null)
+        {
+            for (int i = 0; i < bossSplitColliders.Length; i++)
+            {
+                Collider collider = bossSplitColliders[i];
+                if (collider != null)
+                {
+                    bool wasEnabled = bossSplitColliderEnabledStates != null && i < bossSplitColliderEnabledStates.Length && bossSplitColliderEnabledStates[i];
+                    collider.enabled = wasEnabled;
+                }
+            }
+        }
+
+        if (rb != null)
+        {
+            rb.isKinematic = bossRigidbodyWasKinematicBeforeSplit;
+            rb.linearVelocity = Vector3.zero;
+        }
+
+        bossSplitRenderers = null;
+        bossSplitColliders = null;
+        bossSplitRendererEnabledStates = null;
+        bossSplitColliderEnabledStates = null;
+        bossBodyHiddenForSplit = false;
+    }
+
+    private void SpawnBossSplitChildren()
+    {
+        activeBossSplitChildren.Clear();
+        EnemySpawner spawner = FindObjectOfType<EnemySpawner>();
+        if (spawner == null)
+        {
+            Debug.LogWarning($"[BossTimedSplit] No EnemySpawner found. Boss '{name}' could not split.", this);
+            return;
+        }
+
+        List<GameObject> children = spawner.SpawnSplitChildrenAndCollect(
+            gameObject,
+            Mathf.Max(0, bossSplitChildCount),
+            Mathf.Max(0f, bossSplitScatterRadius),
+            MonsterRank.Elite,
+            1f,
+            1f,
+            1f,
+            1f,
+            1f,
+            false,
+            false,
+            debugLog || debugAttackDiagnostics,
+            "SkillTimed");
+
+        if (children == null || children.Count == 0)
+        {
+            return;
+        }
+
+        activeBossSplitChildren.AddRange(children);
+        ApplyBossRelativeHealthToSplitChildren(children);
+    }
+
+    private void ApplyBossRelativeHealthToSplitChildren(List<GameObject> children)
+    {
+        float childMaxHealth = Mathf.Max(1f, ResolveBossMaxHealthForSplit() * Mathf.Clamp01(bossSplitChildHealthPercentOfBoss));
+        for (int i = 0; i < children.Count; i++)
+        {
+            GameObject child = children[i];
+            if (child == null)
+            {
+                continue;
+            }
+
+            CombatStats stats = child.GetComponent<CombatStats>();
+            BattleResourceBank bank = child.GetComponent<BattleResourceBank>();
+            CombatHealth health = child.GetComponent<CombatHealth>();
+
+            if (stats != null)
+            {
+                stats.maxHealth = childMaxHealth;
+            }
+
+            if (bank != null)
+            {
+                bank.maxHealth = childMaxHealth;
+                bank.currentHealth = childMaxHealth;
+            }
+
+            if (health != null)
+            {
+                health.stats = stats;
+                health.resourceBank = bank;
+                health.currentHealth = childMaxHealth;
+            }
+        }
+    }
+
+    private float ResolveBossMaxHealthForSplit()
+    {
+        CombatHealth health = GetComponent<CombatHealth>();
+        if (health != null)
+        {
+            return Mathf.Max(1f, health.MaxHealthValue);
+        }
+
+        CombatStats statsSource = combatStats != null ? combatStats : GetComponent<CombatStats>();
+        if (statsSource != null)
+        {
+            return Mathf.Max(1f, statsSource.maxHealth);
+        }
+
+        return Mathf.Max(1f, attackDamage * 10f);
+    }
+
+    private int CountAliveBossSplitChildren()
+    {
+        int alive = 0;
+        for (int i = activeBossSplitChildren.Count - 1; i >= 0; i--)
+        {
+            GameObject child = activeBossSplitChildren[i];
+            if (child == null)
+            {
+                activeBossSplitChildren.RemoveAt(i);
+                continue;
+            }
+
+            CombatHealth childHealth = child.GetComponent<CombatHealth>();
+            if (childHealth != null && childHealth.IsDead)
+            {
+                continue;
+            }
+
+            alive++;
+        }
+
+        return alive;
+    }
+
+    private Vector3 ResolveBossSplitMergePosition()
+    {
+        Vector3 sum = Vector3.zero;
+        int alive = 0;
+        for (int i = 0; i < activeBossSplitChildren.Count; i++)
+        {
+            GameObject child = activeBossSplitChildren[i];
+            if (child == null)
+            {
+                continue;
+            }
+
+            CombatHealth childHealth = child.GetComponent<CombatHealth>();
+            if (childHealth != null && childHealth.IsDead)
+            {
+                continue;
+            }
+
+            sum += child.transform.position;
+            alive++;
+        }
+
+        if (alive <= 0)
+        {
+            return transform.position;
+        }
+
+        Vector3 position = sum / alive;
+        position.y = transform.position.y;
+        return position;
+    }
+
+    private void DestroyActiveBossSplitChildren()
+    {
+        for (int i = 0; i < activeBossSplitChildren.Count; i++)
+        {
+            GameObject child = activeBossSplitChildren[i];
+            if (child != null)
+            {
+                Destroy(child);
+            }
+        }
+
+        activeBossSplitChildren.Clear();
     }
 
     private void ChaseTarget(Vector3 toPlayer, string currentState, string targetName, string reason)

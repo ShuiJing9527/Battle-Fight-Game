@@ -847,13 +847,14 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 200
+  maxHealth: 20000
   physicalAttack: 24
   physicalDefense: 14
   specialAttack: 18
   specialDefense: 10
   speed: 8
   luck: 6
+  outgoingDamageMultiplier: 1
 --- !u!114 &7546946093960014386
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -879,19 +880,6 @@ MonoBehaviour:
   functionSoul: 0
   functionCooldownMultiplierPerSoul: 0.97
   debugGrowthSoulRollLog: 0
---- !u!114 &9135010000000000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 6911152978579185059}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  affinityType: 1
 --- !u!114 &919796042838406094
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1315,6 +1303,9 @@ MonoBehaviour:
   hitPoint: {fileID: 0}
   manaCost: 20
   quickShearLifeStealRatio: 0.5
+  nightBuffLifeStealMultiplier: 1.5
+  nightBuffSlowMoveSpeedMultiplier: 0.8
+  nightBuffSlowDuration: 1.5
   scissorCutEffectPrefab: {fileID: 8335468127871354634, guid: 88a5dee28dced174889662aa021b4ffb, type: 3}
   scissorSlashWaveEffectPrefab: {fileID: 2713941305649311741, guid: bfd2612cc7cb93e4295108ef4b49e2b1, type: 3}
   scissorEndEffectPrefab: {fileID: 8335468127871354634, guid: f435fa98bd0df254c89e80a745878d35, type: 3}
@@ -1381,6 +1372,8 @@ MonoBehaviour:
   wEnemyAttackIntervalMultiplier: 3
   wEnemyDamageMultiplier: 0.5
   enemyDebuffRefreshInterval: 0.2
+  nightBuffDurationMultiplier: 1.25
+  nightBuffPlayer01SkillDamageTakenMultiplier: 1.15
   veilBarrierPrefab: {fileID: 5989580462670476894, guid: 1a21f25c2d4bc0244a59a86f0ad9d3e5, type: 3}
   veilBarrierMaterial: {fileID: 2100000, guid: 7f9c2a18f8ac4f2fbdfc6bb40d8c1f7e, type: 2}
   veilBarrierScale: {x: 90, y: 90, z: 90}
@@ -1418,6 +1411,8 @@ MonoBehaviour:
   eHealPerTick: 0
   eHealPercentPerSecond: 0.1
   eHealTickInterval: 0.5
+  nightBuffPostDashSkillDamageMultiplier: 1.2
+  nightBuffPostDashSkillDamageBoostDuration: 5
   eIgnoreTerrainCollision: 1
   eIgnoreEnemyCollision: 1
   eImmuneToMonsterPhysicalDamage: 1
@@ -1724,6 +1719,19 @@ MonoBehaviour:
   hitSfx: {fileID: 0}
   deathSfx: {fileID: 0}
   volume: 1
+--- !u!114 &9135010000000000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 6911152978579185059}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9e4f8b0c2a13484db7420f4a80153101, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  affinityType: 1
 --- !u!1 &8709825368551096566
 GameObject:
   m_ObjectHideFlags: 0
