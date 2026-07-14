@@ -404,11 +404,11 @@ public static class BuildPlayerStatusHUDUnderSelected
 
     private static void SetupHudRoot(RectTransform rect)
     {
-        rect.anchorMin = new Vector2(0f, 1f);
-        rect.anchorMax = new Vector2(0f, 1f);
-        rect.pivot = new Vector2(0f, 1f);
-        rect.anchoredPosition = new Vector2(24f, -24f);
-        rect.sizeDelta = new Vector2(400f, 260f);
+        rect.anchorMin = Vector2.zero;
+        rect.anchorMax = Vector2.one;
+        rect.pivot = new Vector2(0.5f, 0.5f);
+        rect.anchoredPosition = Vector2.zero;
+        rect.sizeDelta = new Vector2(-80f, -48f);
         rect.localScale = Vector3.one;
     }
 

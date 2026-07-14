@@ -31,6 +31,7 @@ public class SkillSlotView
     public SkillHoverTrigger hoverTrigger;
 }
 
+[DisallowMultipleComponent]
 public class PlayerSkillHUD : MonoBehaviour
 {
     private const string LogMissingCanvas = "[SkillUI] Missing target canvas for PlayerSkillHUD.";
@@ -119,6 +120,12 @@ public class PlayerSkillHUD : MonoBehaviour
 
     private void Awake()
     {
+        if (!IsPrimaryComponent())
+        {
+            enabled = false;
+            return;
+        }
+
         Initialize();
     }
 
@@ -165,11 +172,39 @@ public class PlayerSkillHUD : MonoBehaviour
             return;
         }
 
+        ApplyConfiguredLayout();
         EnsureSlots(skillHudRoot);
         CacheSlotReferences(skillHudRoot);
         EnsureTooltip();
         SetSkillIconSet(defaultPlayerIndex);
         initialized = true;
+    }
+
+    private bool IsPrimaryComponent()
+    {
+        PlayerSkillHUD[] components = GetComponents<PlayerSkillHUD>();
+        return components.Length == 0 || components[components.Length - 1] == this;
+    }
+
+    private void ApplyConfiguredLayout()
+    {
+        slotSize = Mathf.Max(1f, slotSize);
+        slotSpacing = Mathf.Max(0f, slotSpacing);
+
+        SetupRoot(skillHudRoot);
+
+        SkillSlotView[] slots = { qSlot, wSlot, eSlot, rSlot };
+        for (int i = 0; i < slots.Length; i++)
+        {
+            RectTransform slotRect = slots[i] != null ? slots[i].root : null;
+            if (slotRect == null && skillHudRoot != null)
+            {
+                slotRect = skillHudRoot.Find($"SkillSlot_{GetDefaultSlotKey(i)}") as RectTransform;
+            }
+
+            ConfigureSlotRect(slotRect, i);
+            ConfigureSlotVisuals(slotRect, i);
+        }
     }
 
     private Canvas ResolveCanvas()
