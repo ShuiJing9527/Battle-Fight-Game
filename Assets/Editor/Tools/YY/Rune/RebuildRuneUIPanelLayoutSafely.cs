@@ -39,6 +39,7 @@ public static class RebuildRuneUIPanelLayoutSafely
             }
 
             RebuildRuneBagPanel(runeBagPanel, runeListViewport, runeListContent, selectedRuneText, noRuneText, runeDetailPanel, changes);
+            RebuildSkillRowIcons(mainPanel, changes);
             GameObject skillDescriptionPanel = RebuildSkillDescriptionPanel(runeSkillPanel, skillRowsRoot, changes);
             BindControllerReferences(prefabRoot, mainPanel, runeListViewport, runeListContent, runeDetailPanel, skillDescriptionPanel, changes);
 
@@ -209,6 +210,52 @@ public static class RebuildRuneUIPanelLayoutSafely
         return panel;
     }
 
+    private static void RebuildSkillRowIcons(GameObject mainPanel, List<string> changes)
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        string[] keys = { "Q", "W", "E", "R" };
+        for (int i = 0; i < keys.Length; i++)
+        {
+            Transform row = FindChild(mainPanel.transform, $"{keys[i]}Row");
+            if (row == null)
+            {
+                continue;
+            }
+
+            GameObject iconRoot = FindOrCreateDirectChild(row.gameObject, $"{keys[i]}SkillIcon", changes);
+            RectTransform iconRect = iconRoot.GetComponent<RectTransform>();
+            iconRect.anchorMin = new Vector2(0f, 0.5f);
+            iconRect.anchorMax = new Vector2(0f, 0.5f);
+            iconRect.pivot = new Vector2(0f, 0.5f);
+            iconRect.anchoredPosition = new Vector2(60f, 0f);
+            iconRect.sizeDelta = new Vector2(64f, 64f);
+
+            Image iconImage = EnsureComponent<Image>(iconRoot);
+            iconImage.preserveAspect = true;
+            iconImage.raycastTarget = false;
+
+            GameObject highlight = FindOrCreateDirectChild(iconRoot, "HoverHighlight", changes);
+            RectTransform highlightRect = highlight.GetComponent<RectTransform>();
+            highlightRect.anchorMin = Vector2.zero;
+            highlightRect.anchorMax = Vector2.one;
+            highlightRect.offsetMin = Vector2.zero;
+            highlightRect.offsetMax = Vector2.zero;
+            highlightRect.localScale = Vector3.one * 1.18f;
+            Image highlightImage = EnsureComponent<Image>(highlight);
+            highlightImage.color = new Color(1f, 0.9f, 0.35f, 0.5f);
+            highlightImage.raycastTarget = false;
+            highlightImage.enabled = false;
+            highlight.SetActive(false);
+
+            EnsureComponent<SkillHoverTrigger>(iconRoot);
+            changes.Add($"Ensured external {keys[i]} skill icon view exists");
+        }
+    }
+
     private static void BindControllerReferences(
         GameObject prefabRoot,
         GameObject mainPanel,
@@ -238,8 +285,28 @@ public static class RebuildRuneUIPanelLayoutSafely
         }
         controller.sharedDescriptionScrollRect = skillDescriptionPanel.GetComponent<ScrollRect>();
 
+        SerializedObject serializedObject = new SerializedObject(controller);
+        BindSkillIconView(serializedObject.FindProperty("qSkillIcon"), FindChild(prefabRoot.transform, "QSkillIcon"));
+        BindSkillIconView(serializedObject.FindProperty("wSkillIcon"), FindChild(prefabRoot.transform, "WSkillIcon"));
+        BindSkillIconView(serializedObject.FindProperty("eSkillIcon"), FindChild(prefabRoot.transform, "ESkillIcon"));
+        BindSkillIconView(serializedObject.FindProperty("rSkillIcon"), FindChild(prefabRoot.transform, "RSkillIcon"));
+        serializedObject.ApplyModifiedPropertiesWithoutUndo();
+
         EditorUtility.SetDirty(controller);
         changes.Add("Updated RuneUIController references to viewport/content/scrollbars/shared description");
+    }
+
+    private static void BindSkillIconView(SerializedProperty property, Transform root)
+    {
+        if (property == null)
+        {
+            return;
+        }
+
+        property.FindPropertyRelative("root").objectReferenceValue = root as RectTransform;
+        property.FindPropertyRelative("icon").objectReferenceValue = root != null ? root.GetComponent<Image>() : null;
+        property.FindPropertyRelative("hoverHighlight").objectReferenceValue = root != null ? root.Find("HoverHighlight")?.GetComponent<Image>() : null;
+        property.FindPropertyRelative("hoverTrigger").objectReferenceValue = root != null ? root.GetComponent<SkillHoverTrigger>() : null;
     }
 
     private static T EnsureComponent<T>(GameObject gameObject) where T : Component
@@ -335,6 +402,26 @@ public static class RebuildRuneUIPanelLayoutSafely
         }
 
         Transform existing = FindChild(parent.transform, name);
+        if (existing != null)
+        {
+            return existing.gameObject;
+        }
+
+        GameObject created = new GameObject(name, typeof(RectTransform));
+        created.transform.SetParent(parent.transform, false);
+        created.layer = parent.layer;
+        changes.Add($"Created {name}");
+        return created;
+    }
+
+    private static GameObject FindOrCreateDirectChild(GameObject parent, string name, List<string> changes)
+    {
+        if (parent == null)
+        {
+            return null;
+        }
+
+        Transform existing = parent.transform.Find(name);
         if (existing != null)
         {
             return existing.gameObject;
