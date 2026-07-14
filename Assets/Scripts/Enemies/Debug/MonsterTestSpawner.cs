@@ -73,7 +73,7 @@ public class MonsterTestSpawner : MonoBehaviour
     };
     private static readonly MonsterRankGeometrySettings FallbackEliteGeometry = new MonsterRankGeometrySettings
     {
-        visualScale = new Vector3(1.5f, 1.5f, 1.5f),
+        visualScale = new Vector3(2f, 2f, 2f),
         visualLocalPosition = new Vector3(0f, 0.25f, 0f),
         groundContactLocalPosition = Vector3.zero,
         physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
@@ -364,6 +364,7 @@ public class MonsterTestSpawner : MonoBehaviour
             Debug.LogWarning("[MonsterTestSpawner] Instantiate failed prefab=" + prefab.name, this);
             return;
         }
+        LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawner", "AfterInstantiate", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
 
         MonsterIdentity prefabIdentity = prefab.GetComponent<MonsterIdentity>();
         MonsterSpecies? runtimeSpecies = prefabIdentity != null ? prefabIdentity.species : (MonsterSpecies?)null;
@@ -385,6 +386,7 @@ public class MonsterTestSpawner : MonoBehaviour
                 trackAsAlive: false,
                 initializeDeathNotifier: true,
                 source: "MonsterTestSpawner");
+            LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawner", "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
         }
         else
         {
@@ -395,8 +397,11 @@ public class MonsterTestSpawner : MonoBehaviour
 
             identity.rank = rank;
             MonsterCombatAutoSetup.Configure(spawnedMonster, runtimeSpecies, rank);
+            LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawnerFallback", "AfterConfigure", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
             ApplyFallbackOfficialConfig(spawnedMonster, rank);
+            LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawnerFallback", "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
         }
+        StartCoroutine(LogNormalPrefabGeometryAfterFirstFrame(spawnedMonster, "MonsterTestSpawner"));
 
         EnemyController enemyController = spawnedMonster.GetComponent<EnemyController>();
         MonsterIdentity configuredIdentity = spawnedMonster.GetComponent<MonsterIdentity>();
@@ -1009,6 +1014,12 @@ public class MonsterTestSpawner : MonoBehaviour
             return;
         }
 
+        if (ShouldPreserveNormalPrefabGeometry(monster, rank))
+        {
+            LogNormalPrefabGeometry(monster, "MonsterTestSpawnerFallback", "FallbackRankGeometrySkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            return;
+        }
+
         Debug.Log(
             "[MonsterTestSpawner] using fallback rank geometry because shared EnemySpawner is null.",
             monster);
@@ -1037,13 +1048,23 @@ public class MonsterTestSpawner : MonoBehaviour
             return;
         }
 
+        if (ShouldPreserveNormalPrefabGeometry(monster, rank))
+        {
+            LogNormalPrefabGeometry(monster, "MonsterTestSpawnerFallback", "ApplyFallbackRankGeometrySkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            return;
+        }
+
         MonsterRankGeometrySettings geometry = ResolveFallbackRankGeometry(rank);
         monster.transform.localScale = Vector3.one;
 
         Transform visualRoot = ResolveFallbackRankVisualRoot(monster);
         if (visualRoot != null)
         {
-            visualRoot.localScale = geometry.visualScale;
+            Vector3 prefabBaseVisualScale = visualRoot.localScale;
+            Vector3 expectedFinalVisualScale = ResolveFallbackFinalVisualScale(rank, prefabBaseVisualScale, geometry.visualScale);
+            LogEliteScaleTrace(monster, "MonsterTestSpawnerFallback", "ApplyFallbackRankGeometryBefore", prefabBaseVisualScale, geometry.visualScale, expectedFinalVisualScale, visualRoot, null);
+
+            visualRoot.localScale = expectedFinalVisualScale;
             visualRoot.localPosition = geometry.visualLocalPosition;
 
             SlimeAnimationController slimeAnimationController = monster.GetComponent<SlimeAnimationController>();
@@ -1052,6 +1073,8 @@ public class MonsterTestSpawner : MonoBehaviour
                 slimeAnimationController.SetVisualBaseScale(visualRoot.localScale);
                 slimeAnimationController.SetVisualBasePosition(visualRoot.localPosition);
             }
+
+            LogEliteScaleTrace(monster, "MonsterTestSpawnerFallback", "ApplyFallbackRankGeometryAfter", prefabBaseVisualScale, geometry.visualScale, expectedFinalVisualScale, visualRoot, slimeAnimationController);
         }
 
         Transform groundContact = EnsureFallbackGroundContact(monster);
@@ -1109,6 +1132,59 @@ public class MonsterTestSpawner : MonoBehaviour
             MonsterRank.Elite => FallbackEliteGeometry,
             _ => FallbackNormalGeometry
         };
+    }
+
+    private static Vector3 ResolveFallbackFinalVisualScale(MonsterRank rank, Vector3 prefabBaseVisualScale, Vector3 configuredVisualScale)
+    {
+        if (rank == MonsterRank.Elite)
+        {
+            return Vector3.Scale(prefabBaseVisualScale, SanitizeScale(configuredVisualScale));
+        }
+
+        return configuredVisualScale;
+    }
+
+    private static Vector3 SanitizeScale(Vector3 scale)
+    {
+        return new Vector3(
+            Mathf.Approximately(scale.x, 0f) ? 1f : scale.x,
+            Mathf.Approximately(scale.y, 0f) ? 1f : scale.y,
+            Mathf.Approximately(scale.z, 0f) ? 1f : scale.z);
+    }
+
+    private static void LogEliteScaleTrace(
+        GameObject monster,
+        string source,
+        string phase,
+        Vector3 prefabBaseVisualScale,
+        Vector3 eliteMultiplier,
+        Vector3 expectedFinalScale,
+        Transform visualRoot,
+        SlimeAnimationController slimeAnimationController)
+    {
+        if (monster == null)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        if (identity == null || identity.rank != MonsterRank.Elite)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[EliteScaleTrace] " +
+            "object=" + monster.name +
+            " spawnSource=" + source +
+            " phase=" + phase +
+            " prefabBaseVisualScale=" + prefabBaseVisualScale +
+            " eliteMultiplier=" + eliteMultiplier +
+            " expectedFinalScale=" + expectedFinalScale +
+            " actualFinalScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+            " visualPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " animationBaseScale=" + (slimeAnimationController != null ? slimeAnimationController.BaseVisualLocalScale.ToString() : "null"),
+            monster);
     }
 
     private static Transform ResolveFallbackRankVisualRoot(GameObject monster)
@@ -1430,5 +1506,112 @@ public class MonsterTestSpawner : MonoBehaviour
         };
 
         return baseName.Contains(suffix) ? baseName : baseName + suffix;
+    }
+
+    private static bool ShouldPreserveNormalPrefabGeometry(GameObject monster, MonsterRank rank)
+    {
+        if (monster == null || rank != MonsterRank.Normal)
+        {
+            return false;
+        }
+
+        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        if (identity != null)
+        {
+            return IsSlimeSpecies(identity.species);
+        }
+
+        return monster.name.StartsWith("Enemy_Slime");
+    }
+
+    private static bool IsSlimeSpecies(MonsterSpecies species)
+    {
+        return species == MonsterSpecies.BlueSlime ||
+               species == MonsterSpecies.GreenSlime ||
+               species == MonsterSpecies.LavaSlime ||
+               species == MonsterSpecies.PoisonSlime ||
+               species == MonsterSpecies.RainbowSlime;
+    }
+
+    private static void LogNormalPrefabGeometry(
+        GameObject monster,
+        string source,
+        string phase,
+        bool rankGeometryExecuted,
+        bool groundContactExecuted,
+        bool visualTransformWriteExecuted)
+    {
+        if (monster == null)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (!ShouldPreserveNormalPrefabGeometry(monster, rank))
+        {
+            return;
+        }
+
+        Transform visual = ResolveNormalVisualTransform(monster);
+        Debug.Log(
+            "[NormalPrefabGeometry] " +
+            "object=" + monster.name +
+            " spawnSource=" + source +
+            " phase=" + phase +
+            " rank=" + rank +
+            " species=" + (identity != null ? identity.species.ToString() : "Unknown") +
+            " visualTransform=" + (visual != null ? visual.name : "null") +
+            " rootPosition=" + monster.transform.position +
+            " rootRotation=" + monster.transform.localRotation.eulerAngles +
+            " rootScale=" + monster.transform.localScale +
+            " visualLocalPosition=" + (visual != null ? visual.localPosition.ToString() : "null") +
+            " visualLocalRotation=" + (visual != null ? visual.localRotation.eulerAngles.ToString() : "null") +
+            " visualLocalScale=" + (visual != null ? visual.localScale.ToString() : "null") +
+            " rankGeometryExecuted=" + rankGeometryExecuted +
+            " groundContactExecuted=" + groundContactExecuted +
+            " visualTransformWriteExecuted=" + visualTransformWriteExecuted,
+            monster);
+    }
+
+    private IEnumerator LogNormalPrefabGeometryAfterFirstFrame(GameObject monster, string source)
+    {
+        if (monster == null)
+        {
+            yield break;
+        }
+
+        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (!ShouldPreserveNormalPrefabGeometry(monster, rank))
+        {
+            yield break;
+        }
+
+        yield return null;
+        LogNormalPrefabGeometry(monster, source, "AfterFirstFrame", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+    }
+
+    private static Transform ResolveNormalVisualTransform(GameObject monster)
+    {
+        if (monster == null)
+        {
+            return null;
+        }
+
+        Transform visual = monster.transform.Find("Visual_Slime");
+        if (visual != null)
+        {
+            return visual;
+        }
+
+        SlimeAnimationController slimeAnimation = monster.GetComponent<SlimeAnimationController>();
+        if (slimeAnimation != null && slimeAnimation.VisualRoot != null && slimeAnimation.VisualRoot != monster.transform)
+        {
+            return slimeAnimation.VisualRoot;
+        }
+
+        Renderer renderer = monster.GetComponentInChildren<Renderer>(true);
+        return renderer != null && renderer.transform != monster.transform ? renderer.transform : null;
     }
 }

@@ -64,7 +64,7 @@ public class EnemySpawner : MonoBehaviour
     };
     [SerializeField] private MonsterRankGeometrySettings eliteGeometry = new MonsterRankGeometrySettings
     {
-        visualScale = new Vector3(1.5f, 1.5f, 1.5f),
+        visualScale = new Vector3(2f, 2f, 2f),
         visualLocalPosition = new Vector3(0f, 0.25f, 0f),
         groundContactLocalPosition = Vector3.zero,
         physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
@@ -705,6 +705,7 @@ public class EnemySpawner : MonoBehaviour
         }
 
         GameObject spawnedEnemy = Instantiate(selectedEnemy, spawnPosition, Quaternion.identity);
+        LogNormalPrefabGeometry(spawnedEnemy, "EnemySpawner", "AfterInstantiate", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
         if (runtimeRank == MonsterRank.Boss)
         {
             Debug.Log(
@@ -923,13 +924,26 @@ public class EnemySpawner : MonoBehaviour
             cloneIdentity.rank = childRank;
             cloneIdentity.suppressRuneDrop = suppressRuneDrop;
 
-            spawnedEnemy.transform.localScale = Vector3.one;
+            if (!ShouldPreserveNormalPrefabGeometry(spawnedEnemy, childRank))
+            {
+                spawnedEnemy.transform.localScale = Vector3.one;
+            }
+            LogNormalPrefabGeometry(spawnedEnemy, "EliteSplit", "AfterInstantiate", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
             MonsterCombatAutoSetup.Configure(spawnedEnemy, species, childRank);
-            ApplyRankGeometry(spawnedEnemy, childRank, "EnemySpawner");
-            ApplyHealthBarExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
+            LogNormalPrefabGeometry(spawnedEnemy, "EliteSplit", "AfterConfigure", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            if (!ShouldPreserveNormalPrefabGeometry(spawnedEnemy, childRank))
+            {
+                ApplyRankGeometry(spawnedEnemy, childRank, "EnemySpawner");
+                ApplyHealthBarExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
+            }
             ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
             ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
-            SnapSplitChildToGround(spawnedEnemy, splitSource);
+            if (!ShouldPreserveNormalPrefabGeometry(spawnedEnemy, childRank))
+            {
+                SnapSplitChildToGround(spawnedEnemy, splitSource);
+            }
+            LogNormalPrefabGeometry(spawnedEnemy, "EliteSplit", "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            StartCoroutine(LogNormalPrefabGeometryAfterFirstFrame(spawnedEnemy, "EliteSplit"));
             RegisterSpawnedEnemy(spawnedEnemy);
 
             EnemyDeathNotifier notifier = spawnedEnemy.GetComponent<EnemyDeathNotifier>();
@@ -1034,6 +1048,12 @@ public class EnemySpawner : MonoBehaviour
 
         if (Mathf.Abs(scaleRatio - 1f) > 0.0001f)
         {
+            MonsterIdentity identity = spawnedEnemy.GetComponent<MonsterIdentity>();
+            if (identity != null && identity.rank == MonsterRank.Normal && IsSlimeSpecies(identity.species))
+            {
+                return;
+            }
+
             Transform scaleTarget = ResolveRankVisualRoot(spawnedEnemy);
 
             if (scaleTarget != null)
@@ -1101,6 +1121,105 @@ public class EnemySpawner : MonoBehaviour
                species == MonsterSpecies.RainbowSlime;
     }
 
+    private static bool ShouldPreserveNormalPrefabGeometry(GameObject enemy, MonsterRank rank)
+    {
+        if (enemy == null || rank != MonsterRank.Normal)
+        {
+            return false;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (identity != null)
+        {
+            return IsSlimeSpecies(identity.species);
+        }
+
+        string enemyName = enemy.name;
+        return enemyName.StartsWith("Enemy_Slime");
+    }
+
+    private void LogNormalPrefabGeometry(
+        GameObject enemy,
+        string source,
+        string phase,
+        bool rankGeometryExecuted,
+        bool groundContactExecuted,
+        bool visualTransformWriteExecuted)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (!ShouldPreserveNormalPrefabGeometry(enemy, rank))
+        {
+            return;
+        }
+
+        Transform visual = ResolveNormalVisualTransform(enemy);
+        Debug.Log(
+            "[NormalPrefabGeometry] " +
+            "object=" + enemy.name +
+            " spawnSource=" + source +
+            " phase=" + phase +
+            " rank=" + rank +
+            " species=" + (identity != null ? identity.species.ToString() : "Unknown") +
+            " visualTransform=" + (visual != null ? visual.name : "null") +
+            " rootPosition=" + enemy.transform.position +
+            " rootRotation=" + enemy.transform.localRotation.eulerAngles +
+            " rootScale=" + enemy.transform.localScale +
+            " visualLocalPosition=" + (visual != null ? visual.localPosition.ToString() : "null") +
+            " visualLocalRotation=" + (visual != null ? visual.localRotation.eulerAngles.ToString() : "null") +
+            " visualLocalScale=" + (visual != null ? visual.localScale.ToString() : "null") +
+            " rankGeometryExecuted=" + rankGeometryExecuted +
+            " groundContactExecuted=" + groundContactExecuted +
+            " visualTransformWriteExecuted=" + visualTransformWriteExecuted,
+            enemy);
+    }
+
+    private IEnumerator LogNormalPrefabGeometryAfterFirstFrame(GameObject enemy, string source)
+    {
+        if (enemy == null)
+        {
+            yield break;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (!ShouldPreserveNormalPrefabGeometry(enemy, rank))
+        {
+            yield break;
+        }
+
+        yield return null;
+        LogNormalPrefabGeometry(enemy, source, "AfterFirstFrame", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+    }
+
+    private static Transform ResolveNormalVisualTransform(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        Transform visual = enemy.transform.Find("Visual_Slime");
+        if (visual != null)
+        {
+            return visual;
+        }
+
+        SlimeAnimationController slimeAnimation = enemy.GetComponent<SlimeAnimationController>();
+        if (slimeAnimation != null && slimeAnimation.VisualRoot != null && slimeAnimation.VisualRoot != enemy.transform)
+        {
+            return slimeAnimation.VisualRoot;
+        }
+
+        Renderer renderer = enemy.GetComponentInChildren<Renderer>(true);
+        return renderer != null && renderer.transform != enemy.transform ? renderer.transform : null;
+    }
+
     private void RegisterSpawnedEnemy(GameObject enemy)
     {
         if (enemy == null)
@@ -1151,13 +1270,22 @@ public class EnemySpawner : MonoBehaviour
         }
 
         cloneIdentity.rank = runtimeRank;
+        bool preserveNormalPrefabGeometry = ShouldPreserveNormalPrefabGeometry(enemy, runtimeRank);
+        LogNormalPrefabGeometry(enemy, source, "ApplyOfficialStart", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
 
         Rigidbody setupBody = enemy.GetComponent<Rigidbody>();
-        RigidbodySetupState setupBodyState = FreezeRigidbodyForBossGrounding(setupBody);
-        enemy.transform.localScale = Vector3.one;
+        RigidbodySetupState setupBodyState = preserveNormalPrefabGeometry ? default : FreezeRigidbodyForBossGrounding(setupBody);
+        if (!preserveNormalPrefabGeometry)
+        {
+            enemy.transform.localScale = Vector3.one;
+        }
         MonsterCombatAutoSetup.Configure(enemy, runtimeSpecies, runtimeRank);
-        ApplyRankGeometry(enemy, runtimeRank, source);
-        ApplyHealthBarExternalConfig(enemy, runtimeRank, source);
+        LogNormalPrefabGeometry(enemy, source, "AfterConfigure", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+        if (!preserveNormalPrefabGeometry)
+        {
+            ApplyRankGeometry(enemy, runtimeRank, source);
+            ApplyHealthBarExternalConfig(enemy, runtimeRank, source);
+        }
         ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(enemy);
 
         if (trackAsAlive)
@@ -1171,8 +1299,13 @@ public class EnemySpawner : MonoBehaviour
             ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
         }
 
-        SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
-        RestoreRigidbodyAfterBossGrounding(setupBody != null ? setupBody : enemy.GetComponent<Rigidbody>(), setupBodyState, enemy.transform.position);
+        if (!preserveNormalPrefabGeometry)
+        {
+            SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
+            RestoreRigidbodyAfterBossGrounding(setupBody != null ? setupBody : enemy.GetComponent<Rigidbody>(), setupBodyState, enemy.transform.position);
+        }
+        LogNormalPrefabGeometry(enemy, source, "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+        StartCoroutine(LogNormalPrefabGeometryAfterFirstFrame(enemy, source));
 
         if (initializeDeathNotifier)
         {
@@ -1211,6 +1344,12 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        if (ShouldPreserveNormalPrefabGeometry(enemy, rank))
+        {
+            LogNormalPrefabGeometry(enemy, source, "ApplyRankGeometrySkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            return;
+        }
+
         MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
         if (geometry == null)
         {
@@ -1228,7 +1367,11 @@ public class EnemySpawner : MonoBehaviour
         Transform visualRoot = ResolveRankVisualRoot(enemy);
         if (visualRoot != null)
         {
-            visualRoot.localScale = SanitizeScale(geometry.visualScale);
+            Vector3 prefabBaseVisualScale = visualRoot.localScale;
+            Vector3 expectedFinalVisualScale = ResolveRankFinalVisualScale(rank, prefabBaseVisualScale, geometry.visualScale);
+            LogEliteScaleTrace(enemy, source, "ApplyRankGeometryBefore", prefabBaseVisualScale, geometry.visualScale, expectedFinalVisualScale, visualRoot, null);
+
+            visualRoot.localScale = expectedFinalVisualScale;
             visualRoot.localPosition = geometry.visualLocalPosition;
 
             SlimeAnimationController slimeAnimationController = enemy.GetComponent<SlimeAnimationController>();
@@ -1237,6 +1380,8 @@ public class EnemySpawner : MonoBehaviour
                 slimeAnimationController.SetVisualBaseScale(visualRoot.localScale);
                 slimeAnimationController.SetVisualBasePosition(visualRoot.localPosition);
             }
+
+            LogEliteScaleTrace(enemy, source, "ApplyRankGeometryAfter", prefabBaseVisualScale, geometry.visualScale, expectedFinalVisualScale, visualRoot, slimeAnimationController);
         }
 
         Transform groundContact = EnsureRankGroundContact(enemy);
@@ -1333,6 +1478,52 @@ public class EnemySpawner : MonoBehaviour
             Mathf.Approximately(scale.x, 0f) ? 1f : scale.x,
             Mathf.Approximately(scale.y, 0f) ? 1f : scale.y,
             Mathf.Approximately(scale.z, 0f) ? 1f : scale.z);
+    }
+
+    private static Vector3 ResolveRankFinalVisualScale(MonsterRank rank, Vector3 prefabBaseVisualScale, Vector3 configuredVisualScale)
+    {
+        Vector3 sanitizedConfiguredScale = SanitizeScale(configuredVisualScale);
+        if (rank == MonsterRank.Elite)
+        {
+            return Vector3.Scale(prefabBaseVisualScale, sanitizedConfiguredScale);
+        }
+
+        return sanitizedConfiguredScale;
+    }
+
+    private static void LogEliteScaleTrace(
+        GameObject enemy,
+        string source,
+        string phase,
+        Vector3 prefabBaseVisualScale,
+        Vector3 eliteMultiplier,
+        Vector3 expectedFinalScale,
+        Transform visualRoot,
+        SlimeAnimationController slimeAnimationController)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (identity == null || identity.rank != MonsterRank.Elite)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[EliteScaleTrace] " +
+            "object=" + enemy.name +
+            " spawnSource=" + source +
+            " phase=" + phase +
+            " prefabBaseVisualScale=" + prefabBaseVisualScale +
+            " eliteMultiplier=" + eliteMultiplier +
+            " expectedFinalScale=" + expectedFinalScale +
+            " actualFinalScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+            " visualPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " animationBaseScale=" + (slimeAnimationController != null ? slimeAnimationController.BaseVisualLocalScale.ToString() : "null"),
+            enemy);
     }
 
     private static Transform ResolveRankVisualRoot(GameObject enemy)
@@ -2223,9 +2414,15 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        Rigidbody body = enemy.GetComponent<Rigidbody>();
         MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
         MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        if (ShouldPreserveNormalPrefabGeometry(enemy, rank))
+        {
+            LogNormalPrefabGeometry(enemy, spawnSource, "SnapEnemyToGroundSkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            return;
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
         Transform visualRoot = ResolveRankVisualRoot(enemy);
         Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
         Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
@@ -2437,6 +2634,12 @@ public class EnemySpawner : MonoBehaviour
         }
 
         MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (identity != null && ShouldPreserveNormalPrefabGeometry(enemy, identity.rank))
+        {
+            LogNormalPrefabGeometry(enemy, spawnSource, "SnapSplitChildToGroundSkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            return;
+        }
+
         if (identity != null && identity.rank == MonsterRank.Boss)
         {
             SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, spawnSource);
