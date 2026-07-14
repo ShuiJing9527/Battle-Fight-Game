@@ -5,6 +5,7 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     private const string RuntimeObjectName = "DayNightGaugeRuntimeState";
     private const string TwinShiftRadianceToTwilightSource = "TwinShiftRadianceToTwilight";
     private const string TwinShiftTwilightToRadianceSource = "TwinShiftTwilightToRadiance";
+    private const float MaxGaugeValue = 100f;
 
     private static DayNightGaugeRuntimeState instance;
 
@@ -16,12 +17,14 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     [SerializeField] private bool debugHitFlow = false;
     [SerializeField] private bool debugAffinityDamage = false;
 
-    [field: SerializeField, Range(0f, 100f)]
-    public float BalanceValue { get; private set; } = 50f;
+    [SerializeField, Range(0f, 100f)] private float radiance;
+    [SerializeField, Range(0f, 100f)] private float twilight;
 
     public static DayNightGaugeRuntimeState Instance => ResolveInstance();
-    public float RadianceValue => BalanceValue;
-    public float TwilightValue => 100f - BalanceValue;
+    public float BalanceValue => Mathf.Clamp(50f + (radiance - twilight) * 0.5f, 0f, MaxGaugeValue);
+    public float RadianceValue => radiance;
+    public float TwilightValue => twilight;
+    public float EmptyValue => Mathf.Clamp(MaxGaugeValue - radiance - twilight, 0f, MaxGaugeValue);
     public float GaugeGainPerHit => gaugeGainPerHit;
     public float BuffActivationThreshold => buffActivationThreshold;
     public float ActivationEpsilon => activationEpsilon;
@@ -40,26 +43,36 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         }
 
         instance = this;
-        BalanceValue = Mathf.Clamp(initialBalanceValue, 0f, 100f);
+        InitializeGaugeValues();
         DontDestroyOnLoad(gameObject);
-        LogLifecycle($"Awake set-instance balance={BalanceValue:F2} twilight={TwilightValue:F2} radiance={RadianceValue:F2}");
+        LogLifecycle($"Awake set-instance {GetGaugeSnapshot()}");
     }
 
     private void OnEnable()
     {
-        LogLifecycle($"OnEnable balance={BalanceValue:F2} twilight={TwilightValue:F2} radiance={RadianceValue:F2}");
+        LogLifecycle($"OnEnable {GetGaugeSnapshot()}");
     }
 
     public void AddRadiance(float amount)
     {
         float clampedAmount = Mathf.Max(0f, amount);
-        SetBalance(BalanceValue + clampedAmount, "AddRadiance", clampedAmount);
+        if (clampedAmount <= 0f)
+        {
+            return;
+        }
+
+        ApplyRadianceGain(clampedAmount, "AddRadiance");
     }
 
     public void AddTwilight(float amount)
     {
         float clampedAmount = Mathf.Max(0f, amount);
-        SetBalance(BalanceValue - clampedAmount, "AddTwilight", clampedAmount);
+        if (clampedAmount <= 0f)
+        {
+            return;
+        }
+
+        ApplyTwilightGain(clampedAmount, "AddTwilight");
     }
 
     public bool TryConsumeRadiance(float amount)
@@ -70,12 +83,14 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
             return true;
         }
 
-        if (RadianceValue + activationEpsilon < clampedAmount)
+        if (radiance + activationEpsilon < clampedAmount)
         {
             return false;
         }
 
-        SetBalance(BalanceValue - clampedAmount, "ConsumeRadiance", clampedAmount);
+        float previousRadiance = radiance;
+        radiance = Mathf.Max(0f, radiance - clampedAmount);
+        LogGaugeChange("ConsumeRadiance", clampedAmount, previousRadiance, twilight);
         return true;
     }
 
@@ -87,50 +102,59 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
             return true;
         }
 
-        if (TwilightValue + activationEpsilon < clampedAmount)
+        if (twilight + activationEpsilon < clampedAmount)
         {
             return false;
         }
 
-        SetBalance(BalanceValue + clampedAmount, "ConsumeTwilight", clampedAmount);
+        float previousTwilight = twilight;
+        twilight = Mathf.Max(0f, twilight - clampedAmount);
+        LogGaugeChange("ConsumeTwilight", clampedAmount, radiance, previousTwilight);
         return true;
     }
 
     public bool TryShiftRadianceToTwilight(float requiredRadiance, float twilightGain)
     {
-        float requiredAmount = Mathf.Max(0f, requiredRadiance);
-        float gainAmount = Mathf.Max(0f, twilightGain);
-
-        if (requiredAmount > 0f && RadianceValue + activationEpsilon < requiredAmount)
-        {
-            LogLifecycle(
-                $"TryShiftRadianceToTwilight failed requiredRadiance={requiredAmount:F2} currentRadiance={RadianceValue:F2} currentTwilight={TwilightValue:F2}");
-            return false;
-        }
-
-        SetBalance(BalanceValue - gainAmount, TwinShiftRadianceToTwilightSource, gainAmount);
-        return true;
+        return TryConsumeFullRadianceAndSeedTwilight(twilightGain, out _);
     }
 
     public bool TryShiftTwilightToRadiance(float requiredTwilight, float radianceGain)
     {
-        float requiredAmount = Mathf.Max(0f, requiredTwilight);
-        float gainAmount = Mathf.Max(0f, radianceGain);
+        return TryConsumeFullTwilightAndSeedRadiance(radianceGain, out _);
+    }
 
-        if (requiredAmount > 0f && TwilightValue + activationEpsilon < requiredAmount)
+    public bool TryConsumeFullTwilightAndSeedRadiance(float seedAmount, out float consumedTwilight)
+    {
+        consumedTwilight = 0f;
+        if (!HasTwilightState())
         {
-            LogLifecycle(
-                $"TryShiftTwilightToRadiance failed requiredTwilight={requiredAmount:F2} currentRadiance={RadianceValue:F2} currentTwilight={TwilightValue:F2}");
+            LogLifecycle($"TryConsumeFullTwilightAndSeedRadiance blocked {GetGaugeSnapshot()}");
             return false;
         }
 
-        SetBalance(BalanceValue + gainAmount, TwinShiftTwilightToRadianceSource, gainAmount);
+        consumedTwilight = twilight;
+        SetGaugeValues(Mathf.Clamp(seedAmount, 0f, MaxGaugeValue), 0f, TwinShiftTwilightToRadianceSource, consumedTwilight);
+        return true;
+    }
+
+    public bool TryConsumeFullRadianceAndSeedTwilight(float seedAmount, out float consumedRadiance)
+    {
+        consumedRadiance = 0f;
+        if (!HasRadianceState())
+        {
+            LogLifecycle($"TryConsumeFullRadianceAndSeedTwilight blocked {GetGaugeSnapshot()}");
+            return false;
+        }
+
+        consumedRadiance = radiance;
+        SetGaugeValues(0f, Mathf.Clamp(seedAmount, 0f, MaxGaugeValue), TwinShiftRadianceToTwilightSource, consumedRadiance);
         return true;
     }
 
     public void ResetGauge()
     {
-        SetBalance(initialBalanceValue, "ResetGauge", Mathf.Abs(initialBalanceValue - BalanceValue));
+        InitializeGaugeValues();
+        LogLifecycle($"ResetGauge {GetGaugeSnapshot()}");
     }
 
     public void SetDebugLogEnabled(bool enabled)
@@ -138,16 +162,14 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         debugLog = enabled;
     }
 
-    // Radiance/Twilight state is earned by filling the corresponding gauge to the threshold.
-    // Day/night only changes whether that state is favorable or unfavorable.
     public bool HasRadianceState()
     {
-        return RadianceValue >= buffActivationThreshold - activationEpsilon;
+        return radiance >= buffActivationThreshold - activationEpsilon;
     }
 
     public bool HasTwilightState()
     {
-        return TwilightValue >= buffActivationThreshold - activationEpsilon;
+        return twilight >= buffActivationThreshold - activationEpsilon;
     }
 
     public bool IsRadianceBuffActive()
@@ -158,19 +180,6 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     public bool IsTwilightBuffActive()
     {
         return HasTwilightState();
-    }
-
-    private void SetBalance(float newValue, string source, float amount)
-    {
-        float previous = BalanceValue;
-        BalanceValue = Mathf.Clamp(newValue, 0f, 100f);
-
-        if (debugLog)
-        {
-            Debug.Log(
-                $"[DayNightGauge] source={source} oldBalance={previous:F2} amount={amount:F2} newBalance={BalanceValue:F2} twilight={TwilightValue:F2} radiance={RadianceValue:F2} instancePath={GetHierarchyPath(gameObject)}",
-                this);
-        }
     }
 
     public static bool TryGetExistingInstance(out DayNightGaugeRuntimeState gauge)
@@ -213,6 +222,106 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         return instance;
     }
 
+    private void InitializeGaugeValues()
+    {
+        float initialRadiance = Mathf.Clamp(initialBalanceValue, 0f, MaxGaugeValue);
+        float initialTwilight = Mathf.Clamp(MaxGaugeValue - initialRadiance, 0f, MaxGaugeValue);
+        SetGaugeValuesWithoutLogging(initialRadiance, initialTwilight);
+    }
+
+    private void ApplyRadianceGain(float amount, string source)
+    {
+        float previousRadiance = radiance;
+        float previousTwilight = twilight;
+        float availableEmpty = EmptyValue;
+        float fillAmount = Mathf.Min(amount, availableEmpty);
+        float overflow = Mathf.Max(0f, amount - fillAmount);
+
+        radiance += fillAmount;
+
+        if (overflow > 0f)
+        {
+            float converted = Mathf.Min(overflow, twilight);
+            twilight -= converted;
+            radiance += converted;
+        }
+
+        ClampGaugeValues();
+        LogGaugeChange(source, amount, previousRadiance, previousTwilight);
+    }
+
+    private void ApplyTwilightGain(float amount, string source)
+    {
+        float previousRadiance = radiance;
+        float previousTwilight = twilight;
+        float availableEmpty = EmptyValue;
+        float fillAmount = Mathf.Min(amount, availableEmpty);
+        float overflow = Mathf.Max(0f, amount - fillAmount);
+
+        twilight += fillAmount;
+
+        if (overflow > 0f)
+        {
+            float converted = Mathf.Min(overflow, radiance);
+            radiance -= converted;
+            twilight += converted;
+        }
+
+        ClampGaugeValues();
+        LogGaugeChange(source, amount, previousRadiance, previousTwilight);
+    }
+
+    private void SetGaugeValues(float newRadiance, float newTwilight, string source, float amount)
+    {
+        float previousRadiance = radiance;
+        float previousTwilight = twilight;
+        SetGaugeValuesWithoutLogging(newRadiance, newTwilight);
+        LogGaugeChange(source, amount, previousRadiance, previousTwilight);
+    }
+
+    private void SetGaugeValuesWithoutLogging(float newRadiance, float newTwilight)
+    {
+        radiance = Mathf.Clamp(newRadiance, 0f, MaxGaugeValue);
+        twilight = Mathf.Clamp(newTwilight, 0f, MaxGaugeValue);
+        ClampGaugeValues();
+    }
+
+    private void ClampGaugeValues()
+    {
+        radiance = Mathf.Clamp(radiance, 0f, MaxGaugeValue);
+        twilight = Mathf.Clamp(twilight, 0f, MaxGaugeValue);
+
+        float total = radiance + twilight;
+        if (total <= MaxGaugeValue + activationEpsilon)
+        {
+            return;
+        }
+
+        float overflow = total - MaxGaugeValue;
+        if (twilight >= overflow)
+        {
+            twilight -= overflow;
+        }
+        else
+        {
+            overflow -= twilight;
+            twilight = 0f;
+            radiance = Mathf.Max(0f, radiance - overflow);
+        }
+    }
+
+    private void LogGaugeChange(string source, float amount, float previousRadiance, float previousTwilight)
+    {
+        if (!debugLog)
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[DayNightGauge] source={source} amount={amount:F2} oldRadiance={previousRadiance:F2} oldTwilight={previousTwilight:F2} oldEmpty={Mathf.Clamp(MaxGaugeValue - previousRadiance - previousTwilight, 0f, MaxGaugeValue):F2} newRadiance={radiance:F2} newTwilight={twilight:F2} newEmpty={EmptyValue:F2} balance={BalanceValue:F2} instancePath={GetHierarchyPath(gameObject)}",
+            this);
+    }
+
     private void LogLifecycle(string message)
     {
         if (!debugLog)
@@ -221,6 +330,11 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
         }
 
         Debug.Log($"[DayNightGaugeLifecycle] instance={DebugInstanceLabel} path={GetHierarchyPath(gameObject)} {message}", this);
+    }
+
+    private string GetGaugeSnapshot()
+    {
+        return $"balance={BalanceValue:F2} twilight={twilight:F2} radiance={radiance:F2} empty={EmptyValue:F2}";
     }
 
     private static string GetHierarchyPath(GameObject target)
