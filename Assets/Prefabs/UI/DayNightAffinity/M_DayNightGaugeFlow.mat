@@ -34,7 +34,6 @@ Material:
     m_Ints: []
     m_Floats:
     - _Alpha: 1
-    - _BalanceValue: 50
     - _ColorMask: 15
     - _CoreGlow: 0.36
     - _CoreWidth: 0.18

@@ -9,7 +9,7 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
 
     private static DayNightGaugeRuntimeState instance;
 
-    [SerializeField, Range(0f, 100f)] private float initialBalanceValue = 50f;
+    [SerializeField, Range(0f, 100f)] private float initialActiveGaugeAmount = 15f;
     [SerializeField, Min(0f)] private float gaugeGainPerHit = 3f;
     [SerializeField, Range(0f, 100f)] private float buffActivationThreshold = 100f;
     [SerializeField, Min(0f)] private float activationEpsilon = 0.001f;
@@ -224,9 +224,67 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
 
     private void InitializeGaugeValues()
     {
-        float initialRadiance = Mathf.Clamp(initialBalanceValue, 0f, MaxGaugeValue);
-        float initialTwilight = Mathf.Clamp(MaxGaugeValue - initialRadiance, 0f, MaxGaugeValue);
+        PlayerDayNightAffinityType activeAffinity = ResolveInitialActiveAffinity();
+        float seedAmount = Mathf.Clamp(initialActiveGaugeAmount, 0f, MaxGaugeValue);
+        float initialRadiance = activeAffinity == PlayerDayNightAffinityType.DayChild ? seedAmount : 0f;
+        float initialTwilight = activeAffinity == PlayerDayNightAffinityType.NightChild ? seedAmount : 0f;
         SetGaugeValuesWithoutLogging(initialRadiance, initialTwilight);
+
+        Debug.Log(
+            $"[DayNightGauge] initialized active={activeAffinity} twilight={FormatGaugeValue(twilight)} radiance={FormatGaugeValue(radiance)} empty={FormatGaugeValue(EmptyValue)}",
+            this);
+    }
+
+    private static PlayerDayNightAffinityType ResolveInitialActiveAffinity()
+    {
+        Player2Bootstrap bootstrap = Object.FindObjectOfType<Player2Bootstrap>();
+        if (bootstrap != null)
+        {
+            PlayerDayNightAffinityType currentAffinity = ResolveAffinityType(bootstrap.CurrentPlayer);
+            if (currentAffinity != PlayerDayNightAffinityType.None)
+            {
+                return currentAffinity;
+            }
+
+            PlayerDayNightAffinityType leaderAffinity = ResolveAffinityType(bootstrap.PartyLeader);
+            if (leaderAffinity != PlayerDayNightAffinityType.None && bootstrap.PartyLeader != null && bootstrap.PartyLeader.activeInHierarchy)
+            {
+                return leaderAffinity;
+            }
+        }
+
+        PlayerDayNightAffinity[] affinities = Object.FindObjectsOfType<PlayerDayNightAffinity>(true);
+        for (int i = 0; i < affinities.Length; i++)
+        {
+            PlayerDayNightAffinity affinity = affinities[i];
+            if (affinity != null && affinity.gameObject.activeInHierarchy && affinity.AffinityType != PlayerDayNightAffinityType.None)
+            {
+                return affinity.AffinityType;
+            }
+        }
+
+        return PlayerDayNightAffinityType.None;
+    }
+
+    private static PlayerDayNightAffinityType ResolveAffinityType(GameObject player)
+    {
+        if (player == null)
+        {
+            return PlayerDayNightAffinityType.None;
+        }
+
+        PlayerDayNightAffinity affinity = player.GetComponent<PlayerDayNightAffinity>();
+        if (affinity == null)
+        {
+            affinity = player.GetComponentInParent<PlayerDayNightAffinity>();
+        }
+
+        return affinity != null ? affinity.AffinityType : PlayerDayNightAffinityType.None;
+    }
+
+    private static string FormatGaugeValue(float value)
+    {
+        return Mathf.Clamp(value, 0f, MaxGaugeValue).ToString("0.##");
     }
 
     private void ApplyRadianceGain(float amount, string source)

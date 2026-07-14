@@ -94,7 +94,8 @@ MonoBehaviour:
   coverFadeMaxPixels: 180
   debugGaugeVisual: 0
   overrideGaugeForPreview: 0
-  previewBalanceValue: 50
+  previewTwilightValue: 50
+  previewRadianceValue: 50
   iconGlowPulseSpeed: 2.2
   iconGlowMinAlpha: 0.18
   iconGlowMaxAlpha: 0.52

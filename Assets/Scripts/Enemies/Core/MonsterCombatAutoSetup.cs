@@ -286,7 +286,6 @@ public static class MonsterCombatAutoSetup
                 " isBoss=" + (identity.rank == MonsterRank.Boss) +
                 " MonsterRankVisual enabled=" + rankVisual.enabled +
                 " MonsterRankVisual applied rank=" + rankVisual.LastAppliedRank +
-                " Boss scale value=" + rankVisual.BossVisualScaleMultiplier.ToString("F2") +
                 " Visual_Slime=" + (visualSlime != null ? visualSlime.name : "null") +
                 " runtimeVisualRoot=" + (runtimeVisualRoot != null ? runtimeVisualRoot.name : "null"),
                 monster);

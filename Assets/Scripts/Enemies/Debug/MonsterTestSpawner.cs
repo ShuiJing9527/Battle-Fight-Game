@@ -60,30 +60,39 @@ public class MonsterTestSpawner : MonoBehaviour
     private const string NormalSuffix = "[MonsterTest_Normal]";
     private const string EliteSuffix = "[MonsterTest_Elite]";
     private const string BossSuffix = "[MonsterTest_Boss]";
-    private const bool FallbackEnableNormalVisualGroundOffset = true;
-    private const float FallbackNormalVisualGroundOffsetY = -0.05f;
-    private const float FallbackNormalHealthBarOffsetY = 0.25f;
-    private const bool FallbackEnableEliteVisualScale = true;
-    private const float FallbackEliteVisualScaleMultiplier = 1.5f;
-    private const bool FallbackEnableEliteVisualGroundOffset = true;
-    private const float FallbackEliteVisualGroundOffsetY = 0.25f;
-    private const float FallbackEliteHealthBarOffsetY = 0.3f;
-    private const bool FallbackDebugEliteVisualConfig = true;
-    private const bool FallbackEnableBossVisualScale = true;
-    private const float FallbackBossVisualScaleMultiplier = 4.0f;
-    private const bool FallbackEnableBossVisualGroundOffset = true;
-    private const float FallbackBossVisualGroundOffsetY = 0.85f;
-    private const float FallbackBossHealthBarOffsetY = 0.45f;
-    private const bool FallbackDebugBossVisualGroundOffset = true;
-    private const bool FallbackEnableBossHurtboxScale = true;
-    private const bool FallbackUseBossVisualBoundsHurtbox = true;
-    private const float FallbackBossHurtboxRadiusMultiplier = 3.0f;
-    private const float FallbackBossHurtboxCenterYOffset = 0f;
-    private const float FallbackBossHurtboxSizeMultiplier = 1f;
-    private static readonly Vector3 FallbackBossHurtboxExtraPadding = Vector3.zero;
-    private static readonly Vector3 FallbackBossHurtboxCenterOffset = Vector3.zero;
-    private const float FallbackBossHurtboxMinimumDepth = 0.2f;
-    private const bool FallbackDebugBossHurtbox = true;
+    private static readonly MonsterRankGeometrySettings FallbackNormalGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = Vector3.one,
+        visualLocalPosition = new Vector3(0f, -0.05f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 0.52f, 0f),
+        physicalColliderRadius = 0.5f,
+        hurtboxCenter = new Vector3(0f, 0.5f, 0f),
+        hurtboxSize = Vector3.one,
+        healthBarOffsetY = 0f
+    };
+    private static readonly MonsterRankGeometrySettings FallbackEliteGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = new Vector3(1.5f, 1.5f, 1.5f),
+        visualLocalPosition = new Vector3(0f, 0.25f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
+        physicalColliderRadius = 0.75f,
+        hurtboxCenter = new Vector3(0f, 0.85f, 0f),
+        hurtboxSize = new Vector3(1.5f, 1.5f, 1.5f),
+        healthBarOffsetY = 0.3f
+    };
+    private static readonly MonsterRankGeometrySettings FallbackBossGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = new Vector3(4f, 4f, 4f),
+        visualLocalPosition = new Vector3(0f, 0.85f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 1.22f, 0f),
+        physicalColliderRadius = 1.2f,
+        hurtboxCenter = new Vector3(0f, 1.75f, 0f),
+        hurtboxSize = new Vector3(3.68f, 3.68f, 1.288f),
+        healthBarOffsetY = 0.45f
+    };
     private bool sharedEnemySpawnerPausedByTest;
     private string lastPlayerResolveFailureReason = "NotResolved";
     private Coroutine autoSpawnRoutine;
@@ -594,6 +603,8 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void PrepareSharedEnemySpawnerForTest()
     {
+        ResolveSharedEnemySpawner();
+
         if (!isolateTestSpawn || !disableSharedEnemySpawnerDuringTest)
         {
             return;
@@ -613,6 +624,30 @@ public class MonsterTestSpawner : MonoBehaviour
             "[MonsterTestSpawner] Shared EnemySpawner paused for isolated test spawning. " +
             "used PauseSpawningForExternalTest=true enabled=false",
             this);
+    }
+
+    private EnemySpawner ResolveSharedEnemySpawner()
+    {
+        if (enemySpawner != null)
+        {
+            return enemySpawner;
+        }
+
+        EnemySpawner[] spawners = FindObjectsOfType<EnemySpawner>(true);
+        for (int i = 0; i < spawners.Length; i++)
+        {
+            EnemySpawner candidate = spawners[i];
+            if (candidate == null)
+            {
+                continue;
+            }
+
+            enemySpawner = candidate;
+            Debug.Log("[MonsterTestSpawner] Resolved scene EnemySpawner for shared Rank Geometry: " + candidate.name, candidate);
+            return enemySpawner;
+        }
+
+        return null;
     }
 
     private void ResumeSharedEnemySpawnerAfterTestIfNeeded()
@@ -975,109 +1010,190 @@ public class MonsterTestSpawner : MonoBehaviour
         }
 
         Debug.Log(
-            "[MonsterTestSpawner] using fallback local visual config because shared EnemySpawner is null.",
+            "[MonsterTestSpawner] using fallback rank geometry because shared EnemySpawner is null.",
             monster);
 
-        MonsterRankVisual rankVisual = monster.GetComponent<MonsterRankVisual>();
-        if (rankVisual != null)
-        {
-            switch (rank)
-            {
-                case MonsterRank.Boss:
-                    rankVisual.ApplyBossVisualConfig(
-                        FallbackEnableBossVisualScale,
-                        FallbackBossVisualScaleMultiplier,
-                        FallbackEnableBossVisualGroundOffset,
-                        FallbackBossVisualGroundOffsetY,
-                        FallbackDebugBossVisualGroundOffset,
-                        "MonsterTestSpawnerFallback");
-                    break;
-                case MonsterRank.Elite:
-                    rankVisual.ApplyEliteVisualConfig(
-                        FallbackEnableEliteVisualScale,
-                        FallbackEliteVisualScaleMultiplier,
-                        FallbackEnableEliteVisualGroundOffset,
-                        FallbackEliteVisualGroundOffsetY,
-                        FallbackDebugEliteVisualConfig,
-                        "MonsterTestSpawnerFallback");
-                    break;
-                default:
-                    rankVisual.ApplyNormalVisualConfig(
-                        FallbackEnableNormalVisualGroundOffset,
-                        FallbackNormalVisualGroundOffsetY,
-                        "MonsterTestSpawnerFallback");
-                    break;
-            }
-        }
+        ApplyFallbackRankGeometry(monster, rank);
 
         WorldHealthBar healthBar = monster.GetComponent<WorldHealthBar>();
         if (healthBar != null)
         {
+            MonsterRankGeometrySettings normalGeometry = ResolveFallbackRankGeometry(MonsterRank.Normal);
+            MonsterRankGeometrySettings eliteGeometry = ResolveFallbackRankGeometry(MonsterRank.Elite);
+            MonsterRankGeometrySettings bossGeometry = ResolveFallbackRankGeometry(MonsterRank.Boss);
             healthBar.ApplyHealthBarConfig(
-                FallbackNormalHealthBarOffsetY,
-                FallbackEliteHealthBarOffsetY,
-                FallbackBossHealthBarOffsetY,
+                normalGeometry.healthBarOffsetY,
+                eliteGeometry.healthBarOffsetY,
+                bossGeometry.healthBarOffsetY,
                 true,
                 "MonsterTestSpawnerFallback");
         }
-
-        if (rank == MonsterRank.Boss)
-        {
-            ApplyBossHurtboxFallbackConfig(monster);
-        }
     }
 
-    private void ApplyBossHurtboxFallbackConfig(GameObject monster)
+    private static void ApplyFallbackRankGeometry(GameObject monster, MonsterRank rank)
     {
-        if (monster == null || !FallbackEnableBossHurtboxScale)
+        if (monster == null)
         {
             return;
         }
 
-        Collider mainCollider = ResolveBossPrimaryBodyCollider(monster);
-        if (mainCollider == null)
+        MonsterRankGeometrySettings geometry = ResolveFallbackRankGeometry(rank);
+        monster.transform.localScale = Vector3.one;
+
+        Transform visualRoot = ResolveFallbackRankVisualRoot(monster);
+        if (visualRoot != null)
         {
-            Debug.LogWarning("[BossHurtboxDebug] missing main body collider for test boss hurtbox scaling.", monster);
-            return;
+            visualRoot.localScale = geometry.visualScale;
+            visualRoot.localPosition = geometry.visualLocalPosition;
+
+            SlimeAnimationController slimeAnimationController = monster.GetComponent<SlimeAnimationController>();
+            if (slimeAnimationController != null)
+            {
+                slimeAnimationController.SetVisualBaseScale(visualRoot.localScale);
+                slimeAnimationController.SetVisualBasePosition(visualRoot.localPosition);
+            }
         }
 
-        Collider hurtboxCollider = EnsureBossScaledHurtbox(
-            monster,
-            mainCollider,
-            FallbackBossHurtboxRadiusMultiplier,
-            FallbackBossHurtboxCenterYOffset,
-            FallbackUseBossVisualBoundsHurtbox,
-            FallbackBossHurtboxSizeMultiplier,
-            FallbackBossHurtboxExtraPadding,
-            FallbackBossHurtboxCenterOffset,
-            FallbackBossHurtboxMinimumDepth);
-
-        if (hurtboxCollider == null || !FallbackDebugBossHurtbox)
+        Transform groundContact = EnsureFallbackGroundContact(monster);
+        if (groundContact != null)
         {
-            return;
+            groundContact.localPosition = geometry.groundContactLocalPosition;
+            groundContact.localRotation = Quaternion.identity;
+            groundContact.localScale = Vector3.one;
         }
 
-        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
-        Transform visualTransform = ResolveBossVisualTransform(monster);
-        Renderer visualRenderer = ResolveBossVisualRenderer(visualTransform);
+        SphereCollider physicalCollider = EnsureFallbackPhysicalSphereCollider(monster);
+        if (physicalCollider != null)
+        {
+            physicalCollider.isTrigger = false;
+            physicalCollider.center = geometry.physicalColliderCenter;
+            physicalCollider.radius = Mathf.Max(0.01f, geometry.physicalColliderRadius);
+        }
+
+        BoxCollider hurtbox = EnsureFallbackRankHurtbox(monster, rank);
+        if (hurtbox != null)
+        {
+            hurtbox.isTrigger = true;
+            hurtbox.center = geometry.hurtboxCenter;
+            hurtbox.size = AbsVector3(geometry.hurtboxSize);
+            hurtbox.gameObject.layer = monster.layer;
+            hurtbox.gameObject.tag = monster.tag;
+        }
 
         Debug.Log(
-            "[BossHurtboxDebug] " +
-            "object=" + monster.name +
-            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
-            " visualScale=" + (visualTransform != null ? visualTransform.localScale.ToString() : "null") +
-            " visualBounds=" + (visualRenderer != null ? visualRenderer.bounds.ToString() : "null") +
-            " mainCollider=" + mainCollider.name +
-            " mainColliderBounds=" + mainCollider.bounds +
-            " hurtboxCollider=" + hurtboxCollider.name +
-            " hurtboxBounds=" + hurtboxCollider.bounds +
-            " useVisualBoundsHurtbox=" + FallbackUseBossVisualBoundsHurtbox +
-            " sizeMultiplier=" + FallbackBossHurtboxSizeMultiplier +
-            " extraPadding=" + FallbackBossHurtboxExtraPadding +
-            " centerOffset=" + FallbackBossHurtboxCenterOffset +
-            " minimumDepth=" + FallbackBossHurtboxMinimumDepth +
-            " source=MonsterTestSpawnerFallback",
+            "[RankGeometry] " +
+            "sourceEnemySpawner=None" +
+            " fallbackUsed=true " +
+            "rank=" + rank +
+            " source=MonsterTestSpawnerFallback" +
+            " rootScale=" + monster.transform.localScale +
+            " visualScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+            " visualLocalPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " visualLocalPositionConfigured=" + geometry.visualLocalPosition +
+            " visualLocalPositionApplied=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " finalVisualLocalPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " groundContactLocalPosition=" + (groundContact != null ? groundContact.localPosition.ToString() : "null") +
+            " physicalColliderCenter=" + (physicalCollider != null ? physicalCollider.center.ToString() : "null") +
+            " physicalColliderRadius=" + (physicalCollider != null ? physicalCollider.radius.ToString("F3") : "n/a") +
+            " hurtboxCenter=" + (hurtbox != null ? hurtbox.center.ToString() : "null") +
+            " hurtboxSize=" + (hurtbox != null ? hurtbox.size.ToString() : "null") +
+            " applyCount=1",
             monster);
+    }
+
+    private static MonsterRankGeometrySettings ResolveFallbackRankGeometry(MonsterRank rank)
+    {
+        return rank switch
+        {
+            MonsterRank.Boss => FallbackBossGeometry,
+            MonsterRank.Elite => FallbackEliteGeometry,
+            _ => FallbackNormalGeometry
+        };
+    }
+
+    private static Transform ResolveFallbackRankVisualRoot(GameObject monster)
+    {
+        Transform visualRoot = monster.transform.Find("Visual_Slime");
+        if (visualRoot != null)
+        {
+            return visualRoot;
+        }
+
+        SlimeAnimationController slimeAnimation = monster.GetComponent<SlimeAnimationController>();
+        if (slimeAnimation != null && slimeAnimation.VisualRoot != null && slimeAnimation.VisualRoot != monster.transform)
+        {
+            return slimeAnimation.VisualRoot;
+        }
+
+        MonsterRankVisual rankVisual = monster.GetComponent<MonsterRankVisual>();
+        return rankVisual != null ? rankVisual.RuntimeVisualRoot : null;
+    }
+
+    private static Transform EnsureFallbackGroundContact(GameObject monster)
+    {
+        Transform root = monster.transform;
+        Transform groundContact = root.Find("GroundContact");
+        if (groundContact == null)
+        {
+            Transform legacyVisualGroundContact = root.Find("Visual_Slime/GroundContact");
+            if (legacyVisualGroundContact != null)
+            {
+                groundContact = legacyVisualGroundContact;
+                groundContact.SetParent(root, false);
+            }
+        }
+
+        if (groundContact == null)
+        {
+            GameObject contactObject = new GameObject("GroundContact");
+            groundContact = contactObject.transform;
+            groundContact.SetParent(root, false);
+        }
+
+        return groundContact;
+    }
+
+    private static SphereCollider EnsureFallbackPhysicalSphereCollider(GameObject monster)
+    {
+        SphereCollider[] spheres = monster.GetComponents<SphereCollider>();
+        for (int i = 0; i < spheres.Length; i++)
+        {
+            SphereCollider sphere = spheres[i];
+            if (sphere != null && !sphere.isTrigger)
+            {
+                return sphere;
+            }
+        }
+
+        SphereCollider created = monster.AddComponent<SphereCollider>();
+        created.isTrigger = false;
+        return created;
+    }
+
+    private static BoxCollider EnsureFallbackRankHurtbox(GameObject monster, MonsterRank rank)
+    {
+        string hurtboxName = rank == MonsterRank.Boss ? "BossScaledHurtbox" : "RankHurtbox";
+        Transform hurtboxRoot = monster.transform.Find(hurtboxName);
+        if (hurtboxRoot == null)
+        {
+            GameObject hurtboxObject = new GameObject(hurtboxName);
+            hurtboxRoot = hurtboxObject.transform;
+            hurtboxRoot.SetParent(monster.transform, false);
+        }
+
+        hurtboxRoot.localPosition = Vector3.zero;
+        hurtboxRoot.localRotation = Quaternion.identity;
+        hurtboxRoot.localScale = Vector3.one;
+        hurtboxRoot.gameObject.SetActive(true);
+
+        RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
+        BoxCollider hurtbox = hurtboxRoot.GetComponent<BoxCollider>();
+        if (hurtbox == null)
+        {
+            hurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
+        }
+
+        return hurtbox;
     }
 
     private Collider ResolveBossPrimaryBodyCollider(GameObject monster)
@@ -1116,160 +1232,9 @@ public class MonsterTestSpawner : MonoBehaviour
         return bestCollider;
     }
 
-    private Collider EnsureBossScaledHurtbox(
-        GameObject monster,
-        Collider sourceCollider,
-        float radiusMultiplierValue,
-        float centerYOffset,
-        bool useVisualBounds,
-        float sizeMultiplierValue,
-        Vector3 extraPadding,
-        Vector3 centerOffset,
-        float minimumDepth)
-    {
-        Transform hurtboxRoot = monster.transform.Find("BossScaledHurtbox");
-        if (hurtboxRoot == null)
-        {
-            GameObject hurtboxObject = new GameObject("BossScaledHurtbox");
-            hurtboxRoot = hurtboxObject.transform;
-            hurtboxRoot.SetParent(monster.transform, false);
-        }
-
-        hurtboxRoot.gameObject.layer = monster.layer;
-        hurtboxRoot.gameObject.tag = monster.tag;
-        hurtboxRoot.localPosition = Vector3.zero;
-        hurtboxRoot.localRotation = Quaternion.identity;
-        hurtboxRoot.localScale = Vector3.one;
-
-        Renderer visualRenderer = useVisualBounds
-            ? ResolveBossVisualRenderer(ResolveBossVisualTransform(monster))
-            : null;
-        if (visualRenderer != null)
-        {
-            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
-            BoxCollider visualBoundsHurtbox = hurtboxRoot.GetComponent<BoxCollider>();
-            if (visualBoundsHurtbox == null)
-            {
-                visualBoundsHurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
-            }
-
-            ConfigureBossVisualBoundsHurtbox(
-                monster.transform,
-                visualRenderer.bounds,
-                visualBoundsHurtbox,
-                radiusMultiplierValue,
-                centerYOffset,
-                sizeMultiplierValue,
-                extraPadding,
-                centerOffset,
-                minimumDepth);
-            return visualBoundsHurtbox;
-        }
-
-        float radiusMultiplier = Mathf.Max(1f, radiusMultiplierValue) * Mathf.Max(0.1f, sizeMultiplierValue);
-        Vector3 colliderCenterOffset = centerOffset + Vector3.up * centerYOffset;
-        Vector3 colliderPadding = AbsVector3(extraPadding);
-
-        if (sourceCollider is SphereCollider sourceSphere)
-        {
-            RemoveColliderComponentsExcept<SphereCollider>(hurtboxRoot);
-            SphereCollider hurtbox = hurtboxRoot.GetComponent<SphereCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<SphereCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.center = sourceSphere.center + colliderCenterOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceSphere.radius * radiusMultiplier + MaxComponent(colliderPadding) * 0.5f);
-            return hurtbox;
-        }
-
-        if (sourceCollider is CapsuleCollider sourceCapsule)
-        {
-            RemoveColliderComponentsExcept<CapsuleCollider>(hurtboxRoot);
-            CapsuleCollider hurtbox = hurtboxRoot.GetComponent<CapsuleCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<CapsuleCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.direction = sourceCapsule.direction;
-            hurtbox.center = sourceCapsule.center + colliderCenterOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceCapsule.radius * radiusMultiplier + Mathf.Max(colliderPadding.x, colliderPadding.z) * 0.5f);
-            hurtbox.height = Mathf.Max(hurtbox.radius * 2f, sourceCapsule.height * radiusMultiplier + colliderPadding.y);
-            return hurtbox;
-        }
-
-        if (sourceCollider is BoxCollider sourceBox)
-        {
-            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
-            BoxCollider hurtbox = hurtboxRoot.GetComponent<BoxCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.center = sourceBox.center + colliderCenterOffset;
-            hurtbox.size = sourceBox.size * radiusMultiplier + colliderPadding;
-            return hurtbox;
-        }
-
-        return null;
-    }
-
-    private static void ConfigureBossVisualBoundsHurtbox(
-        Transform monsterRoot,
-        Bounds visualBounds,
-        BoxCollider hurtbox,
-        float radiusMultiplierValue,
-        float centerYOffset,
-        float sizeMultiplierValue,
-        Vector3 extraPadding,
-        Vector3 centerOffset,
-        float minimumDepth)
-    {
-        if (monsterRoot == null || hurtbox == null)
-        {
-            return;
-        }
-
-        Vector3 localMin = monsterRoot.InverseTransformPoint(visualBounds.min);
-        Vector3 localMax = monsterRoot.InverseTransformPoint(visualBounds.max);
-        Vector3 localCenter = (localMin + localMax) * 0.5f;
-        Vector3 localSize = new Vector3(
-            Mathf.Abs(localMax.x - localMin.x),
-            Mathf.Abs(localMax.y - localMin.y),
-            Mathf.Abs(localMax.z - localMin.z));
-
-        float minDepth = Mathf.Max(minimumDepth, Mathf.Max(localSize.x, localSize.y) * 0.35f);
-        if (localSize.z < minDepth)
-        {
-            localSize.z = minDepth;
-        }
-
-        float sizeMultiplier = Mathf.Max(0.1f, sizeMultiplierValue);
-        Vector3 legacyPadding = localSize * Mathf.Max(0f, radiusMultiplierValue - 1f) * 0.05f;
-        Vector3 customPadding = AbsVector3(extraPadding);
-        localCenter += centerOffset + Vector3.up * centerYOffset;
-        hurtbox.isTrigger = true;
-        hurtbox.center = localCenter;
-        hurtbox.size = new Vector3(
-            Mathf.Max(0.1f, localSize.x * sizeMultiplier + legacyPadding.x + customPadding.x),
-            Mathf.Max(0.1f, localSize.y * sizeMultiplier + legacyPadding.y + customPadding.y),
-            Mathf.Max(0.1f, localSize.z * sizeMultiplier + legacyPadding.z + customPadding.z));
-    }
-
     private static Vector3 AbsVector3(Vector3 value)
     {
         return new Vector3(Mathf.Abs(value.x), Mathf.Abs(value.y), Mathf.Abs(value.z));
-    }
-
-    private static float MaxComponent(Vector3 value)
-    {
-        return Mathf.Max(value.x, Mathf.Max(value.y, value.z));
     }
 
     private static void RemoveColliderComponentsExcept<T>(Transform root) where T : Collider
@@ -1417,12 +1382,8 @@ public class MonsterTestSpawner : MonoBehaviour
             return enemySpawner.GetConfiguredVisualScaleMultiplier(rank);
         }
 
-        return rank switch
-        {
-            MonsterRank.Boss => FallbackBossVisualScaleMultiplier,
-            MonsterRank.Elite => FallbackEliteVisualScaleMultiplier,
-            _ => 1f
-        };
+        Vector3 visualScale = ResolveFallbackRankGeometry(rank).visualScale;
+        return Mathf.Max(Mathf.Abs(visualScale.x), Mathf.Max(Mathf.Abs(visualScale.y), Mathf.Abs(visualScale.z)));
     }
 
     private float ResolveConfiguredVisualGroundOffsetY(MonsterRank rank)
@@ -1432,12 +1393,7 @@ public class MonsterTestSpawner : MonoBehaviour
             return enemySpawner.GetConfiguredVisualGroundOffsetY(rank);
         }
 
-        return rank switch
-        {
-            MonsterRank.Boss => FallbackBossVisualGroundOffsetY,
-            MonsterRank.Elite => FallbackEliteVisualGroundOffsetY,
-            _ => FallbackNormalVisualGroundOffsetY
-        };
+        return ResolveFallbackRankGeometry(rank).visualLocalPosition.y;
     }
 
     private string BuildMonsterStateSummary(GameObject monster, Transform target)

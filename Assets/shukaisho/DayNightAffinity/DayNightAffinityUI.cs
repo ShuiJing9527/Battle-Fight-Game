@@ -120,6 +120,7 @@ public class DayNightAffinityUI : MonoBehaviour
 
         float twilightValue;
         float radianceValue;
+        float emptyValue;
         if (overrideGaugeForPreview)
         {
             twilightValue = Mathf.Clamp(previewTwilightValue, 0f, 100f);
@@ -129,11 +130,23 @@ public class DayNightAffinityUI : MonoBehaviour
             {
                 radianceValue = Mathf.Max(0f, radianceValue - previewOverflow);
             }
+
+            emptyValue = Mathf.Clamp(100f - twilightValue - radianceValue, 0f, 100f);
         }
         else
         {
             twilightValue = Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
             radianceValue = Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
+            emptyValue = Mathf.Clamp(gaugeState.EmptyValue, 0f, 100f);
+        }
+
+        float occupiedValue = Mathf.Clamp(100f - emptyValue, 0f, 100f);
+        float displayedTotal = twilightValue + radianceValue;
+        if (displayedTotal > occupiedValue + 0.001f && displayedTotal > 0.001f)
+        {
+            float scale = occupiedValue / displayedTotal;
+            twilightValue *= scale;
+            radianceValue *= scale;
         }
 
         UpdateBaseAccentState(

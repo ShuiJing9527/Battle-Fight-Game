@@ -3,10 +3,23 @@ using System.Collections.Generic;
 using UnityEngine;
 using AHD2TimeOfDay;
 
+[System.Serializable]
+public class MonsterRankGeometrySettings
+{
+    public Vector3 visualScale = Vector3.one;
+    public Vector3 visualLocalPosition = Vector3.zero;
+    public Vector3 groundContactLocalPosition = Vector3.zero;
+    public Vector3 physicalColliderCenter = new Vector3(0f, 0.52f, 0f);
+    [Min(0.01f)] public float physicalColliderRadius = 0.5f;
+    public Vector3 hurtboxCenter = new Vector3(0f, 0.5f, 0f);
+    public Vector3 hurtboxSize = Vector3.one;
+    public float healthBarOffsetY = 0f;
+}
+
 public class EnemySpawner : MonoBehaviour
 {
     private const string EliteSplitFromTestSuffix = "[EliteSplit_FromTest]";
-    private const string GroundSnapVersion = "BodyRendererDirect_20260713_01";
+    private const string GroundSnapVersion = "RankGeometryGroundContact_20260714_01";
 
     private struct MonsterBaseSnapshot
     {
@@ -22,12 +35,57 @@ public class EnemySpawner : MonoBehaviour
         public Vector3 scaleTargetLocalScale;
     }
 
+    private struct RigidbodySetupState
+    {
+        public bool hasBody;
+        public bool useGravity;
+        public bool isKinematic;
+        public RigidbodyConstraints constraints;
+    }
+
     [Header("Enemy")]
     public GameObject[] enemyPrefabs;
     public GameObject[] normalEnemyPrefabs;
     public GameObject[] eliteEnemyPrefabs;
     public GameObject[] bossEnemyPrefabs;
     public bool useRuntimeRankOverride = true;
+
+    [Header("Rank Geometry")]
+    [SerializeField] private MonsterRankGeometrySettings normalGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = Vector3.one,
+        visualLocalPosition = new Vector3(0f, -0.05f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 0.52f, 0f),
+        physicalColliderRadius = 0.5f,
+        hurtboxCenter = new Vector3(0f, 0.5f, 0f),
+        hurtboxSize = Vector3.one,
+        healthBarOffsetY = 0f
+    };
+    [SerializeField] private MonsterRankGeometrySettings eliteGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = new Vector3(1.5f, 1.5f, 1.5f),
+        visualLocalPosition = new Vector3(0f, 0.25f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
+        physicalColliderRadius = 0.75f,
+        hurtboxCenter = new Vector3(0f, 0.85f, 0f),
+        hurtboxSize = new Vector3(1.5f, 1.5f, 1.5f),
+        healthBarOffsetY = 0.3f
+    };
+    [SerializeField] private MonsterRankGeometrySettings bossGeometry = new MonsterRankGeometrySettings
+    {
+        visualScale = new Vector3(4f, 4f, 4f),
+        visualLocalPosition = new Vector3(0f, 0.85f, 0f),
+        groundContactLocalPosition = Vector3.zero,
+        physicalColliderCenter = new Vector3(0f, 1.22f, 0f),
+        physicalColliderRadius = 1.2f,
+        hurtboxCenter = new Vector3(0f, 1.75f, 0f),
+        hurtboxSize = new Vector3(3.68f, 3.68f, 1.288f),
+        healthBarOffsetY = 0.45f
+    };
+    [SerializeField, Min(0f)] private float physicalGroundSkin = 0.02f;
+    [SerializeField] private bool debugRankGeometry = true;
 
     [SerializeField] private Transform bossSpawnPoint;
     [SerializeField] private Transform[] enemySpawnPoints;
@@ -85,11 +143,6 @@ public class EnemySpawner : MonoBehaviour
     public float normalResistanceMultiplier = 1f;
     [Tooltip("Normal monster speed multiplier after base and time growth. 1 means unchanged.")]
     public float normalSpeedMultiplier = 1f;
-    [Header("Normal Visual Config")]
-    [SerializeField] private bool enableNormalVisualGroundOffset = true;
-    [SerializeField] private float normalVisualGroundOffsetY = -0.05f;
-    [SerializeField] private float normalHealthBarOffsetY = 0.25f;
-
     [Header("Rank Multipliers - Elite")]
     [Tooltip("Elite monster HP multiplier after base and time growth. 1 means unchanged.")]
     public float eliteHealthMultiplier = 3f;
@@ -107,13 +160,6 @@ public class EnemySpawner : MonoBehaviour
     public float eliteAttackIntervalMultiplier = 1.1f;
     [Tooltip("Elite outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float eliteOutgoingDamageMultiplier = 1f;
-    [SerializeField] private bool enableEliteVisualScale = true;
-    [SerializeField] private float eliteVisualScaleMultiplier = 1.5f;
-    [SerializeField] private bool enableEliteVisualGroundOffset = true;
-    [SerializeField] private float eliteVisualGroundOffsetY = 0.25f;
-    [SerializeField] private float eliteHealthBarOffsetY = 0.3f;
-    [SerializeField] private bool debugEliteVisualConfig = true;
-
     [Header("Rank Multipliers - Boss")]
     [Tooltip("Boss HP multiplier after base and time growth. 1 means unchanged.")]
     public float bossHealthMultiplier = 10f;
@@ -131,23 +177,7 @@ public class EnemySpawner : MonoBehaviour
     public float bossAttackIntervalMultiplier = 1.8f;
     [Tooltip("Boss outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float bossOutgoingDamageMultiplier = 1.5f;
-    [SerializeField] private bool enableBossVisualScale = true;
-    [SerializeField] private float bossVisualScaleMultiplier = 4.0f;
-    [SerializeField] private bool enableBossVisualGroundOffset = true;
-    [SerializeField] private float bossVisualGroundOffsetY = 0.85f;
-    [SerializeField] private float bossVisibleGroundContactLocalYOffset = 1.0625f;
-    [SerializeField] private float bossHealthBarOffsetY = 0.45f;
-    [SerializeField] private bool debugBossVisualGroundOffset = true;
-    [SerializeField] private bool enableBossHurtboxScale = true;
-    [SerializeField] private bool useBossVisualBoundsHurtbox = true;
-    [SerializeField] private float bossHurtboxRadiusMultiplier = 3.0f;
-    [SerializeField] private float bossHurtboxCenterYOffset = 0f;
-    [SerializeField, Min(0.1f)] private float bossHurtboxSizeMultiplier = 1f;
-    [SerializeField] private Vector3 bossHurtboxExtraPadding = Vector3.zero;
-    [SerializeField] private Vector3 bossHurtboxCenterOffset = Vector3.zero;
-    [SerializeField, Min(0.01f)] private float bossHurtboxMinimumDepth = 0.2f;
     [SerializeField, Min(0.05f)] private float bossHurtboxRuntimeRefreshInterval = 0.25f;
-    [SerializeField] private bool debugBossHurtbox = true;
 
     [Header("Elite")]
     public float eliteSpawnIntervalMin = 10f;
@@ -274,6 +304,8 @@ public class EnemySpawner : MonoBehaviour
     private readonly List<GameObject> fallbackBossEnemyPrefabs = new List<GameObject>();
     private readonly List<GameObject> aliveEnemies = new List<GameObject>();
     private readonly Dictionary<int, MonsterBaseSnapshot> monsterBaseSnapshots = new Dictionary<int, MonsterBaseSnapshot>();
+    private readonly Dictionary<int, int> rankGeometryApplyCounts = new Dictionary<int, int>();
+    private readonly Dictionary<int, string> rankGeometryApplySources = new Dictionary<int, string>();
     private readonly HashSet<int> finalMomentBossEnemyIds = new HashSet<int>();
     private readonly Dictionary<int, UltimateBossModifiers> ultimateBossModifiersByEnemyId = new Dictionary<int, UltimateBossModifiers>();
     private int resolvedEnemyLayer = -1;
@@ -891,8 +923,9 @@ public class EnemySpawner : MonoBehaviour
             cloneIdentity.rank = childRank;
             cloneIdentity.suppressRuneDrop = suppressRuneDrop;
 
+            spawnedEnemy.transform.localScale = Vector3.one;
             MonsterCombatAutoSetup.Configure(spawnedEnemy, species, childRank);
-            ApplyBossVisualExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
+            ApplyRankGeometry(spawnedEnemy, childRank, "EnemySpawner");
             ApplyHealthBarExternalConfig(spawnedEnemy, childRank, "EnemySpawner");
             ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
             ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
@@ -1001,14 +1034,14 @@ public class EnemySpawner : MonoBehaviour
 
         if (Mathf.Abs(scaleRatio - 1f) > 0.0001f)
         {
-            Transform scaleTarget = spawnedEnemy.transform;
-            MonsterRankVisual rankVisual = spawnedEnemy.GetComponent<MonsterRankVisual>();
-            if (rankVisual != null && rankVisual.visualRoot != null)
+            Transform scaleTarget = ResolveRankVisualRoot(spawnedEnemy);
+
+            if (scaleTarget != null)
             {
-                scaleTarget = rankVisual.visualRoot;
+                scaleTarget.localScale *= Mathf.Max(0.01f, scaleRatio);
             }
 
-            scaleTarget.localScale *= Mathf.Max(0.01f, scaleRatio);
+            spawnedEnemy.transform.localScale = Vector3.one;
         }
     }
 
@@ -1119,8 +1152,11 @@ public class EnemySpawner : MonoBehaviour
 
         cloneIdentity.rank = runtimeRank;
 
+        Rigidbody setupBody = enemy.GetComponent<Rigidbody>();
+        RigidbodySetupState setupBodyState = FreezeRigidbodyForBossGrounding(setupBody);
+        enemy.transform.localScale = Vector3.one;
         MonsterCombatAutoSetup.Configure(enemy, runtimeSpecies, runtimeRank);
-        ApplyRankVisualExternalConfig(enemy, runtimeRank, source);
+        ApplyRankGeometry(enemy, runtimeRank, source);
         ApplyHealthBarExternalConfig(enemy, runtimeRank, source);
         ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(enemy);
 
@@ -1135,10 +1171,8 @@ public class EnemySpawner : MonoBehaviour
             ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
         }
 
-        if (runtimeRank == MonsterRank.Boss)
-        {
-            SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
-        }
+        SnapEnemyToGround(enemy, enemyGroundSnapLayerMask, source);
+        RestoreRigidbodyAfterBossGrounding(setupBody != null ? setupBody : enemy.GetComponent<Rigidbody>(), setupBodyState, enemy.transform.position);
 
         if (initializeDeathNotifier)
         {
@@ -1170,96 +1204,310 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private void ApplyRankVisualExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    private void ApplyRankGeometry(GameObject enemy, MonsterRank rank, string source)
     {
         if (enemy == null)
         {
             return;
         }
 
-        if (rank == MonsterRank.Normal)
+        MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
+        if (geometry == null)
         {
-            ApplyNormalVisualExternalConfig(enemy, source);
             return;
         }
 
-        if (rank == MonsterRank.Elite)
+        int applyCount = RegisterRankGeometryApply(enemy, rank, source, fullApply: true);
+        if (applyCount > 1)
         {
-            ApplyEliteVisualExternalConfig(enemy, source);
             return;
         }
 
-        ApplyBossVisualExternalConfig(enemy, rank, source);
+        enemy.transform.localScale = Vector3.one;
+
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
+        if (visualRoot != null)
+        {
+            visualRoot.localScale = SanitizeScale(geometry.visualScale);
+            visualRoot.localPosition = geometry.visualLocalPosition;
+
+            SlimeAnimationController slimeAnimationController = enemy.GetComponent<SlimeAnimationController>();
+            if (slimeAnimationController != null)
+            {
+                slimeAnimationController.SetVisualBaseScale(visualRoot.localScale);
+                slimeAnimationController.SetVisualBasePosition(visualRoot.localPosition);
+            }
+        }
+
+        Transform groundContact = EnsureRankGroundContact(enemy);
+        if (groundContact != null)
+        {
+            groundContact.localPosition = geometry.groundContactLocalPosition;
+            groundContact.localRotation = Quaternion.identity;
+            groundContact.localScale = Vector3.one;
+        }
+
+        SphereCollider physicalCollider = EnsureRankPhysicalSphereCollider(enemy);
+        if (physicalCollider != null)
+        {
+            physicalCollider.isTrigger = false;
+            physicalCollider.center = geometry.physicalColliderCenter;
+            physicalCollider.radius = Mathf.Max(0.01f, geometry.physicalColliderRadius);
+        }
+
+        BoxCollider hurtbox = EnsureRankHurtbox(enemy, rank);
+        if (hurtbox != null)
+        {
+            hurtbox.isTrigger = true;
+            hurtbox.center = geometry.hurtboxCenter;
+            hurtbox.size = AbsVector3(geometry.hurtboxSize);
+            hurtbox.gameObject.layer = enemy.layer;
+            hurtbox.gameObject.tag = enemy.tag;
+        }
+
+        LogRankGeometry(enemy, rank, geometry, groundHit: default, source, applyCount);
     }
 
-    private void ApplyNormalVisualExternalConfig(GameObject enemy, string source)
+    private int RegisterRankGeometryApply(GameObject enemy, MonsterRank rank, string source, bool fullApply)
     {
-        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
-        if (rankVisual == null)
+        if (enemy == null)
         {
-            return;
+            return 0;
         }
 
-        rankVisual.ApplyNormalVisualConfig(
-            enableNormalVisualGroundOffset,
-            normalVisualGroundOffsetY,
-            source);
-    }
+        int id = enemy.GetInstanceID();
+        rankGeometryApplyCounts.TryGetValue(id, out int previousCount);
+        int nextCount = previousCount + 1;
+        rankGeometryApplyCounts[id] = nextCount;
 
-    private void ApplyEliteVisualExternalConfig(GameObject enemy, string source)
-    {
-        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
-        if (rankVisual == null)
+        string safeSource = string.IsNullOrWhiteSpace(source) ? "Unknown" : source;
+        if (rankGeometryApplySources.TryGetValue(id, out string previousSources) && !string.IsNullOrEmpty(previousSources))
         {
-            return;
+            rankGeometryApplySources[id] = previousSources + " -> " + safeSource;
+        }
+        else
+        {
+            rankGeometryApplySources[id] = safeSource;
         }
 
-        rankVisual.ApplyEliteVisualConfig(
-            enableEliteVisualScale,
-            eliteVisualScaleMultiplier,
-            enableEliteVisualGroundOffset,
-            eliteVisualGroundOffsetY,
-            debugEliteVisualConfig,
-            source);
-
-        if (debugEliteVisualConfig)
+        if (nextCount > 1 && fullApply)
         {
-            Debug.Log(
-                "[EliteSpawnDebug] " +
-                "source=" + source +
-                " prefab=" + enemy.name +
-                " rank=Elite" +
-                " visual scale applied=" + enableEliteVisualScale +
-                " final visual scale=" + rankVisual.RuntimeVisualRoot.localScale +
-                " elite visual scale multiplier=" + eliteVisualScaleMultiplier.ToString("F2"),
+            Debug.LogError(
+                "[RankGeometry] duplicate full apply blocked " +
+                "rank=" + rank +
+                " applyCount=" + nextCount +
+                " source=" + safeSource +
+                " sources=" + rankGeometryApplySources[id],
                 enemy);
         }
+
+        return nextCount;
     }
 
-    private void ApplyBossVisualExternalConfig(GameObject enemy, MonsterRank rank, string source)
+    private int GetRankGeometryApplyCount(GameObject enemy)
     {
-        if (enemy == null || rank != MonsterRank.Boss)
+        if (enemy == null)
+        {
+            return 0;
+        }
+
+        return rankGeometryApplyCounts.TryGetValue(enemy.GetInstanceID(), out int count) ? count : 0;
+    }
+
+    private MonsterRankGeometrySettings ResolveRankGeometry(MonsterRank rank)
+    {
+        switch (rank)
+        {
+            case MonsterRank.Elite:
+                return eliteGeometry;
+            case MonsterRank.Boss:
+                return bossGeometry;
+            default:
+                return normalGeometry;
+        }
+    }
+
+    private static Vector3 SanitizeScale(Vector3 scale)
+    {
+        return new Vector3(
+            Mathf.Approximately(scale.x, 0f) ? 1f : scale.x,
+            Mathf.Approximately(scale.y, 0f) ? 1f : scale.y,
+            Mathf.Approximately(scale.z, 0f) ? 1f : scale.z);
+    }
+
+    private static Transform ResolveRankVisualRoot(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        Transform visualRoot = enemy.transform.Find("Visual_Slime");
+        if (visualRoot != null)
+        {
+            return visualRoot;
+        }
+
+        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+        return rankVisual != null ? rankVisual.RuntimeVisualRoot : null;
+    }
+
+    private static Transform EnsureRankGroundContact(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        Transform root = enemy.transform;
+        Transform groundContact = root.Find("GroundContact");
+        if (groundContact == null)
+        {
+            Transform legacyVisualGroundContact = root.Find("Visual_Slime/GroundContact");
+            if (legacyVisualGroundContact != null)
+            {
+                groundContact = legacyVisualGroundContact;
+                groundContact.SetParent(root, false);
+            }
+        }
+
+        if (groundContact == null)
+        {
+            GameObject contactObject = new GameObject("GroundContact");
+            groundContact = contactObject.transform;
+            groundContact.SetParent(root, false);
+        }
+
+        return groundContact;
+    }
+
+    private static SphereCollider EnsureRankPhysicalSphereCollider(GameObject enemy)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        SphereCollider[] spheres = enemy.GetComponents<SphereCollider>();
+        for (int i = 0; i < spheres.Length; i++)
+        {
+            SphereCollider sphere = spheres[i];
+            if (sphere != null && !sphere.isTrigger)
+            {
+                return sphere;
+            }
+        }
+
+        SphereCollider created = enemy.AddComponent<SphereCollider>();
+        created.isTrigger = false;
+        return created;
+    }
+
+    private static BoxCollider EnsureRankHurtbox(GameObject enemy, MonsterRank rank)
+    {
+        if (enemy == null)
+        {
+            return null;
+        }
+
+        string hurtboxName = rank == MonsterRank.Boss ? "BossScaledHurtbox" : "RankHurtbox";
+        Transform hurtboxRoot = enemy.transform.Find(hurtboxName);
+        if (hurtboxRoot == null)
+        {
+            GameObject hurtboxObject = new GameObject(hurtboxName);
+            hurtboxRoot = hurtboxObject.transform;
+            hurtboxRoot.SetParent(enemy.transform, false);
+        }
+
+        hurtboxRoot.localPosition = Vector3.zero;
+        hurtboxRoot.localRotation = Quaternion.identity;
+        hurtboxRoot.localScale = Vector3.one;
+        hurtboxRoot.gameObject.SetActive(true);
+
+        RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
+        BoxCollider hurtbox = hurtboxRoot.GetComponent<BoxCollider>();
+        if (hurtbox == null)
+        {
+            hurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
+        }
+
+        return hurtbox;
+    }
+
+    private void LogRankGeometry(GameObject enemy, MonsterRank rank, MonsterRankGeometrySettings geometry, RaycastHit groundHit, string source, int applyCount)
+    {
+        if (!debugRankGeometry || enemy == null || geometry == null)
         {
             return;
         }
 
-        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
-        if (rankVisual != null)
-        {
-            rankVisual.ApplyBossVisualConfig(
-                enableBossVisualScale,
-                bossVisualScaleMultiplier,
-                enableBossVisualGroundOffset,
-                bossVisualGroundOffsetY,
-                debugBossVisualGroundOffset,
-                source);
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
+        Transform groundContact = EnsureRankGroundContact(enemy);
+        SphereCollider physicalCollider = EnsureRankPhysicalSphereCollider(enemy);
+        BoxCollider hurtbox = EnsureRankHurtbox(enemy, rank);
+        float physicalBottomY = physicalCollider != null ? physicalCollider.bounds.min.y : float.NaN;
 
-            Debug.Log(
-                $"[BossVisualExternalConfig] scaleMultiplier={bossVisualScaleMultiplier:F2} groundOffsetY={bossVisualGroundOffsetY:F2} source={source}",
-                enemy);
+        Debug.Log(
+            "[RankGeometry] " +
+            "sourceEnemySpawner=" + name +
+            " fallbackUsed=false " +
+            "rank=" + rank +
+            " source=" + source +
+            " rootScale=" + enemy.transform.localScale +
+            " visualScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+            " visualLocalPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " visualLocalPositionConfigured=" + geometry.visualLocalPosition +
+            " visualLocalPositionApplied=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " finalVisualLocalPosition=" + (visualRoot != null ? visualRoot.localPosition.ToString() : "null") +
+            " groundContactLocalPosition=" + (groundContact != null ? groundContact.localPosition.ToString() : "null") +
+            " physicalColliderCenter=" + (physicalCollider != null ? physicalCollider.center.ToString() : "null") +
+            " physicalColliderRadius=" + (physicalCollider != null ? physicalCollider.radius.ToString("F3") : "n/a") +
+            " physicalGroundSkin=" + physicalGroundSkin.ToString("F3") +
+            " physicalColliderBottomWorldY=" + (physicalCollider != null ? physicalBottomY.ToString("F3") : "n/a") +
+            " hurtboxCenter=" + (hurtbox != null ? hurtbox.center.ToString() : "null") +
+            " hurtboxSize=" + (hurtbox != null ? hurtbox.size.ToString() : "null") +
+            " groundHitY=" + (groundHit.collider != null ? groundHit.point.y.ToString("F3") : "n/a") +
+            " applyCount=" + applyCount,
+            enemy);
+    }
+
+    private void ApplyRankHurtboxGeometryOnly(GameObject enemy, MonsterRank rank, string source)
+    {
+        if (enemy == null)
+        {
+            return;
         }
 
-        ApplyBossHurtboxExternalConfig(enemy, rank, source);
+        MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
+        if (geometry == null)
+        {
+            return;
+        }
+
+        BoxCollider hurtbox = EnsureRankHurtbox(enemy, rank);
+        if (hurtbox == null)
+        {
+            return;
+        }
+
+        hurtbox.isTrigger = true;
+        hurtbox.center = geometry.hurtboxCenter;
+        hurtbox.size = AbsVector3(geometry.hurtboxSize);
+        hurtbox.gameObject.layer = enemy.layer;
+        hurtbox.gameObject.tag = enemy.tag;
+
+        if (debugRankGeometry)
+        {
+            Debug.Log(
+                "[RankGeometryHurtboxRefresh] " +
+                "sourceEnemySpawner=" + name +
+                " fallbackUsed=false " +
+                " rank=" + rank +
+                " source=" + source +
+                " hurtboxCenter=" + hurtbox.center +
+                " hurtboxSize=" + hurtbox.size,
+                enemy);
+        }
     }
 
     private void ApplyHealthBarExternalConfig(GameObject enemy, MonsterRank rank, string source)
@@ -1275,71 +1523,14 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        bool debug = debugMonsterSpawnState
-            || (rank == MonsterRank.Elite && debugEliteVisualConfig)
-            || (rank == MonsterRank.Boss && debugBossVisualGroundOffset);
+        bool debug = debugMonsterSpawnState || debugRankGeometry;
 
         healthBar.ApplyHealthBarConfig(
-            normalHealthBarOffsetY,
-            eliteHealthBarOffsetY,
-            bossHealthBarOffsetY,
+            ResolveRankGeometry(MonsterRank.Normal)?.healthBarOffsetY ?? 0f,
+            ResolveRankGeometry(MonsterRank.Elite)?.healthBarOffsetY ?? 0f,
+            ResolveRankGeometry(MonsterRank.Boss)?.healthBarOffsetY ?? 0f,
             debug,
             source);
-    }
-
-    private void ApplyBossHurtboxExternalConfig(GameObject enemy, MonsterRank rank, string source)
-    {
-        if (enemy == null || rank != MonsterRank.Boss || !enableBossHurtboxScale)
-        {
-            return;
-        }
-
-        Collider mainCollider = ResolveBossPrimaryBodyCollider(enemy);
-        if (mainCollider == null)
-        {
-            Debug.LogWarning("[BossHurtboxDebug] missing main body collider for boss hurtbox scaling.", enemy);
-            return;
-        }
-
-        Collider hurtboxCollider = EnsureBossScaledHurtbox(enemy, mainCollider);
-        if (hurtboxCollider == null)
-        {
-            Debug.LogWarning("[BossHurtboxDebug] failed to create scaled hurtbox collider.", enemy);
-            return;
-        }
-
-        if (!debugBossHurtbox)
-        {
-            return;
-        }
-
-        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
-        Transform visualTransform = ResolveBossVisualTransform(enemy);
-        Renderer visualRenderer = ResolveBossVisualRenderer(visualTransform);
-
-        Debug.Log(
-            "[BossHurtboxDebug] " +
-            "object=" + enemy.name +
-            " rank=" + (identity != null ? identity.rank.ToString() : "Unknown") +
-            " visualScale=" + (visualTransform != null ? visualTransform.localScale.ToString() : "null") +
-            " visualBounds=" + (visualRenderer != null ? visualRenderer.bounds.ToString() : "null") +
-            " mainCollider=" + mainCollider.name +
-            " mainColliderIsTrigger=" + mainCollider.isTrigger +
-            " mainColliderBounds=" + mainCollider.bounds +
-            " hurtboxCollider=" + hurtboxCollider.name +
-            " hurtboxIsTrigger=" + hurtboxCollider.isTrigger +
-            " hurtboxBounds=" + hurtboxCollider.bounds +
-            " useVisualBoundsHurtbox=" + useBossVisualBoundsHurtbox +
-            " sizeMultiplier=" + bossHurtboxSizeMultiplier +
-            " extraPadding=" + bossHurtboxExtraPadding +
-            " centerOffset=" + bossHurtboxCenterOffset +
-            " minimumDepth=" + bossHurtboxMinimumDepth +
-            " layer=" + LayerMask.LayerToName(hurtboxCollider.gameObject.layer) +
-            " tag=" + hurtboxCollider.gameObject.tag +
-            " source=" + source,
-            enemy);
-
-        LogBossHurtboxShapeDetails(enemy, mainCollider, hurtboxCollider);
     }
 
     public void RefreshBossHurtboxForRuntime(GameObject enemy, string source)
@@ -1350,14 +1541,8 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        if (!enableBossHurtboxScale)
-        {
-            SetBossScaledHurtboxEnabled(enemy, false);
-            return;
-        }
-
         SetBossScaledHurtboxEnabled(enemy, true);
-        ApplyBossHurtboxExternalConfig(enemy, identity.rank, source);
+        ApplyRankHurtboxGeometryOnly(enemy, identity.rank, source);
     }
 
     private void RefreshAliveBossHurtboxesIfConfigChanged()
@@ -1733,7 +1918,7 @@ public class EnemySpawner : MonoBehaviour
         }
 
         scaleTarget.localScale = Vector3.Scale(snapshot.scaleTargetLocalScale, Vector3.one * Mathf.Max(0.01f, cleanupBossScaleMultiplier));
-        AlignBossVisualToGround(enemy);
+        enemy.transform.localScale = Vector3.one;
     }
 
     private static bool TryGetEnemyScaleTarget(GameObject enemy, out Transform scaleTarget)
@@ -1751,7 +1936,7 @@ public class EnemySpawner : MonoBehaviour
             return true;
         }
 
-        scaleTarget = enemy.transform;
+        scaleTarget = ResolveRankVisualRoot(enemy);
         return scaleTarget != null;
     }
 
@@ -1996,16 +2181,9 @@ public class EnemySpawner : MonoBehaviour
         {
             RigidbodyConstraints constraints = body.constraints;
             constraints |= RigidbodyConstraints.FreezeRotationX | RigidbodyConstraints.FreezeRotationY | RigidbodyConstraints.FreezeRotationZ;
-            MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
-            bool shouldFreezeVerticalPosition = freezeEnemyVerticalPosition ||
-                                                (identity != null && identity.rank == MonsterRank.Boss);
+            bool shouldFreezeVerticalPosition = freezeEnemyVerticalPosition;
             if (shouldFreezeVerticalPosition)
             {
-                if (identity != null && identity.rank == MonsterRank.Boss)
-                {
-                    AlignBossVisualToGround(enemy);
-                }
-
                 constraints |= RigidbodyConstraints.FreezePositionY;
                 Vector3 velocity = body.linearVelocity;
                 velocity.y = 0f;
@@ -2038,12 +2216,6 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private static void AlignBossVisualToGround(GameObject enemy)
-    {
-        // Boss visual grounding is now handled by MonsterRankVisual using a stable local offset.
-        // Keep root / rigidbody / collider anchored to gameplay ground.
-    }
-
     public void SnapEnemyToGround(GameObject enemy, LayerMask groundMask, string spawnSource)
     {
         if (enemy == null)
@@ -2052,19 +2224,34 @@ public class EnemySpawner : MonoBehaviour
         }
 
         Rigidbody body = enemy.GetComponent<Rigidbody>();
-        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
-        Transform visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : enemy.transform.Find("Visual_Slime");
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
         Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
         Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
-        Transform groundContact = EnsureBossGroundContactTransform(visualRoot);
+        Transform groundContact = EnsureRankGroundContact(enemy);
         EnemyController enemyController = enemy.GetComponent<EnemyController>();
         Transform target = ResolveActivePlayerTarget();
+        RigidbodySetupState originalBodyState = FreezeRigidbodyForBossGrounding(body);
 
         Vector3 positionBeforeSnap = enemy.transform.position;
         Vector3 finalScale = visualRoot != null ? visualRoot.localScale : enemy.transform.localScale;
         Vector3 visualRootLocalPosition = visualRoot != null ? visualRoot.localPosition : Vector3.zero;
 
         Physics.SyncTransforms();
+
+        LogBossGroundingDebug(
+            "BeforeGroundSnap",
+            enemy,
+            body,
+            visualRoot,
+            visualRenderer,
+            primaryCollider,
+            groundContact,
+            default,
+            0f,
+            0f,
+            correctionApplied: false);
 
         float colliderMinY = primaryCollider != null ? primaryCollider.bounds.min.y : float.PositiveInfinity;
         float rendererMinY = visualRenderer != null ? visualRenderer.bounds.min.y : float.PositiveInfinity;
@@ -2123,7 +2310,7 @@ public class EnemySpawner : MonoBehaviour
             Mathf.Max(enemy.transform.position.y, boundsTopY) + Mathf.Max(1f, enemyGroundSnapRayStartHeight),
             enemy.transform.position.z);
 
-        if (!TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), groundMask, out RaycastHit groundHit))
+        if (!TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), groundMask, out RaycastHit groundHit, requireMostlyUpNormal: true))
         {
             if (debugBossGroundSnap)
             {
@@ -2140,7 +2327,7 @@ public class EnemySpawner : MonoBehaviour
                     " visual root local position=" + visualRootLocalPosition +
                     " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
                     " ground contact world y=" + groundContactY.ToString("F3") +
-                    " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                    " physical ground skin=" + physicalGroundSkin.ToString("F3") +
                     " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
                     " rendererMinY raw=" + rendererMinY.ToString("F3") +
                     " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
@@ -2163,6 +2350,7 @@ public class EnemySpawner : MonoBehaviour
                     enemy);
             }
 
+            RestoreRigidbodyAfterBossGrounding(body, originalBodyState, enemy.transform.position);
             return;
         }
 
@@ -2182,6 +2370,22 @@ public class EnemySpawner : MonoBehaviour
 
         Physics.SyncTransforms();
 
+        LogBossGroundingDebug(
+            "ImmediatelyAfterSnap",
+            enemy,
+            body,
+            visualRoot,
+            visualRenderer,
+            primaryCollider,
+            groundContact,
+            groundHit,
+            correctionY,
+            0f,
+            correctionApplied: Mathf.Abs(correctionY) > Mathf.Max(0f, enemyGroundSnapTolerance));
+
+        RestoreRigidbodyAfterBossGrounding(body, originalBodyState, enemy.transform.position);
+        StartCoroutine(VerifyBossGroundingAfterSpawn(enemy, spawnSource));
+
         if (debugBossGroundSnap)
         {
             Debug.Log(
@@ -2197,7 +2401,7 @@ public class EnemySpawner : MonoBehaviour
                 " visual root local position=" + visualRootLocalPosition +
                 " ground contact object=" + (groundContact != null ? groundContact.name : "None") +
                 " ground contact world y=" + groundContactY.ToString("F3") +
-                " visible ground offset configuration=" + bossVisibleGroundContactLocalYOffset.ToString("F3") +
+                " physical ground skin=" + physicalGroundSkin.ToString("F3") +
                 " body renderer name=" + (visualRenderer != null ? visualRenderer.name : "None") +
                 " rendererMinY raw=" + rendererMinY.ToString("F3") +
                 " visual bottom y=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
@@ -2240,30 +2444,17 @@ public class EnemySpawner : MonoBehaviour
         }
 
         Rigidbody body = enemy.GetComponent<Rigidbody>();
-        MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
-        Transform visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : enemy.transform.Find("Visual_Slime");
-        Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot != null ? visualRoot : enemy.transform);
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
+        Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
         Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
+        Transform groundContact = EnsureRankGroundContact(enemy);
 
         Physics.SyncTransforms();
 
         float chosenBottomY;
         string chosenSource;
-        if (visualRenderer != null)
-        {
-            chosenBottomY = visualRenderer.bounds.min.y;
-            chosenSource = "RendererBottom";
-        }
-        else if (primaryCollider != null)
-        {
-            chosenBottomY = primaryCollider.bounds.min.y;
-            chosenSource = "ColliderBottom";
-        }
-        else
-        {
-            chosenBottomY = enemy.transform.position.y;
-            chosenSource = "Root";
-        }
+        chosenBottomY = groundContact != null ? groundContact.position.y : enemy.transform.position.y;
+        chosenSource = groundContact != null ? "GroundContact" : "Root";
 
         float boundsTopY = Mathf.Max(
             primaryCollider != null ? primaryCollider.bounds.max.y : enemy.transform.position.y,
@@ -2322,29 +2513,225 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
-    private Transform EnsureBossGroundContactTransform(Transform visualRoot)
+    private IEnumerator VerifyBossGroundingAfterSpawn(GameObject enemy, string spawnSource)
     {
+        yield return new WaitForFixedUpdate();
+
+        if (enemy == null || !enemy.activeInHierarchy)
+        {
+            yield break;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (identity == null || identity.rank != MonsterRank.Boss)
+        {
+            yield break;
+        }
+
+        CombatHealth health = enemy.GetComponent<CombatHealth>();
+        if (health != null && health.IsDead)
+        {
+            yield break;
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        if (body != null && body.linearVelocity.y > 0.25f)
+        {
+            LogBossGroundingDebug(
+                "AfterFirstFixedUpdate",
+                enemy,
+                body,
+                null,
+                null,
+                null,
+                null,
+                default,
+                0f,
+                0f,
+                correctionApplied: false,
+                extraReason: "skip-positive-y-velocity");
+            yield break;
+        }
+
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
+        Transform groundContact = EnsureRankGroundContact(enemy);
+        Renderer visualRenderer = ResolveBossVisualRenderer(visualRoot);
+        Collider primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
+
+        Physics.SyncTransforms();
+
+        float boundsTopY = Mathf.Max(
+            primaryCollider != null ? primaryCollider.bounds.max.y : enemy.transform.position.y,
+            enemy.transform.position.y);
+        Vector3 rayOrigin = new Vector3(
+            enemy.transform.position.x,
+            Mathf.Max(enemy.transform.position.y, boundsTopY) + Mathf.Max(1f, enemyGroundSnapRayStartHeight),
+            enemy.transform.position.z);
+
+        if (groundContact == null ||
+            !TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), enemyGroundSnapLayerMask, out RaycastHit groundHit, requireMostlyUpNormal: true))
+        {
+            LogBossGroundingDebug(
+                "AfterFirstFixedUpdate",
+                enemy,
+                body,
+                visualRoot,
+                visualRenderer,
+                primaryCollider,
+                groundContact,
+                default,
+                0f,
+                0f,
+                correctionApplied: false,
+                extraReason: "no-valid-ground");
+            yield break;
+        }
+
+        float groundingError = groundContact.position.y - groundHit.point.y;
+        bool correctionApplied = Mathf.Abs(groundingError) > Mathf.Max(0f, enemyGroundSnapTolerance);
+        if (correctionApplied)
+        {
+            Vector3 correctedPosition = enemy.transform.position - Vector3.up * groundingError;
+            enemy.transform.position = correctedPosition;
+            if (body != null)
+            {
+                body.position = correctedPosition;
+                body.linearVelocity = new Vector3(body.linearVelocity.x, 0f, body.linearVelocity.z);
+                body.angularVelocity = Vector3.zero;
+            }
+
+            Physics.SyncTransforms();
+            if (body != null)
+            {
+                body.WakeUp();
+            }
+        }
+
+        LogBossGroundingDebug(
+            "AfterFirstFixedUpdate",
+            enemy,
+            body,
+            visualRoot,
+            visualRenderer,
+            primaryCollider,
+            groundContact,
+            groundHit,
+            0f,
+            groundingError,
+            correctionApplied,
+            "source=" + spawnSource);
+    }
+
+    private static RigidbodySetupState FreezeRigidbodyForBossGrounding(Rigidbody body)
+    {
+        RigidbodySetupState state = default;
+        if (body == null)
+        {
+            return state;
+        }
+
+        state.hasBody = true;
+        state.useGravity = body.useGravity;
+        state.isKinematic = body.isKinematic;
+        state.constraints = body.constraints;
+
+        body.useGravity = false;
+        body.isKinematic = true;
+        body.linearVelocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+        body.Sleep();
+        return state;
+    }
+
+    private static void RestoreRigidbodyAfterBossGrounding(Rigidbody body, RigidbodySetupState state, Vector3 correctedPosition)
+    {
+        if (body == null || !state.hasBody)
+        {
+            return;
+        }
+
+        body.position = correctedPosition;
+        body.linearVelocity = Vector3.zero;
+        body.angularVelocity = Vector3.zero;
+        body.constraints = state.constraints;
+        body.isKinematic = state.isKinematic;
+        body.useGravity = state.useGravity;
+        body.WakeUp();
+    }
+
+    private void LogBossGroundingDebug(
+        string phase,
+        GameObject enemy,
+        Rigidbody body,
+        Transform visualRoot,
+        Renderer visualRenderer,
+        Collider primaryCollider,
+        Transform groundContact,
+        RaycastHit groundHit,
+        float deltaY,
+        float groundingError,
+        bool correctionApplied,
+        string extraReason = null)
+    {
+        if (!debugBossGroundSnap || enemy == null)
+        {
+            return;
+        }
+
         if (visualRoot == null)
         {
-            return null;
+            MonsterRankVisual rankVisual = enemy.GetComponent<MonsterRankVisual>();
+            visualRoot = rankVisual != null ? rankVisual.RuntimeVisualRoot : enemy.transform.Find("Visual_Slime");
         }
 
-        Transform groundContact = visualRoot.Find("GroundContact");
+        if (visualRenderer == null)
+        {
+            visualRenderer = ResolveBossVisualRenderer(visualRoot);
+        }
+
+        if (primaryCollider == null)
+        {
+            primaryCollider = ResolveBossPrimaryBodyCollider(enemy);
+        }
+
         if (groundContact == null)
         {
-            GameObject groundContactObject = new GameObject("GroundContact");
-            groundContact = groundContactObject.transform;
-            groundContact.SetParent(visualRoot, false);
+            groundContact = enemy.transform.Find("GroundContact");
         }
 
-        Vector3 localPosition = groundContact.localPosition;
-        localPosition.x = 0f;
-        localPosition.y = bossVisibleGroundContactLocalYOffset;
-        localPosition.z = 0f;
-        groundContact.localPosition = localPosition;
-        groundContact.localRotation = Quaternion.identity;
-        groundContact.localScale = Vector3.one;
-        return groundContact;
+        float physicalColliderBottomY = primaryCollider != null ? primaryCollider.bounds.min.y : float.NaN;
+        float visualGroundingError = groundHit.collider != null && groundContact != null
+            ? groundContact.position.y - groundHit.point.y
+            : 0f;
+        float physicalColliderPenetration = groundHit.collider != null && primaryCollider != null
+            ? groundHit.point.y - physicalColliderBottomY
+            : 0f;
+
+        Debug.Log(
+            "[BossGroundingDebug] " +
+            "phase=" + phase +
+            " version=" + GroundSnapVersion +
+            " rootY=" + enemy.transform.position.y.ToString("F3") +
+            " groundContactLocalY=" + (groundContact != null ? groundContact.localPosition.y.ToString("F3") : "n/a") +
+            " groundContactWorldY=" + (groundContact != null ? groundContact.position.y.ToString("F3") : "n/a") +
+            " rendererMinY=" + (visualRenderer != null ? visualRenderer.bounds.min.y.ToString("F3") : "n/a") +
+            " colliderMinY=" + (primaryCollider != null ? primaryCollider.bounds.min.y.ToString("F3") : "n/a") +
+            " rbPositionY=" + (body != null ? body.position.y.ToString("F3") : "n/a") +
+            " rbVelocityY=" + (body != null ? body.linearVelocity.y.ToString("F3") : "n/a") +
+            " isKinematic=" + (body != null && body.isKinematic) +
+            " useGravity=" + (body != null && body.useGravity) +
+            " groundHitY=" + (groundHit.collider != null ? groundHit.point.y.ToString("F3") : "n/a") +
+            " groundHitObject=" + (groundHit.collider != null ? BuildScenePath(groundHit.collider.transform) : "None") +
+            " groundHitLayer=" + (groundHit.collider != null ? LayerMask.LayerToName(groundHit.collider.gameObject.layer) : "None") +
+            " groundHitNormalY=" + (groundHit.collider != null ? groundHit.normal.y.ToString("F3") : "n/a") +
+            " deltaY=" + deltaY.ToString("F3") +
+            " groundingError=" + groundingError.ToString("F3") +
+            " visualGroundingError=" + visualGroundingError.ToString("F3") +
+            " physicalColliderBottomY=" + (primaryCollider != null ? physicalColliderBottomY.ToString("F3") : "n/a") +
+            " physicalColliderPenetration=" + physicalColliderPenetration.ToString("F3") +
+            " correctionApplied=" + correctionApplied +
+            (string.IsNullOrEmpty(extraReason) ? string.Empty : " reason=" + extraReason),
+            enemy);
     }
 
     private static string BuildScenePath(Transform target)
@@ -2375,7 +2762,7 @@ public class EnemySpawner : MonoBehaviour
             this);
     }
 
-    private static bool TryRaycastGroundBelow(GameObject enemy, Vector3 rayOrigin, float rayDistance, LayerMask groundMask, out RaycastHit selectedHit)
+    private static bool TryRaycastGroundBelow(GameObject enemy, Vector3 rayOrigin, float rayDistance, LayerMask groundMask, out RaycastHit selectedHit, bool requireMostlyUpNormal = false)
     {
         RaycastHit[] hits = Physics.RaycastAll(
             rayOrigin,
@@ -2401,6 +2788,11 @@ public class EnemySpawner : MonoBehaviour
             }
 
             if (enemy != null && (hitCollider.transform == enemy.transform || hitCollider.transform.IsChildOf(enemy.transform)))
+            {
+                continue;
+            }
+
+            if (hit.point.y > rayOrigin.y || (requireMostlyUpNormal && hit.normal.y < 0.35f))
             {
                 continue;
             }
@@ -3383,6 +3775,10 @@ public class EnemySpawner : MonoBehaviour
             name.Contains("particle") ||
             name.Contains("effect") ||
             name.Contains("aura") ||
+            name.Contains("radiancemark") ||
+            name.Contains("radiance") ||
+            name.Contains("hurtbox") ||
+            name.Contains("bossscaledhurtbox") ||
             name.Contains("warning") ||
             name.Contains("indicator"))
         {
@@ -3397,136 +3793,9 @@ public class EnemySpawner : MonoBehaviour
         return true;
     }
 
-    private Collider EnsureBossScaledHurtbox(GameObject enemy, Collider sourceCollider)
-    {
-        Transform hurtboxRoot = enemy.transform.Find("BossScaledHurtbox");
-        if (hurtboxRoot == null)
-        {
-            GameObject hurtboxObject = new GameObject("BossScaledHurtbox");
-            hurtboxRoot = hurtboxObject.transform;
-            hurtboxRoot.SetParent(enemy.transform, false);
-        }
-
-        hurtboxRoot.gameObject.SetActive(true);
-        hurtboxRoot.gameObject.layer = enemy.layer;
-        hurtboxRoot.gameObject.tag = enemy.tag;
-        hurtboxRoot.localPosition = Vector3.zero;
-        hurtboxRoot.localRotation = Quaternion.identity;
-        hurtboxRoot.localScale = Vector3.one;
-
-        Renderer visualRenderer = useBossVisualBoundsHurtbox
-            ? ResolveBossVisualRenderer(ResolveBossVisualTransform(enemy))
-            : null;
-        if (visualRenderer != null)
-        {
-            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
-            BoxCollider visualBoundsHurtbox = hurtboxRoot.GetComponent<BoxCollider>();
-            if (visualBoundsHurtbox == null)
-            {
-                visualBoundsHurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
-            }
-
-            ConfigureBossVisualBoundsHurtbox(enemy.transform, visualRenderer.bounds, visualBoundsHurtbox);
-            return visualBoundsHurtbox;
-        }
-
-        float radiusMultiplier = Mathf.Max(1f, bossHurtboxRadiusMultiplier) * Mathf.Max(0.1f, bossHurtboxSizeMultiplier);
-        Vector3 colliderCenterOffset = bossHurtboxCenterOffset + Vector3.up * bossHurtboxCenterYOffset;
-        Vector3 colliderPadding = AbsVector3(bossHurtboxExtraPadding);
-
-        if (sourceCollider is SphereCollider sourceSphere)
-        {
-            RemoveColliderComponentsExcept<SphereCollider>(hurtboxRoot);
-            SphereCollider hurtbox = hurtboxRoot.GetComponent<SphereCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<SphereCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.center = sourceSphere.center + colliderCenterOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceSphere.radius * radiusMultiplier + MaxComponent(colliderPadding) * 0.5f);
-            return hurtbox;
-        }
-
-        if (sourceCollider is CapsuleCollider sourceCapsule)
-        {
-            RemoveColliderComponentsExcept<CapsuleCollider>(hurtboxRoot);
-            CapsuleCollider hurtbox = hurtboxRoot.GetComponent<CapsuleCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<CapsuleCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.direction = sourceCapsule.direction;
-            hurtbox.center = sourceCapsule.center + colliderCenterOffset;
-            hurtbox.radius = Mathf.Max(0.05f, sourceCapsule.radius * radiusMultiplier + Mathf.Max(colliderPadding.x, colliderPadding.z) * 0.5f);
-            hurtbox.height = Mathf.Max(hurtbox.radius * 2f, sourceCapsule.height * radiusMultiplier + colliderPadding.y);
-            return hurtbox;
-        }
-
-        if (sourceCollider is BoxCollider sourceBox)
-        {
-            RemoveColliderComponentsExcept<BoxCollider>(hurtboxRoot);
-            BoxCollider hurtbox = hurtboxRoot.GetComponent<BoxCollider>();
-            if (hurtbox == null)
-            {
-                hurtbox = hurtboxRoot.gameObject.AddComponent<BoxCollider>();
-            }
-
-            hurtbox.isTrigger = true;
-            hurtbox.center = sourceBox.center + colliderCenterOffset;
-            hurtbox.size = sourceBox.size * radiusMultiplier + colliderPadding;
-            return hurtbox;
-        }
-
-        return null;
-    }
-
-    private void ConfigureBossVisualBoundsHurtbox(Transform enemyRoot, Bounds visualBounds, BoxCollider hurtbox)
-    {
-        if (enemyRoot == null || hurtbox == null)
-        {
-            return;
-        }
-
-        Vector3 worldMin = visualBounds.min;
-        Vector3 worldMax = visualBounds.max;
-        Vector3 localMin = enemyRoot.InverseTransformPoint(worldMin);
-        Vector3 localMax = enemyRoot.InverseTransformPoint(worldMax);
-        Vector3 localCenter = (localMin + localMax) * 0.5f;
-        Vector3 localSize = new Vector3(
-            Mathf.Abs(localMax.x - localMin.x),
-            Mathf.Abs(localMax.y - localMin.y),
-            Mathf.Abs(localMax.z - localMin.z));
-
-        float minDepth = Mathf.Max(bossHurtboxMinimumDepth, Mathf.Max(localSize.x, localSize.y) * 0.35f);
-        if (localSize.z < minDepth)
-        {
-            localSize.z = minDepth;
-        }
-
-        float sizeMultiplier = Mathf.Max(0.1f, bossHurtboxSizeMultiplier);
-        Vector3 legacyPadding = localSize * Mathf.Max(0f, bossHurtboxRadiusMultiplier - 1f) * 0.05f;
-        Vector3 customPadding = AbsVector3(bossHurtboxExtraPadding);
-        localCenter += bossHurtboxCenterOffset + Vector3.up * bossHurtboxCenterYOffset;
-        hurtbox.isTrigger = true;
-        hurtbox.center = localCenter;
-        hurtbox.size = new Vector3(
-            Mathf.Max(0.1f, localSize.x * sizeMultiplier + legacyPadding.x + customPadding.x),
-            Mathf.Max(0.1f, localSize.y * sizeMultiplier + legacyPadding.y + customPadding.y),
-            Mathf.Max(0.1f, localSize.z * sizeMultiplier + legacyPadding.z + customPadding.z));
-    }
-
     private static Vector3 AbsVector3(Vector3 value)
     {
         return new Vector3(Mathf.Abs(value.x), Mathf.Abs(value.y), Mathf.Abs(value.z));
-    }
-
-    private static float MaxComponent(Vector3 value)
-    {
-        return Mathf.Max(value.x, Mathf.Max(value.y, value.z));
     }
 
     private static void RemoveColliderComponentsExcept<T>(Transform root) where T : Collider
@@ -3621,81 +3890,50 @@ public class EnemySpawner : MonoBehaviour
 
     public float GetConfiguredVisualScaleMultiplier(MonsterRank rank)
     {
-        return rank switch
-        {
-            MonsterRank.Boss => enableBossVisualScale ? bossVisualScaleMultiplier : 1f,
-            MonsterRank.Elite => enableEliteVisualScale ? eliteVisualScaleMultiplier : 1f,
-            _ => 1f
-        };
+        MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
+        Vector3 scale = geometry != null ? geometry.visualScale : Vector3.one;
+        return Mathf.Max(Mathf.Abs(scale.x), Mathf.Max(Mathf.Abs(scale.y), Mathf.Abs(scale.z)));
     }
 
     public float GetConfiguredVisualGroundOffsetY(MonsterRank rank)
     {
-        return rank switch
-        {
-            MonsterRank.Boss => enableBossVisualGroundOffset ? bossVisualGroundOffsetY : 0f,
-            MonsterRank.Elite => enableEliteVisualGroundOffset ? eliteVisualGroundOffsetY : 0f,
-            _ => enableNormalVisualGroundOffset ? normalVisualGroundOffsetY : 0f
-        };
+        MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
+        return geometry != null ? geometry.visualLocalPosition.y : 0f;
     }
 
     public float GetConfiguredHealthBarOffsetY(MonsterRank rank)
     {
-        return rank switch
-        {
-            MonsterRank.Boss => bossHealthBarOffsetY,
-            MonsterRank.Elite => eliteHealthBarOffsetY,
-            _ => normalHealthBarOffsetY
-        };
-    }
-
-    public float GetConfiguredBossHurtboxRadiusMultiplier()
-    {
-        return Mathf.Max(1f, bossHurtboxRadiusMultiplier);
-    }
-
-    public float GetConfiguredBossHurtboxCenterYOffset()
-    {
-        return bossHurtboxCenterYOffset;
-    }
-
-    public bool GetConfiguredUseBossVisualBoundsHurtbox()
-    {
-        return useBossVisualBoundsHurtbox;
-    }
-
-    public float GetConfiguredBossHurtboxSizeMultiplier()
-    {
-        return Mathf.Max(0.1f, bossHurtboxSizeMultiplier);
-    }
-
-    public Vector3 GetConfiguredBossHurtboxExtraPadding()
-    {
-        return bossHurtboxExtraPadding;
-    }
-
-    public Vector3 GetConfiguredBossHurtboxCenterOffset()
-    {
-        return bossHurtboxCenterOffset;
-    }
-
-    public float GetConfiguredBossHurtboxMinimumDepth()
-    {
-        return Mathf.Max(0.01f, bossHurtboxMinimumDepth);
+        MonsterRankGeometrySettings geometry = ResolveRankGeometry(rank);
+        return geometry != null ? geometry.healthBarOffsetY : 0f;
     }
 
     public int GetConfiguredBossHurtboxConfigHash()
     {
         int hash = 17;
-        AddBoolToHash(ref hash, enableBossHurtboxScale);
-        AddBoolToHash(ref hash, useBossVisualBoundsHurtbox);
-        AddFloatToHash(ref hash, bossHurtboxRadiusMultiplier);
-        AddFloatToHash(ref hash, bossHurtboxCenterYOffset);
-        AddFloatToHash(ref hash, bossHurtboxSizeMultiplier);
-        AddVector3ToHash(ref hash, bossHurtboxExtraPadding);
-        AddVector3ToHash(ref hash, bossHurtboxCenterOffset);
-        AddFloatToHash(ref hash, bossHurtboxMinimumDepth);
+        AddRankGeometryToHash(ref hash, normalGeometry);
+        AddRankGeometryToHash(ref hash, eliteGeometry);
+        AddRankGeometryToHash(ref hash, bossGeometry);
+        AddFloatToHash(ref hash, physicalGroundSkin);
         return hash;
+    }
+
+    private static void AddRankGeometryToHash(ref int hash, MonsterRankGeometrySettings geometry)
+    {
+        if (geometry == null)
+        {
+            AddBoolToHash(ref hash, false);
+            return;
+        }
+
+        AddBoolToHash(ref hash, true);
+        AddVector3ToHash(ref hash, geometry.visualScale);
+        AddVector3ToHash(ref hash, geometry.visualLocalPosition);
+        AddVector3ToHash(ref hash, geometry.groundContactLocalPosition);
+        AddVector3ToHash(ref hash, geometry.physicalColliderCenter);
+        AddFloatToHash(ref hash, geometry.physicalColliderRadius);
+        AddVector3ToHash(ref hash, geometry.hurtboxCenter);
+        AddVector3ToHash(ref hash, geometry.hurtboxSize);
+        AddFloatToHash(ref hash, geometry.healthBarOffsetY);
     }
 
     private static void AddBoolToHash(ref int hash, bool value)

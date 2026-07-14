@@ -82,9 +82,10 @@ public static class SetupSelectedEnemyPrefabIdentityAndVisual
                 changed = true;
             }
 
+            Transform visualSlime = prefabRoot.transform.Find("Visual_Slime");
             if (rankVisual.visualRoot == null)
             {
-                rankVisual.visualRoot = prefabRoot.transform;
+                rankVisual.visualRoot = visualSlime != null ? visualSlime : prefabRoot.transform;
                 changed = true;
             }
 
@@ -96,11 +97,11 @@ public static class SetupSelectedEnemyPrefabIdentityAndVisual
 
             if (createdRankVisual)
             {
-                rankVisual.normalScale = 1f;
-                rankVisual.eliteScale = 1.45f;
-                rankVisual.bossScale = 2.4f;
-                rankVisual.applyScale = true;
                 rankVisual.createFallbackLight = true;
+                Debug.Log(
+                    "[EnemyPrefabSetup] MonsterRankVisual rank scale configuration is deprecated. " +
+                    "Rank geometry is configured on EnemySpawner.",
+                    prefabRoot);
                 changed = true;
             }
 
