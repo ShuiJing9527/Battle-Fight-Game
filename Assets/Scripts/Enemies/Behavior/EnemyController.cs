@@ -266,7 +266,7 @@ public class EnemyController : MonoBehaviour
         toPlayer.y = 0f;
         float centerDistance = Vector3.Distance(playerTarget.position, transform.position);
         float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
-        float verticalDifference = Mathf.Abs(playerTarget.position.y - transform.position.y);
+        float verticalDifference = ResolveVerticalCombatDifference(playerTarget, out float verticalCenterDifference);
         float horizontalEdgeDistance = ResolveHorizontalEdgeDistance(playerTarget, out Vector3 enemyClosestPoint, out Vector3 playerClosestPoint);
         float attackDistance = ResolveAttackDistance(horizontalCenterDistance, horizontalEdgeDistance);
         float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
@@ -278,6 +278,13 @@ public class EnemyController : MonoBehaviour
         bool insideStopDistance = horizontalEdgeDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon;
         CombatHealth health = GetComponent<CombatHealth>();
         bool isDead = health != null && health.IsDead;
+        bool cooldownReady = Time.time >= nextAttackTime;
+        bool canMove = rb != null && !attackInProgress;
+        string currentState = playerTarget == null
+            ? EnemyAttackRuntimeState.NoTarget.ToString()
+            : (attackInProgress
+                ? EnemyAttackRuntimeState.AttackInProgress.ToString()
+                : (canAttack ? EnemyAttackRuntimeState.AttackReady.ToString() : EnemyAttackRuntimeState.Chase.ToString()));
 
         if (attackStyle == MonsterAttackStyle.ElementalBoss)
         {
@@ -294,9 +301,37 @@ public class EnemyController : MonoBehaviour
             grounded,
             canAttack,
             attackFailReason);
+        LogEliteAttackDiag(
+            horizontalCenterDistance,
+            horizontalEdgeDistance,
+            verticalDifference,
+            verticalCenterDifference,
+            grounded,
+            canMove,
+            canAttack,
+            cooldownReady,
+            currentState,
+            attackFailReason,
+            false,
+            attackInProgress,
+            false);
         // Enter attack flow as soon as the target is in range so chase does not keep pushing the player.
         if (canAttack)
         {
+            LogEliteAttackDiag(
+                horizontalCenterDistance,
+                horizontalEdgeDistance,
+                verticalDifference,
+                verticalCenterDifference,
+                grounded,
+                canMove,
+                canAttack,
+                cooldownReady,
+                currentState,
+                attackFailReason,
+                true,
+                false,
+                false);
             LogEnemyMeleeDecision(attackDistance, true, "None", grounded, "Melee", playerTarget != null ? playerTarget.name : "null", Mathf.Max(0f, nextAttackTime - Time.time), isAttackAnimationActive, false, isDead);
             LogChaseDiagnostics(attackDistance, false, true, false, false, false, "Attack", 0f, playerTarget != null ? playerTarget.name : "null", "InAttackRange");
             LogAttackStateChange(
@@ -475,6 +510,11 @@ public class EnemyController : MonoBehaviour
         this.attackStyle = attackStyle;
         this.attackIntervalMultiplier = Mathf.Max(0.1f, attackIntervalMultiplier);
         this.outgoingDamageMultiplier = Mathf.Max(0.01f, outgoingDamageMultiplier);
+
+        // EnemySpawner rewrites rank combat windows at runtime. Keep the horizontal
+        // attack gate aligned with the final runtime hit window so template-based
+        // Elite/Boss enemies do not keep using stale prefab thresholds.
+        maxHorizontalAttackDistance = Mathf.Max(0.1f, this.attackHitRange);
     }
 
     private void InitializeBossSkillTimers()
@@ -1768,6 +1808,12 @@ public class EnemyController : MonoBehaviour
                 this);
         }
 
+        LogEliteAttackDiagFromCurrentState(
+            failReasonOverride: "None",
+            tryStartMeleeCalled: true,
+            attackRoutineStarted: true,
+            damageApplied: false);
+
         LogSlimeAttackLifecycle("BeginAttack", pendingAttackTarget, "Triggered");
         LogAttackStateChange(
             EnemyAttackRuntimeState.AttackInProgress,
@@ -1835,6 +1881,11 @@ public class EnemyController : MonoBehaviour
         Transform hitTarget = target != null ? target : pendingAttackTarget;
         attackHitFrameTriggeredThisAttack = true;
         LogSlimeAttackLifecycle("AttackHitCallback", hitTarget, hitTarget != null ? "CallbackReceived" : "NoTarget");
+        LogEliteAttackDiagFromCurrentState(
+            failReasonOverride: "None",
+            tryStartMeleeCalled: true,
+            attackRoutineStarted: true,
+            damageApplied: false);
         if (hitTarget == null)
         {
             if (debugAttackDiagnostics)
@@ -1971,6 +2022,11 @@ public class EnemyController : MonoBehaviour
                 float playerShieldAfter = combatHealth.GetShield();
                 string damageResult = ResolveEnemyMeleeDamageResult(playerHpBefore, playerHpAfter, playerShieldBefore, playerShieldAfter);
                 lastMeleeAttackResult = damageResult;
+                LogEliteAttackDiagFromCurrentState(
+                    failReasonOverride: damageResult,
+                    tryStartMeleeCalled: true,
+                    attackRoutineStarted: true,
+                    damageApplied: damageResult == "applied" || damageResult == "shielded");
                 Debug.Log(
                     "[EnemyMeleeDamageFlow] " +
                     "enemy=" + name +
@@ -2483,6 +2539,23 @@ public class EnemyController : MonoBehaviour
         return UsesProjectileAttack() ? horizontalCenterDistance : horizontalEdgeDistance;
     }
 
+    private float ResolveVerticalCombatDifference(Transform hitTarget, out float verticalCenterDifference)
+    {
+        if (hitTarget == null)
+        {
+            verticalCenterDifference = 0f;
+            return 0f;
+        }
+
+        Vector3 enemyBodyCenter = ResolveEnemyBodyCenter();
+        Vector3 playerBodyCenter = ResolvePlayerBodyCenter(hitTarget);
+        verticalCenterDifference = Mathf.Abs(playerBodyCenter.y - enemyBodyCenter.y);
+
+        Vector3 enemyClosest = ResolveEnemyClosestPoint(playerBodyCenter);
+        Vector3 playerClosest = ResolvePlayerClosestPoint(hitTarget, enemyClosest);
+        return Mathf.Abs(playerClosest.y - enemyClosest.y);
+    }
+
     private float ResolveCurrentMeleeHitRadius()
     {
         MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
@@ -2558,6 +2631,116 @@ public class EnemyController : MonoBehaviour
             " isStunned=" + isStunned +
             " isDead=" + isDead,
             this);
+    }
+
+    private void LogEliteAttackDiag(
+        float horizontalCenterDistance,
+        float horizontalEdgeDistance,
+        float verticalDistance,
+        float verticalCenterDistance,
+        bool isGrounded,
+        bool canMove,
+        bool canAttack,
+        bool cooldownReady,
+        string currentState,
+        string failReason,
+        bool tryStartMeleeCalled,
+        bool attackRoutineStarted,
+        bool damageApplied)
+    {
+        if (monsterIdentity == null || monsterIdentity.rank != MonsterRank.Elite)
+        {
+            return;
+        }
+
+        if (!(debugAttackDiagnostics || debugMeleeHitCheck || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextEnemyMeleeDecisionLogTime)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[EliteAttackDiag] " +
+            "enemy=" + name +
+            " target exists=" + (playerTarget != null) +
+            " rank=" + monsterIdentity.rank +
+            " horizontalCenterDistance=" + horizontalCenterDistance.ToString("F2") +
+            " horizontalEdgeDistance=" + horizontalEdgeDistance.ToString("F2") +
+            " verticalDistance=" + verticalDistance.ToString("F2") +
+            " verticalCenterDistance=" + verticalCenterDistance.ToString("F2") +
+            " attackRange=" + attackRange.ToString("F2") +
+            " attackHitRange=" + attackHitRange.ToString("F2") +
+            " maxHorizontalAttackDistance=" + maxHorizontalAttackDistance.ToString("F2") +
+            " maxVerticalAttackDifference=" + maxVerticalAttackDifference.ToString("F2") +
+            " isGrounded=" + isGrounded +
+            " canMove=" + canMove +
+            " canAttack=" + canAttack +
+            " cooldownReady=" + cooldownReady +
+            " currentState=" + currentState +
+            " failReason=" + (string.IsNullOrEmpty(failReason) ? "None" : failReason) +
+            " tryStartMeleeCalled=" + tryStartMeleeCalled +
+            " attackRoutineStarted=" + attackRoutineStarted +
+            " damageApplied=" + damageApplied,
+            this);
+    }
+
+    private void LogEliteAttackDiagFromCurrentState(
+        string failReasonOverride,
+        bool tryStartMeleeCalled,
+        bool attackRoutineStarted,
+        bool damageApplied)
+    {
+        if (monsterIdentity == null || monsterIdentity.rank != MonsterRank.Elite)
+        {
+            return;
+        }
+
+        Transform target = playerTarget;
+        float horizontalCenterDistance = -1f;
+        float horizontalEdgeDistance = -1f;
+        float verticalDistance = 0f;
+        float verticalCenterDistance = 0f;
+
+        if (target != null)
+        {
+            Vector3 toPlayer = target.position - transform.position;
+            toPlayer.y = 0f;
+            horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
+            horizontalEdgeDistance = ResolveHorizontalEdgeDistance(target, out _, out _);
+            verticalDistance = ResolveVerticalCombatDifference(target, out verticalCenterDistance);
+        }
+
+        bool grounded = IsGroundedForAttack();
+        string failReason = !string.IsNullOrEmpty(failReasonOverride)
+            ? failReasonOverride
+            : EvaluateAttackFailReason(horizontalEdgeDistance, verticalDistance, grounded);
+        bool canAttack = string.IsNullOrEmpty(failReason);
+        bool cooldownReady = Time.time >= nextAttackTime;
+        bool canMove = rb != null && !attackInProgress;
+        string currentState = target == null
+            ? EnemyAttackRuntimeState.NoTarget.ToString()
+            : (attackInProgress
+                ? EnemyAttackRuntimeState.AttackInProgress.ToString()
+                : (canAttack ? EnemyAttackRuntimeState.AttackReady.ToString() : EnemyAttackRuntimeState.Chase.ToString()));
+
+        LogEliteAttackDiag(
+            horizontalCenterDistance,
+            horizontalEdgeDistance,
+            verticalDistance,
+            verticalCenterDistance,
+            grounded,
+            canMove,
+            canAttack,
+            cooldownReady,
+            currentState,
+            failReason,
+            tryStartMeleeCalled,
+            attackRoutineStarted,
+            damageApplied);
     }
 
     private Collider ResolvePlayerCollider(Transform hitTarget)

@@ -942,10 +942,7 @@ public class EnemySpawner : MonoBehaviour
             }
             ResolveDifficultyDirector()?.ApplyDifficultyToEnemy(spawnedEnemy);
             ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
-            if (!ShouldPreserveNormalPrefabGeometry(spawnedEnemy, childRank))
-            {
-                SnapSplitChildToGround(spawnedEnemy, splitSource);
-            }
+            SnapSplitChildToGround(spawnedEnemy, splitSource);
             LogNormalPrefabGeometry(spawnedEnemy, "EliteSplit", "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
             StartCoroutine(LogNormalPrefabGeometryAfterFirstFrame(spawnedEnemy, "EliteSplit"));
             RegisterSpawnedEnemy(spawnedEnemy);
@@ -2640,7 +2637,7 @@ public class EnemySpawner : MonoBehaviour
         MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
         if (identity != null && ShouldPreserveNormalPrefabGeometry(enemy, identity.rank))
         {
-            LogNormalPrefabGeometry(enemy, spawnSource, "SnapSplitChildToGroundSkipped", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
+            PlaceSplitChildRootOnGround(enemy, spawnSource);
             return;
         }
 
@@ -2718,6 +2715,127 @@ public class EnemySpawner : MonoBehaviour
                 " finalPosition=" + enemy.transform.position,
                 enemy);
         }
+    }
+
+    private void PlaceSplitChildRootOnGround(GameObject enemy, string spawnSource)
+    {
+        if (enemy == null)
+        {
+            return;
+        }
+
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        Collider mainCollider = ResolveBossPrimaryBodyCollider(enemy);
+        if (mainCollider == null)
+        {
+            if (debugMonsterSpawnState)
+            {
+                Debug.LogWarning(
+                    "[SplitNormalPhysicsDiag] " +
+                    "child name=" + enemy.name +
+                    " spawn world position=" + enemy.transform.position +
+                    " result=no-physical-collider",
+                    enemy);
+            }
+            return;
+        }
+
+        Physics.SyncTransforms();
+
+        float boundsTopY = Mathf.Max(enemy.transform.position.y, mainCollider.bounds.max.y);
+        Vector3 rayOrigin = new Vector3(
+            enemy.transform.position.x,
+            boundsTopY + Mathf.Max(1f, enemyGroundSnapRayStartHeight),
+            enemy.transform.position.z);
+
+        if (!TryRaycastGroundBelow(enemy, rayOrigin, Mathf.Max(1f, enemyGroundSnapRayDistance + enemyGroundSnapRayStartHeight), enemyGroundSnapLayerMask, out RaycastHit groundHit, requireMostlyUpNormal: true))
+        {
+            if (debugMonsterSpawnState)
+            {
+                Debug.LogWarning(
+                    "[SplitNormalPhysicsDiag] " +
+                    "child name=" + enemy.name +
+                    " spawn world position=" + enemy.transform.position +
+                    " root position before=" + enemy.transform.position +
+                    " ground hit object=None" +
+                    " ground hit layer=None" +
+                    " result=no-ground-hit",
+                    enemy);
+            }
+            return;
+        }
+
+        Vector3 rootBefore = enemy.transform.position;
+        float colliderBottomY = mainCollider.bounds.min.y;
+        float correctionY = groundHit.point.y - colliderBottomY;
+        Vector3 rootAfter = rootBefore + Vector3.up * correctionY;
+
+        enemy.transform.position = rootAfter;
+        if (body != null)
+        {
+            body.position = rootAfter;
+            Vector3 velocity = body.linearVelocity;
+            velocity.y = 0f;
+            body.linearVelocity = velocity;
+        }
+
+        Physics.SyncTransforms();
+
+        if (debugMonsterSpawnState)
+        {
+            Debug.Log(
+                "[SplitNormalPhysicsDiag] " +
+                "child name=" + enemy.name +
+                " spawn world position=" + rootBefore +
+                " ground hit object=" + groundHit.collider.name +
+                " ground hit layer=" + LayerMask.LayerToName(groundHit.collider.gameObject.layer) +
+                " ground hit y=" + groundHit.point.y.ToString("F3") +
+                " root position before=" + rootBefore +
+                " root position after=" + rootAfter +
+                " main collider name=" + mainCollider.name +
+                " collider enabled=" + mainCollider.enabled +
+                " collider isTrigger=" + mainCollider.isTrigger +
+                " collider bounds min y=" + mainCollider.bounds.min.y.ToString("F3") +
+                " rigidbody useGravity=" + (body != null && body.useGravity) +
+                " rigidbody isKinematic=" + (body != null && body.isKinematic) +
+                " rigidbody collisionDetectionMode=" + (body != null ? body.collisionDetectionMode.ToString() : "None") +
+                " rigidbody velocity=" + (body != null ? body.linearVelocity.ToString() : "None") +
+                " ground collision layers=" + enemyGroundSnapLayerMask.value,
+                enemy);
+
+            StartCoroutine(LogSplitChildGroundStateNextFrame(enemy, spawnSource));
+        }
+    }
+
+    private IEnumerator LogSplitChildGroundStateNextFrame(GameObject enemy, string spawnSource)
+    {
+        yield return new WaitForFixedUpdate();
+
+        if (enemy == null || !enemy.activeInHierarchy)
+        {
+            yield break;
+        }
+
+        Collider mainCollider = ResolveBossPrimaryBodyCollider(enemy);
+        Rigidbody body = enemy.GetComponent<Rigidbody>();
+        bool isGrounded = false;
+
+        if (mainCollider != null)
+        {
+            Vector3 origin = mainCollider.bounds.center + Vector3.up * 0.05f;
+            float radius = Mathf.Clamp(Mathf.Min(mainCollider.bounds.extents.x, mainCollider.bounds.extents.z) * 0.45f, 0.05f, 0.45f);
+            float castDistance = Mathf.Max(enemyGroundSnapTolerance + mainCollider.bounds.extents.y + 0.15f, 0.2f);
+            isGrounded = Physics.SphereCast(origin, radius, Vector3.down, out _, castDistance, enemyGroundSnapLayerMask, QueryTriggerInteraction.Ignore);
+        }
+
+        Debug.Log(
+            "[SplitNormalPhysicsDiag] " +
+            "child name=" + enemy.name +
+            " source=" + spawnSource +
+            " root position after one frame=" + enemy.transform.position +
+            " rigidbody velocity after one frame=" + (body != null ? body.linearVelocity.ToString() : "None") +
+            " isGrounded after one frame=" + isGrounded,
+            enemy);
     }
 
     private IEnumerator VerifyBossGroundingAfterSpawn(GameObject enemy, string spawnSource)
