@@ -48,6 +48,7 @@ public static class SkillHUDPrefabBuilder
         RectTransform rootRect = root.GetComponent<RectTransform>();
         rootRect.sizeDelta = new Vector2(80f, 80f);
         rootRect.localScale = Vector3.one;
+        root.AddComponent<SkillHoverTrigger>();
 
         GameObject background = CreateUiChild(root.transform, "Background");
         RectTransform backgroundRect = background.GetComponent<RectTransform>();
@@ -67,7 +68,7 @@ public static class SkillHUDPrefabBuilder
 
         GameObject cooldown = CreateUiChild(root.transform, "CooldownOverlay");
         RectTransform cooldownRect = cooldown.GetComponent<RectTransform>();
-        Stretch(cooldownRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Stretch(cooldownRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
         Image cooldownImage = cooldown.AddComponent<Image>();
         cooldownImage.color = new Color(0f, 0f, 0f, 0f);
         cooldownImage.sprite = ResolveCircleSprite();
@@ -77,6 +78,29 @@ public static class SkillHUDPrefabBuilder
         cooldownImage.fillClockwise = false;
         cooldownImage.fillAmount = 0f;
         cooldownImage.raycastTarget = false;
+
+        GameObject cooldownTextObject = CreateUiChild(root.transform, "CooldownText");
+        RectTransform cooldownTextRect = cooldownTextObject.GetComponent<RectTransform>();
+        Stretch(cooldownTextRect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+        Text cooldownText = cooldownTextObject.AddComponent<Text>();
+        cooldownText.text = string.Empty;
+        cooldownText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+        cooldownText.fontSize = 36;
+        cooldownText.fontStyle = FontStyle.Bold;
+        cooldownText.alignment = TextAnchor.MiddleCenter;
+        cooldownText.color = Color.white;
+        cooldownText.raycastTarget = false;
+
+        GameObject hoverHighlight = CreateUiChild(root.transform, "HoverHighlight");
+        RectTransform hoverHighlightRect = hoverHighlight.GetComponent<RectTransform>();
+        Stretch(hoverHighlightRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+        hoverHighlightRect.localScale = Vector3.one * 1.18f;
+        Image hoverHighlightImage = hoverHighlight.AddComponent<Image>();
+        hoverHighlightImage.sprite = ResolveCircleSprite();
+        hoverHighlightImage.color = new Color(1f, 0.9f, 0.35f, 0.5f);
+        hoverHighlightImage.raycastTarget = false;
+        hoverHighlightImage.enabled = false;
+        hoverHighlight.SetActive(false);
 
         GameObject keyLabel = CreateUiChild(root.transform, "KeyLabel");
         RectTransform keyLabelRect = keyLabel.GetComponent<RectTransform>();
@@ -126,6 +150,7 @@ public static class SkillHUDPrefabBuilder
             slotRect.pivot = new Vector2(1f, 0f);
             slotRect.anchoredPosition = new Vector2(-((80f + 16f) * (3 - i)), 0f);
             slotRect.sizeDelta = new Vector2(80f, 80f);
+            slot.AddComponent<SkillHoverTrigger>();
 
             Image background = CreateUiChild(slot.transform, "Background").AddComponent<Image>();
             background.color = new Color(0.08f, 0.1f, 0.14f, 0.92f);
@@ -146,6 +171,16 @@ public static class SkillHUDPrefabBuilder
             overlay.fillClockwise = false;
             overlay.fillAmount = 0f;
 
+            GameObject cooldownTextObject = CreateUiChild(slot.transform, "CooldownText");
+            Text cooldownText = cooldownTextObject.AddComponent<Text>();
+            cooldownText.text = string.Empty;
+            cooldownText.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
+            cooldownText.fontSize = 36;
+            cooldownText.fontStyle = FontStyle.Bold;
+            cooldownText.color = Color.white;
+            cooldownText.alignment = TextAnchor.MiddleCenter;
+            cooldownText.raycastTarget = false;
+
             GameObject labelObject = CreateUiChild(slot.transform, "KeyLabel");
             Text text = labelObject.AddComponent<Text>();
             text.text = key;
@@ -155,9 +190,21 @@ public static class SkillHUDPrefabBuilder
             text.alignment = TextAnchor.UpperLeft;
             text.raycastTarget = false;
 
+            GameObject hoverHighlightObject = CreateUiChild(slot.transform, "HoverHighlight");
+            Image hoverHighlight = hoverHighlightObject.AddComponent<Image>();
+            hoverHighlight.sprite = ResolveCircleSprite();
+            hoverHighlight.color = new Color(1f, 0.9f, 0.35f, 0.5f);
+            hoverHighlight.raycastTarget = false;
+            hoverHighlight.enabled = false;
+            hoverHighlightObject.SetActive(false);
+
             Stretch(slot.transform.Find("Background").GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Stretch(slot.transform.Find("Icon").GetComponent<RectTransform>(), new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
-            Stretch(slot.transform.Find("CooldownOverlay").GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            Stretch(slot.transform.Find("CooldownOverlay").GetComponent<RectTransform>(), new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+            Stretch(slot.transform.Find("CooldownText").GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
+            RectTransform hoverRect = slot.transform.Find("HoverHighlight").GetComponent<RectTransform>();
+            Stretch(hoverRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+            hoverRect.localScale = Vector3.one * 1.18f;
 
             RectTransform labelRect = labelObject.GetComponent<RectTransform>();
             labelRect.anchorMin = new Vector2(0f, 1f);

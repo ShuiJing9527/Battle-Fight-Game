@@ -68,12 +68,22 @@ public class RuneUIController : MonoBehaviour
     private const string LogMissingRuneList = "[RuneUI] Missing runeListContent reference.";
     private const string LogMissingCombatSkillCaster = "[RuneUI] Missing CombatSkillCaster.";
     private const string LogMissingSlotRefs = "[RuneUI] Manual skill slot references are missing. Please assign qSlots / wSlots / eSlots / rSlots in the Inspector.";
+    private const string LogMissingSkillIconRefs = "[RuneUI] Missing external skill icon references on rune panel. Please assign qSkillIcon / wSkillIcon / eSkillIcon / rSkillIcon in the Inspector.";
 
     [System.Serializable]
     public class RuneSlotView
     {
         public Button button;
         public TextMeshProUGUI label;
+    }
+
+    [System.Serializable]
+    public class RuneSkillIconView
+    {
+        public RectTransform root;
+        public Image icon;
+        public Image hoverHighlight;
+        public SkillHoverTrigger hoverTrigger;
     }
 
     [Header("Root")]
@@ -108,6 +118,12 @@ public class RuneUIController : MonoBehaviour
     public RuneSlotView[] eSlots = new RuneSlotView[SlotsPerSkill];
     public RuneSlotView[] rSlots = new RuneSlotView[SlotsPerSkill];
 
+    [Header("Skill Icons")]
+    [SerializeField] private RuneSkillIconView qSkillIcon = new RuneSkillIconView();
+    [SerializeField] private RuneSkillIconView wSkillIcon = new RuneSkillIconView();
+    [SerializeField] private RuneSkillIconView eSkillIcon = new RuneSkillIconView();
+    [SerializeField] private RuneSkillIconView rSkillIcon = new RuneSkillIconView();
+
     private RuneDefinition selectedRune;
     private RuneInventory currentRuneInventory;
     private RuneLibrary currentRuneLibrary;
@@ -127,6 +143,7 @@ public class RuneUIController : MonoBehaviour
     private bool warnedMissingRuneLibrary;
     private bool warnedMissingSelectedRune;
     private bool warnedAlreadyEquippedRune;
+    private bool warnedMissingSkillIconRefs;
     private readonly Dictionary<string, Image> skillRowIcons = new Dictionary<string, Image>();
     private readonly Dictionary<string, Image> skillRowHighlights = new Dictionary<string, Image>();
     private readonly Dictionary<string, SkillHoverTrigger> skillRowHoverTriggers = new Dictionary<string, SkillHoverTrigger>();
@@ -1448,6 +1465,17 @@ public class RuneUIController : MonoBehaviour
         Debug.LogWarning(LogMissingSlotRefs, this);
     }
 
+    private void WarnMissingSkillIconRefsOnce()
+    {
+        if (warnedMissingSkillIconRefs)
+        {
+            return;
+        }
+
+        warnedMissingSkillIconRefs = true;
+        Debug.LogWarning(LogMissingSkillIconRefs, this);
+    }
+
     private void EnsureSkillInfoUI()
     {
         if (mainPanel == null)
@@ -1456,10 +1484,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         EnsureSkillDescriptionPanel();
-        EnsureSkillRowIcon("Q");
-        EnsureSkillRowIcon("W");
-        EnsureSkillRowIcon("E");
-        EnsureSkillRowIcon("R");
+        CacheSkillRowIconViews();
         if (applyDescriptionLayoutAtRuntime)
         {
             ApplyRuneSkillPanelTitleLayout();
@@ -1479,6 +1504,95 @@ public class RuneUIController : MonoBehaviour
         RefreshSkillRowIcon("W", playerIndex, skillHud);
         RefreshSkillRowIcon("E", playerIndex, skillHud);
         RefreshSkillRowIcon("R", playerIndex, skillHud);
+    }
+
+    private void CacheSkillRowIconViews()
+    {
+        skillRowIcons.Clear();
+        skillRowHighlights.Clear();
+        skillRowHoverTriggers.Clear();
+
+        AutoBindSkillIconView(qSkillIcon, "Q");
+        AutoBindSkillIconView(wSkillIcon, "W");
+        AutoBindSkillIconView(eSkillIcon, "E");
+        AutoBindSkillIconView(rSkillIcon, "R");
+
+        RegisterSkillIconView("Q", qSkillIcon);
+        RegisterSkillIconView("W", wSkillIcon);
+        RegisterSkillIconView("E", eSkillIcon);
+        RegisterSkillIconView("R", rSkillIcon);
+    }
+
+    private void AutoBindSkillIconView(RuneSkillIconView view, string key)
+    {
+        if (view == null || mainPanel == null || string.IsNullOrWhiteSpace(key))
+        {
+            return;
+        }
+
+        string upperKey = key.Trim().ToUpperInvariant();
+        Transform row = FindChildRecursive(mainPanel.transform, $"{upperKey}Row");
+        if (view.root == null && row != null)
+        {
+            Transform root =
+                row.Find($"{upperKey}SkillIcon")
+                ?? row.Find($"SkillIcon_{upperKey}")
+                ?? row.Find("SkillIcon");
+            view.root = root as RectTransform;
+        }
+
+        if (view.root == null)
+        {
+            return;
+        }
+
+        if (view.icon == null)
+        {
+            view.icon = view.root.Find("Icon")?.GetComponent<Image>();
+            if (view.icon == null)
+            {
+                view.icon = view.root.GetComponent<Image>();
+            }
+        }
+
+        if (view.hoverHighlight == null)
+        {
+            view.hoverHighlight = view.root.Find("HoverHighlight")?.GetComponent<Image>();
+        }
+
+        if (view.hoverTrigger == null)
+        {
+            view.hoverTrigger = view.root.GetComponent<SkillHoverTrigger>();
+        }
+    }
+
+    private void RegisterSkillIconView(string key, RuneSkillIconView view)
+    {
+        if (view == null || view.root == null || view.icon == null || string.IsNullOrWhiteSpace(key))
+        {
+            WarnMissingSkillIconRefsOnce();
+            return;
+        }
+
+        string upperKey = key.Trim().ToUpperInvariant();
+        skillRowIcons[upperKey] = view.icon;
+
+        if (view.hoverHighlight != null)
+        {
+            view.hoverHighlight.color = skillHoverHighlightColor;
+            view.hoverHighlight.raycastTarget = false;
+            view.hoverHighlight.enabled = false;
+            view.hoverHighlight.gameObject.SetActive(false);
+            skillRowHighlights[upperKey] = view.hoverHighlight;
+        }
+
+        if (view.hoverTrigger != null)
+        {
+            view.hoverTrigger.skillKey = upperKey;
+            view.hoverTrigger.entered = HandleRuneSkillHoverEnter;
+            view.hoverTrigger.exited = HandleRuneSkillHoverExit;
+            skillRowHoverTriggers[upperKey] = view.hoverTrigger;
+        }
     }
 
     private void EnsureSkillDescriptionPanel()
@@ -1765,62 +1879,6 @@ public class RuneUIController : MonoBehaviour
             anchoredPosition.y = skillRowFirstY - (skillRowVerticalSpacing * i);
             rowRect.anchoredPosition = anchoredPosition;
         }
-    }
-
-    private void EnsureSkillRowIcon(string key)
-    {
-        if (mainPanel == null || string.IsNullOrWhiteSpace(key) || skillRowIcons.ContainsKey(key))
-        {
-            return;
-        }
-
-        Transform row = FindChildRecursive(mainPanel.transform, $"{key.ToUpperInvariant()}Row");
-        if (row == null)
-        {
-            return;
-        }
-
-        TextMeshProUGUI keyLabel = row.GetComponentInChildren<TextMeshProUGUI>(true);
-        if (keyLabel == null)
-        {
-            return;
-        }
-
-        GameObject iconObject = new GameObject($"{key.ToUpperInvariant()}SkillIcon", typeof(RectTransform), typeof(Image));
-        iconObject.transform.SetParent(row, false);
-        RectTransform iconRect = iconObject.GetComponent<RectTransform>();
-        iconRect.anchorMin = new Vector2(0f, 0.5f);
-        iconRect.anchorMax = new Vector2(0f, 0.5f);
-        iconRect.pivot = new Vector2(0f, 0.5f);
-        iconRect.sizeDelta = skillRowIconSize;
-        iconRect.anchoredPosition = new Vector2(skillRowIconX, 0f);
-
-        Image iconImage = iconObject.GetComponent<Image>();
-        iconImage.preserveAspect = true;
-
-        GameObject highlightObject = new GameObject("HoverHighlight", typeof(RectTransform), typeof(Image));
-        highlightObject.transform.SetParent(iconObject.transform, false);
-        RectTransform highlightRect = highlightObject.GetComponent<RectTransform>();
-        highlightRect.anchorMin = Vector2.zero;
-        highlightRect.anchorMax = Vector2.one;
-        highlightRect.offsetMin = Vector2.zero;
-        highlightRect.offsetMax = Vector2.zero;
-        highlightRect.localScale = Vector3.one * 1.2f;
-        Image highlightImage = highlightObject.GetComponent<Image>();
-        highlightImage.sprite = iconImage.sprite;
-        highlightImage.color = skillHoverHighlightColor;
-        highlightImage.raycastTarget = false;
-        highlightImage.enabled = false;
-        highlightObject.SetActive(false);
-
-        SkillHoverTrigger trigger = iconObject.AddComponent<SkillHoverTrigger>();
-        trigger.skillKey = key.ToUpperInvariant();
-        trigger.entered = HandleRuneSkillHoverEnter;
-        trigger.exited = HandleRuneSkillHoverExit;
-
-        skillRowIcons[key.ToUpperInvariant()] = iconImage;
-        skillRowHighlights[key.ToUpperInvariant()] = highlightImage;
-        skillRowHoverTriggers[key.ToUpperInvariant()] = trigger;
     }
 
     private void ApplySkillDescriptionPanelLayout(RectTransform rect)
@@ -2118,23 +2176,6 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        if (skillRowIcons.TryGetValue(upperKey, out Image icon) && icon != null)
-        {
-            RectTransform iconRect = icon.rectTransform;
-            iconRect.sizeDelta = skillRowIconSize;
-            iconRect.anchoredPosition = new Vector2(skillRowIconX, 0f);
-        }
-
-        if (skillRowHighlights.TryGetValue(upperKey, out Image highlight) && highlight != null)
-        {
-            RectTransform highlightRect = highlight.rectTransform;
-            highlightRect.anchorMin = Vector2.zero;
-            highlightRect.anchorMax = Vector2.one;
-            highlightRect.offsetMin = Vector2.zero;
-            highlightRect.offsetMax = Vector2.zero;
-            highlightRect.localScale = Vector3.one * 1.18f;
-        }
-
         List<RectTransform> slotRects = new List<RectTransform>();
         for (int i = 0; i < row.childCount; i++)
         {
@@ -2427,6 +2468,11 @@ public class RuneUIController : MonoBehaviour
             {
                 runeDescriptionBackground = runeDescriptionPanel;
             }
+
+            AutoBindSkillIconView(qSkillIcon, "Q");
+            AutoBindSkillIconView(wSkillIcon, "W");
+            AutoBindSkillIconView(eSkillIcon, "E");
+            AutoBindSkillIconView(rSkillIcon, "R");
         }
     }
 }

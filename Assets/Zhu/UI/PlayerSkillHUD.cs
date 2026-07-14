@@ -18,14 +18,42 @@ public class SkillIconSet
     public string rKeyText = "R";
 }
 
+[System.Serializable]
+public class SkillSlotView
+{
+    public RectTransform root;
+    public Image iconImage;
+    public Image cooldownMaskImage;
+    public Text cooldownText;
+    public Text keyText;
+    public GameObject disabledOverlay;
+    public Image hoverHighlight;
+    public SkillHoverTrigger hoverTrigger;
+}
+
 public class PlayerSkillHUD : MonoBehaviour
 {
+    private const string LogMissingCanvas = "[SkillUI] Missing target canvas for PlayerSkillHUD.";
+    private const string LogMissingRoot = "[SkillUI] Missing external SkillHUDRoot reference.";
+    private const string LogMissingSlot = "[SkillUI] Missing external skill slot reference.";
+    private const string LogMissingTooltip = "[SkillUI] Missing external tooltip reference. Hover tooltip will be disabled.";
+
     [Header("Root")]
     [SerializeField] private RectTransform skillHudRoot;
     [SerializeField] private Canvas targetCanvas;
 
-    [Header("Prefabs")]
+    [Header("External Slots")]
+    [SerializeField] private SkillSlotView qSlot = new SkillSlotView();
+    [SerializeField] private SkillSlotView wSlot = new SkillSlotView();
+    [SerializeField] private SkillSlotView eSlot = new SkillSlotView();
+    [SerializeField] private SkillSlotView rSlot = new SkillSlotView();
+
+    [Header("Legacy Prefab (Unused)")]
     [SerializeField] private GameObject skillSlotPrefab;
+
+    [Header("External Tooltip")]
+    [SerializeField] private RectTransform externalTooltipRoot;
+    [SerializeField] private TextMeshProUGUI externalTooltipText;
 
     [Header("Default Player")]
     [SerializeField] private int defaultPlayerIndex = 1;
@@ -84,6 +112,10 @@ public class PlayerSkillHUD : MonoBehaviour
     private RectTransform canvasRectTransform;
     private RectTransform tooltipRoot;
     private TextMeshProUGUI tooltipText;
+    private bool warnedMissingCanvas;
+    private bool warnedMissingRoot;
+    private bool warnedMissingSlot;
+    private bool warnedMissingTooltip;
 
     private void Awake()
     {
@@ -126,22 +158,13 @@ public class PlayerSkillHUD : MonoBehaviour
         }
 
         canvasRectTransform = canvasRect;
-
-        if (skillHudRoot == null)
+        AutoBindExternalReferences(canvas.transform);
+        if (!HasValidExternalReferences())
         {
-            Transform existing = canvas.transform.Find("SkillHUDRoot");
-            if (existing != null)
-            {
-                skillHudRoot = existing as RectTransform;
-            }
+            initialized = false;
+            return;
         }
 
-        if (skillHudRoot == null)
-        {
-            skillHudRoot = CreateRectTransform("SkillHUDRoot", canvas.transform);
-        }
-
-        SetupRoot(skillHudRoot);
         EnsureSlots(skillHudRoot);
         CacheSlotReferences(skillHudRoot);
         EnsureTooltip();
@@ -184,18 +207,13 @@ public class PlayerSkillHUD : MonoBehaviour
             return targetCanvas;
         }
 
-        GameObject canvasObject = new GameObject("HUDCanvas", typeof(RectTransform), typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
-        Canvas createdCanvas = canvasObject.GetComponent<Canvas>();
-        createdCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        if (!warnedMissingCanvas)
+        {
+            warnedMissingCanvas = true;
+            Debug.LogWarning(LogMissingCanvas, this);
+        }
 
-        CanvasScaler scaler = canvasObject.GetComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920f, 1080f);
-        scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.MatchWidthOrHeight;
-        scaler.matchWidthOrHeight = 0.5f;
-
-        targetCanvas = createdCanvas;
-        return targetCanvas;
+        return null;
     }
 
     private void SetupRoot(RectTransform root)
@@ -213,6 +231,147 @@ public class PlayerSkillHUD : MonoBehaviour
         root.localScale = Vector3.one;
     }
 
+    private void AutoBindExternalReferences(Transform canvasTransform)
+    {
+        if (canvasTransform == null)
+        {
+            return;
+        }
+
+        if (skillHudRoot == null)
+        {
+            Transform existing = canvasTransform.Find("SkillHUDRoot");
+            if (existing == null)
+            {
+                existing = FindChildRecursive(canvasTransform, "SkillHUDRoot");
+            }
+
+            skillHudRoot = existing as RectTransform;
+        }
+
+        AutoBindSlotView(qSlot, "Q");
+        AutoBindSlotView(wSlot, "W");
+        AutoBindSlotView(eSlot, "E");
+        AutoBindSlotView(rSlot, "R");
+
+        if (externalTooltipRoot == null)
+        {
+            Transform tooltip = canvasTransform.Find("SkillTooltip");
+            if (tooltip == null)
+            {
+                tooltip = FindChildRecursive(canvasTransform, "SkillTooltip");
+            }
+
+            externalTooltipRoot = tooltip as RectTransform;
+        }
+
+        if (externalTooltipText == null && externalTooltipRoot != null)
+        {
+            Transform textTransform = externalTooltipRoot.Find("Text");
+            if (textTransform == null)
+            {
+                textTransform = FindChildRecursive(externalTooltipRoot, "Text");
+            }
+
+            if (textTransform != null)
+            {
+                externalTooltipText = textTransform.GetComponent<TextMeshProUGUI>();
+            }
+        }
+    }
+
+    private void AutoBindSlotView(SkillSlotView slotView, string key)
+    {
+        if (slotView == null || skillHudRoot == null)
+        {
+            return;
+        }
+
+        if (slotView.root == null)
+        {
+            slotView.root = skillHudRoot.Find($"SkillSlot_{key}") as RectTransform;
+        }
+
+        if (slotView.root == null)
+        {
+            return;
+        }
+
+        if (slotView.iconImage == null)
+        {
+            slotView.iconImage = slotView.root.Find("Icon")?.GetComponent<Image>();
+        }
+
+        if (slotView.cooldownMaskImage == null)
+        {
+            slotView.cooldownMaskImage = slotView.root.Find("CooldownOverlay")?.GetComponent<Image>();
+        }
+
+        if (slotView.cooldownText == null)
+        {
+            slotView.cooldownText = slotView.root.Find("CooldownText")?.GetComponent<Text>();
+        }
+
+        if (slotView.keyText == null)
+        {
+            slotView.keyText = slotView.root.Find("KeyLabel")?.GetComponent<Text>();
+        }
+
+        if (slotView.disabledOverlay == null)
+        {
+            Transform disabledOverlay = slotView.root.Find("DisabledOverlay");
+            slotView.disabledOverlay = disabledOverlay != null ? disabledOverlay.gameObject : null;
+        }
+
+        if (slotView.hoverHighlight == null)
+        {
+            slotView.hoverHighlight = slotView.root.Find("HoverHighlight")?.GetComponent<Image>();
+        }
+
+        if (slotView.hoverTrigger == null)
+        {
+            slotView.hoverTrigger = slotView.root.GetComponent<SkillHoverTrigger>();
+        }
+    }
+
+    private bool HasValidExternalReferences()
+    {
+        if (skillHudRoot == null)
+        {
+            if (!warnedMissingRoot)
+            {
+                warnedMissingRoot = true;
+                Debug.LogWarning(LogMissingRoot, this);
+            }
+
+            return false;
+        }
+
+        bool hasAllSlots =
+            HasValidSlotView(qSlot) &&
+            HasValidSlotView(wSlot) &&
+            HasValidSlotView(eSlot) &&
+            HasValidSlotView(rSlot);
+
+        if (!hasAllSlots && !warnedMissingSlot)
+        {
+            warnedMissingSlot = true;
+            Debug.LogWarning(LogMissingSlot, this);
+        }
+
+        return hasAllSlots;
+    }
+
+    private static bool HasValidSlotView(SkillSlotView slotView)
+    {
+        return slotView != null
+            && slotView.root != null
+            && slotView.iconImage != null
+            && slotView.cooldownMaskImage != null
+            && slotView.cooldownText != null
+            && slotView.keyText != null;
+    }
+
     private void EnsureSlots(RectTransform root)
     {
         for (int i = 0; i < 4; i++)
@@ -222,12 +381,9 @@ public class PlayerSkillHUD : MonoBehaviour
             RectTransform slotRect = root.Find(slotName) as RectTransform;
             if (slotRect == null)
             {
-                slotRect = CreateSlot(root, key);
+                continue;
             }
 
-            ConfigureSlotRect(slotRect, i);
-            ConfigureSlotVisuals(slotRect, i);
-            EnsureCooldownText(slotRect);
             EnsureHoverVisuals(slotRect);
             EnsureHoverTrigger(slotRect, i);
         }
@@ -235,8 +391,43 @@ public class PlayerSkillHUD : MonoBehaviour
 
     private void CacheSlotReferences(RectTransform root)
     {
+        SkillSlotView[] configuredViews = { qSlot, wSlot, eSlot, rSlot };
         for (int i = 0; i < 4; i++)
         {
+            SkillSlotView configuredView = configuredViews[i];
+            if (configuredView != null)
+            {
+                if (configuredView.iconImage != null)
+                {
+                    slotIconImages[i] = configuredView.iconImage;
+                }
+
+                if (configuredView.cooldownMaskImage != null)
+                {
+                    slotCooldownOverlays[i] = configuredView.cooldownMaskImage;
+                }
+
+                if (configuredView.cooldownText != null)
+                {
+                    slotCooldownTexts[i] = configuredView.cooldownText;
+                }
+
+                if (configuredView.keyText != null)
+                {
+                    slotKeyLabels[i] = configuredView.keyText;
+                }
+
+                if (configuredView.hoverHighlight != null)
+                {
+                    slotHoverHighlights[i] = configuredView.hoverHighlight;
+                }
+
+                if (configuredView.hoverTrigger != null)
+                {
+                    slotHoverTriggers[i] = configuredView.hoverTrigger;
+                }
+            }
+
             string key = GetDefaultSlotKey(i);
             Transform slot = root.Find($"SkillSlot_{key}");
             if (slot == null)
@@ -276,6 +467,30 @@ public class PlayerSkillHUD : MonoBehaviour
 
             slotHoverTriggers[i] = slot.GetComponent<SkillHoverTrigger>();
         }
+    }
+
+    private static Transform FindChildRecursive(Transform parent, string name)
+    {
+        if (parent == null || string.IsNullOrWhiteSpace(name))
+        {
+            return null;
+        }
+
+        if (parent.name == name)
+        {
+            return parent;
+        }
+
+        for (int i = 0; i < parent.childCount; i++)
+        {
+            Transform found = FindChildRecursive(parent.GetChild(i), name);
+            if (found != null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     private RectTransform CreateSlot(RectTransform parent, string key)
@@ -762,21 +977,15 @@ public class PlayerSkillHUD : MonoBehaviour
         RectTransform highlight = slotRect.Find("HoverHighlight") as RectTransform;
         if (highlight == null)
         {
-            GameObject highlightObject = CreateUiChild(slotRect, "HoverHighlight");
-            highlight = highlightObject.GetComponent<RectTransform>();
+            return;
         }
-
-        RectTransform icon = slotRect.Find("Icon") as RectTransform;
-        MatchOverlayToIconOrSlot(highlight, icon, slotRect);
-        highlight.localScale = Vector3.one * Mathf.Max(1f, hoverHighlightScale);
 
         Image image = highlight.GetComponent<Image>();
         if (image == null)
         {
-            image = highlight.gameObject.AddComponent<Image>();
+            return;
         }
 
-        image.sprite = GetSharedCooldownCircleSprite();
         image.color = hoverHighlightColor;
         image.raycastTarget = false;
         image.enabled = false;
@@ -793,7 +1002,7 @@ public class PlayerSkillHUD : MonoBehaviour
         SkillHoverTrigger trigger = slotRect.GetComponent<SkillHoverTrigger>();
         if (trigger == null)
         {
-            trigger = slotRect.gameObject.AddComponent<SkillHoverTrigger>();
+            return;
         }
 
         string key = GetDefaultSlotKey(index);
@@ -811,45 +1020,17 @@ public class PlayerSkillHUD : MonoBehaviour
             return;
         }
 
-        Transform existing = canvasRectTransform.Find("SkillTooltip");
-        if (existing == null)
+        tooltipRoot = externalTooltipRoot;
+        tooltipText = externalTooltipText;
+
+        if ((tooltipRoot == null || tooltipText == null) && !warnedMissingTooltip)
         {
-            GameObject tooltipObject = CreateUiChild(canvasRectTransform, "SkillTooltip");
-            tooltipRoot = tooltipObject.GetComponent<RectTransform>();
-
-            GameObject background = CreateUiChild(tooltipRoot, "Background");
-            Image backgroundImage = EnsureImage(background, tooltipBackgroundColor);
-            backgroundImage.raycastTarget = false;
-
-            GameObject textObject = CreateUiChild(tooltipRoot, "Text");
-            tooltipText = EnsureTmpText(textObject, string.Empty);
-            tooltipText.alignment = TextAlignmentOptions.TopLeft;
-            tooltipText.color = tooltipTextColor;
-            tooltipText.fontSize = tooltipFontSize;
-            tooltipText.enableWordWrapping = true;
-            tooltipText.overflowMode = TextOverflowModes.Overflow;
-            tooltipText.lineSpacing = 4f;
-            tooltipText.raycastTarget = false;
-
-            Stretch(background.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-            Stretch(textObject.GetComponent<RectTransform>(), Vector2.zero, Vector2.one, new Vector2(tooltipPadding.x, tooltipPadding.y), new Vector2(-tooltipPadding.x, -tooltipPadding.y));
-        }
-        else
-        {
-            tooltipRoot = existing as RectTransform;
-            Transform textTransform = existing.Find("Text");
-            if (textTransform != null)
-            {
-                tooltipText = textTransform.GetComponent<TextMeshProUGUI>();
-            }
+            warnedMissingTooltip = true;
+            Debug.LogWarning(LogMissingTooltip, this);
         }
 
         if (tooltipRoot != null)
         {
-            tooltipRoot.anchorMin = new Vector2(0.5f, 0.5f);
-            tooltipRoot.anchorMax = new Vector2(0.5f, 0.5f);
-            tooltipRoot.pivot = new Vector2(0.5f, 0f);
-            tooltipRoot.sizeDelta = new Vector2(tooltipWidth, 64f);
             tooltipRoot.gameObject.SetActive(false);
             tooltipRoot.SetAsLastSibling();
         }
@@ -957,36 +1138,6 @@ public class PlayerSkillHUD : MonoBehaviour
         {
             return;
         }
-
-        GameObject cooldownText = CreateUiChild(slotRect, "CooldownText");
-        Text text = EnsureText(cooldownText, string.Empty);
-        text.fontSize = cooldownTextFontSize;
-        text.fontStyle = FontStyle.Bold;
-        text.alignment = TextAnchor.MiddleCenter;
-        text.color = cooldownTextColor;
-        text.raycastTarget = false;
-        text.enabled = false;
-
-        RectTransform rect = cooldownText.GetComponent<RectTransform>();
-        Stretch(rect, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
-
-        Transform keyLabel = slotRect.Find("KeyLabel");
-        if (keyLabel != null)
-        {
-            cooldownText.transform.SetSiblingIndex(Mathf.Max(0, keyLabel.GetSiblingIndex()));
-        }
-
-        if (cooldownTextUseOutline)
-        {
-            Outline outline = cooldownText.GetComponent<Outline>();
-            if (outline == null)
-            {
-                outline = cooldownText.AddComponent<Outline>();
-            }
-
-            outline.effectColor = cooldownTextOutlineColor;
-            outline.effectDistance = new Vector2(1f, -1f);
-        }
     }
 
     private void ConfigureCooldownOverlay(Image overlayImage)
@@ -1006,9 +1157,6 @@ public class PlayerSkillHUD : MonoBehaviour
             return;
         }
 
-        RectTransform slotRect = overlayImage.transform.parent as RectTransform;
-        MatchOverlayToIconOrSlot(overlayImage.rectTransform, iconRect, slotRect);
-        overlayImage.sprite = GetSharedCooldownCircleSprite();
         overlayImage.type = Image.Type.Filled;
         overlayImage.fillMethod = Image.FillMethod.Radial360;
         overlayImage.fillOrigin = cooldownFillOrigin;
@@ -1252,5 +1400,23 @@ public class PlayerSkillHUD : MonoBehaviour
         rect.offsetMin = offsetMin;
         rect.offsetMax = offsetMax;
         rect.localScale = Vector3.one;
+    }
+
+    private void OnValidate()
+    {
+        if (Application.isPlaying)
+        {
+            return;
+        }
+
+        Canvas canvas = targetCanvas != null
+            ? targetCanvas
+            : GetComponentInParent<Canvas>();
+        if (canvas == null)
+        {
+            return;
+        }
+
+        AutoBindExternalReferences(canvas.transform);
     }
 }
