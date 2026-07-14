@@ -61,7 +61,8 @@ public class DayNightAffinityUI : MonoBehaviour
     [SerializeField, Min(0f)] private float coverFadeMaxPixels = 180f;
     [SerializeField] private bool debugGaugeVisual;
     [SerializeField] private bool overrideGaugeForPreview;
-    [SerializeField, Range(0f, 100f)] private float previewBalanceValue = 50f;
+    [SerializeField, Range(0f, 100f)] private float previewTwilightValue = 50f;
+    [SerializeField, Range(0f, 100f)] private float previewRadianceValue = 50f;
 
     [Header("Icon Glow")]
     [SerializeField, Min(0f)] private float iconGlowPulseSpeed = 2.2f;
@@ -117,27 +118,33 @@ public class DayNightAffinityUI : MonoBehaviour
         bool hasDay = TODDayNightAdapter.TryGetIsDay(out bool isDay);
         bool hasNight = TODDayNightAdapter.TryGetIsNight(out bool isNight);
 
-        float balanceValue = overrideGaugeForPreview
-            ? Mathf.Clamp(previewBalanceValue, 0f, 100f)
-            : Mathf.Clamp(gaugeState.BalanceValue, 0f, 100f);
+        float twilightValue;
+        float radianceValue;
+        if (overrideGaugeForPreview)
+        {
+            twilightValue = Mathf.Clamp(previewTwilightValue, 0f, 100f);
+            radianceValue = Mathf.Clamp(previewRadianceValue, 0f, 100f);
+            float previewOverflow = Mathf.Max(0f, twilightValue + radianceValue - 100f);
+            if (previewOverflow > 0f)
+            {
+                radianceValue = Mathf.Max(0f, radianceValue - previewOverflow);
+            }
+        }
+        else
+        {
+            twilightValue = Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
+            radianceValue = Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
+        }
 
-        float radianceValue = overrideGaugeForPreview ? balanceValue : Mathf.Clamp(gaugeState.RadianceValue, 0f, 100f);
-        float twilightValue = overrideGaugeForPreview ? 100f - balanceValue : Mathf.Clamp(gaugeState.TwilightValue, 0f, 100f);
-
-        float twilightDominance = balanceValue < 50f
-            ? Mathf.Clamp01((50f - balanceValue) / 50f)
-            : 0f;
-        float radianceDominance = balanceValue > 50f
-            ? Mathf.Clamp01((balanceValue - 50f) / 50f)
-            : 0f;
-
-        UpdateBaseAccentState(twilightDominance, radianceDominance);
-        UpdateCover(twilightCoverRoot, twilightCoverSolid, twilightCoverFade, false, twilightDominance);
-        UpdateCover(radianceCoverRoot, radianceCoverSolid, radianceCoverFade, true, radianceDominance);
+        UpdateBaseAccentState(
+            twilightValue / 100f,
+            radianceValue / 100f);
+        UpdateCover(twilightCoverRoot, twilightCoverSolid, twilightCoverFade, false, twilightValue / 100f);
+        UpdateCover(radianceCoverRoot, radianceCoverSolid, radianceCoverFade, true, radianceValue / 100f);
         UpdateFlowMaterials();
         UpdateValueTexts(twilightValue, radianceValue);
         UpdateIconState(hasDay, hasNight, isDay, isNight);
-        UpdateGlowState(twilightValue, radianceValue);
+        UpdateGlowState(gaugeState, twilightValue, radianceValue);
     }
 
     private void InitializeVisuals()
@@ -198,10 +205,10 @@ public class DayNightAffinityUI : MonoBehaviour
         }
     }
 
-    private void UpdateGlowState(float twilightValue, float radianceValue)
+    private void UpdateGlowState(DayNightGaugeRuntimeState gaugeState, float twilightValue, float radianceValue)
     {
-        bool moonFull = twilightValue >= 100f;
-        bool sunFull = radianceValue >= 100f;
+        bool moonFull = overrideGaugeForPreview ? twilightValue >= 100f : gaugeState != null && gaugeState.HasTwilightState();
+        bool sunFull = overrideGaugeForPreview ? radianceValue >= 100f : gaugeState != null && gaugeState.HasRadianceState();
         float pulse = Mathf.InverseLerp(-1f, 1f, Mathf.Sin(Time.unscaledTime * Mathf.Max(0f, iconGlowPulseSpeed)));
         float glowAlpha = Mathf.Lerp(iconGlowMinAlpha, iconGlowMaxAlpha, pulse);
 
@@ -249,14 +256,14 @@ public class DayNightAffinityUI : MonoBehaviour
         UpdateAccentAlpha(radianceBaseAccent, Mathf.Max(baseAccentMinAlpha, radianceBaseAlpha));
     }
 
-    private void UpdateCover(RectTransform coverRoot, Image solid, Image fade, bool anchorRight, float dominance)
+    private void UpdateCover(RectTransform coverRoot, Image solid, Image fade, bool anchorRight, float fillRatio)
     {
         if (coverRoot == null || solid == null || fade == null)
         {
             return;
         }
 
-        CoverMetrics metrics = CalculateCoverMetrics(Mathf.Clamp01(dominance));
+        CoverMetrics metrics = CalculateCoverMetrics(Mathf.Clamp01(fillRatio));
         bool visible = metrics.TotalWidth > 0.001f;
         SetCoverVisible(coverRoot, solid, fade, visible);
 
@@ -271,20 +278,20 @@ public class DayNightAffinityUI : MonoBehaviour
         fade.enabled = visible && metrics.FadeWidth > 0.001f;
     }
 
-    private CoverMetrics CalculateCoverMetrics(float dominance)
+    private CoverMetrics CalculateCoverMetrics(float fillRatio)
     {
-        float coverTotalWidth = ResolveGaugeWidth() * Mathf.Clamp01(maxCoverRatio) * dominance;
+        float coverTotalWidth = ResolveGaugeWidth() * Mathf.Clamp01(fillRatio);
         if (coverTotalWidth <= 0.001f)
         {
             return default;
         }
 
-        float fadeRatio = dominance <= coverFadeStartDominance
+        float fadeRatio = fillRatio <= coverFadeStartDominance
             ? coverFadeMaxRatio
             : Mathf.Lerp(
                 coverFadeMaxRatio,
                 coverFadeMinRatio,
-                Mathf.InverseLerp(coverFadeStartDominance, 1f, dominance));
+                Mathf.InverseLerp(coverFadeStartDominance, 1f, fillRatio));
 
         fadeRatio = Mathf.Clamp01(fadeRatio);
 
