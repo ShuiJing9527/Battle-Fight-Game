@@ -65,7 +65,11 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private MonsterRankGeometrySettings eliteGeometry = new MonsterRankGeometrySettings
     {
         visualScale = new Vector3(2f, 2f, 2f),
-        visualLocalPosition = new Vector3(0f, 0.25f, 0f),
+        // Restore the previously verified elite visual height without touching
+        // the confirmed size semantics (normal 0.2 base * elite multiplier 2).
+        // Historic behavior was prefab base Visual_Slime Y (-0.15) + elite offset
+        // (+0.25) => final 0.10, not a hard absolute 0.25.
+        visualLocalPosition = new Vector3(0f, 0.10f, 0f),
         groundContactLocalPosition = Vector3.zero,
         physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
         physicalColliderRadius = 0.75f,

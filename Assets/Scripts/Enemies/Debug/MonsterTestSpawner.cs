@@ -74,7 +74,8 @@ public class MonsterTestSpawner : MonoBehaviour
     private static readonly MonsterRankGeometrySettings FallbackEliteGeometry = new MonsterRankGeometrySettings
     {
         visualScale = new Vector3(2f, 2f, 2f),
-        visualLocalPosition = new Vector3(0f, 0.25f, 0f),
+        // Keep MonsterTestSpawner aligned with the official elite geometry.
+        visualLocalPosition = new Vector3(0f, 0.10f, 0f),
         groundContactLocalPosition = Vector3.zero,
         physicalColliderCenter = new Vector3(0f, 0.77f, 0f),
         physicalColliderRadius = 0.75f,

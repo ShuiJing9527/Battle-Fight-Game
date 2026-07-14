@@ -281,7 +281,7 @@ public class EnemyController : MonoBehaviour
 
         if (attackStyle == MonsterAttackStyle.ElementalBoss)
         {
-            HandleBossElementalCombat(toPlayer, horizontalCenterDistance, centerDistance, verticalDifference, grounded);
+            HandleBossElementalCombat(toPlayer, horizontalCenterDistance, horizontalEdgeDistance, centerDistance, verticalDifference, grounded);
             return;
         }
 
@@ -490,23 +490,36 @@ public class EnemyController : MonoBehaviour
         nextBossDevourAttackTime = now + Mathf.Max(0f, bossDevourInitialDelay);
     }
 
-    private void HandleBossElementalCombat(Vector3 toPlayer, float horizontalCenterDistance, float centerDistance, float verticalDifference, bool grounded)
+    private void HandleBossElementalCombat(Vector3 toPlayer, float horizontalCenterDistance, float horizontalEdgeDistance, float centerDistance, float verticalDifference, bool grounded)
     {
-        float distance = Mathf.Max(0f, horizontalCenterDistance);
+        float decisionDistance = horizontalEdgeDistance < float.MaxValue
+            ? Mathf.Max(0f, horizontalEdgeDistance)
+            : Mathf.Max(0f, horizontalCenterDistance);
         string targetName = playerTarget != null ? playerTarget.name : "null";
         CombatHealth health = GetComponent<CombatHealth>();
         bool isDead = health != null && health.IsDead;
         bool isStunned = false;
         bool isAttacking = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
         float meleeCooldownRemaining = Mathf.Max(0f, nextAttackTime - Time.time);
+        float rangedCooldownRemaining = Mathf.Max(0f, nextBossRangedAttackTime - Time.time);
+        string currentAttackState = attackInProgress
+            ? EnemyAttackRuntimeState.AttackInProgress.ToString()
+            : (activeBossAttackKind == BossAttackKind.Ranged
+                ? BossAttackKind.Ranged.ToString()
+                : (activeBossAttackKind == BossAttackKind.Melee
+                    ? BossAttackKind.Melee.ToString()
+                    : EnemyAttackRuntimeState.Chase.ToString()));
+        Collider physicalBodyCollider = meleeEnemyCollider != null ? meleeEnemyCollider : GetComponent<Collider>();
+        Collider combatSurfaceCollider = ResolvePlayerCollider(playerTarget);
 
         if (attackInProgress)
         {
             rb.linearVelocity = Vector3.zero;
             StopMoveAnimation();
             FaceTargetHorizontally(playerTarget);
-            LogBossMeleeDecision(distance, false, "AlreadyAttacking", grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
-            LogBossRangedDecision(distance, "Ranged", "CastInProgress");
+            LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, "AlreadyAttacking");
+            LogBossMeleeDecision(decisionDistance, false, "AlreadyAttacking", grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(decisionDistance, "Ranged", "CastInProgress");
             return;
         }
 
@@ -517,19 +530,20 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        if (TryBeginBossSpecialSkill(distance, verticalDifference, grounded))
+        if (TryBeginBossSpecialSkill(decisionDistance, verticalDifference, grounded))
         {
             return;
         }
 
-        bool inMeleeRange = distance <= Mathf.Max(0.1f, bossMeleeAttackRange);
-        bool inRangedRange = distance >= Mathf.Max(0.1f, bossRangedMinRange) && distance <= Mathf.Max(bossRangedMinRange, bossRangedMaxRange);
+        bool inMeleeRange = decisionDistance <= Mathf.Max(0.1f, bossMeleeAttackRange);
+        bool inRangedRange = decisionDistance >= Mathf.Max(0.1f, bossRangedMinRange) && decisionDistance <= Mathf.Max(bossRangedMinRange, bossRangedMaxRange);
 
         if (inMeleeRange)
         {
-            string meleeFailReason = EvaluateBossMeleeFailReason(distance, verticalDifference, grounded);
-            LogBossMeleeDecision(distance, string.IsNullOrEmpty(meleeFailReason), string.IsNullOrEmpty(meleeFailReason) ? "None" : meleeFailReason, grounded, "Melee", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
-            LogBossRangedDecision(distance, string.IsNullOrEmpty(meleeFailReason) ? "Melee" : "Melee", string.IsNullOrEmpty(meleeFailReason) ? "WithinMeleeRange" : meleeFailReason);
+            string meleeFailReason = EvaluateBossMeleeFailReason(decisionDistance, verticalDifference, grounded);
+            LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, true, string.IsNullOrEmpty(meleeFailReason), meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, string.IsNullOrEmpty(meleeFailReason) ? "None" : meleeFailReason);
+            LogBossMeleeDecision(decisionDistance, string.IsNullOrEmpty(meleeFailReason), string.IsNullOrEmpty(meleeFailReason) ? "None" : meleeFailReason, grounded, "Melee", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(decisionDistance, "Melee", string.IsNullOrEmpty(meleeFailReason) ? "WithinMeleeRange" : meleeFailReason);
             if (string.IsNullOrEmpty(meleeFailReason))
             {
                 activeBossAttackKind = BossAttackKind.Melee;
@@ -544,9 +558,10 @@ public class EnemyController : MonoBehaviour
 
         if (inRangedRange)
         {
-            string rangedFailReason = EvaluateBossRangedFailReason(distance, verticalDifference, grounded);
-            LogBossMeleeDecision(distance, false, string.IsNullOrEmpty(rangedFailReason) ? "RangedSelected" : rangedFailReason, grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
-            LogBossRangedDecision(distance, string.IsNullOrEmpty(rangedFailReason) ? "Ranged" : "Ranged", string.IsNullOrEmpty(rangedFailReason) ? "WithinRangedWindow" : rangedFailReason);
+            string rangedFailReason = EvaluateBossRangedFailReason(decisionDistance, verticalDifference, grounded);
+            LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, string.IsNullOrEmpty(rangedFailReason) ? "RangedSelected" : rangedFailReason);
+            LogBossMeleeDecision(decisionDistance, false, string.IsNullOrEmpty(rangedFailReason) ? "RangedSelected" : rangedFailReason, grounded, "Ranged", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(decisionDistance, "Ranged", string.IsNullOrEmpty(rangedFailReason) ? "WithinRangedWindow" : rangedFailReason);
             if (string.IsNullOrEmpty(rangedFailReason))
             {
                 BeginBossRangedAttack(playerTarget);
@@ -555,7 +570,8 @@ public class EnemyController : MonoBehaviour
 
             if (rangedFailReason == "Cooldown")
             {
-                LogBossMeleeDecision(distance, false, "RangedCooldownChaseToMelee", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+                LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, false, currentAttackState, physicalBodyCollider, combatSurfaceCollider, "RangedCooldownChaseToMelee");
+                LogBossMeleeDecision(decisionDistance, false, "RangedCooldownChaseToMelee", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
                 ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "RangedCooldownChaseToMelee");
                 return;
             }
@@ -566,16 +582,18 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        if (distance > Mathf.Max(bossRangedMinRange, bossRangedMaxRange))
+        if (decisionDistance > Mathf.Max(bossRangedMinRange, bossRangedMaxRange))
         {
-            LogBossMeleeDecision(distance, false, "TargetOutsideRangedMax", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
-            LogBossRangedDecision(distance, "Chase", "TargetOutsideRangedMax");
+            LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, "TargetOutsideRangedMax");
+            LogBossMeleeDecision(decisionDistance, false, "TargetOutsideRangedMax", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+            LogBossRangedDecision(decisionDistance, "Chase", "TargetOutsideRangedMax");
             ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "TargetOutsideRangedMax");
             return;
         }
 
-        LogBossMeleeDecision(distance, false, "BetweenMeleeAndRangedWindow", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
-        LogBossRangedDecision(distance, "Chase", "BetweenMeleeAndRangedWindow");
+        LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, "BetweenMeleeAndRangedWindow");
+        LogBossMeleeDecision(decisionDistance, false, "BetweenMeleeAndRangedWindow", grounded, "Chase", targetName, meleeCooldownRemaining, isAttacking, isStunned, isDead);
+        LogBossRangedDecision(decisionDistance, "Chase", "BetweenMeleeAndRangedWindow");
         ChaseTarget(toPlayer, currentState: "BossChase", targetName: targetName, reason: "BetweenMeleeAndRangedWindow");
     }
 
@@ -1563,6 +1581,52 @@ public class EnemyController : MonoBehaviour
             " isAttacking=" + isAttacking +
             " isStunned=" + isStunned +
             " isDead=" + isDead,
+            this);
+    }
+
+    private void LogBossMeleeDiag(
+        float horizontalCenterDistance,
+        float horizontalEdgeDistance,
+        float verticalDistance,
+        bool isGrounded,
+        bool targetInMeleeRange,
+        bool canAttack,
+        bool meleeCooldownReady,
+        bool rangedCooldownReady,
+        string currentAttackState,
+        Collider physicalBodyCollider,
+        Collider combatSurfaceCollider,
+        string blockReason)
+    {
+        if (!(debugAttackDiagnostics || debugBossMeleeHit || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextBossMeleeDecisionLogTime)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[BossMeleeDiag] " +
+            "enemy=" + name +
+            " target exists=" + (playerTarget != null) +
+            " horizontal distance=" + horizontalCenterDistance.ToString("F2") +
+            " edge distance=" + horizontalEdgeDistance.ToString("F2") +
+            " vertical distance=" + verticalDistance.ToString("F2") +
+            " targetInMeleeRange=" + targetInMeleeRange +
+            " attackHitRange=" + Mathf.Max(0.1f, bossMeleeHitRadius).ToString("F2") +
+            " stopDistance=" + stopDistance.ToString("F2") +
+            " isGrounded=" + isGrounded +
+            " canMove=" + (rb != null && !attackInProgress) +
+            " canAttack=" + canAttack +
+            " meleeCooldownReady=" + meleeCooldownReady +
+            " rangedCooldownReady=" + rangedCooldownReady +
+            " current attack state=" + currentAttackState +
+            " physicalBodyCollider=" + (physicalBodyCollider != null ? physicalBodyCollider.name : "null") +
+            " combatSurfaceCollider=" + (combatSurfaceCollider != null ? combatSurfaceCollider.name : "null") +
+            " blockReason=" + (string.IsNullOrEmpty(blockReason) ? "None" : blockReason),
             this);
     }
 
