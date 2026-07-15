@@ -94,6 +94,17 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float bossLeapLandingRadius = 2.2f;
     [SerializeField] private float bossLeapDamageMultiplier = 1.8f;
 
+    [Header("Boss Leap Slam Landing")]
+    [SerializeField] private float bossLeapSlamLandingDamage = 80f;
+    [SerializeField] private float bossLeapSlamKnockbackHorizontal = 18f;
+    [SerializeField] private float bossLeapSlamKnockbackVertical = 12f;
+    [SerializeField] private float bossLeapSlamMinimumEscapeDistance = 1.5f;
+    [SerializeField, Min(0f)] private float bossLeapSlamLaunchInputLockDuration = 0.3f;
+
+    [Header("Boss Falling Landing Impact")]
+    [SerializeField] private float bossFallingImpactMinimumHeight = 1.5f;
+    [SerializeField] private float bossFallingImpactMinimumDownwardSpeed = 2f;
+
     [Header("Boss Skill - Split Merge")]
     [SerializeField] private bool enableBossTimedSplit = true;
     [SerializeField] private float bossSplitInitialDelay = 4.0f;
@@ -153,10 +164,12 @@ public class EnemyController : MonoBehaviour
     private float nextBossRangedDecisionLogTime;
     private float nextBossMeleeDecisionLogTime;
     private float nextEnemyMeleeDecisionLogTime;
+    private float nextBossLaunchDebugTime;
     private Vector3 lastGroundProbeOrigin;
     private bool lastGroundProbeHit;
     private string lastGroundHitName = "None";
     private int lastGroundHitLayer = -1;
+    private float lastGroundHitY;
     private float lastGroundProbeCastDistance;
     private Collider[] separationHits;
     private Collider[] bossMeleeHitResults;
@@ -182,6 +195,19 @@ public class EnemyController : MonoBehaviour
     private bool[] bossSplitColliderEnabledStates;
     private bool bossBodyHiddenForSplit;
     private bool bossRigidbodyWasKinematicBeforeSplit;
+    private bool bossLeapBodyOverrideActive;
+    private bool bossLeapBodyUseGravityBefore;
+    private bool bossLeapBodyIsKinematicBefore;
+    private RigidbodyConstraints bossLeapBodyConstraintsBefore;
+    private int bossLandingImpactSequenceId;
+    private Collider[] bossLeapLandingHitResults;
+    private bool bossWasGroundedLastFixedUpdate;
+    private bool bossWasAirborne;
+    private bool bossFallingImpactArmed;
+    private bool bossFallingImpactTriggered;
+    private float bossAirborneStartY;
+    private float bossHighestAirborneY;
+    private float bossLastGroundedY;
 
     private enum EnemyAttackRuntimeState
     {
@@ -202,6 +228,12 @@ public class EnemyController : MonoBehaviour
         LeapSlam,
         TimedSplit,
         Devour
+    }
+
+    private enum BossLandingImpactSource
+    {
+        LeapSlam,
+        AirborneFall
     }
 
     public float BaseMoveSpeed => moveSpeed;
@@ -235,7 +267,13 @@ public class EnemyController : MonoBehaviour
             slimeAnimation.OnAttackHit -= HandleAttackHit;
         }
 
+        RestoreBossLeapBodyOverride("OnDestroy");
         RestoreBossBodyAfterSplit();
+    }
+
+    private void OnDisable()
+    {
+        RestoreBossLeapBodyOverride("OnDisable");
     }
 
     private void Update()
@@ -517,6 +555,16 @@ public class EnemyController : MonoBehaviour
         maxHorizontalAttackDistance = Mathf.Max(0.1f, this.attackHitRange);
     }
 
+    private void FixedUpdate()
+    {
+        if (attackStyle != MonsterAttackStyle.ElementalBoss)
+        {
+            return;
+        }
+
+        UpdateBossAirborneLandingImpact();
+    }
+
     private void InitializeBossSkillTimers()
     {
         if (attackStyle != MonsterAttackStyle.ElementalBoss)
@@ -554,7 +602,7 @@ public class EnemyController : MonoBehaviour
 
         if (attackInProgress)
         {
-            rb.linearVelocity = Vector3.zero;
+            ZeroBossHorizontalVelocityPreserveVertical(grounded, currentAttackState, "AttackInProgress");
             StopMoveAnimation();
             FaceTargetHorizontally(playerTarget);
             LogBossMeleeDiag(horizontalCenterDistance, decisionDistance, verticalDifference, grounded, false, false, meleeCooldownRemaining <= 0.001f, rangedCooldownRemaining <= 0.001f, currentAttackState, physicalBodyCollider, combatSurfaceCollider, "AlreadyAttacking");
@@ -565,7 +613,7 @@ public class EnemyController : MonoBehaviour
 
         if (bossBodyHiddenForSplit)
         {
-            rb.linearVelocity = Vector3.zero;
+            ZeroBossHorizontalVelocityPreserveVertical(grounded, currentAttackState, "BodyHiddenForSplit");
             StopMoveAnimation();
             return;
         }
@@ -591,7 +639,7 @@ public class EnemyController : MonoBehaviour
                 return;
             }
 
-            rb.linearVelocity = Vector3.zero;
+            ZeroBossHorizontalVelocityPreserveVertical(grounded, currentAttackState, "MeleeBlocked:" + meleeFailReason);
             StopMoveAnimation();
             return;
         }
@@ -616,7 +664,7 @@ public class EnemyController : MonoBehaviour
                 return;
             }
 
-            rb.linearVelocity = Vector3.zero;
+            ZeroBossHorizontalVelocityPreserveVertical(grounded, currentAttackState, "RangedBlocked:" + rangedFailReason);
             StopMoveAnimation();
             FaceTargetHorizontally(playerTarget);
             return;
@@ -744,6 +792,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        ResetBossAirborneLandingState(transform.position.y, true);
         activeBossAttackKind = BossAttackKind.LeapSlam;
         attackInProgress = true;
         pendingAttackTarget = target;
@@ -751,6 +800,7 @@ public class EnemyController : MonoBehaviour
         nextBossLeapAttackTime = Time.time + Mathf.Max(0.1f, bossLeapCooldown);
         nextAttackTime = Mathf.Max(nextAttackTime, nextBossLeapAttackTime);
         rb.linearVelocity = Vector3.zero;
+        BeginBossLeapBodyOverride();
         StopMoveAnimation();
         CancelInvoke(nameof(FinishAttackRecovery));
         bossSpecialAttackRoutine = StartCoroutine(BossLeapSlamRoutine(target));
@@ -823,22 +873,7 @@ public class EnemyController : MonoBehaviour
 
     private void ApplyBossLeapLandingDamage(Transform target, Vector3 landingPosition)
     {
-        CombatHealth targetHealth = target != null ? target.GetComponentInParent<CombatHealth>() : null;
-        if (targetHealth == null || targetHealth.IsDead)
-        {
-            return;
-        }
-
-        Vector3 targetPosition = target.position;
-        targetPosition.y = landingPosition.y;
-        float distance = Vector3.Distance(targetPosition, landingPosition);
-        if (distance > Mathf.Max(0.1f, bossLeapLandingRadius))
-        {
-            return;
-        }
-
-        float damage = ResolveCurrentAttackDamage(BattleDamageType.Physical) * Mathf.Max(0f, bossLeapDamageMultiplier);
-        targetHealth.TakeDamage(new BattleDamage(damage, BattleDamageType.Physical, gameObject));
+        TryTriggerBossLandingImpact(landingPosition, BossLandingImpactSource.LeapSlam);
     }
 
     private void BeginBossSplitSkill()
@@ -997,6 +1032,7 @@ public class EnemyController : MonoBehaviour
 
     private void CompleteBossSpecialAttack()
     {
+        RestoreBossLeapBodyOverride("CompleteBossSpecialAttack");
         attackInProgress = false;
         pendingAttackTarget = null;
         activeBossAttackKind = BossAttackKind.None;
@@ -1012,6 +1048,635 @@ public class EnemyController : MonoBehaviour
         }
 
         transform.position = position;
+
+        if (bossLeapBodyOverrideActive && (debugAttackDiagnostics || debugLog))
+        {
+            Debug.Log(
+                "[BossLaunchDebug] move body during leap " +
+                "boss=" + name +
+                " position=" + position +
+                " rbVelocity=" + (rb != null ? rb.linearVelocity.ToString() : "None") +
+                " useGravity=" + (rb != null && rb.useGravity) +
+                " isKinematic=" + (rb != null && rb.isKinematic),
+                this);
+        }
+    }
+
+    private void ZeroBossHorizontalVelocityPreserveVertical(bool grounded, string currentAttackState, string reason)
+    {
+        if (rb == null)
+        {
+            return;
+        }
+
+        Vector3 before = rb.linearVelocity;
+        Vector3 after = grounded
+            ? Vector3.zero
+            : new Vector3(0f, before.y, 0f);
+        rb.linearVelocity = after;
+
+        LogBossLaunchVelocityState(reason, currentAttackState, grounded, before, after, true);
+    }
+
+    private void BeginBossLeapBodyOverride()
+    {
+        if (rb == null || bossLeapBodyOverrideActive)
+        {
+            return;
+        }
+
+        bossLeapBodyUseGravityBefore = rb.useGravity;
+        bossLeapBodyIsKinematicBefore = rb.isKinematic;
+        bossLeapBodyConstraintsBefore = rb.constraints;
+        bossLeapBodyOverrideActive = true;
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        rb.isKinematic = true;
+
+        if (debugAttackDiagnostics || debugLog)
+        {
+            Debug.Log(
+                "[BossLaunchDebug] begin leap body override " +
+                "boss=" + name +
+                " velocityBefore=" + rb.linearVelocity +
+                " useGravityBefore=" + bossLeapBodyUseGravityBefore +
+                " isKinematicBefore=" + bossLeapBodyIsKinematicBefore +
+                " constraintsBefore=" + bossLeapBodyConstraintsBefore,
+                this);
+        }
+    }
+
+    private void RestoreBossLeapBodyOverride(string reason)
+    {
+        if (rb == null || !bossLeapBodyOverrideActive)
+        {
+            return;
+        }
+
+        rb.linearVelocity = Vector3.zero;
+        rb.angularVelocity = Vector3.zero;
+        rb.constraints = bossLeapBodyConstraintsBefore;
+        rb.isKinematic = bossLeapBodyIsKinematicBefore;
+        rb.useGravity = bossLeapBodyUseGravityBefore;
+        bossLeapBodyOverrideActive = false;
+
+        bool groundedAfterRestore = IsGroundedForAttack();
+        if (debugAttackDiagnostics || debugLog || !groundedAfterRestore)
+        {
+            Debug.Log(
+                "[BossLaunchDebug] restore leap body override " +
+                "boss=" + name +
+                " reason=" + reason +
+                " velocityAfter=" + rb.linearVelocity +
+                " useGravity=" + rb.useGravity +
+                " isKinematic=" + rb.isKinematic +
+                " constraints=" + rb.constraints +
+                " grounded=" + groundedAfterRestore +
+                " groundProbeHit=" + lastGroundProbeHit +
+                " groundHitName=" + lastGroundHitName +
+                " groundHitLayer=" + (lastGroundHitLayer >= 0 ? LayerMask.LayerToName(lastGroundHitLayer) : "None"),
+                this);
+        }
+    }
+
+    private void LogBossLaunchVelocityState(
+        string reason,
+        string currentAttackState,
+        bool grounded,
+        Vector3 velocityBefore,
+        Vector3 velocityAfter,
+        bool velocityWasOverwritten)
+    {
+        if (!(debugAttackDiagnostics || debugLog))
+        {
+            return;
+        }
+
+        if (Time.time < nextBossLaunchDebugTime)
+        {
+            return;
+        }
+
+        nextBossLaunchDebugTime = Time.time + 0.08f;
+
+        Debug.Log(
+            "[BossLaunchDebug] " +
+            "reason=" + reason +
+            " boss=" + name +
+            " posY=" + transform.position.y.ToString("F3") +
+            " rbVelocityYBefore=" + velocityBefore.y.ToString("F3") +
+            " rbVelocityYAfter=" + velocityAfter.y.ToString("F3") +
+            " rbVelocityBefore=" + velocityBefore +
+            " rbVelocityAfter=" + velocityAfter +
+            " useGravity=" + (rb != null && rb.useGravity) +
+            " isKinematic=" + (rb != null && rb.isKinematic) +
+            " constraints=" + (rb != null ? rb.constraints.ToString() : "None") +
+            " grounded=" + grounded +
+            " groundProbeHit=" + lastGroundProbeHit +
+            " groundHitName=" + lastGroundHitName +
+            " groundHitLayer=" + (lastGroundHitLayer >= 0 ? LayerMask.LayerToName(lastGroundHitLayer) : "None") +
+            " currentState=" + currentAttackState +
+            " activeBossAttackKind=" + activeBossAttackKind +
+            " velocityWasOverwritten=" + velocityWasOverwritten,
+            this);
+    }
+
+    private void EnsureBossLeapLandingBuffer()
+    {
+        if (bossLeapLandingHitResults == null || bossLeapLandingHitResults.Length < 16)
+        {
+            bossLeapLandingHitResults = new Collider[16];
+        }
+    }
+
+    private bool TryTriggerBossLandingImpact(Vector3 landingPosition, BossLandingImpactSource source)
+    {
+        CombatHealth selfHealth = GetComponent<CombatHealth>();
+        if (selfHealth != null && selfHealth.IsDead)
+        {
+            LogLandingImpactSkipped(source, "Dead", landingPosition);
+            return false;
+        }
+
+        if (bossBodyHiddenForSplit)
+        {
+            LogLandingImpactSkipped(source, "Hidden", landingPosition);
+            return false;
+        }
+
+        if (bossFallingImpactTriggered)
+        {
+            LogLandingImpactSkipped(source, "AlreadyTriggered", landingPosition);
+            return false;
+        }
+
+        bossLandingImpactSequenceId++;
+        bossFallingImpactTriggered = true;
+        bossFallingImpactArmed = false;
+        bossWasAirborne = false;
+        bossAirborneStartY = landingPosition.y;
+        bossHighestAirborneY = landingPosition.y;
+        bossLastGroundedY = lastGroundProbeHit ? lastGroundHitY : landingPosition.y;
+        bossWasGroundedLastFixedUpdate = true;
+        EnsureBossLeapLandingBuffer();
+
+        int hitCount = Physics.OverlapSphereNonAlloc(
+            landingPosition,
+            Mathf.Max(0.1f, bossLeapLandingRadius),
+            bossLeapLandingHitResults,
+            ~0,
+            QueryTriggerInteraction.Collide);
+
+        HashSet<int> processedTargets = new HashSet<int>();
+        for (int i = 0; i < hitCount; i++)
+        {
+            Collider hitCollider = bossLeapLandingHitResults[i];
+            if (hitCollider == null)
+            {
+                continue;
+            }
+
+            CombatHealth targetHealth = hitCollider.GetComponentInParent<CombatHealth>();
+            Transform attackerRoot = transform.root;
+            Transform targetRoot = targetHealth != null ? targetHealth.transform.root : null;
+            bool duplicateSkipped = false;
+            bool excludedSelf = false;
+
+            if (targetHealth == null || targetHealth.IsDead)
+            {
+                if (debugAttackDiagnostics || debugLog)
+                {
+                    Debug.Log(
+                        "[BossLaunchDebug] Landing impact skipped " +
+                        "event=LandingImpactTargetSkipped" +
+                        " source=" + source +
+                        " sequenceId=" + bossLandingImpactSequenceId +
+                        " boss=" + name +
+                        " reason=NoValidTarget" +
+                        " hitCollider=" + hitCollider.name,
+                        this);
+                }
+                continue;
+            }
+
+            if (!BattleTargetUtility.IsPlayer(targetHealth.gameObject))
+            {
+                continue;
+            }
+
+            if (targetRoot == attackerRoot)
+            {
+                excludedSelf = true;
+                if (debugAttackDiagnostics || debugLog)
+                {
+                    Debug.Log(
+                        "[BossLaunchDebug] Landing impact skipped " +
+                        "event=LandingImpactTargetSkipped" +
+                        " source=" + source +
+                        " sequenceId=" + bossLandingImpactSequenceId +
+                        " boss=" + name +
+                        " reason=SameRoot" +
+                        " hitCollider=" + hitCollider.name +
+                        " targetRoot=" + (targetRoot != null ? targetRoot.name : "null"),
+                        this);
+                }
+                continue;
+            }
+
+            int targetKey = targetHealth.GetInstanceID();
+            if (!processedTargets.Add(targetKey))
+            {
+                duplicateSkipped = true;
+                if (debugAttackDiagnostics || debugLog)
+                {
+                    Debug.Log(
+                        "[BossLaunchDebug] Landing impact skipped " +
+                        "event=LandingImpactTargetSkipped" +
+                        " source=" + source +
+                        " sequenceId=" + bossLandingImpactSequenceId +
+                        " boss=" + name +
+                        " reason=DuplicateTarget" +
+                        " hitCollider=" + hitCollider.name +
+                        " playerRoot=" + (targetRoot != null ? targetRoot.name : "null"),
+                        this);
+                }
+                continue;
+            }
+
+            Rigidbody targetBody = targetHealth.GetComponentInParent<Rigidbody>();
+            if (targetBody != null && targetBody == rb)
+            {
+                excludedSelf = true;
+                if (debugAttackDiagnostics || debugLog)
+                {
+                    Debug.Log(
+                        "[BossLaunchDebug] Landing impact skipped " +
+                        "event=LandingImpactTargetSkipped" +
+                        " source=" + source +
+                        " sequenceId=" + bossLandingImpactSequenceId +
+                        " boss=" + name +
+                        " reason=SameRigidbody" +
+                        " hitCollider=" + hitCollider.name +
+                        " targetBody=" + targetBody.name,
+                        this);
+                }
+                continue;
+            }
+
+            Collider playerCollider = ResolvePlayerCollider(targetHealth.transform);
+            Collider bossCollider = meleeEnemyCollider != null ? meleeEnemyCollider : GetComponent<Collider>();
+            Vector3 playerCenter = ResolvePlayerBodyCenter(targetHealth.transform);
+            bool usedFallbackDirection;
+            bool penetrationDetected;
+            bool overlapEscapeApplied;
+            Vector3 horizontalDirection = ResolveBossLeapLandingHorizontalDirection(
+                targetHealth.transform,
+                playerCenter,
+                bossCollider,
+                playerCollider,
+                out usedFallbackDirection,
+                out penetrationDetected,
+                out overlapEscapeApplied,
+                out Vector3 separationOffset);
+
+            float damage = Mathf.Max(0f, bossLeapSlamLandingDamage);
+            Vector3 launchVelocity = horizontalDirection * Mathf.Max(0f, bossLeapSlamKnockbackHorizontal) + Vector3.up * Mathf.Max(0f, bossLeapSlamKnockbackVertical);
+
+            targetHealth.TakeDamage(new BattleDamage(damage, BattleDamageType.Physical, gameObject));
+            ApplyBossLeapLaunchToPlayer(targetHealth.transform, launchVelocity, separationOffset);
+
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Vector3 bossCenter = ResolveEnemyBodyCenter();
+                Vector3 flattenedPlayerCenter = playerCenter;
+                flattenedPlayerCenter.y = bossCenter.y;
+                float distanceAfterImpact = Vector3.Distance(
+                    new Vector3(bossCenter.x, 0f, bossCenter.z),
+                    new Vector3(flattenedPlayerCenter.x, 0f, flattenedPlayerCenter.z));
+
+                Debug.Log(
+                    "[BossLaunchDebug] event=LandingImpactTriggered " +
+                    "source=" + source +
+                    " sequenceId=" + bossLandingImpactSequenceId +
+                    " boss=" + name +
+                    " landingPosition=" + landingPosition +
+                    " hitCollider=" + hitCollider.name +
+                    " playerRoot=" + (targetRoot != null ? targetRoot.name : "null") +
+                    " damage=" + damage.ToString("F2") +
+                    " horizontalDirection=" + horizontalDirection +
+                    " launchVelocity=" + launchVelocity +
+                    " usedFallbackDirection=" + usedFallbackDirection +
+                    " penetrationDetected=" + penetrationDetected +
+                    " overlapEscapeApplied=" + overlapEscapeApplied +
+                    " duplicateSkipped=" + duplicateSkipped +
+                    " excludedSelf=" + excludedSelf +
+                    " distanceToBossCenterAfterImpact=" + distanceAfterImpact.ToString("F2"),
+                    this);
+            }
+        }
+
+        return true;
+    }
+
+    private void UpdateBossAirborneLandingImpact()
+    {
+        if (rb == null)
+        {
+            return;
+        }
+
+        CombatHealth selfHealth = GetComponent<CombatHealth>();
+        if ((selfHealth != null && selfHealth.IsDead) || bossBodyHiddenForSplit || rb.isKinematic)
+        {
+            bool groundedSnapshot = ProbeGrounded();
+            float groundedY = lastGroundProbeHit ? lastGroundHitY : transform.position.y;
+            ResetBossAirborneLandingState(groundedY, groundedSnapshot);
+            return;
+        }
+
+        bool isGrounded = ProbeGrounded();
+        float currentY = transform.position.y;
+        float verticalVelocity = rb.linearVelocity.y;
+        float currentGroundY = lastGroundProbeHit ? lastGroundHitY : currentY;
+
+        if (isGrounded)
+        {
+            bossLastGroundedY = currentGroundY;
+        }
+
+        bool shouldTrackAirborne = !isGrounded &&
+                                   (bossWasAirborne ||
+                                    verticalVelocity > 0.1f ||
+                                    Mathf.Abs(currentY - bossLastGroundedY) > 0.15f);
+
+        if (shouldTrackAirborne && !bossWasAirborne)
+        {
+            bossWasAirborne = true;
+            bossFallingImpactArmed = false;
+            bossFallingImpactTriggered = false;
+            bossAirborneStartY = currentY;
+            bossHighestAirborneY = currentY;
+
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Debug.Log(
+                    "[BossLaunchDebug] event=AirborneStarted " +
+                    "sequenceId=" + (bossLandingImpactSequenceId + 1) +
+                    " boss=" + name +
+                    " positionY=" + currentY.ToString("F3") +
+                    " groundY=" + currentGroundY.ToString("F3") +
+                    " verticalVelocity=" + verticalVelocity.ToString("F3") +
+                    " activeBossAttackKind=" + activeBossAttackKind +
+                    " currentState=" + ResolveBossLaunchCurrentState(),
+                    this);
+            }
+        }
+
+        if (bossWasAirborne)
+        {
+            bossHighestAirborneY = Mathf.Max(bossHighestAirborneY, currentY);
+            float airborneHeight = bossHighestAirborneY - bossLastGroundedY;
+            if (!bossFallingImpactArmed &&
+                airborneHeight >= Mathf.Max(0f, bossFallingImpactMinimumHeight) &&
+                verticalVelocity <= -Mathf.Max(0f, bossFallingImpactMinimumDownwardSpeed))
+            {
+                bossFallingImpactArmed = true;
+
+                if (debugAttackDiagnostics || debugLog)
+                {
+                    Debug.Log(
+                        "[BossLaunchDebug] event=LandingImpactArmed " +
+                        "sequenceId=" + (bossLandingImpactSequenceId + 1) +
+                        " boss=" + name +
+                        " airborneHeight=" + airborneHeight.ToString("F3") +
+                        " highestY=" + bossHighestAirborneY.ToString("F3") +
+                        " groundY=" + bossLastGroundedY.ToString("F3") +
+                        " downwardVelocity=" + verticalVelocity.ToString("F3") +
+                        " source=" + BossLandingImpactSource.AirborneFall,
+                        this);
+                }
+            }
+        }
+
+        if (!bossWasGroundedLastFixedUpdate && isGrounded)
+        {
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Debug.Log(
+                    "[BossLaunchDebug] event=LandingDetected " +
+                    "sequenceId=" + (bossLandingImpactSequenceId + 1) +
+                    " boss=" + name +
+                    " wasGrounded=False" +
+                    " isGrounded=True" +
+                    " armed=" + bossFallingImpactArmed +
+                    " alreadyTriggered=" + bossFallingImpactTriggered +
+                    " activeBossAttackKind=" + activeBossAttackKind +
+                    " source=" + BossLandingImpactSource.AirborneFall +
+                    " currentState=" + ResolveBossLaunchCurrentState(),
+                    this);
+            }
+
+            if (bossWasAirborne && bossFallingImpactArmed && !bossFallingImpactTriggered)
+            {
+                TryTriggerBossLandingImpact(transform.position, BossLandingImpactSource.AirborneFall);
+            }
+            else
+            {
+                string skipReason = !bossWasAirborne
+                    ? "NotAirborne"
+                    : bossFallingImpactTriggered
+                        ? "AlreadyTriggered"
+                        : "NotArmed";
+                LogLandingImpactSkipped(BossLandingImpactSource.AirborneFall, skipReason, transform.position);
+                bossFallingImpactTriggered = false;
+            }
+
+            bossWasAirborne = false;
+            bossFallingImpactArmed = false;
+            bossLastGroundedY = currentGroundY;
+        }
+
+        bossWasGroundedLastFixedUpdate = isGrounded;
+    }
+
+    private void ResetBossAirborneLandingState(float groundedY, bool grounded)
+    {
+        bossWasAirborne = false;
+        bossFallingImpactArmed = false;
+        bossFallingImpactTriggered = false;
+        bossAirborneStartY = transform.position.y;
+        bossHighestAirborneY = transform.position.y;
+        bossLastGroundedY = groundedY;
+        bossWasGroundedLastFixedUpdate = grounded;
+    }
+
+    private void LogLandingImpactSkipped(BossLandingImpactSource source, string reason, Vector3 landingPosition)
+    {
+        if (!(debugAttackDiagnostics || debugLog))
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[BossLaunchDebug] event=LandingImpactSkipped " +
+            "source=" + source +
+            " sequenceId=" + (bossLandingImpactSequenceId + 1) +
+            " boss=" + name +
+            " reason=" + reason +
+            " landingPosition=" + landingPosition +
+            " activeBossAttackKind=" + activeBossAttackKind +
+            " currentState=" + ResolveBossLaunchCurrentState(),
+            this);
+    }
+
+    private string ResolveBossLaunchCurrentState()
+    {
+        if (bossBodyHiddenForSplit)
+        {
+            return "HiddenForSplit";
+        }
+
+        if (attackInProgress)
+        {
+            return EnemyAttackRuntimeState.AttackInProgress.ToString();
+        }
+
+        if (activeBossAttackKind != BossAttackKind.None)
+        {
+            return activeBossAttackKind.ToString();
+        }
+
+        return EnemyAttackRuntimeState.Chase.ToString();
+    }
+
+    private Vector3 ResolveBossLeapLandingHorizontalDirection(
+        Transform target,
+        Vector3 playerCenter,
+        Collider bossCollider,
+        Collider playerCollider,
+        out bool usedFallbackDirection,
+        out bool penetrationDetected,
+        out bool overlapEscapeApplied,
+        out Vector3 separationOffset)
+    {
+        Vector3 bossCenter = ResolveEnemyBodyCenter();
+        Vector3 horizontalDirection = Vector3.ProjectOnPlane(playerCenter - bossCenter, Vector3.up);
+        penetrationDetected = false;
+        overlapEscapeApplied = false;
+        separationOffset = Vector3.zero;
+        usedFallbackDirection = false;
+
+        if (bossCollider != null && playerCollider != null &&
+            Physics.ComputePenetration(
+                bossCollider,
+                bossCollider.transform.position,
+                bossCollider.transform.rotation,
+                playerCollider,
+                playerCollider.transform.position,
+                playerCollider.transform.rotation,
+                out Vector3 penetrationDirection,
+                out float penetrationDistance))
+        {
+            penetrationDetected = true;
+            Vector3 penetrationHorizontal = Vector3.ProjectOnPlane(-penetrationDirection, Vector3.up);
+            if (penetrationHorizontal.sqrMagnitude > 0.0001f)
+            {
+                horizontalDirection = penetrationHorizontal.normalized;
+                float separationDistance = Mathf.Max(Mathf.Max(0f, penetrationDistance) + 0.05f, Mathf.Max(0f, bossLeapSlamMinimumEscapeDistance));
+                separationOffset = horizontalDirection * separationDistance;
+                overlapEscapeApplied = separationDistance > 0f;
+            }
+        }
+
+        if (horizontalDirection.sqrMagnitude < 0.0001f)
+        {
+            horizontalDirection = ResolveBossLeapLandingFallbackDirection(target);
+            usedFallbackDirection = true;
+        }
+        else
+        {
+            horizontalDirection.Normalize();
+        }
+
+        if (separationOffset.sqrMagnitude <= 0.0001f)
+        {
+            separationOffset = horizontalDirection * Mathf.Max(0f, bossLeapSlamMinimumEscapeDistance);
+            overlapEscapeApplied = separationOffset.sqrMagnitude > 0.0001f;
+        }
+
+        return horizontalDirection;
+    }
+
+    private Vector3 ResolveBossLeapLandingFallbackDirection(Transform target)
+    {
+        if (target != null)
+        {
+            Player01SkillController player1 = target.GetComponentInParent<Player01SkillController>();
+            if (player1 != null)
+            {
+                Vector3 direction = -Vector3.ProjectOnPlane(player1.GetFacingWorldDirection(), Vector3.up);
+                if (direction.sqrMagnitude > 0.0001f)
+                {
+                    return direction.normalized;
+                }
+            }
+
+            Player2PrototypeController player2 = target.GetComponentInParent<Player2PrototypeController>();
+            if (player2 != null)
+            {
+                Vector3 direction = -Vector3.ProjectOnPlane(player2.GetFacingDirection(), Vector3.up);
+                if (direction.sqrMagnitude > 0.0001f)
+                {
+                    return direction.normalized;
+                }
+            }
+        }
+
+        Vector3 bossBackward = -Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+        if (bossBackward.sqrMagnitude > 0.0001f)
+        {
+            return bossBackward.normalized;
+        }
+
+        return Vector3.left;
+    }
+
+    private void ApplyBossLeapLaunchToPlayer(Transform target, Vector3 launchVelocity, Vector3 separationOffset)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        PlayerMovement playerMovement = target.GetComponentInParent<PlayerMovement>();
+        if (playerMovement != null)
+        {
+            playerMovement.ApplyExternalLaunch(launchVelocity, Mathf.Max(0f, bossLeapSlamLaunchInputLockDuration), separationOffset);
+            return;
+        }
+
+        Player2PrototypeController player2 = target.GetComponentInParent<Player2PrototypeController>();
+        if (player2 != null)
+        {
+            player2.ApplyExternalLaunch(launchVelocity, Mathf.Max(0f, bossLeapSlamLaunchInputLockDuration), separationOffset);
+            return;
+        }
+
+        Rigidbody targetBody = target.GetComponentInParent<Rigidbody>();
+        if (targetBody != null && targetBody != rb)
+        {
+            if (separationOffset.sqrMagnitude > 0.0001f)
+            {
+                Vector3 newPosition = targetBody.position + separationOffset;
+                targetBody.position = newPosition;
+                target.root.position = newPosition;
+                Physics.SyncTransforms();
+            }
+
+            targetBody.linearVelocity = launchVelocity;
+            targetBody.angularVelocity = Vector3.zero;
+            targetBody.WakeUp();
+        }
     }
 
     private void HideBossBodyForSplit()
@@ -1842,6 +2507,7 @@ public class EnemyController : MonoBehaviour
 
     private void FinishAttackRecovery()
     {
+        RestoreBossLeapBodyOverride("FinishAttackRecovery");
         bool hadPendingAttack = attackInProgress;
         Transform finishedTarget = pendingAttackTarget;
         attackInProgress = false;
@@ -3191,6 +3857,7 @@ public class EnemyController : MonoBehaviour
         lastGroundProbeHit = false;
         lastGroundHitName = "None";
         lastGroundHitLayer = -1;
+        lastGroundHitY = float.NegativeInfinity;
         lastGroundProbeCastDistance = probeDistance;
         lastGroundProbeOrigin = transform.position + Vector3.up * 0.05f;
 
@@ -3208,6 +3875,7 @@ public class EnemyController : MonoBehaviour
                 lastGroundProbeHit = true;
                 lastGroundHitName = sphereHit.collider != null ? sphereHit.collider.name : "Unknown";
                 lastGroundHitLayer = sphereHit.collider != null ? sphereHit.collider.gameObject.layer : -1;
+                lastGroundHitY = sphereHit.point.y;
                 return true;
             }
 
@@ -3218,6 +3886,7 @@ public class EnemyController : MonoBehaviour
                 lastGroundProbeHit = true;
                 lastGroundHitName = rayHit.collider != null ? rayHit.collider.name : "Unknown";
                 lastGroundHitLayer = rayHit.collider != null ? rayHit.collider.gameObject.layer : -1;
+                lastGroundHitY = rayHit.point.y;
                 return true;
             }
 
@@ -3232,6 +3901,7 @@ public class EnemyController : MonoBehaviour
             lastGroundProbeHit = true;
             lastGroundHitName = fallbackHit.collider != null ? fallbackHit.collider.name : "Unknown";
             lastGroundHitLayer = fallbackHit.collider != null ? fallbackHit.collider.gameObject.layer : -1;
+            lastGroundHitY = fallbackHit.point.y;
             return true;
         }
 

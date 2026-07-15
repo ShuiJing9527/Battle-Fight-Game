@@ -620,6 +620,9 @@ public class Player2PrototypeController : MonoBehaviour
     private Vector3 cachedVisualRootBaseLocalPosition;
     private bool cachedVisualRootBaseLocalPositionReady;
     private Coroutine spawnUnstuckRoutine;
+    private Coroutine externalLaunchRoutine;
+    private bool externalLaunchUseGravityBefore;
+    private RigidbodyConstraints externalLaunchConstraintsBefore;
 
     public bool HasActiveRuntimeSkill
     {
@@ -752,6 +755,12 @@ public class Player2PrototypeController : MonoBehaviour
 
     private void OnDestroy()
     {
+        if (externalLaunchRoutine != null)
+        {
+            StopCoroutine(externalLaunchRoutine);
+            externalLaunchRoutine = null;
+        }
+
         qSkill?.Cleanup();
         wSkill?.Cleanup();
         eSkill?.Cleanup();
@@ -1490,6 +1499,43 @@ public class Player2PrototypeController : MonoBehaviour
 
     public Rigidbody Body => rb;
 
+    public void ApplyExternalLaunch(Vector3 launchVelocity, float duration, Vector3 separationOffset)
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb == null)
+        {
+            return;
+        }
+
+        if (externalLaunchRoutine != null)
+        {
+            StopCoroutine(externalLaunchRoutine);
+            RestoreExternalLaunchState();
+        }
+
+        externalLaunchUseGravityBefore = rb.useGravity;
+        externalLaunchConstraintsBefore = rb.constraints;
+
+        if (separationOffset.sqrMagnitude > 0.0001f)
+        {
+            Vector3 newPosition = rb.position + separationOffset;
+            rb.position = newPosition;
+            transform.position = newPosition;
+            Physics.SyncTransforms();
+        }
+
+        rb.useGravity = true;
+        rb.constraints = RigidbodyConstraints.FreezeRotation;
+        rb.linearVelocity = launchVelocity;
+        rb.angularVelocity = Vector3.zero;
+        rb.WakeUp();
+        externalLaunchRoutine = StartCoroutine(ExternalLaunchRoutine(duration));
+    }
+
     public Vector3 FacingDirection => ResolveFacingDirection();
     public Vector3 GetFacingDirection() => FacingDirection;
     public bool TryTriggerRuneCounterQ(CombatHealth attacker, bool suppressRuneCounterRecursion = true)
@@ -1557,6 +1603,36 @@ public class Player2PrototypeController : MonoBehaviour
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
     public Transform GroundAnchor => groundAnchor != null ? groundAnchor : transform;
     public Transform FootAnchor => footAnchor != null ? footAnchor : (visualRoot != null ? visualRoot : transform);
+
+    private IEnumerator ExternalLaunchRoutine(float duration)
+    {
+        if (duration > 0f)
+        {
+            yield return new WaitForSeconds(duration);
+        }
+        else
+        {
+            yield return null;
+        }
+
+        RestoreExternalLaunchState();
+    }
+
+    private void RestoreExternalLaunchState()
+    {
+        if (rb == null)
+        {
+            externalLaunchRoutine = null;
+            return;
+        }
+
+        Vector3 velocity = rb.linearVelocity;
+        velocity.y = 0f;
+        rb.linearVelocity = velocity;
+        rb.useGravity = externalLaunchUseGravityBefore;
+        rb.constraints = externalLaunchConstraintsBefore;
+        externalLaunchRoutine = null;
+    }
 
     public float LegacyERailDuration => eRailDuration;
     public bool LegacyEEnableAfterimageShader => eEnableAfterimageShader;

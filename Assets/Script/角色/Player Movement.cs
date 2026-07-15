@@ -27,6 +27,7 @@ public class PlayerMovement : MonoBehaviour
     private Player01SkillController player01SkillController;
     private float nextSpeedDiagnosticTime;
     private bool movementInputLocked;
+    private Coroutine externalLaunchRoutine;
 
     public float RawResolvedMoveSpeed { get; private set; }
     public float ActualMoveSpeed { get; private set; }
@@ -111,8 +112,62 @@ public class PlayerMovement : MonoBehaviour
         return movementInputLocked;
     }
 
+    public void ApplyExternalLaunch(Vector3 launchVelocity, float lockDuration, Vector3 separationOffset)
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb == null)
+        {
+            return;
+        }
+
+        if (externalLaunchRoutine != null)
+        {
+            StopCoroutine(externalLaunchRoutine);
+            externalLaunchRoutine = null;
+        }
+
+        if (separationOffset.sqrMagnitude > 0.0001f)
+        {
+            Vector3 newPosition = rb.position + separationOffset;
+            rb.position = newPosition;
+            transform.position = newPosition;
+            Physics.SyncTransforms();
+        }
+
+        movementInputLocked = true;
+        rb.linearVelocity = launchVelocity;
+        rb.angularVelocity = Vector3.zero;
+        rb.WakeUp();
+        externalLaunchRoutine = StartCoroutine(ReleaseExternalLaunchRoutine(lockDuration));
+    }
+
+    private System.Collections.IEnumerator ReleaseExternalLaunchRoutine(float lockDuration)
+    {
+        if (lockDuration > 0f)
+        {
+            yield return new WaitForSeconds(lockDuration);
+        }
+        else
+        {
+            yield return null;
+        }
+
+        movementInputLocked = false;
+        externalLaunchRoutine = null;
+    }
+
     private void OnDisable()
     {
+        if (externalLaunchRoutine != null)
+        {
+            StopCoroutine(externalLaunchRoutine);
+            externalLaunchRoutine = null;
+        }
+
         movementInputLocked = false;
         RawResolvedMoveSpeed = 0f;
         ActualMoveSpeed = 0f;
