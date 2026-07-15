@@ -28,6 +28,9 @@ public class MonsterTestSpawner : MonoBehaviour
     [SerializeField] private GameObject[] eliteEnemyPrefabs;
     [SerializeField] private GameObject[] bossEnemyPrefabs;
 
+    [Header("Monster Prefab")]
+    [SerializeField] private GameObject testMonsterPrefab;
+
     [Header("Spawn Placement")]
     [SerializeField] private Transform spawnPoint;
     [SerializeField] private string playerTag = "Player";
@@ -345,7 +348,8 @@ public class MonsterTestSpawner : MonoBehaviour
             ClearTestMonsters();
         }
 
-        GameObject prefab = ResolvePrefabForRank(rank);
+        string prefabSelectionSource;
+        GameObject prefab = ResolveSelectedPrefab(rank, out prefabSelectionSource);
         if (prefab == null)
         {
             Debug.LogWarning("[MonsterTestSpawner] Missing prefab for rank=" + rank, this);
@@ -430,7 +434,11 @@ public class MonsterTestSpawner : MonoBehaviour
 
         Debug.Log(
             "[MonsterTestSpawner] " +
-            "spawn position=" + spawnPosition +
+            "requested prefab=" + (testMonsterPrefab != null ? testMonsterPrefab.name : "null") +
+            " actual spawned prefab=" + prefab.name +
+            " prefab selection source=" + prefabSelectionSource +
+            " rank=" + rank +
+            " spawn position=" + spawnPosition +
             " visual config source=" + visualConfigSource +
             " visual scale=" + configuredVisualScale.ToString("F2") +
             " visual offset=" + configuredVisualOffset.ToString("F2") +
@@ -441,6 +449,9 @@ public class MonsterTestSpawner : MonoBehaviour
             "[MonsterTestSpawner] Spawned " +
             "spawn type=" + ResolveSpawnTypeLabel(rank) +
             " rank=" + rank +
+            " requested prefab=" + (testMonsterPrefab != null ? testMonsterPrefab.name : "null") +
+            " actual spawned prefab=" + prefab.name +
+            " selection source=" + prefabSelectionSource +
             " prefab source=" + prefabSource +
             " prefab=" + prefab.name +
             " object=" + spawnedMonster.name +
@@ -688,6 +699,18 @@ public class MonsterTestSpawner : MonoBehaviour
         }
 
         return null;
+    }
+
+    private GameObject ResolveSelectedPrefab(MonsterRank rank, out string selectionSource)
+    {
+        if (testMonsterPrefab != null)
+        {
+            selectionSource = "InspectorOverride";
+            return testMonsterPrefab;
+        }
+
+        selectionSource = "RankFallback";
+        return ResolvePrefabForRank(rank);
     }
 
     private static GameObject[] ResolvePrefabArray(GameObject[] local, GameObject[] fallback)
