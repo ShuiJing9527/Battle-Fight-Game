@@ -114,6 +114,8 @@ GameObject:
   - component: {fileID: -8609501882762248427}
   - component: {fileID: -1158828784750518386}
   - component: {fileID: 9023344556677889911}
+  - component: {fileID: 9100000000000000031}
+  - component: {fileID: 9100000000000000032}
   m_Layer: 0
   m_Name: Enemy_Slime_Rainbow
   m_TagString: Untagged
@@ -225,6 +227,115 @@ MonoBehaviour:
   landingVfxPrefab: {fileID: 11400000, guid: 8986621e08ddbcd4fb5e8010d305b92f, type: 3}
   landingVfxOffset: {x: 0, y: 0, z: 0}
   landingVfxLifetime: 2
+--- !u!114 &9100000000000000031
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f9e9f67bca8bf0a449c216b1df245117, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: Assembly-CSharp::BossSlimeLeapSlamSkill
+  enableLeapSlam: 1
+  initialDelay: 2
+  cooldown: 6
+  triggerChance: 0.45
+  minimumRange: 2
+  maximumRange: 8
+  allowInMeleeRange: 1
+  meleeSelectionChance: 0.3
+  veryCloseSelectionChance: 0.6
+  veryCloseDistance: 2
+  windupTime: 0.35
+  travelTime: 0.65
+  recoverTime: 0.45
+  leapHeight: 3
+  minimumHorizontalTravel: 0
+  closeTravelDistance: 1
+  maximumHorizontalDistance: 12
+  enableTargetPrediction: 1
+  predictionTime: 0.45
+  maximumPredictionDistance: 4
+  landingRadius: 2.2
+  landingDamage: 120
+  damageMultiplier: 1.8
+  fallingImpactMinimumHeight: 1.5
+  fallingImpactMinimumDownwardSpeed: 2
+  enableFallingHeightTrigger: 1
+  fallingImpactTriggerHeight: 1.2
+  fallingImpactMaximumTriggerHeight: 2.5
+  fallingImpactRequiredDownwardSpeed: 0.5
+  fallingImpactPlayerCheckRadius: 4
+  fallingImpactGroundMask:
+    serializedVersion: 2
+    m_Bits: -1
+  launchHorizontalSpeed: 10
+  launchVerticalSpeed: 7
+  minimumEscapeDistance: 1.5
+  maximumSeparationOffset: 0.35
+  launchInputLockDuration: 0.3
+  enableForcedAirborneImpact: 1
+  armHeight: 1.5
+  triggerHeight: 1.2
+  playerCheckRadius: 4
+  timeout: 2
+  enableLandingVfx: 1
+  landingVfxPrefab: {fileID: 0}
+  landingVfxOffset: {x: 0, y: 0, z: 0}
+  landingVfxLifetime: 2
+--- !u!114 &9100000000000000032
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 8809199598531854168}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cb7b8a9f42785134eb7b9dfe3f7eebae, type: 3}
+  m_Name: ''
+  m_EditorClassIdentifier: Assembly-CSharp::BossSlimeDevourSkill
+  enableSkill: 1
+  selectionChance: 0.35
+  minimumRange: 0
+  maximumRange: 2.2
+  initialDelay: 3
+  cooldown: 10
+  windupDuration: 0.25
+  pullDuration: 0.45
+  holdDuration: 2.55
+  releaseDuration: 0
+  dealInitialDamage: 0
+  initialDamage: 0
+  dealDamageWhileHolding: 1
+  startingTickDamage: 5
+  damageIncreasePerTick: 3
+  damageTickInterval: 0.75
+  maximumTickDamage: 20
+  pullStrength: 12
+  pullSpeed: 12
+  maximumHorizontalPullSpeed: 12
+  maximumVerticalPullSpeed: 8
+  pullStopDistance: 0.15
+  pullAcceleration: 0
+  holdOffset: {x: 0, y: 1.3, z: 0}
+  holdPositionStrength: 12
+  maximumPlayerLift: 2.5
+  groundClearance: 0.05
+  holdStopDistance: 0.08
+  keepBossGroundedDuringDevour: 1
+  makeBossKinematicDuringDevour: 1
+  disableBossGravityDuringDevour: 1
+  ignoreVerticalPlayerFollow: 1
+  maximumAllowedVerticalDrift: 0.02
+  releasePlayerOutsideBoss: 1
+  releaseHorizontalDistance: 0.6
+  releaseVerticalSpeed: 0
+  releaseControlLockDuration: 0
+  darkTint: {r: 0.35, g: 0.35, b: 0.35, a: 1}
 --- !u!54 &7990415199108324068
 Rigidbody:
   m_ObjectHideFlags: 0

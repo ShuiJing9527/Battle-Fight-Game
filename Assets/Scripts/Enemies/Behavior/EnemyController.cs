@@ -82,61 +82,9 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float arcTravelTime = 0.9f;
     [SerializeField] private float targetPredictionTime = 0.25f;
 
-    [Header("Boss Skill - Leap Slam")]
-    [SerializeField] private bool enableBossLeapSlam = true;
-    [SerializeField] private float bossLeapInitialDelay = 2.0f;
-    [SerializeField] private float bossLeapCooldown = 6.0f;
-    [SerializeField, Range(0f, 1f)] private float bossLeapTriggerChance = 0.45f;
-    [SerializeField] private float bossLeapMinRange = 2.0f;
-    [SerializeField] private float bossLeapMaxRange = 8.0f;
-    [SerializeField] private float bossLeapWindupTime = 0.35f;
-    [SerializeField] private float bossLeapTravelTime = 0.65f;
-    [SerializeField] private float bossLeapRecoverTime = 0.45f;
-    [SerializeField] private float bossLeapHeight = 3.0f;
-    [SerializeField] private float bossLeapLandingRadius = 2.2f;
-    [SerializeField] private float bossLeapDamageMultiplier = 1.8f;
-    [SerializeField] private bool allowLeapSlamInMeleeRange = true;
-    [SerializeField, Range(0f, 1f)] private float bossLeapSlamMeleeChance = 0.3f;
-    [SerializeField, Range(0f, 1f)] private float bossLeapSlamVeryCloseChance = 0.6f;
-    [SerializeField] private float bossLeapSlamVeryCloseDistance = 2f;
-    [SerializeField] private float bossLeapSlamMinimumHorizontalTravel = 0f;
-    [SerializeField] private float bossLeapSlamCloseTravelDistance = 1f;
-    [SerializeField] private float bossLeapSlamMaximumHorizontalDistance = 12f;
-    [SerializeField] private bool enableLeapSlamTargetPrediction = true;
-    [SerializeField] private float bossLeapSlamPredictionTime = 0.45f;
-    [SerializeField] private float bossLeapSlamMaximumPredictionDistance = 4f;
-
-    [Header("Boss Leap Slam Landing")]
-    [SerializeField] private float bossLeapSlamLandingDamage = 80f;
-    [SerializeField] private float bossLeapSlamKnockbackHorizontal = 18f;
-    [SerializeField] private float bossLeapSlamKnockbackVertical = 12f;
-    [SerializeField] private float bossLeapSlamMinimumEscapeDistance = 1.5f;
-    [SerializeField] private float bossLeapSlamMaximumLaunchSeparation = 0.35f;
-    [SerializeField, Min(0f)] private float bossLeapSlamLaunchInputLockDuration = 0.3f;
-
-    [Header("Boss Falling Landing Impact")]
-    [SerializeField] private float bossFallingImpactMinimumHeight = 1.5f;
-    [SerializeField] private float bossFallingImpactMinimumDownwardSpeed = 2f;
-    [Header("Boss Falling Impact Height Trigger")]
-    [SerializeField] private bool enableBossFallingHeightTrigger = true;
-    [SerializeField] private float bossFallingImpactTriggerHeight = 1.2f;
-    [SerializeField] private float bossFallingImpactMaximumTriggerHeight = 2.5f;
-    [SerializeField] private float bossFallingImpactRequiredDownwardSpeed = 0.5f;
-    [SerializeField] private float bossFallingImpactPlayerCheckRadius = 4f;
-    [SerializeField] private LayerMask bossFallingImpactGroundMask = ~0;
-
-    [Header("Boss Forced Airborne Impact")]
-    [SerializeField] private bool enableForcedAirborneImpact = true;
-    [SerializeField] private float forcedAirborneImpactArmHeight = 1.5f;
-    [SerializeField] private float forcedAirborneImpactTriggerHeight = 1.2f;
-    [SerializeField] private float forcedAirborneImpactPlayerRadius = 4f;
-    [SerializeField] private float forcedAirborneImpactTimeout = 2f;
-
-    [Header("Landing VFX")]
-    [SerializeField] private bool enableLandingVfx = true;
-    [SerializeField] private GameObject landingVfxPrefab;
-    [SerializeField] private Vector3 landingVfxOffset = Vector3.zero;
-    [SerializeField, Min(0f)] private float landingVfxLifetime = 2f;
+    [Header("Boss Skill Components")]
+    [SerializeField] private BossSlimeLeapSlamSkill leapSlamSkill;
+    [SerializeField] private BossSlimeDevourSkill devourSkill;
 
     [Header("Boss Skill - Split Merge")]
     [SerializeField] private bool enableBossTimedSplit = true;
@@ -149,22 +97,6 @@ public class EnemyController : MonoBehaviour
     [SerializeField, Range(0.01f, 1f)] private float bossSplitChildHealthPercentOfBoss = 0.65f;
     [SerializeField] private float bossSplitWindupTime = 0.35f;
     [SerializeField] private float bossSplitMergeRecoverTime = 0.35f;
-
-    [Header("Boss Skill - Devour")]
-    [SerializeField] private bool enableBossDevour = true;
-    [SerializeField] private float bossDevourInitialDelay = 3.0f;
-    [SerializeField] private float bossDevourCooldown = 10.0f;
-    [SerializeField, Range(0f, 1f)] private float bossDevourTriggerChance = 0.35f;
-    [SerializeField] private float bossDevourRange = 2.2f;
-    [SerializeField] private float bossDevourWindupTime = 0.25f;
-    [SerializeField] private float bossDevourDuration = 3.0f;
-    [SerializeField] private float bossDevourDamagePerSecond = 4.0f;
-    [SerializeField] private float bossDevourTickInterval = 0.5f;
-    [SerializeField] private Color bossDevourDarkTint = new Color(0.35f, 0.35f, 0.35f, 1f);
-    [SerializeField] private Vector3 bossDevourHoldOffset = new Vector3(0f, 0.3f, 0f);
-    [SerializeField] private bool bossDevourLockBossToGround = true;
-    [SerializeField] private bool bossDevourIgnoreVerticalPlayerFollow = true;
-    [SerializeField, Min(0f)] private float bossDevourMaximumPlayerLift = 1.5f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLog = false;
@@ -267,6 +199,11 @@ public class EnemyController : MonoBehaviour
     private bool bossLandingImpactAwaitGroundReset;
     private readonly HashSet<int> bossLaunchedTargetIdsForImpactSequence = new HashSet<int>();
     private int bossLaunchedTargetSequenceId;
+    private bool hasLoggedLeapSlamConfigTrace;
+    private bool hasLoggedDevourConfigTrace;
+    private BossSlimeDevourSkill.RuntimeConfig activeBossDevourRuntimeConfig;
+    private bool leapSlamSkillRuntimeFallbackCreated;
+    private bool devourSkillRuntimeFallbackCreated;
 
     private enum EnemyAttackRuntimeState
     {
@@ -302,6 +239,179 @@ public class EnemyController : MonoBehaviour
     public Transform CurrentTarget => playerTarget;
     public MonsterAttackStyle CurrentAttackStyle => attackStyle;
     public string CurrentBossAttackKindName => activeBossAttackKind.ToString();
+    private bool enableBossLeapSlam => leapSlamSkill != null && leapSlamSkill.EnableLeapSlam;
+    private float bossLeapInitialDelay => leapSlamSkill != null ? leapSlamSkill.InitialDelay : 0f;
+    private float bossLeapCooldown => leapSlamSkill != null ? leapSlamSkill.Cooldown : 0f;
+    private float bossLeapTriggerChance => leapSlamSkill != null ? leapSlamSkill.TriggerChance : 0f;
+    private float bossLeapMinRange => leapSlamSkill != null ? leapSlamSkill.MinimumRange : 0f;
+    private float bossLeapMaxRange => leapSlamSkill != null ? leapSlamSkill.MaximumRange : 0f;
+    private float bossLeapWindupTime => leapSlamSkill != null ? leapSlamSkill.WindupTime : 0f;
+    private float bossLeapTravelTime => leapSlamSkill != null ? leapSlamSkill.TravelTime : 0f;
+    private float bossLeapRecoverTime => leapSlamSkill != null ? leapSlamSkill.RecoverTime : 0f;
+    private float bossLeapHeight => leapSlamSkill != null ? leapSlamSkill.LeapHeight : 0f;
+    private float bossLeapLandingRadius => leapSlamSkill != null ? leapSlamSkill.LandingRadius : 0f;
+    private float bossLeapDamageMultiplier => leapSlamSkill != null ? leapSlamSkill.DamageMultiplier : 1f;
+    private float BossFallingImpactMinimumHeight => leapSlamSkill != null ? leapSlamSkill.FallingImpactMinimumHeight : 1.5f;
+    private float BossFallingImpactMinimumDownwardSpeed => leapSlamSkill != null ? leapSlamSkill.FallingImpactMinimumDownwardSpeed : 2f;
+    private bool EnableBossFallingHeightTrigger => leapSlamSkill != null && leapSlamSkill.EnableFallingHeightTrigger;
+    private float BossFallingImpactTriggerHeight => leapSlamSkill != null ? leapSlamSkill.FallingImpactTriggerHeight : 1.2f;
+    private float BossFallingImpactMaximumTriggerHeight => leapSlamSkill != null ? leapSlamSkill.FallingImpactMaximumTriggerHeight : 2.5f;
+    private float BossFallingImpactRequiredDownwardSpeed => leapSlamSkill != null ? leapSlamSkill.FallingImpactRequiredDownwardSpeed : 0.5f;
+    private float BossFallingImpactPlayerCheckRadius => leapSlamSkill != null ? leapSlamSkill.FallingImpactPlayerCheckRadius : 4f;
+    private LayerMask BossFallingImpactGroundMask => leapSlamSkill != null ? leapSlamSkill.FallingImpactGroundMask : ~0;
+    private bool allowLeapSlamInMeleeRange => leapSlamSkill != null && leapSlamSkill.AllowInMeleeRange;
+    private float bossLeapSlamMeleeChance => leapSlamSkill != null ? leapSlamSkill.MeleeSelectionChance : 0f;
+    private float bossLeapSlamVeryCloseChance => leapSlamSkill != null ? leapSlamSkill.VeryCloseSelectionChance : 0f;
+    private float bossLeapSlamVeryCloseDistance => leapSlamSkill != null ? leapSlamSkill.VeryCloseDistance : 0f;
+    private float bossLeapSlamMinimumHorizontalTravel => leapSlamSkill != null ? leapSlamSkill.MinimumHorizontalTravel : 0f;
+    private float bossLeapSlamCloseTravelDistance => leapSlamSkill != null ? leapSlamSkill.CloseTravelDistance : 0f;
+    private float bossLeapSlamMaximumHorizontalDistance => leapSlamSkill != null ? leapSlamSkill.MaximumHorizontalDistance : 0f;
+    private bool enableLeapSlamTargetPrediction => leapSlamSkill != null && leapSlamSkill.EnableTargetPrediction;
+    private float bossLeapSlamPredictionTime => leapSlamSkill != null ? leapSlamSkill.PredictionTime : 0f;
+    private float bossLeapSlamMaximumPredictionDistance => leapSlamSkill != null ? leapSlamSkill.MaximumPredictionDistance : 0f;
+    private float bossLeapSlamLandingDamage => leapSlamSkill != null ? leapSlamSkill.LandingDamage : 0f;
+    private float bossLeapSlamKnockbackHorizontal => leapSlamSkill != null ? leapSlamSkill.LaunchHorizontalSpeed : 0f;
+    private float bossLeapSlamKnockbackVertical => leapSlamSkill != null ? leapSlamSkill.LaunchVerticalSpeed : 0f;
+    private float bossLeapSlamMinimumEscapeDistance => leapSlamSkill != null ? leapSlamSkill.MinimumEscapeDistance : 0f;
+    private float bossLeapSlamMaximumLaunchSeparation => leapSlamSkill != null ? leapSlamSkill.MaximumSeparationOffset : 0f;
+    private float bossLeapSlamLaunchInputLockDuration => leapSlamSkill != null ? leapSlamSkill.LaunchInputLockDuration : 0f;
+    private bool enableForcedAirborneImpact => leapSlamSkill != null && leapSlamSkill.EnableForcedAirborneImpact;
+    private float forcedAirborneImpactArmHeight => leapSlamSkill != null ? leapSlamSkill.ForcedAirborneArmHeight : 0f;
+    private float forcedAirborneImpactTriggerHeight => leapSlamSkill != null ? leapSlamSkill.ForcedAirborneTriggerHeight : 0f;
+    private float forcedAirborneImpactPlayerRadius => leapSlamSkill != null ? leapSlamSkill.ForcedAirbornePlayerCheckRadius : 0f;
+    private float forcedAirborneImpactTimeout => leapSlamSkill != null ? leapSlamSkill.ForcedAirborneTimeout : 0f;
+    private bool enableLandingVfx => leapSlamSkill != null && leapSlamSkill.EnableLandingVfx;
+    private GameObject landingVfxPrefab => leapSlamSkill != null ? leapSlamSkill.LandingVfxPrefab : null;
+    private Vector3 landingVfxOffset => leapSlamSkill != null ? leapSlamSkill.LandingVfxOffset : Vector3.zero;
+    private float landingVfxLifetime => leapSlamSkill != null ? leapSlamSkill.LandingVfxLifetime : 0f;
+    private bool enableBossDevour => devourSkill != null && devourSkill.EnableSkill;
+    private float bossDevourInitialDelay => devourSkill != null ? devourSkill.InitialDelay : 0f;
+    private float bossDevourCooldown => devourSkill != null ? devourSkill.Cooldown : 0f;
+    private float bossDevourTriggerChance => devourSkill != null ? devourSkill.SelectionChance : 0f;
+    private float bossDevourMinimumRange => devourSkill != null ? devourSkill.MinimumRange : 0f;
+    private float bossDevourRange => devourSkill != null ? devourSkill.MaximumRange : 0f;
+    private float bossDevourWindupTime => devourSkill != null ? devourSkill.WindupDuration : 0f;
+    private float bossDevourPullDuration => devourSkill != null ? devourSkill.PullDuration : 0f;
+    private float bossDevourHoldDuration => devourSkill != null ? devourSkill.HoldDuration : 0f;
+    private float bossDevourReleaseDuration => devourSkill != null ? devourSkill.ReleaseDuration : 0f;
+    private bool bossDevourDealInitialDamage => devourSkill != null && devourSkill.DealInitialDamage;
+    private float bossDevourInitialDamage => devourSkill != null ? devourSkill.InitialDamage : 0f;
+    private bool bossDevourDealDamageWhileHolding => devourSkill != null && devourSkill.DealDamageWhileHolding;
+    private float bossDevourStartingTickDamage => devourSkill != null ? devourSkill.StartingTickDamage : 0f;
+    private float bossDevourDamageIncreasePerTick => devourSkill != null ? devourSkill.DamageIncreasePerTick : 0f;
+    private float bossDevourTickInterval => devourSkill != null ? devourSkill.DamageTickInterval : 1f;
+    private float bossDevourMaximumTickDamage => devourSkill != null ? devourSkill.MaximumTickDamage : 0f;
+    private Color bossDevourDarkTint => devourSkill != null ? devourSkill.DarkTint : Color.white;
+    private Vector3 bossDevourHoldOffset => devourSkill != null ? devourSkill.HoldOffset : Vector3.zero;
+    private bool bossDevourLockBossToGround => devourSkill != null && devourSkill.KeepBossGroundedDuringDevour;
+    private bool bossDevourMakeBossKinematicDuringDevour => devourSkill != null && devourSkill.MakeBossKinematicDuringDevour;
+    private bool bossDevourDisableBossGravityDuringDevour => devourSkill != null && devourSkill.DisableBossGravityDuringDevour;
+    private bool bossDevourIgnoreVerticalPlayerFollow => devourSkill != null && devourSkill.IgnoreVerticalPlayerFollow;
+    private float bossDevourMaximumPlayerLift => devourSkill != null ? devourSkill.MaximumPlayerLift : 0f;
+    private float bossDevourGroundClearance => devourSkill != null ? devourSkill.GroundClearance : 0f;
+    private float bossDevourMaximumAllowedVerticalDrift => devourSkill != null ? devourSkill.MaximumAllowedVerticalDrift : BossDevourUnexpectedVerticalMovementThreshold;
+
+    private BossSlimeLeapSlamSkill ResolveLeapSlamSkill(bool createIfMissing = false)
+    {
+        if (leapSlamSkill != null)
+        {
+            return leapSlamSkill;
+        }
+
+        leapSlamSkill = GetComponent<BossSlimeLeapSlamSkill>();
+        if (leapSlamSkill == null && createIfMissing)
+        {
+            leapSlamSkill = gameObject.AddComponent<BossSlimeLeapSlamSkill>();
+            leapSlamSkillRuntimeFallbackCreated = true;
+        }
+        else if (leapSlamSkill != null)
+        {
+            leapSlamSkillRuntimeFallbackCreated = false;
+        }
+
+        return leapSlamSkill;
+    }
+
+    private BossSlimeDevourSkill ResolveDevourSkill(bool createIfMissing = false)
+    {
+        if (devourSkill != null)
+        {
+            return devourSkill;
+        }
+
+        devourSkill = GetComponent<BossSlimeDevourSkill>();
+        if (devourSkill == null && createIfMissing)
+        {
+            devourSkill = gameObject.AddComponent<BossSlimeDevourSkill>();
+            devourSkillRuntimeFallbackCreated = true;
+        }
+        else if (devourSkill != null)
+        {
+            devourSkillRuntimeFallbackCreated = false;
+        }
+
+        return devourSkill;
+    }
+
+    public void EnsureBossSkillComponentsForRuntime()
+    {
+        bool shouldCreateBossSkillComponents =
+            attackStyle == MonsterAttackStyle.ElementalBoss ||
+            (monsterIdentity != null && monsterIdentity.rank == MonsterRank.Boss);
+
+        if (shouldCreateBossSkillComponents)
+        {
+            ResolveLeapSlamSkill(createIfMissing: true);
+            ResolveDevourSkill(createIfMissing: true);
+        }
+    }
+
+    private void LogBossLeapSlamConfigTraceOnce(string source)
+    {
+        BossSlimeLeapSlamSkill skill = ResolveLeapSlamSkill();
+        if (skill == null || hasLoggedLeapSlamConfigTrace)
+        {
+            return;
+        }
+
+        Debug.Log(
+            skill.BuildConfigTrace(source) +
+            " configSource=" + (leapSlamSkillRuntimeFallbackCreated ? "RuntimeFallback" : "PrefabAssigned"),
+            this);
+        hasLoggedLeapSlamConfigTrace = true;
+    }
+
+    private void LogBossDevourConfigTraceOnce(string source)
+    {
+        BossSlimeDevourSkill skill = ResolveDevourSkill();
+        if (skill == null || hasLoggedDevourConfigTrace)
+        {
+            return;
+        }
+
+        Debug.Log(
+            skill.BuildConfigTrace(source) +
+            " configSource=" + (devourSkillRuntimeFallbackCreated ? "RuntimeFallback" : "PrefabAssigned"),
+            this);
+        hasLoggedDevourConfigTrace = true;
+    }
+
+    private void LogBossDevourStartedTrace(int sequenceId, Transform target)
+    {
+        BossSlimeDevourSkill skill = ResolveDevourSkill();
+        if (skill == null)
+        {
+            return;
+        }
+
+        Debug.Log(
+            skill.BuildConfigTrace("DevourStarted") +
+            " configSource=" + (devourSkillRuntimeFallbackCreated ? "RuntimeFallback" : "PrefabAssigned") +
+            " event=DevourStarted" +
+            " actionSequenceId=" + sequenceId +
+            " target=" + (target != null ? target.name : "null"),
+            this);
+    }
 
     private void Start()
     {
@@ -313,7 +423,10 @@ public class EnemyController : MonoBehaviour
         ResolveMeleeHitSources();
         initialRotation = transform.rotation;
         ResolvePlayerTarget();
+        EnsureBossSkillComponentsForRuntime();
         InitializeBossSkillTimers();
+        LogBossLeapSlamConfigTraceOnce("EnemyController.Start");
+        LogBossDevourConfigTraceOnce("EnemyController.Start");
 
         if (slimeAnimation != null)
         {
@@ -451,7 +564,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // 攻击动作进行中时，原地停住并保持当前朝向，等待攻击回调结算。
+        // 鏀诲嚮鍔ㄤ綔杩涜涓椂锛屽師鍦板仠浣忓苟淇濇寔褰撳墠鏈濆悜锛岀瓑寰呮敾鍑诲洖璋冪粨绠椼€?
         if (isAttackAnimationActive)
         {
             LogEnemyMeleeDecision(attackDistance, false, "AlreadyAttacking", grounded, "None", playerTarget != null ? playerTarget.name : "null", Mathf.Max(0f, nextAttackTime - Time.time), true, false, isDead);
@@ -613,6 +726,7 @@ public class EnemyController : MonoBehaviour
         this.attackStyle = attackStyle;
         this.attackIntervalMultiplier = Mathf.Max(0.1f, attackIntervalMultiplier);
         this.outgoingDamageMultiplier = Mathf.Max(0.01f, outgoingDamageMultiplier);
+        EnsureBossSkillComponentsForRuntime();
 
         // EnemySpawner rewrites rank combat windows at runtime. Keep the horizontal
         // attack gate aligned with the final runtime hit window so template-based
@@ -822,37 +936,70 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        bool leapPreferredInMelee = allowLeapSlamInMeleeRange &&
-                                    distance <= Mathf.Max(0.1f, bossMeleeAttackRange);
-
-        if (leapPreferredInMelee &&
-            enableBossLeapSlam &&
-            Time.time >= nextBossLeapAttackTime)
-        {
-            consideredSkill = "LeapSlam";
-            if (CanUseBossLeapSkill(distance, verticalDifference, grounded) &&
-                RollBossLeapMeleeSelectionChance(distance))
-            {
-                if (BeginBossLeapSlam(playerTarget))
-                {
-                    return true;
-                }
-
-                failReason = "LockFailed";
-            }
-            else
-            {
-                failReason = CanUseBossLeapSkill(distance, verticalDifference, grounded) ? "ChanceMissed" : "ConditionsFailed";
-            }
-        }
+        bool inBossMeleeRange = distance <= Mathf.Max(0.1f, bossMeleeAttackRange);
+        bool leapPreferredInMelee = allowLeapSlamInMeleeRange && inBossMeleeRange;
+        bool devourAvailable = enableBossDevour &&
+                               Time.time >= nextBossDevourAttackTime &&
+                               CanUseBossDevourSkill(distance, verticalDifference, grounded);
+        bool leapAvailable = enableBossLeapSlam &&
+                             Time.time >= nextBossLeapAttackTime &&
+                             CanUseBossLeapSkill(distance, verticalDifference, grounded);
 
         if (enableBossDevour && Time.time >= nextBossDevourAttackTime)
         {
             consideredSkill = "Devour";
-            if (CanUseBossDevourSkill(distance, verticalDifference, grounded) && RollBossSkillChance(bossDevourTriggerChance))
+            LogBossDevourConfigTraceOnce("TryBeginBossSpecialSkill");
+            float leapChance = distance <= Mathf.Max(0.1f, bossLeapSlamVeryCloseDistance)
+                ? bossLeapSlamVeryCloseChance
+                : bossLeapSlamMeleeChance;
+
+            if ((debugAttackDiagnostics || debugLog) && inBossMeleeRange)
+            {
+                Debug.Log(
+                    "[BossCombatDecisionTrace] " +
+                    "distance=" + distance.ToString("F2") +
+                    " veryClose=" + (distance <= Mathf.Max(0.1f, bossLeapSlamVeryCloseDistance)) +
+                    " devourAvailable=" + devourAvailable +
+                    " leapAvailable=" + (leapPreferredInMelee && leapAvailable) +
+                    " basicAttackAvailable=true" +
+                    " devourCooldownRemaining=" + Mathf.Max(0f, nextBossDevourAttackTime - Time.time).ToString("F2") +
+                    " leapCooldownRemaining=" + Mathf.Max(0f, nextBossLeapAttackTime - Time.time).ToString("F2") +
+                    " devourConfiguredChanceOrWeight=" + bossDevourTriggerChance.ToString("F2") +
+                    " leapConfiguredChanceOrWeight=" + leapChance.ToString("F2") +
+                    " candidateSkills=Devour,LeapSlam,BasicAttack" +
+                    " selectionOrder=DevourThenLeapThenBasic" +
+                    " effectiveDevourProbability=" + bossDevourTriggerChance.ToString("F2") +
+                    " effectiveLeapProbability=" + ((1f - bossDevourTriggerChance) * leapChance).ToString("F2") +
+                    " effectiveBasicProbability=" + ((1f - bossDevourTriggerChance) * (1f - leapChance)).ToString("F2"),
+                    this);
+            }
+
+            float devourRoll = Random.value;
+            bool devourPassed = devourAvailable && devourRoll <= Mathf.Clamp01(bossDevourTriggerChance);
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Debug.Log(
+                    "[BossCombatDecisionTrace] " +
+                    "distance=" + distance.ToString("F2") +
+                    " skill=Devour" +
+                    " available=" + devourAvailable +
+                    " cooldownRemaining=" + Mathf.Max(0f, nextBossDevourAttackTime - Time.time).ToString("F2") +
+                    " configuredChance=" + bossDevourTriggerChance.ToString("F2") +
+                    " randomRoll=" + devourRoll.ToString("F4") +
+                    " passed=" + devourPassed,
+                    this);
+            }
+
+            if (devourPassed)
             {
                 if (BeginBossDevourSkill(playerTarget))
                 {
+                    if (debugAttackDiagnostics || debugLog)
+                    {
+                        Debug.Log(
+                            "[BossCombatDecisionTrace] selectedAction=Devour selectionReason=PassedRollAndConditions distance=" + distance.ToString("F2"),
+                            this);
+                    }
                     return true;
                 }
 
@@ -860,17 +1007,39 @@ public class EnemyController : MonoBehaviour
             }
             else
             {
-                failReason = CanUseBossDevourSkill(distance, verticalDifference, grounded) ? "ChanceMissed" : "ConditionsFailed";
+                failReason = devourAvailable ? "ChanceMissed" : "ConditionsFailed";
             }
         }
 
         if (enableBossLeapSlam && Time.time >= nextBossLeapAttackTime)
         {
             consideredSkill = "LeapSlam";
-            if (CanUseBossLeapSkill(distance, verticalDifference, grounded) && RollBossSkillChance(bossLeapTriggerChance))
+            float leapRoll = Random.value;
+            bool leapPassed = leapAvailable && leapRoll <= Mathf.Clamp01(bossLeapTriggerChance);
+            if (debugAttackDiagnostics || debugLog)
+            {
+                Debug.Log(
+                    "[BossCombatDecisionTrace] " +
+                    "distance=" + distance.ToString("F2") +
+                    " skill=LeapSlam" +
+                    " available=" + leapAvailable +
+                    " cooldownRemaining=" + Mathf.Max(0f, nextBossLeapAttackTime - Time.time).ToString("F2") +
+                    " configuredChance=" + bossLeapTriggerChance.ToString("F2") +
+                    " randomRoll=" + leapRoll.ToString("F4") +
+                    " passed=" + leapPassed,
+                    this);
+            }
+
+            if (leapPassed)
             {
                 if (BeginBossLeapSlam(playerTarget))
                 {
+                    if (debugAttackDiagnostics || debugLog)
+                    {
+                        Debug.Log(
+                            "[BossCombatDecisionTrace] selectedAction=LeapSlam selectionReason=PassedRollAndConditions distance=" + distance.ToString("F2"),
+                            this);
+                    }
                     return true;
                 }
 
@@ -878,7 +1047,7 @@ public class EnemyController : MonoBehaviour
             }
             else
             {
-                failReason = CanUseBossLeapSkill(distance, verticalDifference, grounded) ? "ChanceMissed" : "ConditionsFailed";
+                failReason = leapAvailable ? "ChanceMissed" : "ConditionsFailed";
             }
         }
 
@@ -941,7 +1110,9 @@ public class EnemyController : MonoBehaviour
             return false;
         }
 
-        if (distance > Mathf.Max(0.1f, bossDevourRange))
+        float minimumRange = Mathf.Max(0f, bossDevourMinimumRange);
+        float maximumRange = Mathf.Max(minimumRange, bossDevourRange);
+        if (distance < minimumRange || distance > Mathf.Max(0.1f, maximumRange))
         {
             return false;
         }
@@ -976,6 +1147,7 @@ public class EnemyController : MonoBehaviour
         lastAttackTime = Time.time;
         nextBossLeapAttackTime = Time.time + Mathf.Max(0.1f, bossLeapCooldown);
         rb.linearVelocity = Vector3.zero;
+        LogBossLeapSlamConfigTraceOnce("BeginBossLeapSlam");
         BeginBossLeapBodyOverride();
         Debug.Log(
             "[BossLeapSlamTrace] event=LeapStarted " +
@@ -1296,10 +1468,12 @@ public class EnemyController : MonoBehaviour
         pendingAttackTarget = target;
         lastAttackTime = Time.time;
         nextBossDevourAttackTime = Time.time + Mathf.Max(0.1f, bossDevourCooldown);
+        activeBossDevourRuntimeConfig = devourSkill != null ? devourSkill.BuildRuntimeConfig() : default;
         if (rb != null)
         {
             rb.linearVelocity = Vector3.zero;
         }
+        LogBossDevourStartedTrace(sequenceId, target);
         BeginBossDevourBodyOverride(sequenceId);
         StopMoveAnimation();
         CancelInvoke(nameof(FinishAttackRecovery));
@@ -1310,6 +1484,7 @@ public class EnemyController : MonoBehaviour
 
     private System.Collections.IEnumerator BossDevourRoutine(Transform target, int sequenceId)
     {
+        BossSlimeDevourSkill.RuntimeConfig runtimeConfig = activeBossDevourRuntimeConfig;
         Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
         Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
         Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
@@ -1341,11 +1516,10 @@ public class EnemyController : MonoBehaviour
         if (targetHealth != null && !targetHealth.IsDead)
         {
             BossSlimeDevourStatus status = BossSlimeDevourStatus.ResolveOrAdd(targetHealth.gameObject);
-            float tickInterval = Mathf.Max(0.05f, bossDevourTickInterval);
-            status.Apply(gameObject, transform, this, sequenceId, Mathf.Max(0.1f, bossDevourDuration), tickInterval, Mathf.Max(0f, bossDevourDamagePerSecond) * tickInterval, bossDevourDarkTint, bossDevourHoldOffset);
+            status.Apply(gameObject, transform, this, sequenceId, runtimeConfig);
         }
 
-        float duration = Mathf.Max(0.1f, bossDevourDuration);
+        float duration = Mathf.Max(0.1f, runtimeConfig.TotalDuration);
         for (float elapsed = 0f; elapsed < duration; elapsed += Time.deltaTime)
         {
             if (!IsBossActionActive(BossAttackKind.Devour, sequenceId))
@@ -1384,6 +1558,7 @@ public class EnemyController : MonoBehaviour
         RestoreBossLeapBodyOverride("CompleteBossSpecialAttack");
         Coroutine completedRoutine = bossSpecialAttackRoutine;
         bossSpecialAttackRoutine = null;
+        activeBossDevourRuntimeConfig = default;
         if (activeBossAttackRoutine == completedRoutine)
         {
             activeBossAttackRoutine = null;
@@ -1407,8 +1582,14 @@ public class EnemyController : MonoBehaviour
         bossDevourBodyOverrideActive = true;
         rb.linearVelocity = Vector3.zero;
         rb.angularVelocity = Vector3.zero;
-        rb.useGravity = false;
-        rb.isKinematic = true;
+        if (bossDevourDisableBossGravityDuringDevour)
+        {
+            rb.useGravity = false;
+        }
+        if (bossDevourMakeBossKinematicDuringDevour)
+        {
+            rb.isKinematic = true;
+        }
         rb.position = bossDevourGroundAnchorPosition;
         transform.position = bossDevourGroundAnchorPosition;
         Physics.SyncTransforms();
@@ -1459,7 +1640,7 @@ public class EnemyController : MonoBehaviour
         float afterY = transform.position.y;
         float afterVelocityY = rb.linearVelocity.y;
         bool unexpectedVerticalMovement =
-            Mathf.Abs(beforeY - bossDevourGroundAnchorPosition.y) > BossDevourUnexpectedVerticalMovementThreshold;
+            Mathf.Abs(beforeY - bossDevourGroundAnchorPosition.y) > Mathf.Max(0f, bossDevourMaximumAllowedVerticalDrift);
 
         if (Time.time >= nextBossDevourFlightTraceTime || wrotePosition || unexpectedVerticalMovement)
         {
@@ -1863,6 +2044,13 @@ public class EnemyController : MonoBehaviour
             Vector3 launchVelocity = horizontalDirection * Mathf.Max(0f, bossLeapSlamKnockbackHorizontal) + Vector3.up * Mathf.Max(0f, bossLeapSlamKnockbackVertical);
             float playerHpBefore = ResolveCombatHealthValue(targetHealth);
             float playerShieldBefore = targetHealth.GetShield();
+            Debug.Log(
+                "[BossLaunchBalanceTrace] " +
+                "horizontalKnockback=" + bossLeapSlamKnockbackHorizontal.ToString("F2") +
+                " verticalKnockback=" + bossLeapSlamKnockbackVertical.ToString("F2") +
+                " launchVelocity=" + launchVelocity +
+                " playerStartPosition=" + targetHealth.transform.position,
+                this);
 
             LogBossLandingTrace(
                 "ColliderEvaluated",
@@ -2041,8 +2229,8 @@ public class EnemyController : MonoBehaviour
             bossHighestAirborneY = Mathf.Max(bossHighestAirborneY, currentY);
             float airborneHeight = bossHighestAirborneY - bossLastGroundedY;
             if (!bossFallingImpactArmed &&
-                airborneHeight >= Mathf.Max(0f, bossFallingImpactMinimumHeight) &&
-                verticalVelocity <= -Mathf.Max(0f, bossFallingImpactMinimumDownwardSpeed))
+                airborneHeight >= Mathf.Max(0f, BossFallingImpactMinimumHeight) &&
+                verticalVelocity <= -Mathf.Max(0f, BossFallingImpactMinimumDownwardSpeed))
             {
                 bossFallingImpactArmed = true;
                 LogBossLandingTrace(
@@ -2315,12 +2503,12 @@ public class EnemyController : MonoBehaviour
 
     private bool TryTriggerBossFallingHeightThresholdImpact(float verticalVelocity)
     {
-        if (!enableBossFallingHeightTrigger || rb == null || rb.isKinematic || !bossWasAirborne || !bossFallingImpactArmed || bossFallingImpactTriggered)
+        if (!EnableBossFallingHeightTrigger || rb == null || rb.isKinematic || !bossWasAirborne || !bossFallingImpactArmed || bossFallingImpactTriggered)
         {
             return false;
         }
 
-        if (verticalVelocity > -Mathf.Max(0f, bossFallingImpactRequiredDownwardSpeed))
+        if (verticalVelocity > -Mathf.Max(0f, BossFallingImpactRequiredDownwardSpeed))
         {
             return false;
         }
@@ -2337,7 +2525,7 @@ public class EnemyController : MonoBehaviour
                     "bossBottomY", float.NaN,
                     "groundY", float.NaN,
                     "heightAboveGround", float.NaN,
-                    "triggerHeight", bossFallingImpactTriggerHeight,
+                    "triggerHeight", BossFallingImpactTriggerHeight,
                     "velocityY", verticalVelocity,
                     "armed", bossFallingImpactArmed,
                     "alreadyTriggered", bossFallingImpactTriggered,
@@ -2349,7 +2537,7 @@ public class EnemyController : MonoBehaviour
         }
 
         float heightAboveGround = bossBottomY - groundY;
-        int playerCount = CountBossLandingPlayersInImpactZone(gameplayImpactCenter, Mathf.Max(0.1f, bossFallingImpactPlayerCheckRadius));
+        int playerCount = CountBossLandingPlayersInImpactZone(gameplayImpactCenter, Mathf.Max(0.1f, BossFallingImpactPlayerCheckRadius));
         bool playerBelowFound = playerCount > 0;
 
         if ((debugAttackDiagnostics || debugLog) && Time.time >= nextBossLandingHeightTraceTime)
@@ -2362,7 +2550,7 @@ public class EnemyController : MonoBehaviour
                 "bossBottomY", bossBottomY,
                 "groundY", groundY,
                 "heightAboveGround", heightAboveGround,
-                "triggerHeight", bossFallingImpactTriggerHeight,
+                "triggerHeight", BossFallingImpactTriggerHeight,
                 "velocityY", verticalVelocity,
                 "armed", bossFallingImpactArmed,
                 "alreadyTriggered", bossFallingImpactTriggered,
@@ -2370,12 +2558,12 @@ public class EnemyController : MonoBehaviour
                 "groundCollider", groundCollider != null ? groundCollider.name : "null");
         }
 
-        if (heightAboveGround < 0f || heightAboveGround > Mathf.Max(bossFallingImpactTriggerHeight, bossFallingImpactMaximumTriggerHeight))
+        if (heightAboveGround < 0f || heightAboveGround > Mathf.Max(BossFallingImpactTriggerHeight, BossFallingImpactMaximumTriggerHeight))
         {
             return false;
         }
 
-        if (heightAboveGround > Mathf.Max(0f, bossFallingImpactTriggerHeight))
+        if (heightAboveGround > Mathf.Max(0f, BossFallingImpactTriggerHeight))
         {
             return false;
         }
@@ -2413,8 +2601,8 @@ public class EnemyController : MonoBehaviour
         Bounds bounds = bossCollider.bounds;
         bossBottomY = bounds.min.y;
         Vector3 rayOrigin = new Vector3(bounds.center.x, bounds.max.y + 0.2f, bounds.center.z);
-        float rayDistance = Mathf.Max(2f, bounds.size.y + Mathf.Max(0f, bossFallingImpactMaximumTriggerHeight) + 2f);
-        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, rayDistance, bossFallingImpactGroundMask, QueryTriggerInteraction.Ignore);
+        float rayDistance = Mathf.Max(2f, bounds.size.y + Mathf.Max(0f, BossFallingImpactMaximumTriggerHeight) + 2f);
+        RaycastHit[] hits = Physics.RaycastAll(rayOrigin, Vector3.down, rayDistance, BossFallingImpactGroundMask, QueryTriggerInteraction.Ignore);
         if (hits == null || hits.Length == 0)
         {
             return false;
@@ -3679,7 +3867,7 @@ public class EnemyController : MonoBehaviour
         return IsBossActionActive(BossAttackKind.Devour, sequenceId);
     }
 
-    public Vector3 ResolveBossDevourHoldTargetPosition(Transform holdAnchor, Vector3 holdOffset)
+    public Vector3 ResolveBossDevourHoldTargetPosition(Transform holdAnchor, Vector3 holdOffset, Transform heldTarget = null)
     {
         Vector3 anchorPosition;
         if (bossDevourBodyOverrideActive)
@@ -3696,13 +3884,60 @@ public class EnemyController : MonoBehaviour
         }
 
         Vector3 holdTarget = anchorPosition + holdOffset;
+        float maximumLiftY = bossDevourGroundedRootY + Mathf.Max(0f, bossDevourMaximumPlayerLift);
         if (bossDevourIgnoreVerticalPlayerFollow)
         {
-            float maximumLiftY = bossDevourGroundedRootY + Mathf.Max(0f, bossDevourMaximumPlayerLift);
             holdTarget.y = Mathf.Min(holdTarget.y, maximumLiftY);
         }
 
+        Transform targetTransform = heldTarget != null ? heldTarget : playerTarget;
+        Collider playerCollider = ResolvePlayerCollider(targetTransform);
+        if (playerCollider != null && TryResolveBossDevourGroundY(anchorPosition, out float groundY))
+        {
+            float targetRootY = targetTransform != null ? targetTransform.position.y : playerCollider.bounds.center.y;
+            float playerBottomOffset = targetRootY - playerCollider.bounds.min.y;
+            float minimumSafePlayerRootY = groundY + playerBottomOffset + Mathf.Max(0f, bossDevourGroundClearance);
+            if (minimumSafePlayerRootY > maximumLiftY + 0.001f)
+            {
+                Debug.LogWarning(
+                    "[BossDevourConfigTrace] " +
+                    "event=InvalidHoldHeightConfig " +
+                    "minimumSafeY=" + minimumSafePlayerRootY.ToString("F3") +
+                    " maximumAllowedY=" + maximumLiftY.ToString("F3") +
+                    " holdOffset=" + holdOffset +
+                    " target=" + (targetTransform != null ? targetTransform.name : "null"),
+                    this);
+            }
+
+            holdTarget.y = Mathf.Max(holdTarget.y, minimumSafePlayerRootY);
+        }
+
         return holdTarget;
+    }
+
+    private bool TryResolveBossDevourGroundY(Vector3 anchorPosition, out float groundY)
+    {
+        groundY = bossDevourGroundedRootY;
+
+        if (lastGroundProbeHit && !float.IsNaN(lastGroundHitY) && !float.IsInfinity(lastGroundHitY))
+        {
+            groundY = lastGroundHitY;
+            return true;
+        }
+
+        Vector3 rayOrigin = anchorPosition + Vector3.up * 2f;
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit rayHit, 8f, ~0, QueryTriggerInteraction.Ignore))
+        {
+            Transform bossRoot = transform.root;
+            Transform playerRoot = playerTarget != null ? playerTarget.root : null;
+            Transform hitRoot = rayHit.collider != null ? rayHit.collider.transform.root : null;
+            if (hitRoot != bossRoot && hitRoot != playerRoot)
+            {
+                groundY = rayHit.point.y;
+                return true;
+            }
+        }
+        return bossDevourBodyOverrideActive;
     }
 
     private void ReleaseBossActionLock(string endReason, int sequenceId)
@@ -3747,6 +3982,7 @@ public class EnemyController : MonoBehaviour
         bossRangedAttackRoutine = null;
         bossSpecialAttackRoutine = null;
         activeBossAttackKind = BossAttackKind.None;
+        activeBossDevourRuntimeConfig = default;
     }
 
     private void StopBossDevourAttractionImmediately()
@@ -3951,7 +4187,7 @@ public class EnemyController : MonoBehaviour
             Vector3.zero,
             Vector3.zero);
 
-        // 触发攻击动画后，按动画时序进入冷却恢复阶段。
+        // 瑙﹀彂鏀诲嚮鍔ㄧ敾鍚庯紝鎸夊姩鐢绘椂搴忚繘鍏ュ喎鍗存仮澶嶉樁娈点€?
         if (slimeAnimation != null)
         {
             LogSlimeAttackLifecycle("PlayAttackAnimation", pendingAttackTarget, "SlimeAnimation");
@@ -5565,7 +5801,7 @@ public class EnemyController : MonoBehaviour
 
         BattleDamageType damageType = ResolvePrimaryDamageType();
 
-        // 投射物出生点维持在角色前上方，避免和本体碰撞体重叠。
+        // 鎶曞皠鐗╁嚭鐢熺偣缁存寔鍦ㄨ鑹插墠涓婃柟锛岄伩鍏嶅拰鏈綋纰版挒浣撻噸鍙犮€?
         GameObject projectile = CreateProjectileObject();
         if (projectile == null)
         {

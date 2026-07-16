@@ -1328,6 +1328,7 @@ public class EnemySpawner : MonoBehaviour
         EnemyController enemyController = enemy.GetComponent<EnemyController>();
         if (enemyController != null)
         {
+            enemyController.EnsureBossSkillComponentsForRuntime();
             enemyController.enabled = true;
             enemyController.SetTarget(targetOverride != null ? targetOverride : ResolveActivePlayerTarget(), source);
         }
