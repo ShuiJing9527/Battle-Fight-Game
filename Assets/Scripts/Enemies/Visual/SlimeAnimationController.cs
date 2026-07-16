@@ -42,6 +42,12 @@ public class SlimeAnimationController : MonoBehaviour
     [SerializeField] private bool allowAttackVerticalLeap = true;
     [SerializeField] private float maxAttackLeapDistance = 0.65f;
 
+    [Header("Attack Landing VFX")]
+    [SerializeField] private bool enableAttackLandingVfx = true;
+    [SerializeField] private GameObject attackLandingVfxPrefab;
+    [SerializeField] private Vector3 attackLandingVfxOffset = Vector3.zero;
+    [SerializeField, Min(0f)] private float attackLandingVfxLifetime = 2f;
+
     [Header("Visibility")]
     [SerializeField] private float minimumVisibleAlpha = 0.92f;
 
@@ -352,6 +358,7 @@ public class SlimeAnimationController : MonoBehaviour
         }
 
         transform.position = endWorld;
+        PlayAttackLandingVfx(endWorld, jumpDistance);
         if (!hitRaised)
         {
             RaiseAttackHit(target);
@@ -483,6 +490,29 @@ public class SlimeAnimationController : MonoBehaviour
 
         float groundingOffset = -(yRatio - 1f) * spriteHalfHeightLocal;
         visualRoot.localPosition = baseVisualLocalPosition + new Vector3(0f, groundingOffset, 0f);
+    }
+
+    private void PlayAttackLandingVfx(Vector3 landingPosition, float jumpDistance)
+    {
+        if (!enableAttackLandingVfx || attackLandingVfxPrefab == null)
+        {
+            return;
+        }
+
+        bool hasVisibleJump =
+            Mathf.Max(0f, attackJumpHeight) > 0.05f ||
+            (allowAttackForwardLeap && jumpDistance > 0.05f);
+        if (!hasVisibleJump)
+        {
+            return;
+        }
+
+        EnemyLandingVfxUtility.PlayLandingVfx(
+            attackLandingVfxPrefab,
+            landingPosition,
+            attackLandingVfxOffset,
+            attackLandingVfxLifetime,
+            Quaternion.identity);
     }
 
     private void ResolveVisualReferences()

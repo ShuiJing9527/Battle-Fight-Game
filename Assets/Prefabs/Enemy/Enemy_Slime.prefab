@@ -290,6 +290,10 @@ MonoBehaviour:
   debugAttackLogInterval: 0.3
   debugSpeedLogInterval: 1
   targetResolveRetryInterval: 0.25
+  enableLandingVfx: 1
+  landingVfxPrefab: {fileID: 11400000, guid: 8986621e08ddbcd4fb5e8010d305b92f, type: 3}
+  landingVfxOffset: {x: 0, y: 0, z: 0}
+  landingVfxLifetime: 2
 --- !u!114 &2725362885038075655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -321,6 +325,10 @@ MonoBehaviour:
   allowAttackForwardLeap: 1
   allowAttackVerticalLeap: 1
   maxAttackLeapDistance: 0.65
+  enableAttackLandingVfx: 1
+  attackLandingVfxPrefab: {fileID: 11400000, guid: 2ef252c769e88ff4a86bc9de4764ed5b, type: 3}
+  attackLandingVfxOffset: {x: 0, y: 0, z: 0}
+  attackLandingVfxLifetime: 2
   minimumVisibleAlpha: 0.92
   deathDuration: 0.65
   deathFadeTime: 0.45

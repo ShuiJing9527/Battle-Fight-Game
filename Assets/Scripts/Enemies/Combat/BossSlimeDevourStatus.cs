@@ -11,6 +11,10 @@ public class BossSlimeDevourStatus : MonoBehaviour
     private Coroutine activeRoutine;
     private CombatHealth combatHealth;
     private Rigidbody targetBody;
+    private EnemyController ownerController;
+    private int ownerSequenceId;
+    private GameObject currentDamageSource;
+    private float nextTraceTime;
 
     private struct SpriteColorBinding
     {
@@ -45,6 +49,8 @@ public class BossSlimeDevourStatus : MonoBehaviour
     public void Apply(
         GameObject damageSource,
         Transform holdAnchor,
+        EnemyController actionOwner,
+        int actionSequenceId,
         float duration,
         float tickInterval,
         float damagePerTick,
@@ -60,6 +66,9 @@ public class BossSlimeDevourStatus : MonoBehaviour
         CacheRuntimeReferences();
         CacheVisuals();
         ApplyDarkTint(darkTint);
+        currentDamageSource = damageSource;
+        ownerController = actionOwner;
+        ownerSequenceId = actionSequenceId;
         activeRoutine = StartCoroutine(DevourRoutine(damageSource, holdAnchor, duration, tickInterval, damagePerTick, holdOffset));
     }
 
@@ -83,6 +92,27 @@ public class BossSlimeDevourStatus : MonoBehaviour
                 break;
             }
 
+            if (ownerController == null || !ownerController.IsBossDevourActionActive(ownerSequenceId))
+            {
+                Debug.LogWarning(
+                    "[BossActionLockTrace] event=InvalidAttractionState " +
+                    "activeKind=" + (ownerController != null ? ownerController.CurrentBossAttackKindName : "None") +
+                    " target=" + name +
+                    " sequenceId=" + ownerSequenceId,
+                    this);
+                break;
+            }
+
+            if (Time.time >= nextTraceTime)
+            {
+                nextTraceTime = Time.time + 0.5f;
+                Debug.Log(
+                    "[BossActionLockTrace] event=AttractionActive " +
+                    "activeKind=Devour target=" + name +
+                    " sequenceId=" + ownerSequenceId,
+                    this);
+            }
+
             HoldInsideBossBody(holdAnchor, holdOffset);
 
             if (elapsed >= nextDamageTime)
@@ -97,6 +127,26 @@ public class BossSlimeDevourStatus : MonoBehaviour
 
         RestoreVisuals();
         activeRoutine = null;
+        ownerController = null;
+        ownerSequenceId = 0;
+        currentDamageSource = null;
+    }
+
+    public void ForceStop(string reason)
+    {
+        if (activeRoutine != null)
+        {
+            StopCoroutine(activeRoutine);
+            activeRoutine = null;
+        }
+
+        RestoreVisuals();
+        ownerController = null;
+        ownerSequenceId = 0;
+        currentDamageSource = null;
+        Debug.Log(
+            "[BossActionLockTrace] event=ActionLockReleased kind=Devour sequenceId=0 endReason=" + reason,
+            this);
     }
 
     private void CacheRuntimeReferences()
@@ -205,10 +255,13 @@ public class BossSlimeDevourStatus : MonoBehaviour
             return;
         }
 
-        Vector3 targetPosition = holdAnchor.position + holdOffset;
+        Vector3 targetPosition = ownerController != null
+            ? ownerController.ResolveBossDevourHoldTargetPosition(holdAnchor, holdOffset)
+            : holdAnchor.position + holdOffset;
         if (targetBody != null)
         {
             targetBody.linearVelocity = Vector3.zero;
+            targetBody.angularVelocity = Vector3.zero;
             targetBody.position = Vector3.Lerp(targetBody.position, targetPosition, Mathf.Clamp01(Time.deltaTime * 12f));
         }
 

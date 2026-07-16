@@ -623,6 +623,21 @@ public class Player2PrototypeController : MonoBehaviour
     private Coroutine externalLaunchRoutine;
     private bool externalLaunchUseGravityBefore;
     private RigidbodyConstraints externalLaunchConstraintsBefore;
+    private bool isUnderExternalLaunch;
+    [SerializeField, Min(0.01f)] private float minimumExternalLaunchRetriggerInterval = 0.15f;
+    [SerializeField, Min(0.05f)] private float externalLaunchMinimumLockDuration = 0.15f;
+    [SerializeField, Min(0.1f)] private float externalLaunchMaximumAirborneDuration = 2.5f;
+    [SerializeField, Min(0.01f)] private float externalLaunchGroundProbeDistance = 0.2f;
+    [SerializeField, Min(1)] private int externalLaunchLandingConfirmFrames = 2;
+    [SerializeField, Min(0f)] private float externalLaunchGroundSkin = 0.02f;
+    [SerializeField] private bool debugExternalLaunchMotion = true;
+    private int lastExternalLaunchSequenceId;
+    private float lastExternalLaunchReceivedTime = -999f;
+    private bool externalLaunchReceivedThisFrame;
+    private int externalLaunchGroundedFrameCount;
+    private float previousExternalLaunchVelocityY;
+    private float previousExternalLaunchRootY;
+    private float previousExternalLaunchRbY;
 
     public bool HasActiveRuntimeSkill
     {
@@ -1047,6 +1062,16 @@ public class Player2PrototypeController : MonoBehaviour
                 skillHud.StartSkillCooldown("R", ResolveSkillCooldownSeconds(rSkill, "R"));
             }
         }
+    }
+
+    private void FixedUpdate()
+    {
+        if (!isUnderExternalLaunch || rb == null)
+        {
+            return;
+        }
+
+        TraceExternalLaunchStep("FixedUpdate");
     }
     private void InitializeSkillSlots()
     {
@@ -1499,8 +1524,41 @@ public class Player2PrototypeController : MonoBehaviour
 
     public Rigidbody Body => rb;
 
-    public void ApplyExternalLaunch(Vector3 launchVelocity, float duration, Vector3 separationOffset)
+    public void ApplyExternalLaunch(Vector3 launchVelocity, float duration, Vector3 separationOffset, int launchSequenceId = 0)
     {
+        bool duplicateSequence = launchSequenceId > 0 &&
+                                 launchSequenceId == lastExternalLaunchSequenceId &&
+                                 Time.time - lastExternalLaunchReceivedTime <= Mathf.Max(0.01f, minimumExternalLaunchRetriggerInterval);
+        Debug.Log(
+            "[BossLaunchRepeatTrace] event=LaunchReceived " +
+            "controller=Player2PrototypeController" +
+            " target=" + name +
+            " frame=" + Time.frameCount +
+            " fixedTime=" + Time.fixedTime.ToString("F3") +
+            " launchSequenceId=" + launchSequenceId +
+            " previousLaunchSequenceId=" + lastExternalLaunchSequenceId +
+            " externalLaunchAlreadyActive=" + isUnderExternalLaunch +
+            " currentVelocityBefore=" + (rb != null ? rb.linearVelocity.ToString() : "<no-rigidbody>") +
+            " launchVelocity=" + launchVelocity +
+            " duplicateSequence=" + duplicateSequence,
+            this);
+
+        if (duplicateSequence)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[ExternalLaunchYTrace] event=LaunchStart " +
+            "controller=Player2PrototypeController" +
+            " target=" + name +
+            " frame=" + Time.frameCount +
+            " positionBefore=" + transform.position +
+            " launchVelocity=" + launchVelocity +
+            " separationOffset=" + separationOffset +
+            " duration=" + duration,
+            this);
+
         if (rb == null)
         {
             rb = GetComponent<Rigidbody>();
@@ -1520,9 +1578,10 @@ public class Player2PrototypeController : MonoBehaviour
         externalLaunchUseGravityBefore = rb.useGravity;
         externalLaunchConstraintsBefore = rb.constraints;
 
-        if (separationOffset.sqrMagnitude > 0.0001f)
+        Vector3 groundedSafeSeparationOffset = ResolveGroundSafeSeparationOffset(separationOffset, launchVelocity);
+        if (groundedSafeSeparationOffset.sqrMagnitude > 0.0001f)
         {
-            Vector3 newPosition = rb.position + separationOffset;
+            Vector3 newPosition = rb.position + groundedSafeSeparationOffset;
             rb.position = newPosition;
             transform.position = newPosition;
             Physics.SyncTransforms();
@@ -1530,10 +1589,34 @@ public class Player2PrototypeController : MonoBehaviour
 
         rb.useGravity = true;
         rb.constraints = RigidbodyConstraints.FreezeRotation;
+        isUnderExternalLaunch = true;
+        externalLaunchReceivedThisFrame = true;
+        externalLaunchGroundedFrameCount = 0;
+        previousExternalLaunchVelocityY = launchVelocity.y;
+        previousExternalLaunchRootY = transform.position.y;
+        previousExternalLaunchRbY = rb.position.y;
+        lastExternalLaunchSequenceId = launchSequenceId;
+        lastExternalLaunchReceivedTime = Time.time;
+        Vector3 velocityBefore = rb.linearVelocity;
         rb.linearVelocity = launchVelocity;
         rb.angularVelocity = Vector3.zero;
         rb.WakeUp();
-        externalLaunchRoutine = StartCoroutine(ExternalLaunchRoutine(duration));
+        Debug.Log(
+            "[PlayerLaunchMotionTrace] event=LaunchApplied " +
+            "controller=Player2PrototypeController" +
+            " frame=" + Time.frameCount +
+            " positionAfterSeparation=" + transform.position +
+            " velocityBefore=" + velocityBefore +
+            " requestedLaunchVelocity=" + launchVelocity +
+            " velocityAfter=" + rb.linearVelocity +
+            " grounded=" + IsGroundedForExternalLaunch() +
+            " useGravity=" + rb.useGravity +
+            " isKinematic=" + rb.isKinematic +
+            " constraints=" + rb.constraints +
+            " sequenceId=" + launchSequenceId,
+            this);
+        float holdDuration = Mathf.Max(duration, externalLaunchMinimumLockDuration);
+        externalLaunchRoutine = StartCoroutine(ExternalLaunchRoutine(holdDuration));
     }
 
     public Vector3 FacingDirection => ResolveFacingDirection();
@@ -1615,6 +1698,28 @@ public class Player2PrototypeController : MonoBehaviour
             yield return null;
         }
 
+        float startTime = Time.time;
+        externalLaunchGroundedFrameCount = 0;
+        while (Time.time - startTime < Mathf.Max(0.1f, externalLaunchMaximumAirborneDuration))
+        {
+            bool grounded = IsGroundedForExternalLaunch();
+            Vector3 velocity = rb != null ? rb.linearVelocity : Vector3.zero;
+            if (grounded && velocity.y <= 0.05f)
+            {
+                externalLaunchGroundedFrameCount++;
+                if (externalLaunchGroundedFrameCount >= Mathf.Max(1, externalLaunchLandingConfirmFrames))
+                {
+                    break;
+                }
+            }
+            else
+            {
+                externalLaunchGroundedFrameCount = 0;
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
+
         RestoreExternalLaunchState();
     }
 
@@ -1627,11 +1732,221 @@ public class Player2PrototypeController : MonoBehaviour
         }
 
         Vector3 velocity = rb.linearVelocity;
-        velocity.y = 0f;
-        rb.linearVelocity = velocity;
+        if (velocity.y < 0f)
+        {
+            velocity.y = 0f;
+            rb.linearVelocity = velocity;
+        }
         rb.useGravity = externalLaunchUseGravityBefore;
         rb.constraints = externalLaunchConstraintsBefore;
+        isUnderExternalLaunch = false;
+        externalLaunchReceivedThisFrame = false;
         externalLaunchRoutine = null;
+    }
+
+    private void TraceExternalLaunchStep(string source)
+    {
+        if (rb == null)
+        {
+            return;
+        }
+
+        Vector3 currentVelocity = rb.linearVelocity;
+        bool grounded = IsGroundedForExternalLaunch();
+        if (debugExternalLaunchMotion)
+        {
+            Debug.Log(
+                "[PlayerLaunchMotionTrace] event=LaunchPhysicsStep " +
+                "controller=Player2PrototypeController" +
+                " frame=" + Time.frameCount +
+                " fixedTime=" + Time.fixedTime.ToString("F3") +
+                " rootPositionBefore=" + new Vector3(transform.position.x, previousExternalLaunchRootY, transform.position.z) +
+                " rootPositionAfter=" + transform.position +
+                " rigidbodyPositionBefore=" + new Vector3(rb.position.x, previousExternalLaunchRbY, rb.position.z) +
+                " rigidbodyPositionAfter=" + rb.position +
+                " velocityBefore=" + new Vector3(currentVelocity.x, previousExternalLaunchVelocityY, currentVelocity.z) +
+                " velocityAfter=" + currentVelocity +
+                " groundedAfter=" + grounded +
+                " normalMovementExecuted=false" +
+                " groundSnapExecuted=false" +
+                " positionWriteSource=" + source +
+                " velocityWriteSource=Physics",
+                this);
+        }
+
+        if (!externalLaunchReceivedThisFrame &&
+            currentVelocity.y > previousExternalLaunchVelocityY + 0.5f)
+        {
+            Debug.LogWarning(
+                "[PlayerLaunchMotionTrace] event=IllegalUpwardVelocityIncrease " +
+                "controller=Player2PrototypeController" +
+                " frame=" + Time.frameCount +
+                " beforeY=" + previousExternalLaunchVelocityY.ToString("F3") +
+                " afterY=" + currentVelocity.y.ToString("F3") +
+                " source=" + source +
+                " launchReceivedThisFrame=false" +
+                " jumpExecutedThisFrame=false" +
+                " collidedThisFrame=Unknown",
+                this);
+        }
+
+        previousExternalLaunchVelocityY = currentVelocity.y;
+        previousExternalLaunchRootY = transform.position.y;
+        previousExternalLaunchRbY = rb.position.y;
+        externalLaunchReceivedThisFrame = false;
+    }
+
+    private Vector3 ResolveGroundSafeSeparationOffset(Vector3 separationOffset, Vector3 launchVelocity)
+    {
+        Vector3 horizontalOffset = Vector3.ProjectOnPlane(separationOffset, Vector3.up);
+        if (horizontalOffset.sqrMagnitude <= 0.0001f || rb == null)
+        {
+            return separationOffset;
+        }
+
+        if (Mathf.Abs(launchVelocity.y) > 0.05f || !TryResolveGroundedSupport(out _, out _))
+        {
+            return horizontalOffset;
+        }
+
+        if (!TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            return horizontalOffset;
+        }
+
+        Vector3 candidate = rb.position + horizontalOffset;
+        if (!TryResolveGroundYAt(candidate, out float groundY))
+        {
+            return horizontalOffset;
+        }
+
+        float safeRootY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        float deltaY = safeRootY - rb.position.y;
+        return horizontalOffset + Vector3.up * deltaY;
+    }
+
+    private bool IsGroundedForExternalLaunch()
+    {
+        return TryResolveGroundedSupport(out _, out _);
+    }
+
+    private bool TryResolveGroundedSupport(out float groundY, out Collider groundCollider)
+    {
+        groundY = float.NegativeInfinity;
+        groundCollider = null;
+        if (!TryResolveMainColliderBottomOffset(out float bottomOffset) || rb == null)
+        {
+            return false;
+        }
+
+        Vector3 origin = rb.position + Vector3.up * Mathf.Max(0.2f, bottomOffset + 0.25f);
+        float distance = Mathf.Max(0.2f, bottomOffset + Mathf.Max(0.01f, externalLaunchGroundProbeDistance) + 0.25f);
+        RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, distance, ~0, QueryTriggerInteraction.Ignore);
+        float bestDistance = float.PositiveInfinity;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            if (!IsValidGroundHit(hit.collider))
+            {
+                continue;
+            }
+
+            if (hit.distance < bestDistance)
+            {
+                bestDistance = hit.distance;
+                groundY = hit.point.y;
+                groundCollider = hit.collider;
+            }
+        }
+
+        return groundCollider != null;
+    }
+
+    private bool TryResolveGroundYAt(Vector3 candidatePosition, out float groundY)
+    {
+        groundY = float.NegativeInfinity;
+        if (!TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            return false;
+        }
+
+        Vector3 origin = candidatePosition + Vector3.up * Mathf.Max(0.5f, bottomOffset + 1f);
+        float distance = Mathf.Max(2f, bottomOffset + 2f);
+        RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, distance, ~0, QueryTriggerInteraction.Ignore);
+        float bestDistance = float.PositiveInfinity;
+        for (int i = 0; i < hits.Length; i++)
+        {
+            RaycastHit hit = hits[i];
+            if (!IsValidGroundHit(hit.collider))
+            {
+                continue;
+            }
+
+            if (hit.distance < bestDistance)
+            {
+                bestDistance = hit.distance;
+                groundY = hit.point.y;
+            }
+        }
+
+        return !float.IsNegativeInfinity(groundY);
+    }
+
+    private bool TryResolveMainColliderBottomOffset(out float bottomOffset)
+    {
+        bottomOffset = 0f;
+        Collider[] colliders = GetComponentsInChildren<Collider>(true);
+        Bounds? combinedBounds = null;
+        for (int i = 0; i < colliders.Length; i++)
+        {
+            Collider collider = colliders[i];
+            if (collider == null || !collider.enabled || collider.isTrigger)
+            {
+                continue;
+            }
+
+            combinedBounds = combinedBounds.HasValue
+                ? EncapsulateBounds(combinedBounds.Value, collider.bounds)
+                : collider.bounds;
+        }
+
+        if (!combinedBounds.HasValue)
+        {
+            return false;
+        }
+
+        bottomOffset = rb.position.y - combinedBounds.Value.min.y;
+        return true;
+    }
+
+    private bool IsValidGroundHit(Collider collider)
+    {
+        if (collider == null || !collider.enabled || collider.isTrigger)
+        {
+            return false;
+        }
+
+        if (collider.transform == transform || collider.transform.IsChildOf(transform))
+        {
+            return false;
+        }
+
+        if (collider.GetComponentInParent<PlayerMovement>() != null ||
+            collider.GetComponentInParent<Player2PrototypeController>() != null ||
+            collider.GetComponentInParent<EnemyController>() != null ||
+            collider.GetComponentInParent<CombatHealth>() != null)
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static Bounds EncapsulateBounds(Bounds a, Bounds b)
+    {
+        a.Encapsulate(b.min);
+        a.Encapsulate(b.max);
+        return a;
     }
 
     public float LegacyERailDuration => eRailDuration;
