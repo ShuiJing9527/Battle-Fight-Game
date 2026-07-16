@@ -6,6 +6,14 @@ using UnityEngine.EventSystems;
 
 public class RuneUIController : MonoBehaviour
 {
+    private enum DescriptionSource
+    {
+        None,
+        Skill,
+        Rune,
+        EmptySlot
+    }
+
     [System.Serializable]
     public class RuneInventoryLayoutSettings
     {
@@ -61,6 +69,7 @@ public class RuneUIController : MonoBehaviour
     private const string LabelDescriptionPlaceholder = "Description: -";
     private const string LabelEffectPlaceholder = "Effect: -";
     private const string LabelRuneFallback = "Rune";
+    private const string LabelEmptyRuneSlot = "空符文槽";
     private const string LogNoRuneSelected = "[RuneUI] Please select a rune first.";
     private const string LogNoAvailableRuneCopy = "[RuneUI] No available copy of this rune.";
     private const string LogMissingRuneInventory = "[RuneUI] Missing RuneInventory on current player. Rune list will show No rune.";
@@ -69,6 +78,8 @@ public class RuneUIController : MonoBehaviour
     private const string LogMissingCombatSkillCaster = "[RuneUI] Missing CombatSkillCaster.";
     private const string LogMissingSlotRefs = "[RuneUI] Manual skill slot references are missing. Please assign qSlots / wSlots / eSlots / rSlots in the Inspector.";
     private const string LogMissingSkillIconRefs = "[RuneUI] Missing external skill icon references on rune panel. Please assign qSkillIcon / wSkillIcon / eSkillIcon / rSkillIcon in the Inspector.";
+    private const string RunePanelDescriptionTracePrefix = "[RunePanelDescriptionTrace] ";
+    private const string RunePanelHoverTracePrefix = "[RunePanelHoverTrace] ";
 
     [System.Serializable]
     public class RuneSlotView
@@ -163,6 +174,7 @@ public class RuneUIController : MonoBehaviour
     private TextMeshProUGUI attributeFooterText;
     private RuntimeLootDropOnDeath lootDropPreview;
     private bool isSkillDescriptionHoverActive;
+    private DescriptionSource currentDescriptionSource;
     private Transform runeButtonTemplate;
 
     public bool IsPanelOpen => IsMainPanelVisible();
@@ -429,6 +441,13 @@ public class RuneUIController : MonoBehaviour
                 button.onClick.RemoveAllListeners();
                 if (capturedRune != null)
                 {
+                    LogRunePanelDescriptionTrace(
+                        "RuneButtonBound",
+                        "button=" + child.name +
+                        " runeId=" + capturedRune.runeId +
+                        " runeName=" + GetRuneName(capturedRune) +
+                        " runeDescriptionLength=" + GetRuneDescription(capturedRune).Length +
+                        " iconSource=RuneDataButtonLabel iconAssigned=false");
                     button.onClick.AddListener(() => SelectRune(capturedRune));
                     BindRuneHoverEvents(button, capturedRune);
                 }
@@ -535,6 +554,7 @@ public class RuneUIController : MonoBehaviour
             int capturedSlotIndex = i;
             slotView.button.onClick.RemoveAllListeners();
             slotView.button.onClick.AddListener(() => EquipSelectedRuneToSlot(capturedSkillIndex, capturedSlotIndex));
+            EnsureRuneSlotHoverTrigger(slotView.button, capturedSkillIndex, capturedSlotIndex, GetEquippedRune(capturedSkillIndex, capturedSlotIndex));
         }
     }
 
@@ -557,7 +577,7 @@ public class RuneUIController : MonoBehaviour
             slotView.label.text = rune != null ? GetRuneName(rune) : Localize(LabelEmpty);
             if (slotView.button != null)
             {
-                BindEquippedSlotHoverEvents(slotView.button, skillIndex, rune);
+                EnsureRuneSlotHoverTrigger(slotView.button, skillIndex, i, rune);
             }
         }
     }
@@ -651,6 +671,12 @@ public class RuneUIController : MonoBehaviour
     private void SetSelectedRune(RuneDefinition rune)
     {
         selectedRune = rune;
+        LogRunePanelDescriptionTrace(
+            "RuneSelected",
+            "runeId=" + (selectedRune != null ? selectedRune.runeId.ToString() : "null") +
+            " runeName=" + (selectedRune != null ? GetRuneName(selectedRune) : "null") +
+            " runeDataNull=" + (selectedRune == null) +
+            " descriptionRaw=" + (selectedRune != null ? GetRuneDescription(selectedRune) : string.Empty));
         if (selectedRuneText != null)
         {
             selectedRuneText.text = selectedRune != null ? $"{Localize("Selected Rune")}: {GetRuneName(selectedRune)}" : Localize(LabelSelectedRuneNone);
@@ -908,36 +934,7 @@ public class RuneUIController : MonoBehaviour
 
     private void BindEquippedSlotHoverEvents(Button button, int skillIndex, RuneDefinition rune)
     {
-        if (button == null)
-        {
-            return;
-        }
-
-        EventTrigger trigger = button.GetComponent<EventTrigger>();
-        if (trigger == null)
-        {
-            trigger = button.gameObject.AddComponent<EventTrigger>();
-        }
-
-        if (trigger.triggers == null)
-        {
-            trigger.triggers = new List<EventTrigger.Entry>();
-        }
-        else
-        {
-            trigger.triggers.Clear();
-        }
-
-        RuneDefinition capturedRune = rune;
-        int capturedSkillIndex = skillIndex;
-
-        EventTrigger.Entry enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-        enterEntry.callback.AddListener(_ => ShowEquippedSlotDescription(capturedSkillIndex, capturedRune));
-        trigger.triggers.Add(enterEntry);
-
-        EventTrigger.Entry exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
-        exitEntry.callback.AddListener(_ => RestoreSharedDescription());
-        trigger.triggers.Add(exitEntry);
+        EnsureRuneSlotHoverTrigger(button, skillIndex, 0, rune);
     }
 
     private void ResolveCurrentPlayerContext()
@@ -1255,6 +1252,7 @@ public class RuneUIController : MonoBehaviour
             }
 
             RestoreSharedDescription();
+            LogRunePanelDescriptionTrace("DescriptionSkipped", "reason=NoSelectedRune");
             return;
         }
 
@@ -1286,38 +1284,37 @@ public class RuneUIController : MonoBehaviour
         if (rune == null)
         {
             RestoreSharedDescription();
+            LogRunePanelDescriptionTrace("DescriptionSkipped", "reason=NoSelectedRune");
             return;
         }
 
         string rarityText = Localize(rune.rarity.ToString());
         string typeText = Localize(rune.GetTypeDisplayName());
-        string description = string.IsNullOrWhiteSpace(rune.description) ? "-" : Localize(rune.description.Trim());
+        string rawDescription = GetRuneDescription(rune);
+        string description = string.IsNullOrWhiteSpace(rawDescription) ? "-" : Localize(rawDescription.Trim());
         string effectText = rune.GetFullEffectDescription();
         effectText = string.IsNullOrWhiteSpace(effectText) ? $"ID: {rune.runeId}" : Localize(effectText);
         string body = $"{Localize("Type")}: {typeText} / {rarityText}\n\n{Localize("Description")}:\n{description}\n\n{Localize("Effect")}:\n{effectText}";
-        ShowSharedDescription($"{Localize("Rune Name")}: {GetRuneName(rune)}", body, false);
+        ShowSharedDescription($"{Localize("Rune Name")}: {GetRuneName(rune)}", body, false, DescriptionSource.Rune);
+        LogRunePanelDescriptionTrace(
+            "DescriptionUpdated",
+            "source=Rune" +
+            " runeId=" + rune.runeId +
+            " descriptionTextLength=" + rawDescription.Length +
+            " object=" + GetRuneName(rune));
     }
 
-    private void ShowEquippedSlotDescription(int skillIndex, RuneDefinition rune)
-    {
-        if (rune != null)
-        {
-            ShowRuneDescription(rune);
-            return;
-        }
-
-        ShowSkillDescriptionByKey(GetSkillKeyName(skillIndex), ResolveCurrentPlayerIndex());
-    }
-
-    private void ShowSharedDescription(string title, string body, bool skillHover)
+    private void ShowSharedDescription(string title, string body, bool skillHover, DescriptionSource source)
     {
         EnsureSkillDescriptionPanel();
         if (skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
         {
+            LogRunePanelDescriptionTrace("DescriptionSkipped", "reason=MissingDescriptionPanelReference");
             return;
         }
 
         isSkillDescriptionHoverActive = skillHover;
+        currentDescriptionSource = source;
         skillDescriptionTitleText.text = title ?? string.Empty;
         skillDescriptionBodyText.text = body ?? string.Empty;
         RefreshSkillDescriptionPanelHeight();
@@ -1334,19 +1331,32 @@ public class RuneUIController : MonoBehaviour
         string normalizedKey = (key ?? string.Empty).Trim().ToUpperInvariant();
         if (string.IsNullOrEmpty(normalizedKey))
         {
+            LogRunePanelDescriptionTrace("DescriptionSkipped", "reason=EmptySkillKey");
             return;
         }
 
         SkillUIDefinitionEntry entry = SkillUIDefinitionDatabase.Get(playerIndex, normalizedKey);
         if (entry == null)
         {
+            LogRunePanelDescriptionTrace(
+                "DescriptionSkipped",
+                "reason=MissingSkillUIDefinition skillKey=" + normalizedKey +
+                " playerIndex=" + playerIndex);
             return;
         }
 
         ShowSharedDescription(
             SkillUIDefinitionDatabase.GetLocalizedTitle(entry),
             SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
-            true);
+            true,
+            DescriptionSource.Skill);
+        LogRunePanelDescriptionTrace(
+            "DescriptionUpdated",
+            "source=Skill" +
+            " skillKey=" + normalizedKey +
+            " playerIndex=" + playerIndex +
+            " descriptionTextLength=" + SkillUIDefinitionDatabase.BuildDetailBodyText(entry).Length +
+            " object=" + normalizedKey + "SkillIcon");
     }
 
     private void RestoreSharedDescription()
@@ -1362,6 +1372,7 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        currentDescriptionSource = DescriptionSource.None;
         if (skillDescriptionPanel != null)
         {
             skillDescriptionPanel.SetActive(false);
@@ -1376,6 +1387,18 @@ public class RuneUIController : MonoBehaviour
         {
             skillDescriptionBodyText.text = string.Empty;
         }
+    }
+
+    private void ShowEmptyRuneSlotDescription(int skillIndex, int slotIndex, Transform slotTransform)
+    {
+        string skillKey = GetSkillKeyName(skillIndex);
+        ShowSharedDescription(Localize(LabelEmptyRuneSlot), string.Empty, false, DescriptionSource.EmptySlot);
+        LogRunePanelDescriptionTrace(
+            "DescriptionUpdated",
+            "source=EmptySlot" +
+            " skillKey=" + skillKey +
+            " slotIndex=" + slotIndex +
+            " object=" + (slotTransform != null ? slotTransform.name : "null"));
     }
 
     private void SetPauseState(bool pause)
@@ -1532,17 +1555,23 @@ public class RuneUIController : MonoBehaviour
 
         string upperKey = key.Trim().ToUpperInvariant();
         Transform row = FindChildRecursive(mainPanel.transform, $"{upperKey}Row");
-        if (view.root == null && row != null)
+        Transform expectedIconRoot = row != null
+            ? row.Find($"{upperKey}SkillIcon")
+              ?? row.Find($"SkillIcon_{upperKey}")
+              ?? row.Find("SkillIcon")
+            : null;
+
+        if (view.root == null || (expectedIconRoot != null && view.root.transform != expectedIconRoot))
         {
-            Transform root =
-                row.Find($"{upperKey}SkillIcon")
-                ?? row.Find($"SkillIcon_{upperKey}")
-                ?? row.Find("SkillIcon");
-            view.root = root as RectTransform;
+            view.root = expectedIconRoot as RectTransform;
         }
 
         if (view.root == null)
         {
+            LogRunePanelHoverTrace(
+                "SkillTriggerBindingSkipped",
+                "skillKey=" + upperKey +
+                " reason=SkillIconRootMissing");
             return;
         }
 
@@ -1555,15 +1584,54 @@ public class RuneUIController : MonoBehaviour
             }
         }
 
+        if (view.icon == null)
+        {
+            LogRunePanelHoverTrace(
+                "SkillTriggerBindingSkipped",
+                "skillKey=" + upperKey +
+                " rootObject=" + view.root.name +
+                " rootPath=" + GetHierarchyPath(view.root) +
+                " reason=SkillIconImageMissing");
+            return;
+        }
+
+        RemoveIncorrectSkillTriggersForRow(upperKey, row, view.icon.transform);
+
         if (view.hoverHighlight == null)
         {
             view.hoverHighlight = view.root.Find("HoverHighlight")?.GetComponent<Image>();
         }
 
-        if (view.hoverTrigger == null)
+        if (view.hoverHighlight != null)
         {
-            view.hoverTrigger = view.root.GetComponent<SkillHoverTrigger>();
+            view.hoverHighlight.raycastTarget = false;
         }
+
+        view.icon.raycastTarget = true;
+
+        SkillHoverTrigger iconTrigger = view.icon.GetComponent<SkillHoverTrigger>();
+        if (iconTrigger == null)
+        {
+            iconTrigger = view.icon.gameObject.AddComponent<SkillHoverTrigger>();
+        }
+
+        if (view.root != null && view.root != view.icon.transform)
+        {
+            SkillHoverTrigger incorrectRootTrigger = view.root.GetComponent<SkillHoverTrigger>();
+            if (incorrectRootTrigger != null && incorrectRootTrigger != iconTrigger)
+            {
+                LogRunePanelHoverTrace(
+                    "IncorrectSkillTriggerRemoved",
+                    "skillKey=" + upperKey +
+                    " targetObject=" + view.root.name +
+                    " targetPath=" + GetHierarchyPath(view.root) +
+                    " isRuneSlot=" + IsRuneSlotName(view.root.name) +
+                    " reason=RootWasNotIconGraphic");
+                Destroy(incorrectRootTrigger);
+            }
+        }
+
+        view.hoverTrigger = iconTrigger;
     }
 
     private void RegisterSkillIconView(string key, RuneSkillIconView view)
@@ -1591,7 +1659,19 @@ public class RuneUIController : MonoBehaviour
             view.hoverTrigger.skillKey = upperKey;
             view.hoverTrigger.entered = HandleRuneSkillHoverEnter;
             view.hoverTrigger.exited = HandleRuneSkillHoverExit;
+            view.hoverTrigger.clicked = HandleRuneSkillClick;
+            view.root.gameObject.SetActive(true);
             skillRowHoverTriggers[upperKey] = view.hoverTrigger;
+
+            LogRunePanelHoverTrace(
+                "SkillTriggerBinding",
+                "skillKey=" + upperKey +
+                " targetObject=" + view.hoverTrigger.gameObject.name +
+                " targetPath=" + GetHierarchyPath(view.hoverTrigger.transform) +
+                " hasImage=" + (view.icon != null) +
+                " hasButton=" + (view.hoverTrigger.GetComponent<Button>() != null) +
+                " isRuneSlot=" + IsRuneSlotName(view.hoverTrigger.gameObject.name) +
+                " isSkillIcon=" + IsSkillIconName(view.hoverTrigger.gameObject.name));
         }
     }
 
@@ -2354,6 +2434,13 @@ public class RuneUIController : MonoBehaviour
             highlight.gameObject.SetActive(true);
         }
 
+        LogRunePanelHoverTrace(
+            "PointerEnter",
+            "skillKey=" + key +
+            " targetObject=" + trigger.gameObject.name +
+            " targetPath=" + GetHierarchyPath(trigger.transform) +
+            " isRuneSlot=" + IsRuneSlotName(trigger.gameObject.name) +
+            " isSkillIcon=" + IsSkillIconName(trigger.gameObject.name));
         ShowSkillDescriptionByKey(key, trigger.playerIndex);
     }
 
@@ -2373,6 +2460,231 @@ public class RuneUIController : MonoBehaviour
 
         isSkillDescriptionHoverActive = false;
         RestoreSharedDescription();
+    }
+
+    private void HandleRuneSkillClick(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        string key = (trigger.skillKey ?? string.Empty).Trim().ToUpperInvariant();
+        if (string.IsNullOrEmpty(key))
+        {
+            LogRunePanelDescriptionTrace("DescriptionSkipped", "reason=SkillClickMissingKey");
+            return;
+        }
+
+        LogRunePanelDescriptionTrace(
+            "SkillSelected",
+            "skillKey=" + key +
+            " playerIndex=" + trigger.playerIndex +
+            " iconSelectionSource=ExternalSkillIcon");
+        ShowSkillDescriptionByKey(key, trigger.playerIndex);
+    }
+
+    public void HandleRuneSlotHoverEnter(int skillIndex, int slotIndex, RuneDefinition rune, Transform slotTransform)
+    {
+        LogRunePanelHoverTrace(
+            "RuneSlotPointerEnter",
+            "skillKey=" + GetSkillKeyName(skillIndex) +
+            " slotIndex=" + slotIndex +
+            " object=" + (slotTransform != null ? slotTransform.name : "null") +
+            " hasRune=" + (rune != null));
+
+        if (rune != null)
+        {
+            ShowRuneDescription(rune);
+            return;
+        }
+
+        ShowEmptyRuneSlotDescription(skillIndex, slotIndex, slotTransform);
+    }
+
+    public void HandleRuneSlotHoverExit(int skillIndex, int slotIndex, RuneDefinition rune, Transform slotTransform)
+    {
+        LogRunePanelHoverTrace(
+            "RuneSlotPointerExit",
+            "skillKey=" + GetSkillKeyName(skillIndex) +
+            " slotIndex=" + slotIndex +
+            " object=" + (slotTransform != null ? slotTransform.name : "null") +
+            " sourceBeforeRestore=" + currentDescriptionSource);
+        RestoreSharedDescription();
+    }
+
+    private void EnsureRuneSlotHoverTrigger(Button button, int skillIndex, int slotIndex, RuneDefinition rune)
+    {
+        if (button == null)
+        {
+            return;
+        }
+
+        DisableAndRemoveSkillHoverTrigger(button.transform, "RuneSlotMustNotShowSkillDescription");
+        DisableAndRemoveSkillHoverTrigger(button.transform.parent, "RuneSlotMustNotShowSkillDescription");
+
+        EventTrigger oldEventTrigger = button.GetComponent<EventTrigger>();
+        if (oldEventTrigger != null)
+        {
+            oldEventTrigger.enabled = false;
+            if (oldEventTrigger.triggers != null)
+            {
+                oldEventTrigger.triggers.Clear();
+            }
+        }
+
+        RuneSlotHoverTrigger slotHoverTrigger = button.GetComponent<RuneSlotHoverTrigger>();
+        if (slotHoverTrigger == null)
+        {
+            slotHoverTrigger = button.gameObject.AddComponent<RuneSlotHoverTrigger>();
+        }
+
+        slotHoverTrigger.Configure(this, skillIndex, slotIndex, rune);
+    }
+
+    private void DisableAndRemoveSkillHoverTrigger(Transform target, string reason)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        SkillHoverTrigger[] triggers = target.GetComponentsInChildren<SkillHoverTrigger>(true);
+        for (int i = 0; i < triggers.Length; i++)
+        {
+            SkillHoverTrigger trigger = triggers[i];
+            if (trigger == null)
+            {
+                continue;
+            }
+
+            if (!IsRuneSlotObjectOrChild(trigger.transform))
+            {
+                continue;
+            }
+
+            trigger.enabled = false;
+            LogRunePanelHoverTrace(
+                "IncorrectSkillTriggerRemoved",
+                "object=" + trigger.gameObject.name +
+                " reason=" + reason);
+            Destroy(trigger);
+        }
+    }
+
+    private void RemoveIncorrectSkillTriggersForRow(string skillKey, Transform row, Transform validTriggerTransform)
+    {
+        if (row == null)
+        {
+            return;
+        }
+
+        SkillHoverTrigger[] triggers = row.GetComponentsInChildren<SkillHoverTrigger>(true);
+        for (int i = 0; i < triggers.Length; i++)
+        {
+            SkillHoverTrigger trigger = triggers[i];
+            if (trigger == null)
+            {
+                continue;
+            }
+
+            Transform triggerTransform = trigger.transform;
+            if (triggerTransform == validTriggerTransform)
+            {
+                continue;
+            }
+
+            bool isRuneSlot = IsRuneSlotName(triggerTransform.name);
+            bool isSkillRow = triggerTransform.name.EndsWith("Row");
+            bool isInvalidBinding = isRuneSlot || isSkillRow || triggerTransform != row.Find($"{skillKey}SkillIcon");
+            if (!isInvalidBinding)
+            {
+                continue;
+            }
+
+            LogRunePanelHoverTrace(
+                "IncorrectSkillTriggerRemoved",
+                "skillKey=" + skillKey +
+                " targetObject=" + triggerTransform.name +
+                " targetPath=" + GetHierarchyPath(triggerTransform) +
+                " isRuneSlot=" + isRuneSlot +
+                " isSkillIcon=" + IsSkillIconName(triggerTransform.name));
+            Destroy(trigger);
+        }
+    }
+
+    private static bool IsRuneSlotName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        return name.StartsWith("QSlot")
+            || name.StartsWith("WSlot")
+            || name.StartsWith("ESlot")
+            || name.StartsWith("RSlot");
+    }
+
+    private static bool IsRuneSlotObjectOrChild(Transform target)
+    {
+        Transform current = target;
+        while (current != null)
+        {
+            if (IsRuneSlotName(current.name))
+            {
+                return true;
+            }
+
+            current = current.parent;
+        }
+
+        return false;
+    }
+
+    private static bool IsSkillIconName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        return name.EndsWith("SkillIcon") || name.StartsWith("SkillIcon_");
+    }
+
+    private static string GetHierarchyPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        Stack<string> segments = new Stack<string>();
+        Transform current = target;
+        while (current != null)
+        {
+            segments.Push(current.name);
+            current = current.parent;
+        }
+
+        return string.Join("/", segments.ToArray());
+    }
+
+    private string GetRuneDescription(RuneDefinition rune)
+    {
+        return rune != null && !string.IsNullOrWhiteSpace(rune.description)
+            ? rune.description
+            : string.Empty;
+    }
+
+    private void LogRunePanelDescriptionTrace(string eventName, string details)
+    {
+        Debug.Log(RunePanelDescriptionTracePrefix + "event=" + eventName + " " + details, this);
+    }
+
+    private void LogRunePanelHoverTrace(string eventName, string details)
+    {
+        Debug.Log(RunePanelHoverTracePrefix + "event=" + eventName + " " + details, this);
     }
 
     private int ResolveCurrentPlayerIndex()
