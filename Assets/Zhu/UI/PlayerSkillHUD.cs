@@ -28,6 +28,7 @@ public class SkillSlotView
     public Text keyText;
     public GameObject disabledOverlay;
     public Image hoverHighlight;
+    public Image selectionHighlight;
     public SkillHoverTrigger hoverTrigger;
 }
 
@@ -85,12 +86,15 @@ public class PlayerSkillHUD : MonoBehaviour
     [SerializeField] private Color cooldownTextColor = Color.white;
     [SerializeField] private bool cooldownTextUseOutline = true;
     [SerializeField] private Color cooldownTextOutlineColor = Color.black;
-    [SerializeField] private bool cooldownOverlayDiagnosticMode = true;
+    [SerializeField] private bool cooldownOverlayDiagnosticMode = false;
     [SerializeField] private bool enableCooldownDebugKeys = false;
 
-    [Header("Hover")]
-    [SerializeField] private Color hoverHighlightColor = new Color(1f, 0.9f, 0.35f, 0.5f);
-    [SerializeField] private float hoverHighlightScale = 1.18f;
+    [Header("Hover / Selection")]
+    [SerializeField] private Color hoverHighlightColor = new Color(0.55f, 0.88f, 1f, 0.75f);
+    [SerializeField] private float hoverHighlightScale = 1.14f;
+    [SerializeField] private Color selectionHighlightColor = new Color(1f, 0.88f, 0.28f, 0.95f);
+    [SerializeField] private float selectionHighlightScale = 1.2f;
+    [SerializeField] private bool useGeneratedHighlightRingSprite = true;
     [SerializeField] private Color tooltipBackgroundColor = new Color(0.08f, 0.1f, 0.14f, 0.96f);
     [SerializeField] private Color tooltipTextColor = Color.white;
     [SerializeField] private int tooltipFontSize = 18;
@@ -103,13 +107,16 @@ public class PlayerSkillHUD : MonoBehaviour
     private readonly Text[] slotCooldownTexts = new Text[4];
     private readonly Text[] slotKeyLabels = new Text[4];
     private readonly Image[] slotHoverHighlights = new Image[4];
+    private readonly Image[] slotSelectionHighlights = new Image[4];
     private readonly SkillHoverTrigger[] slotHoverTriggers = new SkillHoverTrigger[4];
     private readonly float[] cooldownDurations = new float[4];
     private readonly float[] cooldownRemaining = new float[4];
     private readonly bool[] cooldownWasActive = new bool[4];
     private static Sprite sharedCooldownCircleSprite;
+    private static Sprite sharedHighlightRingSprite;
     private bool initialized;
     private int currentPlayerIndex;
+    private int selectedSlotIndex = -1;
     private RectTransform canvasRectTransform;
     private RectTransform tooltipRoot;
     private TextMeshProUGUI tooltipText;
@@ -363,6 +370,17 @@ public class PlayerSkillHUD : MonoBehaviour
             slotView.hoverHighlight = slotView.root.Find("HoverHighlight")?.GetComponent<Image>();
         }
 
+        if (slotView.selectionHighlight == null)
+        {
+            Transform selectionHighlight = slotView.root.Find("SelectionHighlight");
+            if (selectionHighlight == null)
+            {
+                selectionHighlight = slotView.root.Find("SelectedHighlight");
+            }
+
+            slotView.selectionHighlight = selectionHighlight?.GetComponent<Image>();
+        }
+
         if (slotView.hoverTrigger == null)
         {
             slotView.hoverTrigger = slotView.root.GetComponent<SkillHoverTrigger>();
@@ -419,7 +437,9 @@ public class PlayerSkillHUD : MonoBehaviour
                 continue;
             }
 
-            EnsureHoverVisuals(slotRect);
+            EnsureHighlightChild(slotRect, "HoverHighlight");
+            EnsureHighlightChild(slotRect, "SelectionHighlight");
+            EnsureHighlightVisuals(slotRect);
             EnsureHoverTrigger(slotRect, i);
         }
     }
@@ -455,6 +475,11 @@ public class PlayerSkillHUD : MonoBehaviour
                 if (configuredView.hoverHighlight != null)
                 {
                     slotHoverHighlights[i] = configuredView.hoverHighlight;
+                }
+
+                if (configuredView.selectionHighlight != null)
+                {
+                    slotSelectionHighlights[i] = configuredView.selectionHighlight;
                 }
 
                 if (configuredView.hoverTrigger != null)
@@ -498,6 +523,17 @@ public class PlayerSkillHUD : MonoBehaviour
             if (highlight != null)
             {
                 slotHoverHighlights[i] = highlight.GetComponent<Image>();
+            }
+
+            Transform selectionHighlight = slot.Find("SelectionHighlight");
+            if (selectionHighlight == null)
+            {
+                selectionHighlight = slot.Find("SelectedHighlight");
+            }
+
+            if (selectionHighlight != null)
+            {
+                slotSelectionHighlights[i] = selectionHighlight.GetComponent<Image>();
             }
 
             slotHoverTriggers[i] = slot.GetComponent<SkillHoverTrigger>();
@@ -596,12 +632,16 @@ public class PlayerSkillHUD : MonoBehaviour
         RectTransform background = slotRect.Find("Background") as RectTransform;
         RectTransform icon = slotRect.Find("Icon") as RectTransform;
         RectTransform overlay = slotRect.Find("CooldownOverlay") as RectTransform;
+        RectTransform hoverHighlight = slotRect.Find("HoverHighlight") as RectTransform;
+        RectTransform selectionHighlight = slotRect.Find("SelectionHighlight") as RectTransform;
         RectTransform cooldownText = slotRect.Find("CooldownText") as RectTransform;
         RectTransform keyLabel = slotRect.Find("KeyLabel") as RectTransform;
 
         Stretch(background, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         Stretch(icon, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
         MatchOverlayToIconOrSlot(overlay, icon, slotRect);
+        MatchOverlayToIconOrSlot(hoverHighlight, icon, slotRect);
+        MatchOverlayToIconOrSlot(selectionHighlight, icon, slotRect);
         Stretch(cooldownText, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
 
         if (background != null)
@@ -632,6 +672,16 @@ public class PlayerSkillHUD : MonoBehaviour
             {
                 ConfigureCooldownOverlay(overlayImage, icon);
             }
+        }
+
+        if (hoverHighlight != null)
+        {
+            ConfigureHighlightImage(hoverHighlight.GetComponent<Image>(), hoverHighlightColor, hoverHighlightScale, false);
+        }
+
+        if (selectionHighlight != null)
+        {
+            ConfigureHighlightImage(selectionHighlight.GetComponent<Image>(), selectionHighlightColor, selectionHighlightScale, false);
         }
 
         if (cooldownText != null)
@@ -742,6 +792,7 @@ public class PlayerSkillHUD : MonoBehaviour
         ApplySlotVisual(3, iconSet.rIcon, iconSet.rKeyText, "R");
         RefreshAllCooldownVisuals();
         RefreshHoverBindings();
+        RefreshSelectionHighlights();
     }
 
     public void StartSkillCooldown(string key, float duration)
@@ -1002,29 +1053,26 @@ public class PlayerSkillHUD : MonoBehaviour
         }
     }
 
-    private void EnsureHoverVisuals(RectTransform slotRect)
+    private void EnsureHighlightVisuals(RectTransform slotRect)
     {
         if (slotRect == null)
         {
             return;
         }
 
-        RectTransform highlight = slotRect.Find("HoverHighlight") as RectTransform;
+        ConfigureNamedHighlight(slotRect, "HoverHighlight", hoverHighlightColor, hoverHighlightScale, false);
+        ConfigureNamedHighlight(slotRect, "SelectionHighlight", selectionHighlightColor, selectionHighlightScale, false);
+    }
+
+    private void ConfigureNamedHighlight(RectTransform slotRect, string childName, Color color, float scale, bool active)
+    {
+        RectTransform highlight = slotRect != null ? slotRect.Find(childName) as RectTransform : null;
         if (highlight == null)
         {
             return;
         }
 
-        Image image = highlight.GetComponent<Image>();
-        if (image == null)
-        {
-            return;
-        }
-
-        image.color = hoverHighlightColor;
-        image.raycastTarget = false;
-        image.enabled = false;
-        highlight.gameObject.SetActive(false);
+        ConfigureHighlightImage(highlight.GetComponent<Image>(), color, scale, active);
     }
 
     private void EnsureHoverTrigger(RectTransform slotRect, int index)
@@ -1045,6 +1093,7 @@ public class PlayerSkillHUD : MonoBehaviour
         trigger.playerIndex = CurrentPlayerIndex;
         trigger.entered = HandleSlotHoverEnter;
         trigger.exited = HandleSlotHoverExit;
+        trigger.clicked = HandleSlotClick;
         slotHoverTriggers[index] = trigger;
     }
 
@@ -1083,6 +1132,7 @@ public class PlayerSkillHUD : MonoBehaviour
 
             trigger.skillKey = GetDefaultSlotKey(i);
             trigger.playerIndex = CurrentPlayerIndex;
+            trigger.clicked = HandleSlotClick;
         }
     }
 
@@ -1096,6 +1146,7 @@ public class PlayerSkillHUD : MonoBehaviour
         int index = ResolveSlotIndex(trigger.skillKey);
         if (index >= 0 && index < slotHoverHighlights.Length && slotHoverHighlights[index] != null)
         {
+            ConfigureHighlightImage(slotHoverHighlights[index], hoverHighlightColor, hoverHighlightScale, true);
             slotHoverHighlights[index].color = hoverHighlightColor;
             slotHoverHighlights[index].enabled = true;
             slotHoverHighlights[index].gameObject.SetActive(true);
@@ -1161,6 +1212,32 @@ public class PlayerSkillHUD : MonoBehaviour
         }
     }
 
+    private void HandleSlotClick(SkillHoverTrigger trigger)
+    {
+        if (trigger == null)
+        {
+            return;
+        }
+
+        selectedSlotIndex = ResolveSlotIndex(trigger.skillKey);
+        RefreshSelectionHighlights();
+    }
+
+    private void RefreshSelectionHighlights()
+    {
+        for (int i = 0; i < slotSelectionHighlights.Length; i++)
+        {
+            Image highlight = slotSelectionHighlights[i];
+            if (highlight == null)
+            {
+                continue;
+            }
+
+            bool active = i == selectedSlotIndex;
+            ConfigureHighlightImage(highlight, selectionHighlightColor, selectionHighlightScale, active);
+        }
+    }
+
     private void EnsureCooldownText(RectTransform slotRect)
     {
         if (slotRect == null)
@@ -1196,11 +1273,37 @@ public class PlayerSkillHUD : MonoBehaviour
         overlayImage.fillMethod = Image.FillMethod.Radial360;
         overlayImage.fillOrigin = cooldownFillOrigin;
         overlayImage.fillClockwise = cooldownFillClockwise;
+        if (overlayImage.sprite == null)
+        {
+            overlayImage.sprite = GetSharedCooldownCircleSprite();
+        }
+
         overlayImage.fillAmount = 0f;
         overlayImage.color = ResolveCooldownOverlayColor();
         overlayImage.raycastTarget = false;
-        overlayImage.preserveAspect = false;
+        overlayImage.preserveAspect = true;
         overlayImage.enabled = true;
+    }
+
+    private void ConfigureHighlightImage(Image image, Color color, float scale, bool active)
+    {
+        if (image == null)
+        {
+            return;
+        }
+
+        if (useGeneratedHighlightRingSprite || image.sprite == null)
+        {
+            image.sprite = GetSharedHighlightRingSprite();
+        }
+
+        image.type = Image.Type.Simple;
+        image.preserveAspect = true;
+        image.raycastTarget = false;
+        image.color = color;
+        image.rectTransform.localScale = Vector3.one * Mathf.Max(0.01f, scale);
+        image.enabled = active;
+        image.gameObject.SetActive(active);
     }
 
     private void ApplySlotHierarchy(RectTransform slotRect)
@@ -1211,9 +1314,10 @@ public class PlayerSkillHUD : MonoBehaviour
         }
 
         Transform background = slotRect.Find("Background");
-        Transform hoverHighlight = slotRect.Find("HoverHighlight");
         Transform icon = slotRect.Find("Icon");
         Transform overlay = slotRect.Find("CooldownOverlay");
+        Transform hoverHighlight = slotRect.Find("HoverHighlight");
+        Transform selectionHighlight = slotRect.Find("SelectionHighlight");
         Transform cooldownText = slotRect.Find("CooldownText");
         Transform keyLabel = slotRect.Find("KeyLabel");
 
@@ -1221,11 +1325,6 @@ public class PlayerSkillHUD : MonoBehaviour
         if (background != null)
         {
             background.SetSiblingIndex(siblingIndex++);
-        }
-
-        if (hoverHighlight != null)
-        {
-            hoverHighlight.SetSiblingIndex(siblingIndex++);
         }
 
         if (icon != null)
@@ -1236,6 +1335,16 @@ public class PlayerSkillHUD : MonoBehaviour
         if (overlay != null)
         {
             overlay.SetSiblingIndex(siblingIndex++);
+        }
+
+        if (hoverHighlight != null)
+        {
+            hoverHighlight.SetSiblingIndex(siblingIndex++);
+        }
+
+        if (selectionHighlight != null)
+        {
+            selectionHighlight.SetSiblingIndex(siblingIndex++);
         }
 
         if (cooldownText != null)
@@ -1259,6 +1368,18 @@ public class PlayerSkillHUD : MonoBehaviour
         sharedCooldownCircleSprite = CreateCircleSprite(128);
         sharedCooldownCircleSprite.name = "PlayerSkillHUD_CooldownCircleSprite";
         return sharedCooldownCircleSprite;
+    }
+
+    private static Sprite GetSharedHighlightRingSprite()
+    {
+        if (sharedHighlightRingSprite != null)
+        {
+            return sharedHighlightRingSprite;
+        }
+
+        sharedHighlightRingSprite = CreateRingSprite(128);
+        sharedHighlightRingSprite.name = "PlayerSkillHUD_HighlightRingSprite";
+        return sharedHighlightRingSprite;
     }
 
     private void DebugCooldownEvent(string key, float duration, bool started)
@@ -1296,7 +1417,9 @@ public class PlayerSkillHUD : MonoBehaviour
 
     private Color ResolveCooldownOverlayColor()
     {
-        return cooldownOverlayDiagnosticMode ? new Color(1f, 0f, 0f, 0.6f) : cooldownOverlayColor;
+        return cooldownOverlayDiagnosticMode && enableCooldownDebugKeys
+            ? new Color(1f, 0f, 0f, 0.6f)
+            : cooldownOverlayColor;
     }
 
     private static void MatchOverlayToIconOrSlot(RectTransform overlayRect, RectTransform iconRect, RectTransform slotRect)
@@ -1352,6 +1475,62 @@ public class PlayerSkillHUD : MonoBehaviour
             new Rect(0f, 0f, clampedSize, clampedSize),
             new Vector2(0.5f, 0.5f),
             100f);
+    }
+
+    private static Sprite CreateRingSprite(int size)
+    {
+        int clampedSize = Mathf.Max(16, size);
+        Texture2D texture = new Texture2D(clampedSize, clampedSize, TextureFormat.RGBA32, false);
+        texture.wrapMode = TextureWrapMode.Clamp;
+        texture.filterMode = FilterMode.Bilinear;
+
+        float radius = (clampedSize - 1) * 0.5f;
+        float outerRadius = radius * 0.94f;
+        float ringRadius = radius * 0.77f;
+        float innerRadius = radius * 0.58f;
+        Vector2 center = new Vector2(radius, radius);
+
+        for (int y = 0; y < clampedSize; y++)
+        {
+            for (int x = 0; x < clampedSize; x++)
+            {
+                float distance = Vector2.Distance(new Vector2(x, y), center);
+                float ringAlpha = Mathf.InverseLerp(innerRadius, ringRadius, distance) * (1f - Mathf.InverseLerp(ringRadius, outerRadius, distance));
+                float glowAlpha = distance > ringRadius ? 1f - Mathf.InverseLerp(ringRadius, radius, distance) : 0f;
+                float alpha = Mathf.Clamp01((ringAlpha * 0.95f) + (glowAlpha * 0.35f));
+                texture.SetPixel(x, y, new Color(1f, 1f, 1f, alpha));
+            }
+        }
+
+        texture.Apply();
+
+        return Sprite.Create(
+            texture,
+            new Rect(0f, 0f, clampedSize, clampedSize),
+            new Vector2(0.5f, 0.5f),
+            100f);
+    }
+
+    private static RectTransform EnsureHighlightChild(RectTransform slotRect, string childName)
+    {
+        if (slotRect == null)
+        {
+            return null;
+        }
+
+        RectTransform highlight = slotRect.Find(childName) as RectTransform;
+        if (highlight != null)
+        {
+            return highlight;
+        }
+
+        highlight = CreateRectTransform(childName, slotRect);
+        Stretch(highlight, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+        Image image = highlight.gameObject.AddComponent<Image>();
+        image.sprite = GetSharedHighlightRingSprite();
+        image.raycastTarget = false;
+        highlight.gameObject.SetActive(false);
+        return highlight;
     }
 
     private static string GetDefaultSlotKey(int index)

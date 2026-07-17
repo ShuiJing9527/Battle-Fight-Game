@@ -89,14 +89,37 @@ public class RuneBagUI : MonoBehaviour
         ClearSelectedRune();
     }
 
+    private void OnEnable()
+    {
+        GameLocalization.LanguageChanged += OnLanguageChanged;
+    }
+
     private void OnDisable()
     {
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
         SetPauseState(false);
     }
 
     private void OnDestroy()
     {
+        GameLocalization.LanguageChanged -= OnLanguageChanged;
         SetPauseState(false);
+    }
+
+    private void OnLanguageChanged(GameLanguage language)
+    {
+        if (!Application.isPlaying)
+        {
+            return;
+        }
+
+        RefreshAll();
+        if (selectedRuneText != null)
+        {
+            selectedRuneText.text = selectedRune != null
+                ? LocalizeOrFallback("Selected Rune", "已选符文") + "：" + GetRuneName(selectedRune)
+                : LocalizeOrFallback("rune.select_prompt", "请选择符文");
+        }
     }
 
     public void OpenPanel()
@@ -256,7 +279,7 @@ public class RuneBagUI : MonoBehaviour
 
             if (slotUI.equippedRuneText != null)
             {
-                slotUI.equippedRuneText.text = slot.equippedRune == null ? "Empty" : GetRuneName(slot.equippedRune);
+                slotUI.equippedRuneText.text = slot.equippedRune == null ? LocalizeOrFallback("Empty", "空") : GetRuneName(slot.equippedRune);
                 slotUI.equippedRuneText.fontSize = Mathf.Max(slotUI.equippedRuneText.fontSize, slotTextFontSize);
             }
 
@@ -277,7 +300,7 @@ public class RuneBagUI : MonoBehaviour
         selectedRune = rune;
         if (selectedRuneText != null)
         {
-            selectedRuneText.text = "Selected: " + GetRuneName(rune);
+            selectedRuneText.text = LocalizeOrFallback("Selected Rune", "已选符文") + "：" + GetRuneName(rune);
             selectedRuneText.fontSize = Mathf.Max(selectedRuneText.fontSize, selectedRuneFontSize);
         }
 
@@ -345,7 +368,7 @@ public class RuneBagUI : MonoBehaviour
         selectedRune = null;
         if (selectedRuneText != null)
         {
-            selectedRuneText.text = "Select a rune";
+            selectedRuneText.text = LocalizeOrFallback("rune.select_prompt", "请选择符文");
             selectedRuneText.fontSize = Mathf.Max(selectedRuneText.fontSize, selectedRuneFontSize);
         }
     }
@@ -369,12 +392,17 @@ public class RuneBagUI : MonoBehaviour
     {
         if (rune == null)
         {
-            return "Empty";
+            return LocalizeOrFallback("Empty", "空");
         }
 
-        if (!string.IsNullOrEmpty(rune.runeName))
+        if (rune.runeType != RuneType.None)
         {
-            return rune.runeName;
+            return RuneDefinition.GetLocalizedName(rune.runeType);
+        }
+
+        if (!string.IsNullOrEmpty(rune.runeName) && !IsKnownEnglishRuneName(rune.runeName))
+        {
+            return LocalizeOrFallback(rune.runeName, rune.runeName);
         }
 
         System.Type type = rune.GetType();
@@ -406,7 +434,29 @@ public class RuneBagUI : MonoBehaviour
             }
         }
 
-        return "Rune";
+        return "符文";
+    }
+
+    private static string LocalizeOrFallback(string key, string fallback)
+    {
+        return GameLocalization.Instance != null
+            ? GameLocalization.Instance.TranslateOrFallback(key, fallback)
+            : fallback;
+    }
+
+    private static bool IsKnownEnglishRuneName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        string normalized = name.Trim();
+        return normalized == "Life Rune" ||
+               normalized == "Shield Rune" ||
+               normalized == "Mana Rune" ||
+               normalized == "Thorn Rune" ||
+               normalized == "Luck Rune";
     }
 
     private System.Collections.Generic.List<RuneStackEntry> BuildRuneStacks()

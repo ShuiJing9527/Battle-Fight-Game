@@ -83,9 +83,10 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         EnsureRuntimeArrays();
 
         // Cooldown and mana are advanced together so the HUD can read a consistent state.
+        float cooldownRecoveryMultiplier = runeRuntimeState != null ? runeRuntimeState.GetSkillCooldownRecoveryMultiplier() : 1f;
         for (int i = 0; i < runtimeCurrentCD.Length; i++)
         {
-            runtimeCurrentCD[i] = Mathf.Max(0f, runtimeCurrentCD[i] - deltaTime);
+            runtimeCurrentCD[i] = Mathf.Max(0f, runtimeCurrentCD[i] - deltaTime * Mathf.Max(0f, cooldownRecoveryMultiplier));
         }
 
         if (resourceBank != null)
@@ -153,6 +154,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
             runeRuntimeState = GetComponent<RuneRuntimeState>();
         }
 
+        runeRuntimeState?.NotifyBaseSkillManaSpent(skillIndex, data.manaCost);
         runeRuntimeState?.PrepareManaBurstForSkillCast(skillIndex, data.manaCost);
 
         runtimeCurrentCD[skillIndex] = Mathf.Max(0f, data.maxCooldown * ResolveCooldownMultiplier());

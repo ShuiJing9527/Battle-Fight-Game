@@ -61,14 +61,14 @@ public class RuneUIController : MonoBehaviour
 
     private const int SkillCount = 4;
     private const int SlotsPerSkill = 5;
-    private const string LabelEmpty = "Empty";
-    private const string LabelNoRune = "No rune";
-    private const string LabelSelectedRuneNone = "Selected Rune: None";
-    private const string LabelRuneNameNone = "Rune Name: None";
-    private const string LabelTypePlaceholder = "Type: -";
-    private const string LabelDescriptionPlaceholder = "Description: -";
-    private const string LabelEffectPlaceholder = "Effect: -";
-    private const string LabelRuneFallback = "Rune";
+    private const string LabelEmpty = "空";
+    private const string LabelNoRune = "无符文";
+    private const string LabelSelectedRuneNone = "已选符文：无";
+    private const string LabelRuneNameNone = "符文名称：无";
+    private const string LabelTypePlaceholder = "类型：-";
+    private const string LabelDescriptionPlaceholder = "说明：-";
+    private const string LabelEffectPlaceholder = "效果：-";
+    private const string LabelRuneFallback = "符文";
     private const string LabelEmptyRuneSlot = "空符文槽";
     private const string LogNoRuneSelected = "[RuneUI] Please select a rune first.";
     private const string LogNoAvailableRuneCopy = "[RuneUI] No available copy of this rune.";
@@ -306,6 +306,7 @@ public class RuneUIController : MonoBehaviour
         RefreshRuneList();
         RefreshSkillSlots();
         SetSelectedRune(selectedRune);
+        RefreshStaticRunePanelLabels();
         RefreshSkillInfoVisuals();
     }
 
@@ -350,6 +351,7 @@ public class RuneUIController : MonoBehaviour
         ResolveCurrentPlayerContext();
         EnsureRuneBagLayoutUI();
         EnsureSkillInfoUI();
+        RefreshStaticRunePanelLabels();
         RefreshRuneList();
         RefreshSkillSlots();
         RefreshSkillInfoVisuals();
@@ -402,7 +404,7 @@ public class RuneUIController : MonoBehaviour
         if (noRuneText != null)
         {
             noRuneText.gameObject.SetActive(!hasRuneEntries);
-            noRuneText.text = hasRuneEntries ? string.Empty : Localize(LabelNoRune);
+            noRuneText.text = hasRuneEntries ? string.Empty : LocalizeOrFallback("No rune", LabelNoRune);
         }
 
         for (int i = 0; i < childCount; i++)
@@ -431,7 +433,7 @@ public class RuneUIController : MonoBehaviour
                 }
                 else
                 {
-                    label.text = Localize(LabelEmpty);
+                    label.text = LocalizeOrFallback("Empty", LabelEmpty);
                 }
             }
 
@@ -574,7 +576,7 @@ public class RuneUIController : MonoBehaviour
             }
 
             RuneDefinition rune = GetEquippedRune(skillIndex, i);
-            slotView.label.text = rune != null ? GetRuneName(rune) : Localize(LabelEmpty);
+            slotView.label.text = rune != null ? GetRuneName(rune) : LocalizeOrFallback("Empty", LabelEmpty);
             if (slotView.button != null)
             {
                 EnsureRuneSlotHoverTrigger(slotView.button, skillIndex, i, rune);
@@ -679,7 +681,9 @@ public class RuneUIController : MonoBehaviour
             " descriptionRaw=" + (selectedRune != null ? GetRuneDescription(selectedRune) : string.Empty));
         if (selectedRuneText != null)
         {
-            selectedRuneText.text = selectedRune != null ? $"{Localize("Selected Rune")}: {GetRuneName(selectedRune)}" : Localize(LabelSelectedRuneNone);
+            selectedRuneText.text = selectedRune != null
+                ? $"{LocalizeOrFallback("Selected Rune", "已选符文")}：{GetRuneName(selectedRune)}"
+                : LocalizeOrFallback("Selected Rune: None", LabelSelectedRuneNone);
         }
 
         RefreshSelectedRuneDetails(selectedRune);
@@ -999,15 +1003,20 @@ public class RuneUIController : MonoBehaviour
     {
         if (rune == null)
         {
-            return Localize(LabelEmpty);
+            return LocalizeOrFallback("Empty", LabelEmpty);
         }
 
-        if (!string.IsNullOrEmpty(rune.runeName))
+        if (rune.runeType != RuneType.None)
+        {
+            return RuneDefinition.GetLocalizedName(rune.runeType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(rune.runeName) && !IsKnownEnglishRuneName(rune.runeName))
         {
             return Localize(rune.runeName);
         }
 
-        return Localize(LabelRuneFallback);
+        return LocalizeOrFallback("Rune", LabelRuneFallback);
     }
 
     private string GetSkillKeyName(int skillIndex)
@@ -1233,7 +1242,7 @@ public class RuneUIController : MonoBehaviour
         {
             if (runeNameText != null)
             {
-                runeNameText.text = Localize(LabelRuneNameNone);
+                runeNameText.text = LocalizeOrFallback("Rune Name: None", LabelRuneNameNone);
             }
 
             if (runeTypeText != null)
@@ -1258,7 +1267,7 @@ public class RuneUIController : MonoBehaviour
 
         if (runeNameText != null)
         {
-            runeNameText.text = $"{Localize("Selected Rune")}: {GetRuneName(rune)}";
+            runeNameText.text = $"{LocalizeOrFallback("Selected Rune", "已选符文")}：{GetRuneName(rune)}";
         }
 
         if (runeTypeText != null)
@@ -1288,14 +1297,20 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        string rarityText = Localize(rune.rarity.ToString());
-        string typeText = Localize(rune.GetTypeDisplayName());
+        RuneDefinition displayRune = GetDisplayRuneDefinition(rune) ?? rune;
+        string rarityText = RuneDefinition.GetLocalizedRarity(displayRune.rarity);
+        string typeText = GetRuneName(rune);
         string rawDescription = GetRuneDescription(rune);
-        string description = string.IsNullOrWhiteSpace(rawDescription) ? "-" : Localize(rawDescription.Trim());
-        string effectText = rune.GetFullEffectDescription();
-        effectText = string.IsNullOrWhiteSpace(effectText) ? $"ID: {rune.runeId}" : Localize(effectText);
-        string body = $"{Localize("Type")}: {typeText} / {rarityText}\n\n{Localize("Description")}:\n{description}\n\n{Localize("Effect")}:\n{effectText}";
-        ShowSharedDescription($"{Localize("Rune Name")}: {GetRuneName(rune)}", body, false, DescriptionSource.Rune);
+        string description = string.IsNullOrWhiteSpace(rawDescription) ? "-" : rawDescription.Trim();
+        string effectText = displayRune.runeType != RuneType.None
+            ? RuneDefinition.GetLocalizedFullDescription(displayRune.runeType)
+            : displayRune.GetFullEffectDescription();
+        effectText = string.IsNullOrWhiteSpace(effectText) ? $"ID: {displayRune.runeId}" : effectText;
+        string body =
+            $"{LocalizeOrFallback("Type", "类型")}：{typeText} / {rarityText}\n\n" +
+            $"{LocalizeOrFallback("Description", "简介")}：\n{description}\n\n" +
+            $"{LocalizeOrFallback("Rune Effects", "符文效果")}：\n{effectText}";
+        ShowSharedDescription($"{LocalizeOrFallback("Rune Name", "符文名称")}：{GetRuneName(rune)}", body, false, DescriptionSource.Rune);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Rune" +
@@ -1392,7 +1407,7 @@ public class RuneUIController : MonoBehaviour
     private void ShowEmptyRuneSlotDescription(int skillIndex, int slotIndex, Transform slotTransform)
     {
         string skillKey = GetSkillKeyName(skillIndex);
-        ShowSharedDescription(Localize(LabelEmptyRuneSlot), string.Empty, false, DescriptionSource.EmptySlot);
+        ShowSharedDescription(LocalizeOrFallback("rune.empty_slot", LabelEmptyRuneSlot), string.Empty, false, DescriptionSource.EmptySlot);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=EmptySlot" +
@@ -2672,9 +2687,87 @@ public class RuneUIController : MonoBehaviour
 
     private string GetRuneDescription(RuneDefinition rune)
     {
-        return rune != null && !string.IsNullOrWhiteSpace(rune.description)
-            ? rune.description
+        RuneDefinition displayRune = GetDisplayRuneDefinition(rune);
+        return displayRune != null && displayRune.runeType != RuneType.None
+            ? RuneDefinition.GetLocalizedFlavor(displayRune.runeType)
             : string.Empty;
+    }
+
+    private static RuneDefinition GetDisplayRuneDefinition(RuneDefinition rune)
+    {
+        if (rune == null || rune.runeType == RuneType.None)
+        {
+            return rune;
+        }
+
+        RuneDefinition defaultRune = RuneDefinition.CreateDefaultRune(rune.runeType);
+        return defaultRune ?? rune;
+    }
+
+    private static bool IsKnownEnglishRuneName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return false;
+        }
+
+        string normalized = name.Trim();
+        return normalized == "Life Rune" ||
+               normalized == "Shield Rune" ||
+               normalized == "Mana Rune" ||
+               normalized == "Thorn Rune" ||
+               normalized == "Luck Rune";
+    }
+
+    private void RefreshStaticRunePanelLabels()
+    {
+        if (mainPanel == null)
+        {
+            return;
+        }
+
+        TextMeshProUGUI[] texts = mainPanel.GetComponentsInChildren<TextMeshProUGUI>(true);
+        for (int i = 0; i < texts.Length; i++)
+        {
+            TextMeshProUGUI text = texts[i];
+            if (text == null)
+            {
+                continue;
+            }
+
+            string value = (text.text ?? string.Empty).Trim();
+            switch (value)
+            {
+                case "Rune Bag":
+                    text.text = LocalizeOrFallback("Rune Bag", "符文背包");
+                    break;
+                case "Rune Skill Panel":
+                    text.text = LocalizeOrFallback("Rune Skill Panel", "符文技能面板");
+                    break;
+                case "Empty":
+                    text.text = LocalizeOrFallback("Empty", LabelEmpty);
+                    break;
+                case "符文背包":
+                case "ルーンバッグ":
+                    text.text = LocalizeOrFallback("Rune Bag", "符文背包");
+                    break;
+                case "符文技能面板":
+                case "ルーンスキルパネル":
+                    text.text = LocalizeOrFallback("Rune Skill Panel", "符文技能面板");
+                    break;
+                case "空":
+                case "空き":
+                    text.text = LocalizeOrFallback("Empty", LabelEmpty);
+                    break;
+            }
+        }
+    }
+
+    private static string LocalizeOrFallback(string key, string fallback)
+    {
+        return GameLocalization.Instance != null
+            ? GameLocalization.Instance.TranslateOrFallback(key, fallback)
+            : fallback;
     }
 
     private void LogRunePanelDescriptionTrace(string eventName, string details)

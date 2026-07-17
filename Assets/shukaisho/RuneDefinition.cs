@@ -41,12 +41,12 @@ public class RuneDefinition
     {
         return runeType switch
         {
-            RuneType.Life => "Life Rune",
-            RuneType.Shield => "Shield Rune",
-            RuneType.Mana => "Mana Rune",
-            RuneType.Thorn => "Thorn Rune",
-            RuneType.Luck => "Luck Rune",
-            _ => "Rune"
+            RuneType.Life => "生命符文",
+            RuneType.Shield => "护盾符文",
+            RuneType.Mana => "魔力符文",
+            RuneType.Thorn => "荆棘符文",
+            RuneType.Luck => "幸运符文",
+            _ => "符文"
         };
     }
 
@@ -66,6 +66,7 @@ public class RuneDefinition
     public string GetFullEffectDescription()
     {
         StringBuilder builder = new StringBuilder();
+        builder.AppendLine("【符文本体效果】");
         AppendEffectLine(builder, "1", tier1Effect);
         AppendEffectLine(builder, "2", tier2Effect);
         AppendEffectLine(builder, "3", tier3Effect);
@@ -79,10 +80,70 @@ public class RuneDefinition
                 builder.Append('\n');
             }
 
-            builder.Append("Set Bonus: ").Append(setBonusEffect.Trim());
+            builder.Append("【套装额外效果】\n").Append(setBonusEffect.Trim());
         }
 
         return builder.ToString();
+    }
+
+    public static string GetLocalizedName(RuneType type)
+    {
+        RuneDefinition fallbackRune = CreateDefaultRune(type);
+        string fallback = fallbackRune != null ? fallbackRune.runeName : "符文";
+        return TranslateRuneText(GetLocalizationKey(type, "name"), fallback);
+    }
+
+    public static string GetLocalizedFlavor(RuneType type)
+    {
+        RuneDefinition fallbackRune = CreateDefaultRune(type);
+        string fallback = fallbackRune != null ? fallbackRune.description : string.Empty;
+        return TranslateRuneText(GetLocalizationKey(type, "flavor"), fallback);
+    }
+
+    public static string GetLocalizedFullDescription(RuneType type)
+    {
+        RuneDefinition fallbackRune = CreateDefaultRune(type);
+        string fallback = fallbackRune != null ? fallbackRune.GetFullEffectDescription() : string.Empty;
+        return TranslateRuneText(GetLocalizationKey(type, "full_description"), fallback);
+    }
+
+    public static string GetLocalizedRarity(RuneRarity rarity)
+    {
+        string fallback = rarity switch
+        {
+            RuneRarity.Common => "普通",
+            RuneRarity.Rare => "稀有",
+            RuneRarity.Epic => "史诗",
+            _ => rarity.ToString()
+        };
+
+        return TranslateRuneText(rarity.ToString(), fallback);
+    }
+
+    private static string TranslateRuneText(string key, string chineseFallback)
+    {
+        GameLocalization localization = GameLocalization.Instance;
+        if (localization == null || localization.CurrentLanguage == GameLanguage.SimplifiedChinese)
+        {
+            return chineseFallback;
+        }
+
+        return localization.TranslateOrFallback(key, chineseFallback);
+    }
+
+    private static string GetLocalizationKey(RuneType type, string suffix)
+    {
+        string typeKey = type switch
+        {
+            RuneType.Life => "life",
+            RuneType.Shield => "shield",
+            RuneType.Mana => "mana",
+            RuneType.Thorn => "thorn",
+            RuneType.Luck => "luck",
+            _ => string.Empty
+        };
+
+        return string.IsNullOrWhiteSpace(typeKey) ? string.Empty : $"rune.{typeKey}.{suffix}";
     }
 
     private static void AppendEffectLine(StringBuilder builder, string tierLabel, string text)
@@ -97,7 +158,7 @@ public class RuneDefinition
             builder.Append('\n');
         }
 
-        builder.Append(tierLabel).Append(" Piece: ").Append(text.Trim());
+        builder.Append(tierLabel).Append("件：").Append(text.Trim());
     }
 
     public static RuneDefinition CreateDefaultRune(RuneType type)
@@ -112,62 +173,62 @@ public class RuneDefinition
         {
             case RuneType.Life:
                 rune.runeId = 101;
-                rune.runeName = "Life Rune";
-                rune.description = "A rune born from life force. It strengthens the body and converts vitality into healing, damage, shields, and growth.";
-                rune.tier1Effect = "When you kill a monster, gain 1 Life Attribute Soul and 1 Life Recovery Soul.";
-                rune.tier2Effect = "When you cast a skill, restore HP equal to 5% of your max HP. This can trigger once per skill cast.";
-                rune.tier3Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 5% of your max HP. This can trigger once per skill cast.";
-                rune.tier4Effect = "If healing from Life Rune effects overheals you, the overflow is converted into permanent shield. Permanent shield does not decay over time and is capped at 100% of your max HP.";
-                rune.tier5Effect = "Max HP increased by 50%.";
-                rune.setBonusEffect = "Life Awakening. Gain all-stat bonuses based on max HP. Every 10 max HP counts as 1 Life Attribute. All stats except HP are increased by 10% of that Life Attribute value, rounded down.";
+                rune.runeName = "生命符文";
+                rune.description = "以生命为源泉的符文，能够强化体魄，并将生命力转化为回复、伤害、护盾与成长。";
+                rune.tier1Effect = "击杀敌人时，额外掉落1个成长之魂和1个生命之魂。";
+                rune.tier2Effect = "每次成功施放技能时，恢复自身5%最大生命值。";
+                rune.tier3Effect = "每次成功施放技能后，下一次对敌人造成伤害时，追加相当于自身5%最大生命值的伤害。";
+                rune.tier4Effect = "生命符文产生的治疗溢出时，将溢出治疗量转化为护盾，最多至自身100%最大生命值。";
+                rune.tier5Effect = "自身最大生命值提高50%。";
+                rune.setBonusEffect = "2件套·生命亲和：自身受到的治疗效果提高15%。\n4件套·生命共鸣：当前生命值高于或等于50%时，造成的伤害提高20%；低于50%时，受到怪物造成的伤害降低25%。生命值从50%以下恢复至50%以上时，获得8秒生命共鸣，同时获得上述增伤和减伤，刷新但不叠加。\n5件套·生命统御：每拥有100点最大生命值，物理攻击、物理防御、特殊攻击、特殊防御和速度各提高1点，不提高最大生命值与幸运。";
                 break;
 
             case RuneType.Shield:
                 rune.runeId = 102;
-                rune.runeName = "Shield Rune";
-                rune.description = "A rune formed from protective will. It builds shields when you avoid damage and converts shield power into stronger defense and offense.";
-                rune.tier1Effect = "After not taking monster damage for 3 seconds, refill your current shield up to 50% of your max HP.";
-                rune.tier2Effect = "While you have a shield, your damage dealt is increased by 30%.";
-                rune.tier3Effect = "When you kill a monster, gain 1 Shield Soul.";
-                rune.tier4Effect = "Shield gained is increased by 100%.";
-                rune.tier5Effect = "After casting a skill, the first enemy hit takes bonus damage equal to 15% of your current shield. This can trigger once per skill cast. This damage is affected by Shield Efficiency.";
-                rune.setBonusEffect = "Guardian Ascension. Shield cap is increased to 300% of your max HP. Each time you kill an elite monster or Boss, shield efficiency is permanently increased by 10%, up to 300%.";
+                rune.runeName = "护盾符文";
+                rune.description = "守护意志凝结而成的符文，能将护盾转化为更强的防御与攻击力量。";
+                rune.tier1Effect = "连续3秒未受到怪物伤害后，自动恢复护盾，直到达到50%最大生命值。";
+                rune.tier2Effect = "自身拥有护盾时，造成的伤害提高30%。";
+                rune.tier3Effect = "击杀敌人时，额外掉落1个功能之魂和1个护盾之魂。";
+                rune.tier4Effect = "自身获得的护盾量提高100%，受护盾效率影响。";
+                rune.tier5Effect = "每次成功施放技能后，下一次对敌人造成伤害时，追加相当于自身当前护盾值15%的伤害，受护盾效率影响。";
+                rune.setBonusEffect = "2件套·坚固屏障：自身拥有护盾时，护盾受到的伤害降低15%，只影响护盾承受的部分。\n4件套·壁垒重构：护盾被怪物击破时，获得3秒壁垒重构：受到怪物伤害降低40%，免疫击退和硬直。结束时获得30%最大生命值护盾。15秒冷却。\n5件套·不落要塞：护盾上限提高至300%最大生命值。击杀精英或Boss时，护盾效率永久+10%，最高300%。";
                 break;
 
             case RuneType.Mana:
                 rune.runeId = 103;
-                rune.runeName = "Mana Rune";
-                rune.description = "A rune condensed from pure mana. It expands mana capacity, strengthens Mana Soul recovery, and converts extra mana consumption into stronger skill effects and growth.";
-                rune.tier1Effect = "Max Mana increased by 200.";
-                rune.tier2Effect = "Mana regeneration speed increased by 150%.";
-                rune.tier3Effect = "When you kill a monster, an additional Mana Soul drops. If Mana Soul recovery overflows your mana, the overflow is converted into Mana Overflow. Mana Overflow is capped at 200% of your max mana.";
-                rune.tier4Effect = "When you cast a skill, additionally consume up to 20% of your max mana from Mana Overflow first, then normal mana. Based on the actual extra consumed ratio, that skill's core effect is strengthened up to its own configured cap. This can trigger once per skill cast.";
-                rune.tier5Effect = "Gain all-stat bonuses based on max mana. Every 10 max mana counts as 1 Mana Attribute. All stats except HP and MP are increased by 10% of that Mana Attribute value, affected by Mana Conversion Efficiency and rounded down.";
-                rune.setBonusEffect = "Mana Ascension. Mana Soul recovery becomes 400% of its original value, Mana Overflow cap is increased to 300% of max mana, and each elite monster or Boss kill permanently increases Mana Conversion Efficiency by 10%, up to 300%.";
+                rune.runeName = "魔力符文";
+                rune.description = "由纯粹魔力凝结而成的符文，能扩张法力容量，并将溢出的魔力转化为爆发。";
+                rune.tier1Effect = "最大魔力值提高200点。";
+                rune.tier2Effect = "魔力恢复速度提高150%。";
+                rune.tier3Effect = "击杀敌人时，额外掉落1个能量之魂和1个魔力之魂。获得魔力时，超过最大魔力值的部分转化为魔力溢出，最多至200%最大魔力值。";
+                rune.tier4Effect = "施放技能时，额外消耗最多20%最大魔力值的魔力，优先使用当前魔力，不足时再使用魔力溢出，强化该技能的符文奖励。";
+                rune.tier5Effect = "每拥有100点最大魔力值，物理攻击、物理防御、特殊攻击、特殊防御和速度各+1。";
+                rune.setBonusEffect = "2件套·魔力回流：成功施放技能后，返还该技能基础魔力消耗的15%。\n4件套·奥术共鸣：通过魔力符文额外耗蓝累计达到20%最大魔力值时，获得8秒奥术共鸣：造成伤害+25%，技能冷却恢复速度+25%，魔力符文额外耗蓝产生的技能强化效果+75%。触发后累计值清零。\n5件套·奥术超载：魔力之魂恢复量提高至400%，魔力溢出上限提高至300%最大魔力值。击杀精英或Boss时，魔力转化效率永久+10%，最高300%。";
                 break;
 
             case RuneType.Thorn:
                 rune.runeId = 104;
-                rune.runeName = "Thorn Rune";
-                rune.description = "A rune born from pain and the will to counterattack. It reduces incoming damage and converts attacks received into retaliatory power.";
-                rune.tier1Effect = "Monster damage taken is reduced by 25%.";
-                rune.tier2Effect = "When hit by a monster, deal Thorn damage to the attacker. Base Thorn damage is (10% of max HP + Physical Attack + Physical Defense + Special Attack + Special Defense + Speed + Luck) x 30%.";
-                rune.tier3Effect = "Thorn damage increased by 100%.";
-                rune.tier4Effect = "After casting a skill, the first time that skill deals damage, add bonus damage equal to 150% of your current Thorn damage. This can trigger once per skill cast.";
-                rune.tier5Effect = "When hit by a monster, automatically release Thorn Counter. Thorn Counter creates a thorn burst centered on you, damages enemies in range for 300% of your current Thorn damage, always includes the attacker, has its own cooldown, and does not trigger other auto-cast effects.";
-                rune.setBonusEffect = "Pain Backlash. Thorn damage is additionally increased by 100%, Thorn Counter cooldown is reduced to 2 seconds, and each elite monster or Boss kill permanently increases Thorn Efficiency by 10%, up to 300%.";
+                rune.runeName = "荆棘符文";
+                rune.description = "由痛苦与反击意志凝结而成的符文，能将承受的攻击转化为反击力量。";
+                rune.tier1Effect = "受到怪物造成的伤害降低25%。";
+                rune.tier2Effect = "受到怪物攻击时，对攻击者造成荆棘伤害。基础荆棘值为（自身10%最大生命值+主要属性+幸运）x30%。";
+                rune.tier3Effect = "荆棘伤害提高100%。";
+                rune.tier4Effect = "每次成功施放技能后，下一次对敌人造成伤害时，追加150%当前荆棘值的伤害。";
+                rune.tier5Effect = "受到怪物攻击时，自动释放荆棘反击。";
+                rune.setBonusEffect = "2件套·倒刺汲取：荆棘伤害成功命中后恢复2%最大生命值，每1秒最多1次。\n4件套·荆棘反噬：受到怪物伤害时，本次伤害额外降低30%，并对攻击者造成200%当前荆棘值的荆棘伤害。5秒冷却。\n5件套·万刺反击：荆棘伤害额外提高100%，荆棘反击冷却缩短至2秒。击杀精英或Boss时，荆棘效率永久+10%，最高300%。";
                 break;
 
             case RuneType.Luck:
                 rune.runeId = 105;
-                rune.runeName = "Luck Rune";
-                rune.description = "A rune condensed from the breath of fate. It improves Soul acquisition efficiency and turns chance-based combat rewards into long-term growth.";
-                rune.tier1Effect = "Luck increased by 5.";
-                rune.tier2Effect = "When a monster drops an Attribute Soul, there is a 30% chance to increase that Soul's point value by 1, up to a maximum of 5.";
-                rune.tier3Effect = "When you kill a monster, there is a 25% chance to drop 1 additional random Attribute Soul.";
-                rune.tier4Effect = "When you pick up any Soul, there is a 20% chance to copy 1 Soul of the same type. The copied Soul has a fixed value of 2 points.";
-                rune.tier5Effect = "When you kill an elite monster or Boss, drop 5 additional random Attribute Souls.";
-                rune.setBonusEffect = "Fate's Favor. All Luck Rune probability effects have their base trigger rates multiplied by 1.5. Each elite monster or Boss kill permanently increases Luck Efficiency by 10%, up to 500%.";
+                rune.runeName = "幸运符文";
+                rune.description = "由命运气息凝结而成的符文，能将战斗中的偶然收益转化为长期成长。";
+                rune.tier1Effect = "幸运+5。";
+                rune.tier2Effect = "成长之魂生成时，有30%概率使其点数+1，最高5点。";
+                rune.tier3Effect = "击杀敌人时，有25%概率额外掉落1个成长之魂。";
+                rune.tier4Effect = "拾取任意灵魂时，有20%概率额外复制1个同类灵魂，复制灵魂固定为2点。";
+                rune.tier5Effect = "击杀精英敌人或Boss时，额外掉落5个成长之魂。";
+                rune.setBonusEffect = "2件套·命运一掷：每次成功施放技能时，有20%概率进行命运抽奖，从当前装备的非幸运符文种类中抽取1种并触发对应拟态效果。若没有其他符文，则恢复5%最大生命值和5%最大魔力值。\n4件套·双重眷顾：命运抽奖基础概率提高至35%。成功时抽取两个不同结果；若只有1种结果，第2次效果降为50%。\n5件套·命运大奖：命运抽奖成功时，有15%概率改为触发当前抽奖池中全部结果。击杀精英或Boss时，幸运效率永久+10%，最高300%。幸运效率影响抽奖和大奖概率，最终概率不超过100%。";
                 break;
         }
 

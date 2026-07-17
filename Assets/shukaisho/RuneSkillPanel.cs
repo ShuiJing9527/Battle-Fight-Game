@@ -110,22 +110,22 @@ public class RuneSkillPanel : MonoBehaviour
         }
 
         Rect windowRect = new Rect(24f, 90f, 540f, 460f);
-        GUI.Window(GetInstanceID(), windowRect, DrawFallbackWindow, "Rune Skill Panel");
+        GUI.Window(GetInstanceID(), windowRect, DrawFallbackWindow, LocalizeOrFallback("Rune Skill Panel", "符文技能面板"));
     }
 
     private void DrawFallbackWindow(int windowId)
     {
-        GUILayout.Label("Inventory Runes");
+        GUILayout.Label(LocalizeOrFallback("Rune Bag", "符文背包"));
         if (inventory == null || inventory.Count == 0)
         {
-            GUILayout.Label("No rune");
+            GUILayout.Label(LocalizeOrFallback("No rune", "无符文"));
         }
         else
         {
             for (int i = 0; i < inventory.Count; i++)
             {
                 RuneDefinition rune = inventory.GetRune(i);
-                string label = rune != null ? rune.runeName : "Empty";
+                string label = rune != null ? GetRuneDisplayName(rune) : LocalizeOrFallback("Empty", "空");
                 if (GUILayout.Button(selectedRuneIndex == i ? $"> {label}" : label, GUILayout.Height(34f)))
                 {
                     selectedRuneIndex = i;
@@ -134,7 +134,7 @@ public class RuneSkillPanel : MonoBehaviour
         }
 
         GUILayout.Space(10f);
-        GUILayout.Label("Equip selected rune to skill slot");
+        GUILayout.Label(LocalizeOrFallback("rune.equip_prompt", "将选中的符文镶嵌到技能槽"));
         string[] skillLabels = { "Q", "W", "E", "R" };
         for (int skillIndex = 0; skillIndex < skillLabels.Length; skillIndex++)
         {
@@ -151,6 +151,28 @@ public class RuneSkillPanel : MonoBehaviour
         }
 
         GUI.DragWindow();
+    }
+
+    private static string GetRuneDisplayName(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return LocalizeOrFallback("Empty", "空");
+        }
+
+        if (rune.runeType != RuneType.None)
+        {
+            return RuneDefinition.GetLocalizedName(rune.runeType);
+        }
+
+        return !string.IsNullOrWhiteSpace(rune.runeName) ? LocalizeOrFallback(rune.runeName, rune.runeName) : "符文";
+    }
+
+    private static string LocalizeOrFallback(string key, string fallback)
+    {
+        return GameLocalization.Instance != null
+            ? GameLocalization.Instance.TranslateOrFallback(key, fallback)
+            : fallback;
     }
 
     private void CacheBootstrap()

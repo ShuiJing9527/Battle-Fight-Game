@@ -134,7 +134,7 @@ public class BattleResourceBank : MonoBehaviour
         switch (type)
         {
             case SoulType.Life:
-                ApplyLifeSoul(resolvedValue);
+                ApplyLifeSoul(resolvedValue, true);
                 feedback = $"Heal +{Mathf.CeilToInt(resolvedValue)}";
                 break;
             case SoulType.Energy:
@@ -175,7 +175,12 @@ public class BattleResourceBank : MonoBehaviour
 
     public void Heal(float amount)
     {
-        ApplyLifeSoul(amount);
+        Heal(amount, true);
+    }
+
+    public void Heal(float amount, bool applyRuneHealingMultiplier)
+    {
+        ApplyLifeSoul(amount, applyRuneHealingMultiplier);
     }
 
     public void SetShield(float amount)
@@ -232,8 +237,18 @@ public class BattleResourceBank : MonoBehaviour
         OnShieldChanged?.Invoke(shield, maxShield);
     }
 
-    private void ApplyLifeSoul(float amount)
+    private void ApplyLifeSoul(float amount, bool applyRuneHealingMultiplier)
     {
+        amount = Mathf.Max(0f, amount);
+        if (applyRuneHealingMultiplier)
+        {
+            RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+            if (runtimeState != null)
+            {
+                amount *= runtimeState.GetHealingReceivedMultiplier();
+            }
+        }
+
         currentHealth = Mathf.Min(maxHealth, currentHealth + amount);
     }
 
@@ -356,7 +371,7 @@ public class BattleResourceBank : MonoBehaviour
         switch (soulType)
         {
             case SoulType.Life:
-                ApplyLifeSoul(amount);
+                ApplyLifeSoul(amount, true);
                 return $"HP +{Mathf.CeilToInt(amount)}";
             case SoulType.Function:
                 ApplyFunctionSoul(amount);
@@ -408,13 +423,23 @@ public class BattleResourceBank : MonoBehaviour
     public float AbsorbDamage(float amount)
     {
         amount = Mathf.Max(0f, amount);
-        float shieldUsed = Mathf.Min(shield, amount);
+        RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+        float shieldDamageMultiplier = runtimeState != null ? runtimeState.GetShieldDamageTakenMultiplier() : 1f;
+        float shieldBefore = shield;
+        float shieldUsed = Mathf.Min(shield, amount * shieldDamageMultiplier);
         shield -= shieldUsed;
         if (shieldUsed > 0f)
         {
             OnShieldChanged?.Invoke(shield, maxShield);
         }
-        return amount - shieldUsed;
+
+        if (shieldBefore > 0f && shield <= 0f)
+        {
+            runtimeState?.NotifyShieldBrokenByMonsterDamage(shieldBefore);
+        }
+
+        float absorbedIncomingDamage = shieldDamageMultiplier > 0f ? shieldUsed / shieldDamageMultiplier : amount;
+        return Mathf.Max(0f, amount - absorbedIncomingDamage);
     }
 
     private RuneRuntimeState ResolveRuneRuntimeState()

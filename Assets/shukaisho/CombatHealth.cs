@@ -253,7 +253,7 @@ public class CombatHealth : MonoBehaviour
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
         {
-            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
+            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier(resolvedMonsterSource, finalDamage);
         }
         float afterRuneDamage = finalDamage;
         finalDamage *= GetIncomingDamageMultiplier();
@@ -476,7 +476,7 @@ public class CombatHealth : MonoBehaviour
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
         {
-            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier();
+            finalDamage *= runeRuntimeState.GetIncomingMonsterDamageMultiplier(resolvedMonsterSource, finalDamage);
         }
         finalDamage *= GetIncomingDamageMultiplier();
         float resolvedDamageBeforeShield = Mathf.Max(0f, finalDamage);
@@ -577,9 +577,15 @@ public class CombatHealth : MonoBehaviour
     public void Heal(float amount)
     {
         amount = Mathf.Max(0f, amount);
+        RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+        if (runtimeState != null)
+        {
+            amount *= runtimeState.GetHealingReceivedMultiplier();
+        }
+
         if (resourceBank != null)
         {
-            resourceBank.Heal(amount);
+            resourceBank.Heal(amount, false);
             currentHealth = resourceBank.currentHealth;
         }
         else
@@ -717,7 +723,8 @@ public class CombatHealth : MonoBehaviour
         }
 
         float baseShield = GetBaseShield();
-        float shieldUsed = Mathf.Min(baseShield, amount);
+        float shieldDamageMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldDamageTakenMultiplier() : 1f;
+        float shieldUsed = Mathf.Min(baseShield, amount * shieldDamageMultiplier);
         if (shieldUsed <= 0f)
         {
             return amount;
@@ -735,7 +742,13 @@ public class CombatHealth : MonoBehaviour
             NotifyShieldStateChanged();
         }
 
-        return amount - shieldUsed;
+        if (baseShield > 0f && remainingShield <= 0f)
+        {
+            runeRuntimeState?.NotifyShieldBrokenByMonsterDamage(baseShield);
+        }
+
+        float absorbedIncomingDamage = shieldDamageMultiplier > 0f ? shieldUsed / shieldDamageMultiplier : amount;
+        return Mathf.Max(0f, amount - absorbedIncomingDamage);
     }
 
     private float GetBaseShield()

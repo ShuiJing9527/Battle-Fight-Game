@@ -281,6 +281,7 @@ public sealed class RuneTestLoadout : MonoBehaviour
             return false;
         }
 
+        NormalizeDefaultRuneText(runtimeRune, runeType);
         context.runeInventory.AddRune(runtimeRune, "RuneTestLoadout-" + source);
         reason = "AddedToRuneInventory";
         return true;
@@ -411,6 +412,31 @@ public sealed class RuneTestLoadout : MonoBehaviour
             tier5Effect = source.tier5Effect,
             setBonusEffect = source.setBonusEffect
         };
+    }
+
+    private static void NormalizeDefaultRuneText(RuneDefinition rune, RuneType requestedType)
+    {
+        if (rune == null)
+        {
+            return;
+        }
+
+        RuneDefinition defaultRune = RuneDefinition.CreateDefaultRune(requestedType != RuneType.None ? requestedType : rune.runeType);
+        if (defaultRune == null)
+        {
+            return;
+        }
+
+        rune.runeId = defaultRune.runeId;
+        rune.runeName = defaultRune.runeName;
+        rune.runeType = defaultRune.runeType;
+        rune.description = defaultRune.description;
+        rune.tier1Effect = defaultRune.tier1Effect;
+        rune.tier2Effect = defaultRune.tier2Effect;
+        rune.tier3Effect = defaultRune.tier3Effect;
+        rune.tier4Effect = defaultRune.tier4Effect;
+        rune.tier5Effect = defaultRune.tier5Effect;
+        rune.setBonusEffect = defaultRune.setBonusEffect;
     }
 
     private static string BuildGrantSummary(Dictionary<RuneType, int> grantedCounts)

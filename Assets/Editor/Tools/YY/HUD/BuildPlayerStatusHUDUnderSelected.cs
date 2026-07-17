@@ -207,6 +207,7 @@ public static class BuildPlayerStatusHUDUnderSelected
         property.FindPropertyRelative("keyText").objectReferenceValue = root != null ? root.Find("KeyLabel")?.GetComponent<Text>() : null;
         property.FindPropertyRelative("disabledOverlay").objectReferenceValue = root != null ? root.Find("DisabledOverlay")?.gameObject : null;
         property.FindPropertyRelative("hoverHighlight").objectReferenceValue = root != null ? root.Find("HoverHighlight")?.GetComponent<Image>() : null;
+        property.FindPropertyRelative("selectionHighlight").objectReferenceValue = root != null ? root.Find("SelectionHighlight")?.GetComponent<Image>() : null;
         property.FindPropertyRelative("hoverTrigger").objectReferenceValue = root != null ? root.GetComponent<SkillHoverTrigger>() : null;
     }
 
@@ -289,6 +290,9 @@ public static class BuildPlayerStatusHUDUnderSelected
             image.fillMethod = Image.FillMethod.Radial360;
             image.fillOrigin = 2;
             image.fillClockwise = true;
+            image.fillAmount = 0f;
+            image.raycastTarget = false;
+            image.preserveAspect = true;
         });
         EnsureLegacyTextChild(slot.transform, "CooldownText", string.Empty, 36, TextAnchor.MiddleCenter, Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
         EnsureKeyLabel(slot.transform, key);
@@ -298,6 +302,7 @@ public static class BuildPlayerStatusHUDUnderSelected
             image.color = new Color(1f, 0.9f, 0.35f, 0.5f);
             image.raycastTarget = false;
             image.enabled = false;
+            image.preserveAspect = true;
         });
         if (!hadHoverHighlight)
         {
@@ -305,6 +310,21 @@ public static class BuildPlayerStatusHUDUnderSelected
             hoverHighlightObject.SetActive(false);
         }
 
+        bool hadSelectionHighlight = slot.transform.Find("SelectionHighlight") != null;
+        GameObject selectionHighlightObject = EnsureSkillSlotChild(slot.transform, "SelectionHighlight", new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero, image =>
+        {
+            image.color = new Color(1f, 0.88f, 0.28f, 0.95f);
+            image.raycastTarget = false;
+            image.enabled = false;
+            image.preserveAspect = true;
+        });
+        if (!hadSelectionHighlight)
+        {
+            selectionHighlightObject.transform.localScale = Vector3.one * 1.2f;
+            selectionHighlightObject.SetActive(false);
+        }
+
+        ApplySkillSlotHierarchy(slot.transform);
         return slot;
     }
 
@@ -370,6 +390,16 @@ public static class BuildPlayerStatusHUDUnderSelected
         hoverImage.raycastTarget = false;
         hoverImage.enabled = false;
         hoverHighlight.SetActive(false);
+
+        GameObject selectionHighlight = CreateUIObject("SelectionHighlight", slot.transform);
+        RectTransform selectionRect = selectionHighlight.GetComponent<RectTransform>();
+        Stretch(selectionRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+        selectionRect.localScale = Vector3.one * 1.2f;
+        Image selectionImage = EnsureImage(selectionHighlight, new Color(1f, 0.88f, 0.28f, 0.95f));
+        selectionImage.raycastTarget = false;
+        selectionImage.enabled = false;
+        selectionImage.preserveAspect = true;
+        selectionHighlight.SetActive(false);
 
         return slot;
     }
@@ -493,6 +523,35 @@ public static class BuildPlayerStatusHUDUnderSelected
         }
 
         return child;
+    }
+
+    private static void ApplySkillSlotHierarchy(Transform slot)
+    {
+        if (slot == null)
+        {
+            return;
+        }
+
+        string[] orderedChildren =
+        {
+            "Background",
+            "Icon",
+            "CooldownOverlay",
+            "HoverHighlight",
+            "SelectionHighlight",
+            "CooldownText",
+            "KeyLabel"
+        };
+
+        int siblingIndex = 0;
+        for (int i = 0; i < orderedChildren.Length; i++)
+        {
+            Transform child = slot.Find(orderedChildren[i]);
+            if (child != null)
+            {
+                child.SetSiblingIndex(siblingIndex++);
+            }
+        }
     }
 
     private static Text EnsureLegacyTextChild(

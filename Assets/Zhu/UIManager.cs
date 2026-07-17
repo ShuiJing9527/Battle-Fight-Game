@@ -8,6 +8,7 @@ public class UIManager : MonoBehaviour
 
     public void StartGame()
     {
+        GameLocalization.MarkFormalGameStart();
         SceneManager.LoadScene(startSceneName);
     }
 

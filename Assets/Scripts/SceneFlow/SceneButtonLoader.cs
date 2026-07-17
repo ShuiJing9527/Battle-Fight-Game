@@ -23,6 +23,7 @@ public class SceneButtonLoader : MonoBehaviour
         waitingForDemoBattle = true;
         DontDestroyOnLoad(gameObject);
         SceneManager.sceneLoaded += HandleDemoBattleLoaded;
+        GameLocalization.MarkFormalGameStart();
         SceneManager.LoadScene(demoBattleSceneName);
     }
 
@@ -81,6 +82,7 @@ public class SceneButtonLoader : MonoBehaviour
             return;
         }
 
+        GameLocalization.MarkFormalGameStart();
         SceneManager.LoadScene(sceneName);
     }
 }

@@ -102,6 +102,17 @@ public static class SkillHUDPrefabBuilder
         hoverHighlightImage.enabled = false;
         hoverHighlight.SetActive(false);
 
+        GameObject selectionHighlight = CreateUiChild(root.transform, "SelectionHighlight");
+        RectTransform selectionHighlightRect = selectionHighlight.GetComponent<RectTransform>();
+        Stretch(selectionHighlightRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+        selectionHighlightRect.localScale = Vector3.one * 1.2f;
+        Image selectionHighlightImage = selectionHighlight.AddComponent<Image>();
+        selectionHighlightImage.sprite = ResolveCircleSprite();
+        selectionHighlightImage.color = new Color(1f, 0.88f, 0.28f, 0.95f);
+        selectionHighlightImage.raycastTarget = false;
+        selectionHighlightImage.enabled = false;
+        selectionHighlight.SetActive(false);
+
         GameObject keyLabel = CreateUiChild(root.transform, "KeyLabel");
         RectTransform keyLabelRect = keyLabel.GetComponent<RectTransform>();
         keyLabelRect.anchorMin = new Vector2(0f, 1f);
@@ -198,6 +209,14 @@ public static class SkillHUDPrefabBuilder
             hoverHighlight.enabled = false;
             hoverHighlightObject.SetActive(false);
 
+            GameObject selectionHighlightObject = CreateUiChild(slot.transform, "SelectionHighlight");
+            Image selectionHighlight = selectionHighlightObject.AddComponent<Image>();
+            selectionHighlight.sprite = ResolveCircleSprite();
+            selectionHighlight.color = new Color(1f, 0.88f, 0.28f, 0.95f);
+            selectionHighlight.raycastTarget = false;
+            selectionHighlight.enabled = false;
+            selectionHighlightObject.SetActive(false);
+
             Stretch(slot.transform.Find("Background").GetComponent<RectTransform>(), Vector2.zero, Vector2.one, Vector2.zero, Vector2.zero);
             Stretch(slot.transform.Find("Icon").GetComponent<RectTransform>(), new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
             Stretch(slot.transform.Find("CooldownOverlay").GetComponent<RectTransform>(), new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
@@ -205,6 +224,9 @@ public static class SkillHUDPrefabBuilder
             RectTransform hoverRect = slot.transform.Find("HoverHighlight").GetComponent<RectTransform>();
             Stretch(hoverRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
             hoverRect.localScale = Vector3.one * 1.18f;
+            RectTransform selectionRect = slot.transform.Find("SelectionHighlight").GetComponent<RectTransform>();
+            Stretch(selectionRect, new Vector2(0.18f, 0.18f), new Vector2(0.82f, 0.82f), Vector2.zero, Vector2.zero);
+            selectionRect.localScale = Vector3.one * 1.2f;
 
             RectTransform labelRect = labelObject.GetComponent<RectTransform>();
             labelRect.anchorMin = new Vector2(0f, 1f);

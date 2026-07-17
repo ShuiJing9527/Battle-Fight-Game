@@ -18,22 +18,22 @@ public class BattleSkill
 
 public class CombatSkillCaster : MonoBehaviour
 {
-    private const string DefaultQSkillName = "Q Basic Skill";
+    private const string DefaultQSkillName = "Q 基础技能";
     private const float DefaultQEnergyCost = 10f;
     private const float DefaultQBaseDamage = 10f;
     private const float DefaultQAttackRange = 2f;
 
-    private const string DefaultWSkillName = "W Defense Skill";
+    private const string DefaultWSkillName = "W 防御技能";
     private const float DefaultWEnergyCost = 30f;
     private const float DefaultWBaseDamage = 0f;
     private const float DefaultWAttackRange = 0f;
 
-    private const string DefaultESkillName = "E Movement Skill";
+    private const string DefaultESkillName = "E 位移技能";
     private const float DefaultEEnergyCost = 20f;
     private const float DefaultEBaseDamage = 16f;
     private const float DefaultEAttackRange = 1.2f;
 
-    private const string DefaultRSkillName = "R Ultimate Skill";
+    private const string DefaultRSkillName = "R 终结技能";
     private const float DefaultREnergyCost = 60f;
     private const float DefaultRBaseDamage = 50f;
     private const float DefaultRAttackRange = 6f;
@@ -122,6 +122,7 @@ public class CombatSkillCaster : MonoBehaviour
             return false;
         }
 
+        runeRuntimeState?.NotifyBaseSkillManaSpent(skillIndex, skill.energyCost);
         int runeCastId = runeRuntimeState != null ? runeRuntimeState.NotifySkillCastStarted(skillIndex) : -1;
         float manaRuneEffectStrength = runeRuntimeState != null ? runeRuntimeState.TriggerManaRuneCastEffect(skillIndex) : 0f;
         ExecuteSkill(skill, skillIndex, runeCastId, manaRuneEffectStrength);
@@ -168,7 +169,7 @@ public class CombatSkillCaster : MonoBehaviour
         }
 
         baseDamage *= runeRuntimeState != null ? runeRuntimeState.GetOutgoingDamageMultiplier(skillIndex) : 1f;
-        baseDamage *= 1f + Mathf.Clamp01(manaRuneEffectStrength) * 0.5f;
+        baseDamage *= 1f + Mathf.Max(0f, manaRuneEffectStrength) * 0.5f;
 
         for (int hit = 0; hit < Mathf.Max(1, skill.hitCount); hit++)
         {

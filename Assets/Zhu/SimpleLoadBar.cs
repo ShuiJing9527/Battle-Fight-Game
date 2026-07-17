@@ -52,6 +52,8 @@ public class SimpleLoadBar : MonoBehaviour
             return;
         }
 
+        GameLocalization.MarkFormalGameStart();
+
         if (blackMask != null)
         {
             blackMask.SetActive(true);

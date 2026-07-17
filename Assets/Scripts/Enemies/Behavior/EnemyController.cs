@@ -2911,6 +2911,13 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        RuneRuntimeState targetRuneState = target.GetComponentInParent<RuneRuntimeState>();
+        if (targetRuneState != null && targetRuneState.IsKnockbackImmuneFromRunes)
+        {
+            LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", false, "rejectReason", "RuneKnockbackImmune", "target", target.name);
+            return;
+        }
+
         PlayerMovement playerMovement = target.GetComponentInParent<PlayerMovement>();
         if (playerMovement != null)
         {
