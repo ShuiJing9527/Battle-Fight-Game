@@ -1,84 +1,84 @@
-{
-  "entries": [
-    {
-      "playerIndex": 1,
-      "key": "Q",
-      "displayName": "Q - \u5feb\u901f\u526a\u51fb",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a3\u79d2",
-      "costText": "\u6d88\u8017\uff1a\u4e2d\u7b49\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u8fd1\u6218",
-      "damageText": "\u4f24\u5bb3\uff1a\u5feb\u901f\u7269\u7406\u7206\u53d1",
-      "descriptionText": "\u5feb\u901f\u6325\u526a\u653b\u51fb\u8fd1\u8ddd\u79bb\u654c\u4eba\uff0c\u7528\u4e8e\u538b\u5236\u8eab\u8fb9\u76ee\u6807\uff0c\u5e76\u89e6\u53d1\u7b26\u6587\u8054\u52a8\u3002"
-    },
-    {
-      "playerIndex": 1,
-      "key": "W",
-      "displayName": "W - \u4e1d\u6d41\u5b88\u62a4",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a5\u79d2",
-      "costText": "\u6d88\u8017\uff1a\u4e2d\u7b49\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u81ea\u8eab / \u9632\u5fa1",
-      "damageText": "\u4f24\u5bb3\uff1a\u9632\u5fa1\u8f85\u52a9",
-      "descriptionText": "\u8fdb\u5165\u9632\u5fa1\u59ff\u6001\uff0c\u964d\u4f4e\u53d7\u5230\u7684\u4f24\u5bb3\uff0c\u5e2e\u52a9\u73a9\u5bb6\u4fdd\u6301\u5b89\u5168\u8ddd\u79bb\u3002"
-    },
-    {
-      "playerIndex": 1,
-      "key": "E",
-      "displayName": "E - \u65ad\u7ebf\u51b2\u523a",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a8\u79d2",
-      "costText": "\u6d88\u8017\uff1a\u4e2d\u7b49\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u4f4d\u79fb",
-      "damageText": "\u4f24\u5bb3\uff1a\u4f4e\u63a5\u89e6\u4f24\u5bb3",
-      "descriptionText": "\u5411\u524d\u5feb\u901f\u51b2\u523a\uff0c\u8c03\u6574\u4f4d\u7f6e\uff0c\u5e76\u53ef\u5728\u51b2\u523a\u9014\u4e2d\u64e6\u4f24\u63a5\u89e6\u5230\u7684\u654c\u4eba\u3002"
-    },
-    {
-      "playerIndex": 1,
-      "key": "R",
-      "displayName": "R - \u98de\u9488\u5c04\u51fb",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a12\u79d2",
-      "costText": "\u6d88\u8017\uff1a\u9ad8\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u8fdc\u8ddd\u79bb",
-      "damageText": "\u4f24\u5bb3\uff1a\u7279\u6b8a\u6295\u5c04\u7206\u53d1",
-      "descriptionText": "\u53d1\u5c04\u5f3a\u529b\u8fdc\u7a0b\u7ec8\u7ed3\u653b\u51fb\uff0c\u7528\u4e8e\u5728\u5b89\u5168\u8ddd\u79bb\u538b\u5236\u76ee\u6807\u3002"
-    },
-    {
-      "playerIndex": 2,
-      "key": "Q",
-      "displayName": "Q - \u795e\u5149\u5251\u96e8",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a0.8\u79d2",
-      "costText": "\u6d88\u8017\uff1a10\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u6307\u5b9a\u843d\u70b9\u533a\u57df",
-      "damageText": "\u4f24\u5bb3\uff1a\u591a\u6bb5\u6df7\u5408\u5251\u96e8",
-      "descriptionText": "\u5728\u6307\u5b9a\u533a\u57df\u53ec\u5524\u5760\u843d\u661f\u5251\u3002\u6bcf\u628a\u5251\u547d\u4e2d\u65f6\u5206\u522b\u8ba1\u7b97\u7269\u7406\u4e0e\u7279\u6b8a\u4f24\u5bb3\u3002"
-    },
-    {
-      "playerIndex": 2,
-      "key": "W",
-      "displayName": "W - \u5723\u8f6e\u5b88\u62a4",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a6\u79d2",
-      "costText": "\u6d88\u8017\uff1a40\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u81ea\u8eab / \u73af\u7ed5",
-      "damageText": "\u4f24\u5bb3\uff1a\u4f4e\u4f24\u5bb3\uff0c\u504f\u9632\u5fa1",
-      "descriptionText": "\u751f\u6210\u9632\u5fa1\u5251\u8f6e\uff0c\u63d0\u4f9b\u62a4\u76fe\u4e0e\u51cf\u4f24\uff0c\u4e3b\u8981\u7528\u4e8e\u9632\u5b88\u800c\u975e\u8f93\u51fa\u3002"
-    },
-    {
-      "playerIndex": 2,
-      "key": "E",
-      "displayName": "E - \u5929\u7ffc\u4f4d\u79fb",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a8\u79d2",
-      "costText": "\u6d88\u8017\uff1a20\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u51b2\u523a",
-      "damageText": "\u4f24\u5bb3\uff1a\u529f\u80fd\u6027\u4f4d\u79fb",
-      "descriptionText": "\u8fdb\u884c\u77ed\u8ddd\u79bb\u5929\u7ffc\u51b2\u523a\uff0c\u7528\u4e8e\u8c03\u6574\u7ad9\u4f4d\u3001\u62c9\u5f00\u8ddd\u79bb\u548c\u89c4\u907f\u5371\u9669\u3002"
-    },
-    {
-      "playerIndex": 2,
-      "key": "R",
-      "displayName": "R - \u795e\u7737\u661f\u96e8",
-      "cooldownText": "\u51b7\u5374\u65f6\u95f4\uff1a15\u79d2",
-      "costText": "\u6d88\u8017\uff1a60\u9b54\u529b",
-      "rangeText": "\u8303\u56f4\uff1a\u5927\u8303\u56f4\u6f29\u6da1\u533a\u57df",
-      "damageText": "\u4f24\u5bb3\uff1a\u6301\u7eed\u591a\u6bb5\u7279\u6b8a\u4f24\u5bb3",
-      "descriptionText": "\u751f\u6210\u5251\u4e4b\u6f29\u6da1\u4e0e\u661f\u96e8\u9886\u57df\uff0c\u6301\u7eed\u5bf9\u63a7\u5236\u533a\u57df\u5185\u7684\u654c\u4eba\u9020\u6210\u4f24\u5bb3\u3002"
-    }
-  ]
+﻿{
+    "entries":  [
+                    {
+                        "playerIndex":  1,
+                        "key":  "Q",
+                        "displayName":  "Q - 快刀剪乱",
+                        "cooldownText":  "冷却时间：3秒",
+                        "costText":  "消耗：中等魔力",
+                        "rangeText":  "范围：近战",
+                        "damageText":  "伤害：快速物理爆发",
+                        "descriptionText":  "灵罗娃娃快速挥动剪刀，对前方近距离敌人造成物理与魔法的混合伤害。\n该技能自带30%暴击率，并有5%概率造成5倍伤害。\n技能造成伤害后，灵罗娃娃会回复相当于本次实际伤害50%的生命值。"
+                    },
+                    {
+                        "playerIndex":  1,
+                        "key":  "W",
+                        "displayName":  "W - 星辰帷幕",
+                        "cooldownText":  "冷却时间：5秒",
+                        "costText":  "消耗：中等魔力",
+                        "rangeText":  "范围：自身 / 防御",
+                        "damageText":  "伤害：防御辅助",
+                        "descriptionText":  "灵罗娃娃展开星辰帷幕，使结界环绕自身并跟随移动。\n帷幕持续期间，灵罗娃娃受到的伤害降低50%。\n范围内敌人的移动速度、攻击频率和造成的伤害都会降低。"
+                    },
+                    {
+                        "playerIndex":  1,
+                        "key":  "E",
+                        "displayName":  "E - 灵体疾行",
+                        "cooldownText":  "冷却时间：8秒",
+                        "costText":  "消耗：中等魔力",
+                        "rangeText":  "范围：位移",
+                        "damageText":  "伤害：低接触伤害",
+                        "descriptionText":  "灵罗娃娃进入灵体状态，提升移动速度，并可穿过障碍物和敌人。\n灵体状态期间会持续回复生命值，并免疫怪物造成的物理攻击伤害。\n状态结束后恢复正常。"
+                    },
+                    {
+                        "playerIndex":  1,
+                        "key":  "R",
+                        "displayName":  "R - 飞针射击",
+                        "cooldownText":  "冷却时间：25秒",
+                        "costText":  "消耗：60魔力",
+                        "rangeText":  "范围：前方近战 / 目标周围飞针",
+                        "damageText":  "伤害：前刺与飞针混合伤害",
+                        "descriptionText":  "灵罗娃娃先发动一次近距离前刺，随后连续召出4～12枚飞针穿刺周围敌人。\n飞针沿直线飞行，可以穿透多个敌人；同一枚飞针对同一敌人最多命中一次。\n夜之子会提高本技能伤害，魔力符文强化会同时增强前刺与飞针。"
+                    },
+                    {
+                        "playerIndex":  2,
+                        "key":  "Q",
+                        "displayName":  "Q - 星刃坠落",
+                        "cooldownText":  "冷却时间：0.8秒",
+                        "costText":  "消耗：10魔力",
+                        "rangeText":  "范围：指定落点区域",
+                        "damageText":  "伤害：多段混合剑雨",
+                        "descriptionText":  "神眷之子召唤星刃从空中随机坠落，对敌人造成物理与魔法的混合伤害。\n初始会随机召唤1～3把星刃，随技能等级提升，最多可召唤1～7把。\n每把星刃独立判定命中，不一定全部命中同一目标。"
+                    },
+                    {
+                        "playerIndex":  2,
+                        "key":  "W",
+                        "displayName":  "W - 星刃护盾",
+                        "cooldownText":  "冷却时间：6秒",
+                        "costText":  "消耗：40魔力",
+                        "rangeText":  "范围：自身 / 环绕",
+                        "damageText":  "伤害：低伤害，偏防御",
+                        "descriptionText":  "神眷之子展开神圣护盾，并召唤星刃环绕自身旋转。\n护盾值相当于自身100%最大生命值。\n旋转星刃会阻挡靠近的敌人，并对接触的敌人造成基于护盾值的混合伤害。"
+                    },
+                    {
+                        "playerIndex":  2,
+                        "key":  "E",
+                        "displayName":  "E - 星痕瞬移",
+                        "cooldownText":  "冷却时间：8秒",
+                        "costText":  "消耗：20魔力",
+                        "rangeText":  "范围：冲刺",
+                        "damageText":  "伤害：功能性位移",
+                        "descriptionText":  "神眷之子化作星光向指定方向高速位移，并对路径上的敌人造成物理与魔法的混合伤害。\n同一次星痕瞬移中，每个敌人最多受到一次路径伤害。"
+                    },
+                    {
+                        "playerIndex":  2,
+                        "key":  "R",
+                        "displayName":  "R - 神环星雨",
+                        "cooldownText":  "冷却时间：15秒",
+                        "costText":  "消耗：60魔力",
+                        "rangeText":  "范围：大范围漩涡区域",
+                        "damageText":  "伤害：持续多段特殊伤害",
+                        "descriptionText":  "神眷之子展开环绕自身的星刃阵，持续旋转并对接触的敌人造成物理与魔法的混合伤害。\n每把星刃独立判定命中，同一敌人可以被多把星刃连续命中。\n当前星刃数量越多，技能持续时间越长，旋转速度越快。"
+                    }
+                ]
 }

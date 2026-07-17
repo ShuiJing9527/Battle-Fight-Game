@@ -35,6 +35,16 @@ public class EnemySpawner : MonoBehaviour
         public Vector3 scaleTargetLocalScale;
     }
 
+    private struct PlayerRuneScalingSnapshot
+    {
+        public bool initialized;
+        public int runeCount;
+        public float strengthMultiplier;
+        public float movementMultiplier;
+        public string playerName;
+        public string countSource;
+    }
+
     private struct RigidbodySetupState
     {
         public bool hasBody;
@@ -296,6 +306,12 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private bool debugDifficultySpawnLogs = false;
     [SerializeField] private bool debugScalingBreakdown = false;
 
+    [Header("Player Rune Monster Scaling")]
+    [SerializeField] private bool enablePlayerRuneStrengthScaling = true;
+    [SerializeField, Min(0f)] private float strengthIncreasePerEquippedRune = 0.05f;
+    [SerializeField, Min(1f)] private float maximumRuneMovementSpeedMultiplier = 1.5f;
+    [SerializeField] private bool debugPlayerRuneMonsterScaling = false;
+
     private Player2Bootstrap playerBootstrap;
     private TODController todController;
     private float previousTodTime;
@@ -308,6 +324,7 @@ public class EnemySpawner : MonoBehaviour
     private readonly List<GameObject> fallbackBossEnemyPrefabs = new List<GameObject>();
     private readonly List<GameObject> aliveEnemies = new List<GameObject>();
     private readonly Dictionary<int, MonsterBaseSnapshot> monsterBaseSnapshots = new Dictionary<int, MonsterBaseSnapshot>();
+    private readonly Dictionary<int, PlayerRuneScalingSnapshot> playerRuneScalingSnapshots = new Dictionary<int, PlayerRuneScalingSnapshot>();
     private readonly Dictionary<int, int> rankGeometryApplyCounts = new Dictionary<int, int>();
     private readonly Dictionary<int, string> rankGeometryApplySources = new Dictionary<int, string>();
     private readonly HashSet<int> finalMomentBossEnemyIds = new HashSet<int>();
@@ -1909,6 +1926,7 @@ public class EnemySpawner : MonoBehaviour
         float rankMagicMultiplier = ResolveRankMagicMultiplier(rank);
         float rankResistanceMultiplier = ResolveRankResistanceMultiplier(rank);
         float rankSpeedMultiplier = ResolveRankSpeedMultiplier(rank);
+        PlayerRuneScalingSnapshot runeScaling = GetOrCreatePlayerRuneScalingSnapshot(enemy);
 
         float specialBossHpMultiplier = 1f;
         float specialBossAttackMultiplier = 1f;
@@ -1949,12 +1967,12 @@ public class EnemySpawner : MonoBehaviour
             specialBossSpeedMultiplier *= Mathf.Max(0.01f, cleanupBossSpeedMultiplier);
         }
 
-        float healthMultiplier = Mathf.Max(0.01f, baseHealthMultiplier) * timeMultiplier * rankHealthMultiplier * specialBossHpMultiplier;
-        float attackMultiplier = Mathf.Max(0.01f, baseAttackMultiplier) * timeMultiplier * rankAttackMultiplier * specialBossAttackMultiplier;
-        float defenseMultiplier = Mathf.Max(0.01f, baseDefenseMultiplier) * timeMultiplier * rankDefenseMultiplier * specialBossDefenseMultiplier;
-        float magicMultiplier = Mathf.Max(0.01f, baseSpecialAttackMultiplier) * timeMultiplier * rankMagicMultiplier * specialBossSpecialAttackMultiplier;
-        float resistanceMultiplier = Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * timeMultiplier * rankResistanceMultiplier * specialBossSpecialDefenseMultiplier;
-        float speedMultiplier = Mathf.Max(0.01f, baseSpeedMultiplier) * timeMultiplier * rankSpeedMultiplier * specialBossSpeedMultiplier;
+        float healthMultiplier = Mathf.Max(0.01f, baseHealthMultiplier) * timeMultiplier * rankHealthMultiplier * specialBossHpMultiplier * runeScaling.strengthMultiplier;
+        float attackMultiplier = Mathf.Max(0.01f, baseAttackMultiplier) * timeMultiplier * rankAttackMultiplier * specialBossAttackMultiplier * runeScaling.strengthMultiplier;
+        float defenseMultiplier = Mathf.Max(0.01f, baseDefenseMultiplier) * timeMultiplier * rankDefenseMultiplier * specialBossDefenseMultiplier * runeScaling.strengthMultiplier;
+        float magicMultiplier = Mathf.Max(0.01f, baseSpecialAttackMultiplier) * timeMultiplier * rankMagicMultiplier * specialBossSpecialAttackMultiplier * runeScaling.strengthMultiplier;
+        float resistanceMultiplier = Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * timeMultiplier * rankResistanceMultiplier * specialBossSpecialDefenseMultiplier * runeScaling.strengthMultiplier;
+        float speedMultiplier = Mathf.Max(0.01f, baseSpeedMultiplier) * timeMultiplier * rankSpeedMultiplier * specialBossSpeedMultiplier * runeScaling.movementMultiplier;
 
         stats.maxHealth = Mathf.Max(1f, Mathf.Round(snapshot.maxHealth * healthMultiplier));
         stats.physicalAttack = Mathf.Max(0f, Mathf.Round(snapshot.physicalAttack * attackMultiplier));
@@ -1993,8 +2011,35 @@ public class EnemySpawner : MonoBehaviour
                 $"baseHP={snapshot.maxHealth:F1} baseATK={snapshot.physicalAttack:F1} baseDEF={snapshot.physicalDefense:F1} baseSATK={snapshot.specialAttack:F1} baseSDEF={snapshot.specialDefense:F1} baseSPD={snapshot.speed:F2} " +
                 $"baseMulHP={baseHealthMultiplier:F2} baseMulATK={baseAttackMultiplier:F2} baseMulDEF={baseDefenseMultiplier:F2} baseMulSATK={baseSpecialAttackMultiplier:F2} baseMulSDEF={baseSpecialDefenseMultiplier:F2} baseMulSPD={baseSpeedMultiplier:F2} " +
                 $"timeMul={timeMultiplier:F2} rankHP={rankHealthMultiplier:F2} rankATK={rankAttackMultiplier:F2} rankDEF={rankDefenseMultiplier:F2} rankSATK={rankMagicMultiplier:F2} rankSDEF={rankResistanceMultiplier:F2} rankSPD={rankSpeedMultiplier:F2} " +
+                $"runeCount={runeScaling.runeCount} runeStrength={runeScaling.strengthMultiplier:F2} runeMove={runeScaling.movementMultiplier:F2} runePlayer={runeScaling.playerName} runeSource={runeScaling.countSource} " +
                 $"specialBossHP={specialBossHpMultiplier:F2} specialBossATK={specialBossAttackMultiplier:F2} specialBossDEF={specialBossDefenseMultiplier:F2} specialBossSATK={specialBossSpecialAttackMultiplier:F2} specialBossSDEF={specialBossSpecialDefenseMultiplier:F2} specialBossSPD={specialBossSpeedMultiplier:F2} " +
                 $"finalHP={stats.maxHealth:F1} finalATK={stats.physicalAttack:F1} finalDEF={stats.physicalDefense:F1} finalSATK={stats.specialAttack:F1} finalSDEF={stats.specialDefense:F1} finalSPD={stats.speed:F2}",
+                enemy);
+        }
+
+        if (debugPlayerRuneMonsterScaling && runeScaling.initialized)
+        {
+            Debug.Log(
+                "[MonsterRuneScalingTrace] " +
+                "event=ScalingApplied " +
+                $"enemy={enemy.name} " +
+                $"enemyInstanceId={enemyId} " +
+                $"player={runeScaling.playerName} " +
+                $"countSource={runeScaling.countSource} " +
+                $"equippedRuneCount={runeScaling.runeCount} " +
+                $"strengthPerRune={Mathf.Max(0f, strengthIncreasePerEquippedRune):F2} " +
+                $"strengthMultiplier={runeScaling.strengthMultiplier:F2} " +
+                $"movementMultiplier={runeScaling.movementMultiplier:F2} " +
+                $"baseMaxHealth={snapshot.maxHealth:F1} " +
+                $"scaledMaxHealth={stats.maxHealth:F1} " +
+                $"baseDamage={Mathf.Max(snapshot.physicalAttack, snapshot.specialAttack):F1} " +
+                $"scaledDamage={Mathf.Max(stats.physicalAttack, stats.specialAttack):F1} " +
+                $"basePhysicalDefense={snapshot.physicalDefense:F1} " +
+                $"scaledPhysicalDefense={stats.physicalDefense:F1} " +
+                $"baseSpecialDefense={snapshot.specialDefense:F1} " +
+                $"scaledSpecialDefense={stats.specialDefense:F1} " +
+                $"baseMovementSpeed={snapshot.speed:F2} " +
+                $"scaledMovementSpeed={stats.speed:F2}",
                 enemy);
         }
 
@@ -2027,6 +2072,146 @@ public class EnemySpawner : MonoBehaviour
                 $"finalHP={stats.maxHealth:F1} finalATK={stats.physicalAttack:F1} finalDEF={stats.physicalDefense:F1} finalSATK={stats.specialAttack:F1} finalSDEF={stats.specialDefense:F1} finalSPD={stats.speed:F2}",
                 enemy);
         }
+    }
+
+    private PlayerRuneScalingSnapshot GetOrCreatePlayerRuneScalingSnapshot(GameObject enemy)
+    {
+        int enemyId = enemy != null ? enemy.GetInstanceID() : 0;
+        if (enemyId != 0 && playerRuneScalingSnapshots.TryGetValue(enemyId, out PlayerRuneScalingSnapshot existing) && existing.initialized)
+        {
+            return existing;
+        }
+
+        PlayerRuneScalingSnapshot created = CreatePlayerRuneScalingSnapshot();
+        if (enemyId != 0)
+        {
+            playerRuneScalingSnapshots[enemyId] = created;
+        }
+
+        return created;
+    }
+
+    private PlayerRuneScalingSnapshot CreatePlayerRuneScalingSnapshot()
+    {
+        int runeCount = 0;
+        string playerName = "None";
+        string countSource = "Disabled";
+
+        if (enablePlayerRuneStrengthScaling)
+        {
+            Transform activePlayer = ResolveActivePlayerTarget();
+            if (activePlayer == null)
+            {
+                ResolvePlayerTarget();
+                activePlayer = ResolveActivePlayerTarget();
+            }
+
+            runeCount = ResolveEquippedRuneCountForMonsterScaling(activePlayer, out playerName, out countSource);
+        }
+
+        float strengthMultiplier = CalculateRuneStrengthMultiplier(runeCount, strengthIncreasePerEquippedRune);
+        float movementMultiplier = Mathf.Min(strengthMultiplier, Mathf.Max(1f, maximumRuneMovementSpeedMultiplier));
+        return new PlayerRuneScalingSnapshot
+        {
+            initialized = true,
+            runeCount = Mathf.Max(0, runeCount),
+            strengthMultiplier = strengthMultiplier,
+            movementMultiplier = movementMultiplier,
+            playerName = playerName,
+            countSource = countSource
+        };
+    }
+
+    public static float CalculateRuneStrengthMultiplier(int runeCount, float strengthIncreasePerRune)
+    {
+        return 1f + Mathf.Max(0, runeCount) * Mathf.Max(0f, strengthIncreasePerRune);
+    }
+
+    public static int ResolveEquippedRuneCountForMonsterScaling(Transform player, out string playerName, out string countSource)
+    {
+        playerName = player != null ? player.name : "None";
+        countSource = "None";
+
+        if (player != null)
+        {
+            CombatSkillCaster caster = player.GetComponentInParent<CombatSkillCaster>();
+            if (caster == null)
+            {
+                caster = player.GetComponentInChildren<CombatSkillCaster>(true);
+            }
+
+            if (caster != null)
+            {
+                return ResolveEquippedRuneCountFromCaster(caster, out countSource);
+            }
+        }
+
+        CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
+        int bestCount = 0;
+        for (int i = 0; i < casters.Length; i++)
+        {
+            CombatSkillCaster caster = casters[i];
+            if (caster == null || !caster.gameObject.activeInHierarchy)
+            {
+                continue;
+            }
+
+            int count = ResolveEquippedRuneCountFromCaster(caster, out string source);
+            if (count < bestCount)
+            {
+                continue;
+            }
+
+            bestCount = count;
+            playerName = caster.name;
+            countSource = "FallbackHighestActiveCaster:" + source;
+        }
+
+        return bestCount;
+    }
+
+    private static int ResolveEquippedRuneCountFromCaster(CombatSkillCaster caster, out string countSource)
+    {
+        countSource = "MissingCaster";
+        if (caster == null)
+        {
+            return 0;
+        }
+
+        RuneRuntimeState runtimeState = caster.GetComponent<RuneRuntimeState>();
+        if (runtimeState != null)
+        {
+            countSource = "RuneRuntimeState.GlobalRuneCounts";
+            return
+                runtimeState.GetGlobalRuneCount(RuneType.Life) +
+                runtimeState.GetGlobalRuneCount(RuneType.Shield) +
+                runtimeState.GetGlobalRuneCount(RuneType.Mana) +
+                runtimeState.GetGlobalRuneCount(RuneType.Thorn) +
+                runtimeState.GetGlobalRuneCount(RuneType.Luck);
+        }
+
+        countSource = "CombatSkillCaster.EquippedRunesFallback";
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < 4; skillIndex++)
+        {
+            BattleSkill skill = caster.TryGetSkillRaw(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            int slotLimit = Mathf.Min(Mathf.Max(0, skill.runeSlotCount), skill.equippedRunes.Length);
+            for (int slotIndex = 0; slotIndex < slotLimit; slotIndex++)
+            {
+                RuneDefinition rune = skill.equippedRunes[slotIndex];
+                if (rune != null && rune.IsConfigured() && rune.runeType != RuneType.None)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private void ConfigureEnemyController(GameObject enemy, CombatStats stats)
@@ -3577,6 +3762,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(enemy.GetInstanceID());
             finalMomentBossEnemyIds.Remove(enemy.GetInstanceID());
             ultimateBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
+            playerRuneScalingSnapshots.Remove(enemy.GetInstanceID());
             Destroy(enemy);
         }
     }
@@ -3723,6 +3909,7 @@ public class EnemySpawner : MonoBehaviour
             {
                 finalMomentBossEnemyIds.Remove(enemy.GetInstanceID());
                 ultimateBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
+                playerRuneScalingSnapshots.Remove(enemy.GetInstanceID());
             }
         }
 
@@ -3762,6 +3949,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(staleKeys[i]);
             finalMomentBossEnemyIds.Remove(staleKeys[i]);
             ultimateBossModifiersByEnemyId.Remove(staleKeys[i]);
+            playerRuneScalingSnapshots.Remove(staleKeys[i]);
         }
     }
 
@@ -3780,6 +3968,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(destroyedEnemy.GetInstanceID());
             finalMomentBossEnemyIds.Remove(destroyedEnemy.GetInstanceID());
             ultimateBossModifiersByEnemyId.Remove(destroyedEnemy.GetInstanceID());
+            playerRuneScalingSnapshots.Remove(destroyedEnemy.GetInstanceID());
         }
 
         CleanupTrackedEnemies();

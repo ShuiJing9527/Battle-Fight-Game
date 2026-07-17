@@ -60,6 +60,12 @@ public class MonsterTestSpawner : MonoBehaviour
     [Header("Runtime")]
     [SerializeField] private List<GameObject> spawnedTestMonsters = new List<GameObject>();
 
+    [Header("Fallback Player Rune Monster Scaling")]
+    [SerializeField] private bool enablePlayerRuneStrengthScaling = true;
+    [SerializeField, Min(0f)] private float strengthIncreasePerEquippedRune = 0.05f;
+    [SerializeField, Min(1f)] private float maximumRuneMovementSpeedMultiplier = 1.5f;
+    [SerializeField] private bool debugPlayerRuneMonsterScaling = false;
+
     private const string NormalSuffix = "[MonsterTest_Normal]";
     private const string EliteSuffix = "[MonsterTest_Elite]";
     private const string BossSuffix = "[MonsterTest_Boss]";
@@ -404,6 +410,7 @@ public class MonsterTestSpawner : MonoBehaviour
             MonsterCombatAutoSetup.Configure(spawnedMonster, runtimeSpecies, rank);
             LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawnerFallback", "AfterConfigure", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
             ApplyFallbackOfficialConfig(spawnedMonster, rank);
+            ApplyFallbackPlayerRuneMonsterScaling(spawnedMonster, target);
             LogNormalPrefabGeometry(spawnedMonster, "MonsterTestSpawnerFallback", "ApplyOfficialEnd", rankGeometryExecuted: false, groundContactExecuted: false, visualTransformWriteExecuted: false);
         }
         StartCoroutine(LogNormalPrefabGeometryAfterFirstFrame(spawnedMonster, "MonsterTestSpawner"));
@@ -1063,6 +1070,149 @@ public class MonsterTestSpawner : MonoBehaviour
                 true,
                 "MonsterTestSpawnerFallback");
         }
+    }
+
+    private void ApplyFallbackPlayerRuneMonsterScaling(GameObject monster, Transform target)
+    {
+        if (!enablePlayerRuneStrengthScaling || monster == null)
+        {
+            return;
+        }
+
+        CombatStats stats = monster.GetComponent<CombatStats>();
+        if (stats == null)
+        {
+            return;
+        }
+
+        int runeCount = EnemySpawner.ResolveEquippedRuneCountForMonsterScaling(target, out string playerName, out string countSource);
+        float strengthMultiplier = EnemySpawner.CalculateRuneStrengthMultiplier(runeCount, strengthIncreasePerEquippedRune);
+        float movementMultiplier = Mathf.Min(strengthMultiplier, Mathf.Max(1f, maximumRuneMovementSpeedMultiplier));
+
+        float baseMaxHealth = stats.maxHealth;
+        float basePhysicalAttack = stats.physicalAttack;
+        float baseSpecialAttack = stats.specialAttack;
+        float basePhysicalDefense = stats.physicalDefense;
+        float baseSpecialDefense = stats.specialDefense;
+        float baseMovementSpeed = stats.speed;
+
+        stats.maxHealth = Mathf.Max(1f, Mathf.Round(baseMaxHealth * strengthMultiplier));
+        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(basePhysicalAttack * strengthMultiplier));
+        stats.specialAttack = Mathf.Max(0f, Mathf.Round(baseSpecialAttack * strengthMultiplier));
+        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(basePhysicalDefense * strengthMultiplier));
+        stats.specialDefense = Mathf.Max(0f, Mathf.Round(baseSpecialDefense * strengthMultiplier));
+        stats.speed = Mathf.Max(0.1f, RoundToDecimals(baseMovementSpeed * movementMultiplier, 2));
+
+        BattleResourceBank resourceBank = monster.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = stats.maxHealth;
+            resourceBank.currentHealth = stats.maxHealth;
+        }
+
+        CombatHealth combatHealth = monster.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            combatHealth.stats = stats;
+            combatHealth.resourceBank = resourceBank;
+            combatHealth.currentHealth = stats.maxHealth;
+        }
+
+        ConfigureFallbackEnemyController(monster, stats);
+
+        if (debugPlayerRuneMonsterScaling)
+        {
+            Debug.Log(
+                "[MonsterRuneScalingTrace] " +
+                "event=ScalingApplied " +
+                $"enemy={monster.name} " +
+                $"enemyInstanceId={monster.GetInstanceID()} " +
+                $"player={playerName} " +
+                $"countSource={countSource} " +
+                $"equippedRuneCount={runeCount} " +
+                $"strengthPerRune={Mathf.Max(0f, strengthIncreasePerEquippedRune):F2} " +
+                $"strengthMultiplier={strengthMultiplier:F2} " +
+                $"movementMultiplier={movementMultiplier:F2} " +
+                $"baseMaxHealth={baseMaxHealth:F1} " +
+                $"scaledMaxHealth={stats.maxHealth:F1} " +
+                $"baseDamage={Mathf.Max(basePhysicalAttack, baseSpecialAttack):F1} " +
+                $"scaledDamage={Mathf.Max(stats.physicalAttack, stats.specialAttack):F1} " +
+                $"basePhysicalDefense={basePhysicalDefense:F1} " +
+                $"scaledPhysicalDefense={stats.physicalDefense:F1} " +
+                $"baseSpecialDefense={baseSpecialDefense:F1} " +
+                $"scaledSpecialDefense={stats.specialDefense:F1} " +
+                $"baseMovementSpeed={baseMovementSpeed:F2} " +
+                $"scaledMovementSpeed={stats.speed:F2}",
+                monster);
+        }
+    }
+
+    private static void ConfigureFallbackEnemyController(GameObject monster, CombatStats stats)
+    {
+        if (monster == null || stats == null)
+        {
+            return;
+        }
+
+        EnemyController controller = monster.GetComponent<EnemyController>();
+        MonsterIdentity identity = monster.GetComponent<MonsterIdentity>();
+        if (controller == null || identity == null)
+        {
+            return;
+        }
+
+        float range = 1.2f;
+        float hitRange = 1.25f;
+        float cooldown = 1.35f;
+        if (identity.rank == MonsterRank.Elite)
+        {
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.35f;
+                hitRange = 1.45f;
+                cooldown = 1.45f;
+                identity.attackStyle = MonsterAttackStyle.Melee;
+            }
+            else
+            {
+                range = 5f;
+                hitRange = 6f;
+                cooldown = 1.6f;
+            }
+        }
+        else if (identity.rank == MonsterRank.Boss)
+        {
+            if (IsSlimeSpecies(identity.species))
+            {
+                range = 1.6f;
+                hitRange = 1.8f;
+                cooldown = 1.5f;
+                identity.attackStyle = MonsterAttackStyle.ElementalBoss;
+            }
+            else
+            {
+                range = 8f;
+                hitRange = 8f;
+                cooldown = 2.2f;
+            }
+        }
+
+        BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
+        float attackPower = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
+        controller.ConfigureRuntime(
+            Mathf.Max(0.1f, stats.speed),
+            0.8f,
+            range,
+            hitRange,
+            cooldown,
+            attackPower,
+            identity.attackStyle);
+    }
+
+    private static float RoundToDecimals(float value, int decimals)
+    {
+        float multiplier = Mathf.Pow(10f, Mathf.Max(0, decimals));
+        return Mathf.Round(value * multiplier) / multiplier;
     }
 
     private static void ApplyFallbackRankGeometry(GameObject monster, MonsterRank rank)
