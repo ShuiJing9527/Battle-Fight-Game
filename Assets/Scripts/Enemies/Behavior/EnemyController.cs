@@ -81,6 +81,12 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private float arcHeight = 2.0f;
     [SerializeField] private float arcTravelTime = 0.9f;
     [SerializeField] private float targetPredictionTime = 0.25f;
+    [SerializeField, Min(1)] private int minSlimeProjectileCount = 1;
+    [SerializeField, Min(1)] private int maxSlimeProjectileCount = 5;
+    [SerializeField, Min(0f)] private float slimeProjectileInterval = 0.15f;
+    [SerializeField, Range(0f, 15f)] private float slimeProjectileHorizontalScatterAngle = 6f;
+    [SerializeField, Range(0f, 8f)] private float slimeProjectileVerticalScatterAngle = 3f;
+    [SerializeField] private bool debugBossSlimeProjectile = false;
 
     [Header("Boss Skill Components")]
     [SerializeField] private BossSlimeLeapSlamSkill leapSlamSkill;
@@ -3493,6 +3499,7 @@ public class EnemyController : MonoBehaviour
         Vector3 spawnPosition = ResolveProjectileSpawnPosition(target);
         int facingSign = ResolveBossFacingSign(target);
         string targetSide = facingSign >= 0 ? "Right" : "Left";
+        int shotCount = ResolveBossSlimeProjectileCount();
         if (debugAttackDiagnostics || debugLog)
         {
             Debug.Log($"[BossRangedCast] start cast target position={targetPoint} cast time={configuredTotal:F2} projectile prefab={(ResolveProjectilePrefab() != null ? ResolveProjectilePrefab().name : "runtime sphere")} spawn position={spawnPosition}", this);
@@ -3568,8 +3575,22 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        PlayBossRangedMuzzleParticle();
-        ExecuteProjectileAttack(target);
+        LogBossSlimeProjectileVolleyStarted(shotCount, target);
+        for (int i = 0; i < shotCount; i++)
+        {
+            if (!IsBossActionActive(BossAttackKind.Ranged, sequenceId))
+            {
+                yield break;
+            }
+
+            PlayBossRangedMuzzleParticle();
+            ExecuteProjectileAttack(target, i, shotCount);
+
+            if (i < shotCount - 1)
+            {
+                yield return new WaitForSeconds(Mathf.Max(0f, slimeProjectileInterval));
+            }
+        }
 
         if (enableBossRangedCastAnimation && visual != null)
         {
@@ -5235,6 +5256,11 @@ public class EnemyController : MonoBehaviour
 
     private void ExecuteProjectileAttack(Transform hitTarget)
     {
+        ExecuteProjectileAttack(hitTarget, 0, 1);
+    }
+
+    private void ExecuteProjectileAttack(Transform hitTarget, int volleyIndex, int volleyCount)
+    {
         if (attackStyle == MonsterAttackStyle.ElementalBoss)
         {
             // Boss multi-skill expansion point: keep projectile as the phase-one fallback
@@ -5244,7 +5270,7 @@ public class EnemyController : MonoBehaviour
                 float distanceToTarget = hitTarget != null ? Vector3.Distance(transform.position, hitTarget.position) : -1f;
                 Debug.Log($"[BossAcidAttack] enter ranged branch boss={name} target={(hitTarget != null ? hitTarget.name : "null")} distance={distanceToTarget:F2} attackStyle={attackStyle}", this);
             }
-            FireProjectileAt(hitTarget);
+            FireProjectileAt(hitTarget, volleyIndex, volleyCount);
             return;
         }
 
@@ -5786,13 +5812,20 @@ public class EnemyController : MonoBehaviour
 
     private void FireProjectileAt(Transform hitTarget)
     {
+        FireProjectileAt(hitTarget, 0, 1);
+    }
+
+    private void FireProjectileAt(Transform hitTarget, int volleyIndex, int volleyCount)
+    {
         if (hitTarget == null)
         {
             return;
         }
 
         Vector3 spawnPosition = ResolveProjectileSpawnPosition(hitTarget);
-        Vector3 targetPoint = ResolveBossProjectileTargetPoint(hitTarget);
+        Vector3 targetPoint = attackStyle == MonsterAttackStyle.ElementalBoss
+            ? ResolveBossProjectileVolleyTargetPoint(hitTarget, spawnPosition, volleyIndex, volleyCount)
+            : ResolveBossProjectileTargetPoint(hitTarget);
         Vector3 direction = targetPoint - spawnPosition;
         direction.y = 0f;
         if (direction.sqrMagnitude < MovementZeroEpsilon)
@@ -5911,6 +5944,65 @@ public class EnemyController : MonoBehaviour
         }
 
         return predictedPosition;
+    }
+
+    private int ResolveBossSlimeProjectileCount()
+    {
+        int safeMin = Mathf.Max(1, minSlimeProjectileCount);
+        int safeMax = Mathf.Max(safeMin, maxSlimeProjectileCount);
+        return Random.Range(safeMin, safeMax + 1);
+    }
+
+    private Vector3 ResolveBossProjectileVolleyTargetPoint(Transform hitTarget, Vector3 spawnPosition, int volleyIndex, int volleyCount)
+    {
+        Vector3 targetPoint = ResolveBossProjectileTargetPoint(hitTarget);
+        if (volleyIndex <= 0 || volleyCount <= 1)
+        {
+            return targetPoint;
+        }
+
+        Vector3 horizontalDirection = targetPoint - spawnPosition;
+        horizontalDirection.y = 0f;
+        if (horizontalDirection.sqrMagnitude < MovementZeroEpsilon)
+        {
+            horizontalDirection = transform.forward;
+        }
+
+        horizontalDirection.Normalize();
+        Vector3 right = Vector3.Cross(Vector3.up, horizontalDirection).normalized;
+        if (right.sqrMagnitude < MovementZeroEpsilon)
+        {
+            right = transform.right;
+        }
+
+        float distance = Mathf.Max(1f, Vector3.Distance(
+            new Vector3(spawnPosition.x, 0f, spawnPosition.z),
+            new Vector3(targetPoint.x, 0f, targetPoint.z)));
+        float horizontalScatter = Mathf.Tan(Mathf.Deg2Rad * Mathf.Max(0f, slimeProjectileHorizontalScatterAngle)) * distance;
+        float verticalScatter = Mathf.Tan(Mathf.Deg2Rad * Mathf.Max(0f, slimeProjectileVerticalScatterAngle)) * distance;
+        float horizontalOffset = Random.Range(-horizontalScatter, horizontalScatter);
+        float verticalOffset = Random.Range(-verticalScatter, verticalScatter);
+        return targetPoint + right * horizontalOffset + Vector3.up * verticalOffset;
+    }
+
+    private void LogBossSlimeProjectileVolleyStarted(int shotCount, Transform target)
+    {
+        if (!debugBossSlimeProjectile)
+        {
+            return;
+        }
+
+        int safeMin = Mathf.Max(1, minSlimeProjectileCount);
+        int safeMax = Mathf.Max(safeMin, maxSlimeProjectileCount);
+        Debug.Log(
+            "[BossSlimeProjectileTrace] " +
+            "event=VolleyStarted " +
+            "count=" + shotCount +
+            " min=" + safeMin +
+            " max=" + safeMax +
+            " interval=" + Mathf.Max(0f, slimeProjectileInterval).ToString("F2") +
+            " target=" + (target != null ? target.name : "null"),
+            this);
     }
 
     private int ResolveBossFacingSign(Transform target)

@@ -655,9 +655,9 @@ public class RuneUIController : MonoBehaviour
 
         skill.equippedRunes[slotIndex] = selectedRune;
         currentSkillCaster.RefreshRuneState();
-        SetSelectedRune(null);
         RefreshRuneList();
         RefreshSkillSlots();
+        RefreshSelectedRuneDetails(selectedRune);
     }
 
     private void SelectRune(RuneDefinition rune)
@@ -1298,25 +1298,32 @@ public class RuneUIController : MonoBehaviour
         }
 
         RuneDefinition displayRune = GetDisplayRuneDefinition(rune) ?? rune;
-        string rarityText = RuneDefinition.GetLocalizedRarity(displayRune.rarity);
-        string typeText = GetRuneName(rune);
-        string rawDescription = GetRuneDescription(rune);
-        string description = string.IsNullOrWhiteSpace(rawDescription) ? "-" : rawDescription.Trim();
-        string effectText = displayRune.runeType != RuneType.None
-            ? RuneDefinition.GetLocalizedFullDescription(displayRune.runeType)
+        int equippedCount = ResolveCurrentRuneTypeEquippedCount(displayRune.runeType);
+        string body = displayRune.runeType != RuneType.None
+            ? RuneDefinition.GetLocalizedProgressiveDescription(displayRune.runeType, equippedCount)
             : displayRune.GetFullEffectDescription();
-        effectText = string.IsNullOrWhiteSpace(effectText) ? $"ID: {displayRune.runeId}" : effectText;
-        string body =
-            $"{LocalizeOrFallback("Type", "类型")}：{typeText} / {rarityText}\n\n" +
-            $"{LocalizeOrFallback("Description", "简介")}：\n{description}\n\n" +
-            $"{LocalizeOrFallback("Rune Effects", "符文效果")}：\n{effectText}";
-        ShowSharedDescription($"{LocalizeOrFallback("Rune Name", "符文名称")}：{GetRuneName(rune)}", body, false, DescriptionSource.Rune);
+        body = string.IsNullOrWhiteSpace(body) ? $"ID: {displayRune.runeId}" : body.Trim();
+        ShowSharedDescription(string.Empty, body, false, DescriptionSource.Rune);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Rune" +
             " runeId=" + rune.runeId +
-            " descriptionTextLength=" + rawDescription.Length +
+            " runeType=" + displayRune.runeType +
+            " equippedCount=" + equippedCount +
+            " bodyLength=" + body.Length +
             " object=" + GetRuneName(rune));
+    }
+
+    private int ResolveCurrentRuneTypeEquippedCount(RuneType runeType)
+    {
+        if (runeType == RuneType.None)
+        {
+            return 0;
+        }
+
+        ResolveCurrentPlayerContext();
+        RuneRuntimeState runtimeState = currentSkillCaster != null ? currentSkillCaster.GetComponent<RuneRuntimeState>() : null;
+        return runtimeState != null ? runtimeState.GetGlobalRuneCount(runeType) : 0;
     }
 
     private void ShowSharedDescription(string title, string body, bool skillHover, DescriptionSource source)
