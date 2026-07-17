@@ -21,6 +21,7 @@ public enum GameLanguage
 public class GameLocalization : MonoBehaviour
 {
     private const string PreferenceKey = "GameLanguage";
+    private const string RuntimeObjectName = "Game Localization";
 
     public static GameLocalization Instance { get; private set; }
     public static event Action<GameLanguage> LanguageChanged;
@@ -75,6 +76,9 @@ public class GameLocalization : MonoBehaviour
         ,{ "Effect", new[] { "Effect", "\u6548\u679c", "\u52b9\u679c" } }
         ,{ "Attributes", new[] { "Attributes", "\u5c5e\u6027", "\u80fd\u529b" } }
         ,{ "Character Attributes", new[] { "Character Attributes", "\u89d2\u8272\u5c5e\u6027", "\u30ad\u30e3\u30e9\u30af\u30bf\u30fc\u80fd\u529b" } }
+        ,{ "character.player01.name", new[] { "Spiritweave Doll", "\u7075\u7f57\u5a03\u5a03", "\u970a\u7f85\u4eba\u5f62" } }
+        ,{ "character.player02.name", new[] { "Chosen Child", "\u795e\u7737\u4e4b\u5b50", "\u795e\u7737\u306e\u5b50" } }
+        ,{ "character.attributes.title", new[] { "{0} Attributes", "{0}\u5c5e\u6027", "{0}\u306e\u80fd\u529b" } }
         ,{ "Character Preview", new[] { "Character Preview", "\u89d2\u8272\u9884\u89c8", "\u30ad\u30e3\u30e9\u30af\u30bf\u30fc\u30d7\u30ec\u30d3\u30e5\u30fc" } }
         ,{ "LUCK", new[] { "LUCK", "\u5e78\u8fd0", "\u904b" } }
         ,{ "Crit Rate", new[] { "Crit Rate", "\u66b4\u51fb\u7387", "\u30af\u30ea\u30c6\u30a3\u30ab\u30eb\u7387" } }
@@ -85,6 +89,29 @@ public class GameLocalization : MonoBehaviour
     private readonly Dictionary<TextMeshProUGUI, TMP_FontAsset> originalFonts = new Dictionary<TextMeshProUGUI, TMP_FontAsset>();
 
     public GameLanguage CurrentLanguage { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void EnsureRuntimeInstance()
+    {
+        EnsureInstance();
+    }
+
+    public static GameLocalization EnsureInstance()
+    {
+        if (Instance != null)
+        {
+            return Instance;
+        }
+
+        GameLocalization existing = FindObjectOfType<GameLocalization>();
+        if (existing != null)
+        {
+            return existing;
+        }
+
+        GameObject localizationObject = new GameObject(RuntimeObjectName);
+        return localizationObject.AddComponent<GameLocalization>();
+    }
 
     public void SetCjkFont(TMP_FontAsset font)
     {
@@ -108,7 +135,7 @@ public class GameLocalization : MonoBehaviour
     {
         if (Instance != null && Instance != this)
         {
-            Destroy(gameObject);
+            Destroy(this);
             return;
         }
 
@@ -159,13 +186,43 @@ public class GameLocalization : MonoBehaviour
         if (string.IsNullOrEmpty(key))
             return key;
 
-        foreach (KeyValuePair<string, string[]> entry in translations)
+        if (TryTranslate(key, out string translated))
         {
-            if (entry.Key == key || Array.IndexOf(entry.Value, key) >= 0)
-                return entry.Value[(int)CurrentLanguage];
+            return translated;
         }
 
         return key;
+    }
+
+    public string TranslateOrFallback(string key, string fallback)
+    {
+        return TryTranslate(key, out string translated) ? translated : fallback;
+    }
+
+    public string FormatOrFallback(string key, string fallbackFormat, params object[] args)
+    {
+        string format = TranslateOrFallback(key, fallbackFormat);
+        return args == null || args.Length == 0 ? format : string.Format(format, args);
+    }
+
+    public bool TryTranslate(string key, out string translated)
+    {
+        translated = key;
+        if (string.IsNullOrEmpty(key))
+        {
+            return false;
+        }
+
+        foreach (KeyValuePair<string, string[]> entry in translations)
+        {
+            if (entry.Key == key || Array.IndexOf(entry.Value, key) >= 0)
+            {
+                translated = entry.Value[(int)CurrentLanguage];
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public void ApplyToText(TextMeshProUGUI text, string key = null)

@@ -90,6 +90,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private GameObject panelPrefab;
     [SerializeField] private KeyCode toggleKey = KeyCode.I;
     [SerializeField] private bool debugToggleLog = false;
+    [SerializeField] private bool debugCharacterLocalization = false;
     [SerializeField] private bool usePanelOverrideSorting = true;
     [SerializeField] private int panelSortingOrder = 500;
 
@@ -1165,12 +1166,15 @@ public class PlayerAttributePanelUI : MonoBehaviour
         float critRate = BattleStatUtility.GetCritRate(cachedStats) * 100f;
         float extraSoulDrop = ResolveExtraSoulDropChance(luck) * 100f;
         float extraRuneDrop = ResolveExtraRuneDropChance(luck) * 100f;
+        string characterNameKey = ResolveCharacterDisplayNameLocalizationKey(cachedPlayer);
+        string localizedCharacterName = ResolveLocalizedCharacterDisplayName(cachedPlayer, characterNameKey);
+        string localizedAttributeTitle = cachedPlayer != null
+            ? FormatLocalized("character.attributes.title", "{0} Attributes", localizedCharacterName)
+            : Localize("Character Attributes", "Character Attributes");
 
         if (titleText != null)
         {
-            titleText.text = cachedPlayer != null
-                ? cachedPlayer.name + " " + Localize("Attributes")
-                : Localize("Character Attributes");
+            titleText.text = localizedAttributeTitle;
         }
 
         if (previewText != null)
@@ -1180,8 +1184,13 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (playerNameText != null)
         {
-            playerNameText.text = cachedPlayer != null ? cachedPlayer.name : Localize("Player");
+            playerNameText.text = cachedPlayer != null ? localizedCharacterName : Localize("Player");
         }
+
+        LogCharacterLocalizationTrace(
+            characterNameKey,
+            localizedCharacterName,
+            localizedAttributeTitle);
 
         if (characterPreviewText != null)
         {
@@ -1242,16 +1251,114 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private static string Localize(string key)
     {
-        return GameLocalization.Instance != null ? GameLocalization.Instance.Translate(key) : key;
+        return Localize(key, key);
+    }
+
+    private static string Localize(string key, string fallback)
+    {
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        return localization != null ? localization.TranslateOrFallback(key, fallback) : fallback;
+    }
+
+    private static string FormatLocalized(string key, string fallbackFormat, params object[] args)
+    {
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        if (localization != null)
+        {
+            return localization.FormatOrFallback(key, fallbackFormat, args);
+        }
+
+        return args == null || args.Length == 0 ? fallbackFormat : string.Format(fallbackFormat, args);
+    }
+
+    private static string ResolveLocalizedCharacterDisplayName(GameObject player, string localizationKey)
+    {
+        if (string.IsNullOrEmpty(localizationKey))
+        {
+            return player != null ? player.name : Localize("Player", "Player");
+        }
+
+        return Localize(localizationKey, ResolveCharacterDisplayNameFallback(player, localizationKey));
+    }
+
+    private static string ResolveCharacterDisplayNameFallback(GameObject player, string localizationKey)
+    {
+        if (localizationKey == "character.player01.name")
+        {
+            return "Spiritweave Doll";
+        }
+
+        if (localizationKey == "character.player02.name")
+        {
+            return "Chosen Child";
+        }
+
+        return player != null ? player.name : "Player";
+    }
+
+    private static string ResolveCharacterDisplayNameLocalizationKey(GameObject player)
+    {
+        if (player == null)
+        {
+            return null;
+        }
+
+        if (player.name.Contains("Player01"))
+        {
+            return "character.player01.name";
+        }
+
+        if (player.name.Contains("Player02"))
+        {
+            return "character.player02.name";
+        }
+
+        if (player.GetComponent<Player01SkillController>() != null)
+        {
+            return "character.player01.name";
+        }
+
+        if (player.GetComponent<Player2PrototypeController>() != null)
+        {
+            return "character.player02.name";
+        }
+
+        return null;
+    }
+
+    private void LogCharacterLocalizationTrace(string nameKey, string resolvedName, string resolvedTitle)
+    {
+        if (!debugCharacterLocalization)
+        {
+            return;
+        }
+
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        string playerId = nameKey == "character.player01.name"
+            ? "Player01"
+            : (nameKey == "character.player02.name" ? "Player02" : "Unknown");
+
+        Debug.Log(
+            "[CharacterLocalizationTrace] " +
+            "event=CharacterNameResolved " +
+            "playerId=" + playerId +
+            " language=" + (localization != null ? localization.CurrentLanguage.ToString() : "None") +
+            " nameKey=" + (string.IsNullOrEmpty(nameKey) ? "None" : nameKey) +
+            " resolvedName=" + resolvedName +
+            " titleKey=character.attributes.title " +
+            " resolvedTitle=" + resolvedTitle +
+            " localizationReady=" + (localization != null),
+            this);
     }
 
     private void ApplyLanguageFontToPanel()
     {
-        if (panelRoot == null || GameLocalization.Instance == null)
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        if (panelRoot == null || localization == null)
             return;
 
         foreach (TextMeshProUGUI text in panelRoot.GetComponentsInChildren<TextMeshProUGUI>(true))
-            GameLocalization.Instance.ApplyFontForLanguage(text);
+            localization.ApplyFontForLanguage(text);
     }
 
     private float ResolveCurrentHealth()
