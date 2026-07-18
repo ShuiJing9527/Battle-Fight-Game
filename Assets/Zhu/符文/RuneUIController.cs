@@ -932,7 +932,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         EventTrigger.Entry enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-        enterEntry.callback.AddListener(_ => ShowRuneDescription(rune, button.transform as RectTransform, button.gameObject.name));
+        enterEntry.callback.AddListener(_ => ShowRuneDescription(rune));
         trigger.triggers.Add(enterEntry);
 
         EventTrigger.Entry exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
@@ -1306,7 +1306,7 @@ public class RuneUIController : MonoBehaviour
         ShowRuneDescription(rune);
     }
 
-    private void ShowRuneDescription(RuneDefinition rune, RectTransform targetRect = null, string sourceObject = null)
+    private void ShowRuneDescription(RuneDefinition rune)
     {
         if (rune == null)
         {
@@ -1321,7 +1321,7 @@ public class RuneUIController : MonoBehaviour
             ? RuneDefinition.GetLocalizedProgressiveDescription(displayRune.runeType, equippedCount)
             : displayRune.GetFullEffectDescription();
         body = string.IsNullOrWhiteSpace(body) ? $"ID: {displayRune.runeId}" : body.Trim();
-        ShowSharedDescription(string.Empty, body, false, DescriptionSource.Rune, targetRect, sourceObject);
+        ShowSharedDescription(string.Empty, body, false, DescriptionSource.Rune);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Rune" +
@@ -1329,7 +1329,7 @@ public class RuneUIController : MonoBehaviour
             " runeType=" + displayRune.runeType +
             " equippedCount=" + equippedCount +
             " bodyLength=" + body.Length +
-            " object=" + (string.IsNullOrWhiteSpace(sourceObject) ? GetRuneName(rune) : sourceObject));
+            " object=" + GetRuneName(rune));
     }
 
     private int ResolveCurrentRuneTypeEquippedCount(RuneType runeType)
@@ -1348,9 +1348,7 @@ public class RuneUIController : MonoBehaviour
         string title,
         string body,
         bool skillHover,
-        DescriptionSource source,
-        RectTransform targetRect = null,
-        string sourceObject = null)
+        DescriptionSource source)
     {
         EnsureSkillDescriptionPanel();
         if (skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
@@ -1364,23 +1362,10 @@ public class RuneUIController : MonoBehaviour
         skillDescriptionTitleText.text = title ?? string.Empty;
         skillDescriptionBodyText.text = body ?? string.Empty;
         skillDescriptionPanel.SetActive(true);
-        EnsureTooltipDetachedOverlayParent();
         Canvas.ForceUpdateCanvases();
         RefreshSkillDescriptionPanelHeight();
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(skillDescriptionPanel.transform as RectTransform);
-        LogTooltipRuntimeTrace(
-            "event=TooltipShowRequested" +
-            " source=" + source +
-            " controllerObject=" + name +
-            " controllerInstanceId=" + GetInstanceID() +
-            " tooltipObject=" + skillDescriptionPanel.name +
-            " tooltipHierarchyPath=" + GetHierarchyPath(skillDescriptionPanel.transform) +
-            " tooltipInstanceId=" + skillDescriptionPanel.GetInstanceID() +
-            " targetObject=" + (targetRect != null ? targetRect.name : "null") +
-            " targetHierarchyPath=" + GetHierarchyPath(targetRect) +
-            " targetInstanceId=" + (targetRect != null ? targetRect.GetInstanceID().ToString() : "null"));
-        PositionSharedDescriptionPanel(targetRect, sourceObject);
         if (sharedDescriptionScrollRect != null)
         {
             Canvas.ForceUpdateCanvases();
@@ -1388,7 +1373,7 @@ public class RuneUIController : MonoBehaviour
         }
     }
 
-    private void ShowSkillDescriptionByKey(string key, int playerIndex, RectTransform targetRect = null, string sourceObject = null)
+    private void ShowSkillDescriptionByKey(string key, int playerIndex)
     {
         string normalizedKey = (key ?? string.Empty).Trim().ToUpperInvariant();
         if (string.IsNullOrEmpty(normalizedKey))
@@ -1411,16 +1396,14 @@ public class RuneUIController : MonoBehaviour
             SkillUIDefinitionDatabase.GetLocalizedTitle(entry),
             SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
             true,
-            DescriptionSource.Skill,
-            targetRect,
-            sourceObject);
+            DescriptionSource.Skill);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Skill" +
             " skillKey=" + normalizedKey +
             " playerIndex=" + playerIndex +
             " descriptionTextLength=" + SkillUIDefinitionDatabase.BuildDetailBodyText(entry).Length +
-            " object=" + (string.IsNullOrWhiteSpace(sourceObject) ? normalizedKey + "SkillIcon" : sourceObject));
+            " object=" + normalizedKey + "SkillIcon");
     }
 
     private void RestoreSharedDescription()
@@ -1460,9 +1443,7 @@ public class RuneUIController : MonoBehaviour
             LocalizeOrFallback("rune.empty_slot", LabelEmptyRuneSlot),
             string.Empty,
             false,
-            DescriptionSource.EmptySlot,
-            slotTransform as RectTransform,
-            slotTransform != null ? slotTransform.name : null);
+            DescriptionSource.EmptySlot);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=EmptySlot" +
@@ -2117,7 +2098,7 @@ public class RuneUIController : MonoBehaviour
 
     private void RefreshSkillDescriptionPanelHeight()
     {
-        if (skillDescriptionPanel == null)
+        if (skillDescriptionPanel == null || !applyDescriptionLayoutAtRuntime)
         {
             return;
         }
@@ -2130,17 +2111,10 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        if (applyDescriptionLayoutAtRuntime)
-        {
-            ApplySkillDescriptionPanelLayout(panelRect);
-        }
+        ApplySkillDescriptionPanelLayout(panelRect);
 
-        float baseHeight = applyDescriptionLayoutAtRuntime
-            ? descriptionLayoutSettings.panelSize.y
-            : Mathf.Max(1f, panelRect.rect.height > 0f ? panelRect.rect.height : panelRect.sizeDelta.y);
-        float maxHeight = applyDescriptionLayoutAtRuntime
-            ? Mathf.Max(descriptionLayoutSettings.panelSize.y, descriptionLayoutSettings.maxHeight)
-            : Mathf.Max(baseHeight, skillDescriptionPanelMaxHeight);
+        float baseHeight = descriptionLayoutSettings.panelSize.y;
+        float maxHeight = Mathf.Max(descriptionLayoutSettings.panelSize.y, descriptionLayoutSettings.maxHeight);
         float panelWidth = panelRect.rect.width > 0f ? panelRect.rect.width : panelRect.sizeDelta.x;
         float contentWidth = Mathf.Max(40f, panelWidth - (skillDescriptionPanelPadding.x * 2f));
         float titleHeight = 0f;
@@ -2166,10 +2140,7 @@ public class RuneUIController : MonoBehaviour
         finalHeight = Mathf.Min(finalHeight, maxHeight);
         panelRect.sizeDelta = new Vector2(panelWidth, finalHeight);
 
-        if (applyDescriptionLayoutAtRuntime)
-        {
-            ApplySkillDescriptionTextLayout();
-        }
+        ApplySkillDescriptionTextLayout();
     }
 
     private void ApplySkillDescriptionTextLayout()
@@ -2523,7 +2494,7 @@ public class RuneUIController : MonoBehaviour
             " targetPath=" + GetHierarchyPath(trigger.transform) +
             " isRuneSlot=" + IsRuneSlotName(trigger.gameObject.name) +
             " isSkillIcon=" + IsSkillIconName(trigger.gameObject.name));
-        ShowSkillDescriptionByKey(key, trigger.playerIndex, trigger.transform as RectTransform, trigger.gameObject.name);
+        ShowSkillDescriptionByKey(key, trigger.playerIndex);
     }
 
     private void HandleRuneSkillHoverExit(SkillHoverTrigger trigger)
@@ -2563,7 +2534,7 @@ public class RuneUIController : MonoBehaviour
             "skillKey=" + key +
             " playerIndex=" + trigger.playerIndex +
             " iconSelectionSource=ExternalSkillIcon");
-        ShowSkillDescriptionByKey(key, trigger.playerIndex, trigger.transform as RectTransform, trigger.gameObject.name);
+        ShowSkillDescriptionByKey(key, trigger.playerIndex);
     }
 
     public void HandleRuneSlotHoverEnter(int skillIndex, int slotIndex, RuneDefinition rune, Transform slotTransform)
@@ -2577,7 +2548,7 @@ public class RuneUIController : MonoBehaviour
 
         if (rune != null)
         {
-            ShowRuneDescription(rune, slotTransform as RectTransform, slotTransform != null ? slotTransform.name : null);
+            ShowRuneDescription(rune);
             return;
         }
 

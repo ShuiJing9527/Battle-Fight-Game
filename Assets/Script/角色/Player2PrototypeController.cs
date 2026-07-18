@@ -632,8 +632,11 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     [SerializeField, Min(0.01f)] private float externalLaunchGroundProbeDistance = 0.2f;
     [SerializeField, Min(1)] private int externalLaunchLandingConfirmFrames = 2;
     [SerializeField, Min(0f)] private float externalLaunchGroundSkin = 0.02f;
+    [SerializeField, Min(0.01f)] private float externalLaunchLeaveGroundDistance = 0.05f;
     [SerializeField, Min(0.01f)] private float externalLaunchMinorGroundPenetrationMaxCorrection = 0.1f;
     [SerializeField, Min(0.1f)] private float externalLaunchFallRecoveryDistance = 6f;
+    [SerializeField, Min(0.1f)] private float globalFallRecoveryDistance = 8f;
+    [SerializeField, Min(0f)] private float safeGroundUpdateMaxPenetration = 0.02f;
     [SerializeField] private CollisionDetectionMode externalLaunchCollisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
     [SerializeField, Min(0.01f)] private float externalLaunchStartGroundCorrectionMax = 0.15f;
     [SerializeField, Min(0f)] private float externalLaunchStartGroundSkin = 0.03f;
@@ -656,6 +659,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     private float externalLaunchStartPositionY;
     private int externalLaunchRiseVerificationStep;
     private bool externalLaunchRiseSafetyApplied;
+    private bool externalLaunchHasActuallyLeftGround;
     private ExternalLaunchPhase externalLaunchPhase = ExternalLaunchPhase.None;
 
     public bool HasActiveRuntimeSkill
@@ -818,6 +822,8 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         {
             UpdateLastValidGroundedPosition();
         }
+
+        TryExecuteGlobalFallSafety("Update");
 
         if (Keyboard.current == null)
         {
@@ -1090,7 +1096,14 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
     private void FixedUpdate()
     {
-        if (!isUnderExternalLaunch || rb == null)
+        if (rb == null)
+        {
+            return;
+        }
+
+        TryExecuteGlobalFallSafety("FixedUpdate");
+
+        if (!isUnderExternalLaunch)
         {
             return;
         }
@@ -1624,7 +1637,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             out float launchStartCorrectionApplied,
             out Collider launchStartGroundCollider);
         isUnderExternalLaunch = true;
-        externalLaunchPhase = ExternalLaunchPhase.Rising;
+        TransitionExternalLaunchPhase(ExternalLaunchPhase.Rising, "LaunchApplied");
         externalLaunchReceivedThisFrame = true;
         externalLaunchGroundedFrameCount = 0;
         previousExternalLaunchVelocityY = launchVelocity.y;
@@ -1633,6 +1646,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         externalLaunchStartPositionY = transform.position.y;
         externalLaunchRiseVerificationStep = 0;
         externalLaunchRiseSafetyApplied = false;
+        externalLaunchHasActuallyLeftGround = false;
         lastExternalLaunchSequenceId = launchSequenceId;
         lastExternalLaunchReceivedTime = Time.time;
         Vector3 velocityBefore = rb.linearVelocity;
@@ -1758,19 +1772,23 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         {
             bool grounded = IsGroundedForExternalLaunch();
             Vector3 velocity = rb != null ? rb.linearVelocity : Vector3.zero;
-            if (externalLaunchPhase == ExternalLaunchPhase.Rising && velocity.y <= 0f)
-            {
-                externalLaunchPhase = ExternalLaunchPhase.Falling;
-            }
+            UpdateExternalLaunchPhaseState(velocity, grounded, "Routine");
             if (grounded && velocity.y <= 0.05f)
             {
-                if (externalLaunchPhase != ExternalLaunchPhase.Falling)
+                if (externalLaunchPhase != ExternalLaunchPhase.Falling &&
+                    externalLaunchPhase != ExternalLaunchPhase.LandingConfirm)
                 {
                     yield return new WaitForFixedUpdate();
                     continue;
                 }
 
-                externalLaunchPhase = ExternalLaunchPhase.LandingConfirm;
+                if (!externalLaunchHasActuallyLeftGround)
+                {
+                    yield return new WaitForFixedUpdate();
+                    continue;
+                }
+
+                TransitionExternalLaunchPhase(ExternalLaunchPhase.LandingConfirm, "RoutineGrounded");
                 externalLaunchGroundedFrameCount++;
                 if (externalLaunchGroundedFrameCount >= Mathf.Max(1, externalLaunchLandingConfirmFrames))
                 {
@@ -1821,7 +1839,8 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         rb.collisionDetectionMode = externalLaunchCollisionDetectionModeBefore;
         rb.interpolation = externalLaunchInterpolationBefore;
         isUnderExternalLaunch = false;
-        externalLaunchPhase = ExternalLaunchPhase.None;
+        externalLaunchHasActuallyLeftGround = false;
+        TransitionExternalLaunchPhase(ExternalLaunchPhase.None, "RestoreExternalLaunchState");
         externalLaunchReceivedThisFrame = false;
         externalLaunchRoutine = null;
     }
@@ -1836,15 +1855,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         Vector3 currentVelocity = rb.linearVelocity;
         Vector3 previousRbPosition = new Vector3(rb.position.x, previousExternalLaunchRbY, rb.position.z);
         bool grounded = IsGroundedForExternalLaunch();
-        if (externalLaunchPhase == ExternalLaunchPhase.Rising && currentVelocity.y <= 0f)
-        {
-            externalLaunchPhase = ExternalLaunchPhase.Falling;
-        }
-
-        if (grounded && externalLaunchPhase == ExternalLaunchPhase.Falling)
-        {
-            externalLaunchPhase = ExternalLaunchPhase.LandingConfirm;
-        }
+        UpdateExternalLaunchPhaseState(currentVelocity, grounded, source);
 
         if (debugPlayerAirborneLanding)
         {
@@ -1913,6 +1924,83 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         previousExternalLaunchRootY = transform.position.y;
         previousExternalLaunchRbY = rb.position.y;
         externalLaunchReceivedThisFrame = false;
+    }
+
+    private void UpdateExternalLaunchPhaseState(Vector3 currentVelocity, bool grounded, string source)
+    {
+        if (rb == null)
+        {
+            return;
+        }
+
+        float deltaY = transform.position.y - externalLaunchStartPositionY;
+        if (!externalLaunchHasActuallyLeftGround &&
+            (deltaY >= Mathf.Max(0.001f, externalLaunchLeaveGroundDistance) || !grounded))
+        {
+            externalLaunchHasActuallyLeftGround = true;
+            if (debugExternalLaunchMotion)
+            {
+                Debug.Log(
+                    "[PlayerExternalLaunchPhaseTrace] " +
+                    "player=" + name +
+                    " controller=Player2PrototypeController" +
+                    " sequenceId=" + lastExternalLaunchSequenceId +
+                    " phase=" + externalLaunchPhase +
+                    " event=ActuallyLeftGround" +
+                    " reason=" + source +
+                    " position=" + transform.position +
+                    " velocity=" + currentVelocity +
+                    " grounded=" + grounded +
+                    " deltaY=" + deltaY.ToString("F3") +
+                    " lastValidGroundedPosition=" + (hasLastValidGroundedPosition ? lastValidGroundedPosition.ToString() : "None"),
+                    this);
+            }
+        }
+
+        if (externalLaunchPhase == ExternalLaunchPhase.Rising && currentVelocity.y <= 0f)
+        {
+            TransitionExternalLaunchPhase(ExternalLaunchPhase.Falling, source + "_VelocityNonPositive");
+        }
+        else if (grounded &&
+                 externalLaunchHasActuallyLeftGround &&
+                 externalLaunchPhase == ExternalLaunchPhase.Falling)
+        {
+            TransitionExternalLaunchPhase(ExternalLaunchPhase.LandingConfirm, source + "_GroundedWhileFalling");
+        }
+    }
+
+    private void TransitionExternalLaunchPhase(ExternalLaunchPhase newPhase, string reason)
+    {
+        if (externalLaunchPhase == newPhase)
+        {
+            return;
+        }
+
+        ExternalLaunchPhase previousPhase = externalLaunchPhase;
+        externalLaunchPhase = newPhase;
+
+        if (debugExternalLaunchMotion || debugPlayerAirborneLanding)
+        {
+            bool hasBottomOffset = TryResolveMainColliderBottomOffset(out float bottomOffset);
+            float colliderBottomY = hasBottomOffset ? rb.position.y - bottomOffset : float.NaN;
+            Debug.Log(
+                "[PlayerExternalLaunchPhaseTrace] " +
+                "player=" + name +
+                " controller=Player2PrototypeController" +
+                " sequenceId=" + lastExternalLaunchSequenceId +
+                " fromPhase=" + previousPhase +
+                " toPhase=" + newPhase +
+                " reason=" + reason +
+                " position=" + transform.position +
+                " velocity=" + (rb != null ? rb.linearVelocity.ToString() : "None") +
+                " grounded=" + IsGroundedForExternalLaunch() +
+                " constraints=" + (rb != null ? rb.constraints.ToString() : "None") +
+                " useGravity=" + (rb != null && rb.useGravity) +
+                " isKinematic=" + (rb != null && rb.isKinematic) +
+                " solidColliderBottomY=" + (float.IsNaN(colliderBottomY) ? "NaN" : colliderBottomY.ToString("F3")) +
+                " lastValidGroundedPosition=" + (hasLastValidGroundedPosition ? lastValidGroundedPosition.ToString() : "None"),
+                this);
+        }
     }
 
     private void TraceExternalLaunchRise(Vector3 currentVelocity, bool grounded)
@@ -2177,11 +2265,58 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        Vector3 velocity = rb.linearVelocity;
-        if (velocity.y <= 0.05f && IsGroundedForExternalLaunch())
+        if (isUnderExternalLaunch)
         {
-            lastValidGroundedPosition = rb.position;
-            hasLastValidGroundedPosition = true;
+            return;
+        }
+
+        Vector3 velocity = rb.linearVelocity;
+        if (Mathf.Abs(velocity.y) > 0.05f ||
+            !TryResolveGroundedSupport(out float groundY, out Collider groundCollider) ||
+            !TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            return;
+        }
+
+        float currentBottomY = rb.position.y - bottomOffset;
+        float penetrationDepth = groundY - currentBottomY;
+        if (penetrationDepth > Mathf.Max(0f, safeGroundUpdateMaxPenetration) || currentBottomY < groundY - Mathf.Max(0f, safeGroundUpdateMaxPenetration))
+        {
+            if (debugPlayerAirborneLanding)
+            {
+                Debug.Log(
+                    "[PlayerSafeGroundTrace] " +
+                    "event=SafeGroundUpdateRejected" +
+                    " controller=Player2PrototypeController" +
+                    " player=" + name +
+                    " position=" + rb.position +
+                    " groundCollider=" + (groundCollider != null ? groundCollider.name : "None") +
+                    " groundY=" + groundY.ToString("F3") +
+                    " colliderBottomY=" + currentBottomY.ToString("F3") +
+                    " penetrationDepth=" + penetrationDepth.ToString("F3") +
+                    " velocity=" + velocity,
+                    this);
+            }
+
+            return;
+        }
+
+        lastValidGroundedPosition = rb.position;
+        hasLastValidGroundedPosition = true;
+
+        if (debugPlayerAirborneLanding)
+        {
+            Debug.Log(
+                "[PlayerSafeGroundTrace] " +
+                "event=SafeGroundPositionUpdated" +
+                " controller=Player2PrototypeController" +
+                " player=" + name +
+                " position=" + rb.position +
+                " groundCollider=" + (groundCollider != null ? groundCollider.name : "None") +
+                " groundY=" + groundY.ToString("F3") +
+                " colliderBottomY=" + currentBottomY.ToString("F3") +
+                " velocity=" + velocity,
+                this);
         }
     }
 
@@ -2219,6 +2354,38 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             LogGroundFallTrace("EmergencyFallRecovery", reason, float.NaN, float.NaN, null, Vector3.up, lastValidGroundedPosition);
             MoveExternalLaunchRoot(lastValidGroundedPosition, reason, null, Vector3.up);
             FinishExternalLaunchState(reason);
+        }
+    }
+
+    private void TryExecuteGlobalFallSafety(string source)
+    {
+        if (rb == null || !hasLastValidGroundedPosition)
+        {
+            return;
+        }
+
+        float recoveryDistance = Mathf.Max(0.1f, globalFallRecoveryDistance, externalLaunchFallRecoveryDistance);
+        float verticalDistance = lastValidGroundedPosition.y - rb.position.y;
+        if (verticalDistance < recoveryDistance)
+        {
+            return;
+        }
+
+        Vector3 safePosition = lastValidGroundedPosition;
+        if (TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            safePosition.y = lastValidGroundedPosition.y + Mathf.Max(0f, externalLaunchGroundSkin);
+            if (TryResolveGroundYAt(lastValidGroundedPosition, out float safeGroundY))
+            {
+                safePosition.y = safeGroundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+            }
+        }
+
+        LogGroundFallTrace("EmergencyFallRecovery", "GlobalFallSafety_" + source, float.NaN, float.NaN, null, Vector3.up, safePosition, verticalDistance);
+        MoveExternalLaunchRoot(safePosition, "GlobalFallSafety", null, Vector3.up);
+        if (isUnderExternalLaunch)
+        {
+            FinishExternalLaunchState("GlobalFallSafety");
         }
     }
 
@@ -2529,6 +2696,51 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             " groundCollider=" + groundName +
             " groundLayer=" + (groundLayer >= 0 ? LayerMask.LayerToName(groundLayer) : "None") +
             " groundNormal=" + (groundNormal.HasValue ? groundNormal.Value.ToString() : Vector3.up.ToString()),
+            this);
+    }
+
+    private void OnCollisionEnter(Collision collision)
+    {
+        LogGroundCollisionTrace("CollisionEnter", collision);
+    }
+
+    private void OnCollisionStay(Collision collision)
+    {
+        LogGroundCollisionTrace("CollisionStay", collision);
+    }
+
+    private void OnCollisionExit(Collision collision)
+    {
+        LogGroundCollisionTrace("CollisionExit", collision);
+    }
+
+    private void LogGroundCollisionTrace(string eventName, Collision collision)
+    {
+        if ((!debugPlayerAirborneLanding && !debugExternalLaunchMotion) ||
+            collision == null ||
+            (!isUnderExternalLaunch && !ShouldTriggerFallRecovery() && rb != null && rb.position.y >= -1f))
+        {
+            return;
+        }
+
+        ContactPoint contact = collision.contactCount > 0 ? collision.GetContact(0) : default;
+        Collider otherCollider = collision.collider;
+        Debug.Log(
+            "[PlayerGroundCollisionTrace] " +
+            "player=" + name +
+            " controller=Player2PrototypeController" +
+            " sequenceId=" + lastExternalLaunchSequenceId +
+            " event=" + eventName +
+            " otherObject=" + (otherCollider != null ? otherCollider.name : "None") +
+            " otherLayer=" + (otherCollider != null ? LayerMask.LayerToName(otherCollider.gameObject.layer) : "None") +
+            " otherIsTrigger=" + (otherCollider != null && otherCollider.isTrigger) +
+            " contactCount=" + collision.contactCount +
+            " point=" + contact.point +
+            " normal=" + contact.normal +
+            " separation=" + contact.separation.ToString("F3") +
+            " position=" + transform.position +
+            " velocity=" + (rb != null ? rb.linearVelocity.ToString() : "None") +
+            " phase=" + externalLaunchPhase,
             this);
     }
 

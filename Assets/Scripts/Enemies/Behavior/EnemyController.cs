@@ -210,6 +210,7 @@ public class EnemyController : MonoBehaviour
     private BossSlimeDevourSkill.RuntimeConfig activeBossDevourRuntimeConfig;
     private bool leapSlamSkillRuntimeFallbackCreated;
     private bool devourSkillRuntimeFallbackCreated;
+    private readonly Dictionary<int, BossPlayerCollisionIsolationState> activeBossPlayerCollisionIsolations = new Dictionary<int, BossPlayerCollisionIsolationState>();
 
     private enum EnemyAttackRuntimeState
     {
@@ -239,6 +240,16 @@ public class EnemyController : MonoBehaviour
         AirbornePlayerContact,
         FallingHeightThreshold,
         ForcedAirborneHeight
+    }
+
+    private sealed class BossPlayerCollisionIsolationState
+    {
+        public Collider BossCollider;
+        public Collider PlayerCollider;
+        public Rigidbody PlayerBody;
+        public float StartedAt;
+        public int SequenceId;
+        public Coroutine RestoreRoutine;
     }
 
     public float BaseMoveSpeed => moveSpeed;
@@ -281,6 +292,17 @@ public class EnemyController : MonoBehaviour
     private float bossLeapSlamMinimumEscapeDistance => leapSlamSkill != null ? leapSlamSkill.MinimumEscapeDistance : 0f;
     private float bossLeapSlamMaximumLaunchSeparation => leapSlamSkill != null ? leapSlamSkill.MaximumSeparationOffset : 0f;
     private float bossLeapSlamLaunchInputLockDuration => leapSlamSkill != null ? leapSlamSkill.LaunchInputLockDuration : 0f;
+    private float bossLeapCenterOverlapHorizontalThreshold => leapSlamSkill != null ? leapSlamSkill.CenterOverlapHorizontalThreshold : 0f;
+    private float bossLeapCenterFallbackAngle => leapSlamSkill != null ? leapSlamSkill.CenterFallbackAngle : 0f;
+    private float bossLeapCenterSeparationHorizontal => leapSlamSkill != null ? leapSlamSkill.CenterSeparationHorizontal : 0f;
+    private float bossLeapCenterSeparationUpward => leapSlamSkill != null ? leapSlamSkill.CenterSeparationUpward : 0f;
+    private float bossLeapMaximumInitialSeparation => leapSlamSkill != null ? leapSlamSkill.MaximumInitialSeparation : 0f;
+    private float bossLeapLaunchCollisionSeparationSkin => leapSlamSkill != null ? leapSlamSkill.LaunchCollisionSeparationSkin : 0.08f;
+    private float bossLeapLaunchGroundClearance => leapSlamSkill != null ? leapSlamSkill.LaunchGroundClearance : 0.05f;
+    private float bossLeapLaunchMaximumSafeRepositionDistance => leapSlamSkill != null ? leapSlamSkill.LaunchMaximumSafeRepositionDistance : 1.5f;
+    private float bossLeapLaunchBossCollisionRestoreDistance => leapSlamSkill != null ? leapSlamSkill.LaunchBossCollisionRestoreDistance : 0.75f;
+    private float bossLeapLaunchCollisionIgnoreMaximumDuration => leapSlamSkill != null ? leapSlamSkill.LaunchBossCollisionIgnoreMaximumDuration : 0.5f;
+    private LayerMask bossLeapLaunchSafeGroundMask => leapSlamSkill != null ? leapSlamSkill.LaunchSafeGroundMask : BossFallingImpactGroundMask;
     private bool enableForcedAirborneImpact => leapSlamSkill != null && leapSlamSkill.EnableForcedAirborneImpact;
     private float forcedAirborneImpactArmHeight => leapSlamSkill != null ? leapSlamSkill.ForcedAirborneArmHeight : 0f;
     private float forcedAirborneImpactTriggerHeight => leapSlamSkill != null ? leapSlamSkill.ForcedAirborneTriggerHeight : 0f;
@@ -449,6 +471,7 @@ public class EnemyController : MonoBehaviour
             slimeAnimation.OnAttackHit -= HandleAttackHit;
         }
 
+        RestoreAllBossPlayerCollisionIsolations("BossDestroyed");
         ReleaseBossActionLock("Destroyed", activeBossActionSequenceId);
         RestoreBossLeapBodyOverride("OnDestroy");
         RestoreBossBodyAfterSplit();
@@ -456,6 +479,7 @@ public class EnemyController : MonoBehaviour
 
     private void OnDisable()
     {
+        RestoreAllBossPlayerCollisionIsolations("BossDisabled");
         ReleaseBossActionLock("Disabled", activeBossActionSequenceId);
         RestoreBossLeapBodyOverride("OnDisable");
     }
@@ -1176,7 +1200,7 @@ public class EnemyController : MonoBehaviour
         Vector3 startPosition = transform.position;
         bool closeSlam = target != null &&
                          Vector3.ProjectOnPlane(target.position - startPosition, Vector3.up).magnitude <= Mathf.Max(0.1f, bossMeleeAttackRange);
-        Vector3 landingPosition = ResolveBossLeapLandingPosition(target, startPosition, closeSlam);
+        Vector3 landingPosition = ResolveBossLeapLandingPosition(target, startPosition, closeSlam, sequenceId);
         Vector3 baseScale = slimeAnimation != null ? slimeAnimation.BaseVisualLocalScale : Vector3.one;
         Vector3 basePosition = slimeAnimation != null ? slimeAnimation.BaseVisualLocalPosition : Vector3.zero;
         Transform visual = slimeAnimation != null ? slimeAnimation.VisualRoot : null;
@@ -1210,7 +1234,7 @@ public class EnemyController : MonoBehaviour
 
             if (elapsed <= Time.deltaTime)
             {
-                landingPosition = ResolveBossLeapLandingPosition(target, startPosition, closeSlam);
+                landingPosition = ResolveBossLeapLandingPosition(target, startPosition, closeSlam, sequenceId);
                 if (debugAttackDiagnostics || debugLog)
                 {
                     Debug.Log(
@@ -1295,13 +1319,13 @@ public class EnemyController : MonoBehaviour
         TryTriggerBossLandingImpact(landingPosition, BossLandingImpactSource.LeapSlam, actionSequenceId, bossCurrentAirborneSequenceId);
     }
 
-    private Vector3 ResolveBossLeapLandingPosition(Transform target, Vector3 startPosition, bool closeSlam)
+    private Vector3 ResolveBossLeapLandingPosition(Transform target, Vector3 startPosition, bool closeSlam, int sequenceId)
     {
         Vector3 predictedTargetPosition = ResolveBossLeapPredictedTargetPosition(target);
         Vector3 horizontalToTarget = Vector3.ProjectOnPlane(predictedTargetPosition - startPosition, Vector3.up);
         Vector3 horizontalDirection = horizontalToTarget.sqrMagnitude > 0.0001f
             ? horizontalToTarget.normalized
-            : ResolveBossLeapLandingFallbackDirection(target);
+            : ResolveBossLeapLandingFallbackDirection(target, sequenceId, out _, out _);
 
         float horizontalDistance = horizontalToTarget.magnitude;
         float minimumTravel = closeSlam
@@ -2041,9 +2065,13 @@ public class EnemyController : MonoBehaviour
                 playerCenter,
                 bossCollider,
                 playerCollider,
+                sequenceId,
                 out usedFallbackDirection,
+                out bool centerOverlapDetected,
                 out penetrationDetected,
                 out overlapEscapeApplied,
+                out string fallbackSource,
+                out float fallbackAngle,
                 out Vector3 separationOffset);
 
             float damage = Mathf.Max(0f, bossLeapSlamLandingDamage);
@@ -2056,9 +2084,28 @@ public class EnemyController : MonoBehaviour
                 " playerPosition=" + targetHealth.transform.position +
                 " rawDirection=" + (targetHealth.transform.position - transform.position) +
                 " horizontalDirection=" + horizontalDirection +
+                " centerOverlapDetected=" + centerOverlapDetected +
+                " fallbackSource=" + fallbackSource +
+                " fallbackAngle=" + fallbackAngle.ToString("F2") +
                 " verticalLaunchSpeed=" + Mathf.Max(0f, bossLeapSlamKnockbackVertical).ToString("F2") +
                 " finalLaunchVelocity=" + launchVelocity +
                 " worldUp=" + Vector3.up,
+                this);
+            Debug.Log(
+                "[BossLaunchCenterOverlapTrace] " +
+                "sequenceId=" + sequenceId +
+                " bossPosition=" + transform.position +
+                " playerPosition=" + targetHealth.transform.position +
+                " rawHorizontalOffset=" + Vector3.ProjectOnPlane(playerCenter - ResolveEnemyBodyCenter(), Vector3.up) +
+                " horizontalSqrMagnitude=" + Vector3.ProjectOnPlane(playerCenter - ResolveEnemyBodyCenter(), Vector3.up).sqrMagnitude.ToString("F4") +
+                " centerOverlapDetected=" + centerOverlapDetected +
+                " penetrationDetected=" + penetrationDetected +
+                " fallbackSource=" + fallbackSource +
+                " fallbackAngle=" + fallbackAngle.ToString("F2") +
+                " finalHorizontalDirection=" + horizontalDirection +
+                " initialSeparationApplied=" + (separationOffset.sqrMagnitude > 0.0001f) +
+                " initialSeparationVector=" + separationOffset +
+                " finalLaunchVelocity=" + launchVelocity,
                 this);
             Debug.Log(
                 "[BossLaunchBalanceTrace] " +
@@ -2148,7 +2195,16 @@ public class EnemyController : MonoBehaviour
                     this);
                 continue;
             }
-            ApplyBossLeapLaunchToPlayer(targetHealth.transform, launchVelocity, separationOffset, sequenceId, source);
+            ApplyBossLeapLaunchToPlayer(
+                targetHealth.transform,
+                bossCollider,
+                playerCollider,
+                centerOverlapDetected,
+                penetrationDetected,
+                launchVelocity,
+                separationOffset,
+                sequenceId,
+                source);
 
             if (debugAttackDiagnostics || debugLog)
             {
@@ -2796,17 +2852,25 @@ public class EnemyController : MonoBehaviour
         Vector3 playerCenter,
         Collider bossCollider,
         Collider playerCollider,
+        int sequenceId,
         out bool usedFallbackDirection,
+        out bool centerOverlapDetected,
         out bool penetrationDetected,
         out bool overlapEscapeApplied,
+        out string fallbackSource,
+        out float fallbackAngle,
         out Vector3 separationOffset)
     {
         Vector3 bossCenter = ResolveEnemyBodyCenter();
-        Vector3 horizontalDirection = Vector3.ProjectOnPlane(playerCenter - bossCenter, Vector3.up);
+        Vector3 rawHorizontalOffset = Vector3.ProjectOnPlane(playerCenter - bossCenter, Vector3.up);
+        Vector3 horizontalDirection = rawHorizontalOffset;
         penetrationDetected = false;
         overlapEscapeApplied = false;
         separationOffset = Vector3.zero;
         usedFallbackDirection = false;
+        centerOverlapDetected = rawHorizontalOffset.sqrMagnitude <= Mathf.Pow(Mathf.Max(0f, bossLeapCenterOverlapHorizontalThreshold), 2f);
+        fallbackSource = "None";
+        fallbackAngle = 0f;
 
         if (bossCollider != null && playerCollider != null &&
             Physics.ComputePenetration(
@@ -2830,9 +2894,9 @@ public class EnemyController : MonoBehaviour
             }
         }
 
-        if (horizontalDirection.sqrMagnitude < 0.0001f)
+        if (horizontalDirection.sqrMagnitude < 0.0001f || centerOverlapDetected)
         {
-            horizontalDirection = ResolveBossLeapLandingFallbackDirection(target);
+            horizontalDirection = ResolveBossLeapLandingFallbackDirection(target, sequenceId, out fallbackSource, out fallbackAngle);
             usedFallbackDirection = true;
         }
         else
@@ -2840,7 +2904,12 @@ public class EnemyController : MonoBehaviour
             horizontalDirection.Normalize();
         }
 
-        if (separationOffset.sqrMagnitude <= 0.0001f)
+        if (centerOverlapDetected)
+        {
+            separationOffset = ResolveBossLeapCenterSeparationOffset(horizontalDirection);
+            overlapEscapeApplied = separationOffset.sqrMagnitude > 0.0001f;
+        }
+        else if (separationOffset.sqrMagnitude <= 0.0001f)
         {
             separationOffset = horizontalDirection * Mathf.Max(0f, bossLeapSlamMinimumEscapeDistance);
             overlapEscapeApplied = separationOffset.sqrMagnitude > 0.0001f;
@@ -2849,8 +2918,25 @@ public class EnemyController : MonoBehaviour
         return horizontalDirection;
     }
 
-    private Vector3 ResolveBossLeapLandingFallbackDirection(Transform target)
+    private Vector3 ResolveBossLeapLandingFallbackDirection(Transform target, int sequenceId, out string fallbackSource, out float fallbackAngle)
     {
+        fallbackSource = "None";
+        fallbackAngle = 0f;
+
+        if (target != null)
+        {
+            Rigidbody targetBody = target.GetComponentInParent<Rigidbody>();
+            if (targetBody != null)
+            {
+                Vector3 velocityDirection = Vector3.ProjectOnPlane(targetBody.linearVelocity, Vector3.up);
+                if (velocityDirection.sqrMagnitude > 0.04f)
+                {
+                    fallbackSource = "TargetVelocity";
+                    return velocityDirection.normalized;
+                }
+            }
+        }
+
         if (target != null)
         {
             Player01SkillController player1 = target.GetComponentInParent<Player01SkillController>();
@@ -2859,6 +2945,7 @@ public class EnemyController : MonoBehaviour
                 Vector3 direction = -Vector3.ProjectOnPlane(player1.GetFacingWorldDirection(), Vector3.up);
                 if (direction.sqrMagnitude > 0.0001f)
                 {
+                    fallbackSource = "Player01Facing";
                     return direction.normalized;
                 }
             }
@@ -2869,21 +2956,52 @@ public class EnemyController : MonoBehaviour
                 Vector3 direction = -Vector3.ProjectOnPlane(player2.GetFacingDirection(), Vector3.up);
                 if (direction.sqrMagnitude > 0.0001f)
                 {
+                    fallbackSource = "Player02Facing";
                     return direction.normalized;
                 }
             }
         }
 
-        Vector3 bossBackward = -Vector3.ProjectOnPlane(transform.forward, Vector3.up);
-        if (bossBackward.sqrMagnitude > 0.0001f)
+        Vector3 bossForward = Vector3.ProjectOnPlane(transform.forward, Vector3.up);
+        if (bossForward.sqrMagnitude > 0.0001f)
         {
-            return bossBackward.normalized;
+            float signedAngle = sequenceId % 2 == 0
+                ? Mathf.Abs(bossLeapCenterFallbackAngle)
+                : -Mathf.Abs(bossLeapCenterFallbackAngle);
+            fallbackAngle = signedAngle;
+            fallbackSource = "BossForwardAngled";
+            return (Quaternion.AngleAxis(signedAngle, Vector3.up) * bossForward.normalized).normalized;
         }
 
+        fallbackSource = "WorldLeft";
         return Vector3.left;
     }
 
-    private void ApplyBossLeapLaunchToPlayer(Transform target, Vector3 launchVelocity, Vector3 separationOffset, int sequenceId, BossLandingImpactSource source)
+    private Vector3 ResolveBossLeapCenterSeparationOffset(Vector3 horizontalDirection)
+    {
+        Vector3 initialSeparation =
+            horizontalDirection * Mathf.Max(0f, bossLeapCenterSeparationHorizontal) +
+            Vector3.up * Mathf.Max(0f, bossLeapCenterSeparationUpward);
+
+        float maxDistance = Mathf.Max(0f, bossLeapMaximumInitialSeparation);
+        if (maxDistance > 0f && initialSeparation.magnitude > maxDistance)
+        {
+            initialSeparation = initialSeparation.normalized * maxDistance;
+        }
+
+        return initialSeparation;
+    }
+
+    private void ApplyBossLeapLaunchToPlayer(
+        Transform target,
+        Collider bossCollider,
+        Collider playerCollider,
+        bool centerOverlapDetected,
+        bool penetrationDetected,
+        Vector3 launchVelocity,
+        Vector3 separationOffset,
+        int sequenceId,
+        BossLandingImpactSource source)
     {
         Vector3 launchSeparationOffset = ResolveBossLaunchSeparationOffset(separationOffset);
 
@@ -2938,6 +3056,14 @@ public class EnemyController : MonoBehaviour
         Player2PrototypeController tracedPlayer2 = target.GetComponentInParent<Player2PrototypeController>();
         PlayerMovement tracedPlayerMovement = target.GetComponentInParent<PlayerMovement>();
         Rigidbody tracedRigidbody = target.GetComponentInParent<Rigidbody>();
+        Rigidbody launchBody = selectedReceiver != null && selectedReceiver.ExternalLaunchBody != null ? selectedReceiver.ExternalLaunchBody : tracedRigidbody;
+        Collider launchSolidCollider = ResolveLaunchSolidCollider(selectedReceiver, launchBody, target, playerCollider);
+        bool shouldIsolateCollision = ShouldIsolateBossPlayerCollision(
+            centerOverlapDetected,
+            penetrationDetected,
+            bossCollider,
+            launchSolidCollider);
+        Vector3 launchPositionBeforeResolution = launchBody != null ? launchBody.position : target.position;
         Debug.Log(
             "[BossLaunchDispatchTrace] " +
             "event=TargetReceived" +
@@ -2958,8 +3084,74 @@ public class EnemyController : MonoBehaviour
             " receiverOwner=" + (selectedReceiver != null && selectedReceiver.LaunchOwnerComponent != null ? selectedReceiver.LaunchOwnerComponent.name : "null") +
             " rigidbodyFound=" + (tracedRigidbody != null) +
             " rigidbodyObject=" + (tracedRigidbody != null ? tracedRigidbody.name : "null") +
-            " rigidbodyInstanceId=" + (tracedRigidbody != null ? tracedRigidbody.GetInstanceID().ToString() : "null"),
+            " rigidbodyInstanceId=" + (tracedRigidbody != null ? tracedRigidbody.GetInstanceID().ToString() : "null") +
+            " solidCollider=" + (launchSolidCollider != null ? launchSolidCollider.name : "null") +
+            " shouldIsolateCollision=" + shouldIsolateCollision,
             this);
+
+        if (launchBody != null && launchSolidCollider != null)
+        {
+            bool safePositionResolved = false;
+            Vector3 safeLaunchPosition = launchBody.position;
+            float safeLaunchSeparationDistance = 0f;
+            float safeLaunchGroundY = float.NaN;
+            bool overlapAfterResolution = false;
+
+            if (shouldIsolateCollision)
+            {
+                BeginBossPlayerCollisionIsolation(bossCollider, launchSolidCollider, launchBody, sequenceId);
+                safePositionResolved = TryResolveBossPlayerSafeLaunchPosition(
+                    launchBody,
+                    launchSolidCollider,
+                    bossCollider,
+                    launchVelocity,
+                    out safeLaunchPosition,
+                    out safeLaunchSeparationDistance,
+                    out safeLaunchGroundY,
+                    out overlapAfterResolution);
+                if (safePositionResolved)
+                {
+                    launchBody.position = safeLaunchPosition;
+                    Physics.SyncTransforms();
+                }
+
+                bool playerGroundCollisionStillEnabled = true;
+                if (TryResolveGroundBelowPosition(
+                        safePositionResolved ? safeLaunchPosition : launchBody.position,
+                        launchSolidCollider,
+                        out RaycastHit groundHit))
+                {
+                    playerGroundCollisionStillEnabled = !Physics.GetIgnoreCollision(launchSolidCollider, groundHit.collider);
+                    if (!playerGroundCollisionStillEnabled)
+                    {
+                        Debug.LogError(
+                            "[BossPlayerCollisionIsolationTrace] event=InvalidGroundCollisionIgnoreDetected " +
+                            "bossCollider=" + (bossCollider != null ? bossCollider.name : "null") +
+                            " playerCollider=" + launchSolidCollider.name +
+                            " groundCollider=" + groundHit.collider.name,
+                            this);
+                    }
+                }
+
+                Debug.Log(
+                    "[BossPlayerCollisionIsolationTrace] event=SafeLaunchPositionResolved " +
+                    "bossCollider=" + (bossCollider != null ? bossCollider.name : "null") +
+                    " playerCollider=" + launchSolidCollider.name +
+                    " positionBefore=" + launchPositionBeforeResolution +
+                    " positionAfter=" + (safePositionResolved ? safeLaunchPosition.ToString() : "<unchanged>") +
+                    " separationDistance=" + safeLaunchSeparationDistance.ToString("F3") +
+                    " bossOverlapAfter=" + overlapAfterResolution +
+                    " playerBottomY=" + (safePositionResolved ? (safeLaunchPosition.y - ExternalLaunchSafetyUtility.ResolveBottomOffset(launchBody, launchSolidCollider)).ToString("F3") : "NaN") +
+                    " groundY=" + safeLaunchGroundY.ToString("F3") +
+                    " playerGroundCollisionStillEnabled=" + playerGroundCollisionStillEnabled,
+                    this);
+            }
+
+            if (safePositionResolved)
+            {
+                launchSeparationOffset = Vector3.zero;
+            }
+        }
 
         if (selectedReceiver != null)
         {
@@ -3032,6 +3224,323 @@ public class EnemyController : MonoBehaviour
         }
 
         LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", false, "rejectReason", "NoLaunchReceiver");
+    }
+
+    private Collider ResolveLaunchSolidCollider(IExternalLaunchReceiver selectedReceiver, Rigidbody launchBody, Transform target, Collider fallbackPlayerCollider)
+    {
+        if (selectedReceiver != null &&
+            selectedReceiver.LaunchOwnerComponent != null &&
+            launchBody != null &&
+            ExternalLaunchSafetyUtility.TryResolvePhysicalBodyCollider(selectedReceiver.LaunchOwnerComponent, launchBody, out Collider solidCollider))
+        {
+            return solidCollider;
+        }
+
+        if (fallbackPlayerCollider != null && fallbackPlayerCollider.enabled && !fallbackPlayerCollider.isTrigger)
+        {
+            return fallbackPlayerCollider;
+        }
+
+        return ResolvePlayerCollider(target);
+    }
+
+    private bool ShouldIsolateBossPlayerCollision(bool centerOverlapDetected, bool penetrationDetected, Collider bossCollider, Collider playerCollider)
+    {
+        if (bossCollider == null || playerCollider == null)
+        {
+            return false;
+        }
+
+        return centerOverlapDetected ||
+               penetrationDetected ||
+               IsPlayerWithinBossBottomProjection(bossCollider, playerCollider);
+    }
+
+    private bool IsPlayerWithinBossBottomProjection(Collider bossCollider, Collider playerCollider)
+    {
+        if (bossCollider == null || playerCollider == null)
+        {
+            return false;
+        }
+
+        Vector3 bossCenter = bossCollider.bounds.center;
+        Vector3 playerCenter = playerCollider.bounds.center;
+        bossCenter.y = 0f;
+        playerCenter.y = 0f;
+        float horizontalDistance = Vector3.Distance(bossCenter, playerCenter);
+        float allowedDistance = ResolveHorizontalBoundsExtent(bossCollider.bounds) + ResolveHorizontalBoundsExtent(playerCollider.bounds);
+        return horizontalDistance <= allowedDistance;
+    }
+
+    private float ResolveHorizontalBoundsExtent(Bounds bounds)
+    {
+        return Mathf.Max(bounds.extents.x, bounds.extents.z);
+    }
+
+    private bool TryResolveBossPlayerSafeLaunchPosition(
+        Rigidbody playerBody,
+        Collider playerCollider,
+        Collider bossCollider,
+        Vector3 launchVelocity,
+        out Vector3 safePosition,
+        out float appliedDistance,
+        out float groundY,
+        out bool overlapAfterResolution)
+    {
+        safePosition = playerBody != null ? playerBody.position : Vector3.zero;
+        appliedDistance = 0f;
+        groundY = float.NaN;
+        overlapAfterResolution = true;
+
+        if (playerBody == null || playerCollider == null || bossCollider == null)
+        {
+            return false;
+        }
+
+        Vector3 launchHorizontalDirection = Vector3.ProjectOnPlane(launchVelocity, Vector3.up);
+        if (launchHorizontalDirection.sqrMagnitude <= 0.0001f)
+        {
+            launchHorizontalDirection = Vector3.ProjectOnPlane(playerCollider.bounds.center - bossCollider.bounds.center, Vector3.up);
+        }
+
+        if (launchHorizontalDirection.sqrMagnitude <= 0.0001f)
+        {
+            launchHorizontalDirection = Vector3.right;
+        }
+
+        launchHorizontalDirection.Normalize();
+
+        float playerBottomOffset = ExternalLaunchSafetyUtility.ResolveBottomOffset(playerBody, playerCollider);
+        float playerHorizontalExtent = ResolveHorizontalBoundsExtent(playerCollider.bounds);
+        float bossHorizontalExtent = ResolveHorizontalBoundsExtent(bossCollider.bounds);
+        float requiredDistance = bossHorizontalExtent + playerHorizontalExtent + Mathf.Max(0f, bossLeapLaunchCollisionSeparationSkin);
+        float maximumDistance = Mathf.Max(requiredDistance, bossLeapLaunchMaximumSafeRepositionDistance);
+        float stepDistance = Mathf.Max(0.05f, playerHorizontalExtent * 0.35f);
+        Vector3 bossCenter = bossCollider.bounds.center;
+
+        for (float distance = requiredDistance; distance <= maximumDistance + 0.001f; distance += stepDistance)
+        {
+            Vector3 candidatePosition = bossCenter + launchHorizontalDirection * distance;
+            if (TryResolveGroundedPlayerBodyY(candidatePosition, playerCollider, playerBody, playerBottomOffset, out float adjustedBodyY, out groundY))
+            {
+                candidatePosition.y = adjustedBodyY;
+            }
+            else
+            {
+                candidatePosition.y = playerBody.position.y;
+            }
+
+            if (!WouldCollidersOverlapAtBodyPosition(bossCollider, playerCollider, playerBody, candidatePosition))
+            {
+                safePosition = candidatePosition;
+                appliedDistance = distance;
+                overlapAfterResolution = false;
+                return true;
+            }
+        }
+
+        Vector3 fallbackPosition = bossCenter + launchHorizontalDirection * maximumDistance;
+        if (TryResolveGroundedPlayerBodyY(fallbackPosition, playerCollider, playerBody, playerBottomOffset, out float fallbackBodyY, out groundY))
+        {
+            fallbackPosition.y = fallbackBodyY;
+        }
+        else
+        {
+            fallbackPosition.y = playerBody.position.y;
+        }
+
+        safePosition = fallbackPosition;
+        appliedDistance = maximumDistance;
+        overlapAfterResolution = WouldCollidersOverlapAtBodyPosition(bossCollider, playerCollider, playerBody, fallbackPosition);
+        return !overlapAfterResolution;
+    }
+
+    private bool TryResolveGroundedPlayerBodyY(
+        Vector3 candidateBodyPosition,
+        Collider playerCollider,
+        Rigidbody playerBody,
+        float playerBottomOffset,
+        out float adjustedBodyY,
+        out float groundY)
+    {
+        adjustedBodyY = candidateBodyPosition.y;
+        groundY = float.NaN;
+
+        if (!TryResolveGroundBelowPosition(candidateBodyPosition, playerCollider, out RaycastHit groundHit))
+        {
+            return false;
+        }
+
+        groundY = groundHit.point.y;
+        adjustedBodyY = groundY + playerBottomOffset + Mathf.Max(0f, bossLeapLaunchGroundClearance);
+        return true;
+    }
+
+    private bool TryResolveGroundBelowPosition(Vector3 candidateBodyPosition, Collider playerCollider, out RaycastHit groundHit)
+    {
+        Vector3 origin = new Vector3(
+            candidateBodyPosition.x,
+            Mathf.Max(candidateBodyPosition.y, transform.position.y) + 6f,
+            candidateBodyPosition.z);
+        float rayDistance = 24f;
+        return Physics.Raycast(
+            origin,
+            Vector3.down,
+            out groundHit,
+            rayDistance,
+            bossLeapLaunchSafeGroundMask,
+            QueryTriggerInteraction.Ignore);
+    }
+
+    private bool WouldCollidersOverlapAtBodyPosition(Collider bossCollider, Collider playerCollider, Rigidbody playerBody, Vector3 candidateBodyPosition)
+    {
+        Vector3 bodyDelta = candidateBodyPosition - playerBody.position;
+        Vector3 candidateColliderPosition = playerCollider.transform.position + bodyDelta;
+        return Physics.ComputePenetration(
+            bossCollider,
+            bossCollider.transform.position,
+            bossCollider.transform.rotation,
+            playerCollider,
+            candidateColliderPosition,
+            playerCollider.transform.rotation,
+            out _,
+            out _);
+    }
+
+    private void BeginBossPlayerCollisionIsolation(Collider bossCollider, Collider playerCollider, Rigidbody playerBody, int sequenceId)
+    {
+        if (bossCollider == null || playerCollider == null)
+        {
+            return;
+        }
+
+        int key = playerCollider.GetInstanceID();
+        if (activeBossPlayerCollisionIsolations.TryGetValue(key, out BossPlayerCollisionIsolationState existingState))
+        {
+            RestoreBossPlayerCollisionIsolation(existingState, "Replaced");
+        }
+
+        Physics.IgnoreCollision(bossCollider, playerCollider, true);
+        BossPlayerCollisionIsolationState state = new BossPlayerCollisionIsolationState
+        {
+            BossCollider = bossCollider,
+            PlayerCollider = playerCollider,
+            PlayerBody = playerBody,
+            StartedAt = Time.time,
+            SequenceId = sequenceId
+        };
+        state.RestoreRoutine = StartCoroutine(RestoreBossPlayerCollisionIsolationRoutine(state));
+        activeBossPlayerCollisionIsolations[key] = state;
+
+        bool playerGroundCollisionStillEnabled = true;
+        bool playerColliderEnabled = playerCollider.enabled;
+        bool playerColliderIsTrigger = playerCollider.isTrigger;
+        bool playerDetectCollisions = playerBody == null || playerBody.detectCollisions;
+        if (TryResolveGroundBelowPosition(playerBody != null ? playerBody.position : playerCollider.bounds.center, playerCollider, out RaycastHit groundHit))
+        {
+            playerGroundCollisionStillEnabled = !Physics.GetIgnoreCollision(playerCollider, groundHit.collider);
+        }
+
+        Debug.Log(
+            "[BossPlayerCollisionIsolationTrace] event=IsolationStarted " +
+            "bossCollider=" + bossCollider.name +
+            " playerCollider=" + playerCollider.name +
+            " playerGroundCollisionStillEnabled=" + playerGroundCollisionStillEnabled +
+            " playerDetectCollisions=" + playerDetectCollisions +
+            " playerColliderEnabled=" + playerColliderEnabled +
+            " playerColliderIsTrigger=" + playerColliderIsTrigger +
+            " sequenceId=" + sequenceId,
+            this);
+    }
+
+    private System.Collections.IEnumerator RestoreBossPlayerCollisionIsolationRoutine(BossPlayerCollisionIsolationState state)
+    {
+        string restoreReason = "Timeout";
+        float restoreDistance = Mathf.Max(0.05f, bossLeapLaunchBossCollisionRestoreDistance);
+        float maxDuration = Mathf.Max(0.05f, bossLeapLaunchCollisionIgnoreMaximumDuration);
+
+        while (Time.time - state.StartedAt < maxDuration)
+        {
+            if (state.BossCollider == null || state.PlayerCollider == null)
+            {
+                restoreReason = "ColliderMissing";
+                break;
+            }
+
+            bool overlapping = Physics.ComputePenetration(
+                state.BossCollider,
+                state.BossCollider.transform.position,
+                state.BossCollider.transform.rotation,
+                state.PlayerCollider,
+                state.PlayerCollider.transform.position,
+                state.PlayerCollider.transform.rotation,
+                out _,
+                out _);
+
+            Vector3 bossCenter = state.BossCollider.bounds.center;
+            Vector3 playerCenter = state.PlayerCollider.bounds.center;
+            bossCenter.y = 0f;
+            playerCenter.y = 0f;
+            float horizontalDistance = Vector3.Distance(bossCenter, playerCenter);
+
+            if (!overlapping)
+            {
+                restoreReason = horizontalDistance >= restoreDistance ? "DistanceReached" : "NoLongerOverlapping";
+                break;
+            }
+
+            yield return new WaitForFixedUpdate();
+        }
+
+        RestoreBossPlayerCollisionIsolation(state, restoreReason);
+    }
+
+    private void RestoreBossPlayerCollisionIsolation(BossPlayerCollisionIsolationState state, string reason)
+    {
+        if (state == null)
+        {
+            return;
+        }
+
+        if (state.RestoreRoutine != null)
+        {
+            StopCoroutine(state.RestoreRoutine);
+            state.RestoreRoutine = null;
+        }
+
+        if (state.BossCollider != null && state.PlayerCollider != null)
+        {
+            Physics.IgnoreCollision(state.BossCollider, state.PlayerCollider, false);
+        }
+
+        if (state.PlayerCollider != null)
+        {
+            activeBossPlayerCollisionIsolations.Remove(state.PlayerCollider.GetInstanceID());
+        }
+
+        Debug.Log(
+            "[BossPlayerCollisionIsolationTrace] event=IsolationRestored " +
+            "bossCollider=" + (state.BossCollider != null ? state.BossCollider.name : "null") +
+            " playerCollider=" + (state.PlayerCollider != null ? state.PlayerCollider.name : "null") +
+            " reason=" + reason +
+            " duration=" + (Time.time - state.StartedAt).ToString("F3"),
+            this);
+    }
+
+    private void RestoreAllBossPlayerCollisionIsolations(string reason)
+    {
+        if (activeBossPlayerCollisionIsolations.Count == 0)
+        {
+            return;
+        }
+
+        BossPlayerCollisionIsolationState[] states = new BossPlayerCollisionIsolationState[activeBossPlayerCollisionIsolations.Count];
+        activeBossPlayerCollisionIsolations.Values.CopyTo(states, 0);
+        activeBossPlayerCollisionIsolations.Clear();
+        for (int i = 0; i < states.Length; i++)
+        {
+            RestoreBossPlayerCollisionIsolation(states[i], reason);
+        }
     }
 
     private static string BuildHierarchyPath(Transform target)

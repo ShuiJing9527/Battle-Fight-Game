@@ -51,6 +51,17 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     [SerializeField] private float minimumEscapeDistance = 1.5f;
     [SerializeField] private float maximumSeparationOffset = 0.35f;
     [SerializeField, Min(0f)] private float launchInputLockDuration = 0.3f;
+    [SerializeField, Min(0f)] private float centerOverlapHorizontalThreshold = 0.25f;
+    [SerializeField] private float centerFallbackAngle = 35f;
+    [SerializeField, Min(0f)] private float centerSeparationHorizontal = 0.25f;
+    [SerializeField, Min(0f)] private float centerSeparationUpward = 0.12f;
+    [SerializeField, Min(0f)] private float maximumInitialSeparation = 0.35f;
+    [SerializeField, Min(0f)] private float launchCollisionSeparationSkin = 0.08f;
+    [SerializeField, Min(0f)] private float launchGroundClearance = 0.05f;
+    [SerializeField, Min(0f)] private float launchMaximumSafeRepositionDistance = 1.5f;
+    [SerializeField, Min(0f)] private float launchBossCollisionRestoreDistance = 0.75f;
+    [SerializeField, Min(0f)] private float launchBossCollisionIgnoreMaximumDuration = 0.5f;
+    [SerializeField] private LayerMask launchSafeGroundMask = ~0;
 
     [Header("Forced Airborne Impact")]
     [SerializeField] private bool enableForcedAirborneImpact = true;
@@ -101,6 +112,17 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     public float MinimumEscapeDistance => minimumEscapeDistance;
     public float MaximumSeparationOffset => maximumSeparationOffset;
     public float LaunchInputLockDuration => launchInputLockDuration;
+    public float CenterOverlapHorizontalThreshold => centerOverlapHorizontalThreshold;
+    public float CenterFallbackAngle => centerFallbackAngle;
+    public float CenterSeparationHorizontal => centerSeparationHorizontal;
+    public float CenterSeparationUpward => centerSeparationUpward;
+    public float MaximumInitialSeparation => maximumInitialSeparation;
+    public float LaunchCollisionSeparationSkin => launchCollisionSeparationSkin;
+    public float LaunchGroundClearance => launchGroundClearance;
+    public float LaunchMaximumSafeRepositionDistance => launchMaximumSafeRepositionDistance;
+    public float LaunchBossCollisionRestoreDistance => launchBossCollisionRestoreDistance;
+    public float LaunchBossCollisionIgnoreMaximumDuration => launchBossCollisionIgnoreMaximumDuration;
+    public LayerMask LaunchSafeGroundMask => launchSafeGroundMask;
     public bool EnableForcedAirborneImpact => enableForcedAirborneImpact;
     public float ForcedAirborneArmHeight => armHeight;
     public float ForcedAirborneTriggerHeight => triggerHeight;

@@ -104,6 +104,9 @@ public class PlayerSkillHUD : MonoBehaviour
     [SerializeField] private float tooltipScreenMargin = 16f;
     [SerializeField] private Vector2 tooltipPreferredRightOffset = new Vector2(18f, 18f);
     [SerializeField] private Vector2 tooltipPreferredLeftOffset = new Vector2(-18f, 18f);
+    [Header("R Tooltip Manual Offset")]
+    [Tooltip("R技能说明框最终位置的手动偏移。X负值向左，正值向右；Y正值向上，负值向下。")]
+    [SerializeField] private Vector2 rTooltipManualOffset = new Vector2(-1f, 0f);
     [SerializeField] private bool debugTooltipPositioning = true;
 
     private readonly Image[] slotIconImages = new Image[4];
@@ -1192,10 +1195,11 @@ public class PlayerSkillHUD : MonoBehaviour
             Stretch(textRect, Vector2.zero, Vector2.one, new Vector2(tooltipPadding.x, tooltipPadding.y), new Vector2(-tooltipPadding.x, -tooltipPadding.y));
         }
 
-        RectTransform slotRect = trigger.transform as RectTransform;
+        SkillSlotView currentSlotView = ResolveSlotView(trigger.skillKey);
+        RectTransform slotRect = currentSlotView != null ? currentSlotView.root : trigger.transform as RectTransform;
         if (slotRect != null && canvasRectTransform != null)
         {
-            PositionTooltipForSlot(slotRect, tooltipRoot.sizeDelta);
+            PositionTooltipForSlot(currentSlotView, slotRect, tooltipRoot.sizeDelta);
         }
 
         tooltipRoot.gameObject.SetActive(true);
@@ -1233,7 +1237,7 @@ public class PlayerSkillHUD : MonoBehaviour
         RefreshSelectionHighlights();
     }
 
-    private void PositionTooltipForSlot(RectTransform slotRect, Vector2 tooltipSize)
+    private void PositionTooltipForSlot(SkillSlotView currentSlot, RectTransform slotRect, Vector2 tooltipSize)
     {
         if (slotRect == null || canvasRectTransform == null || tooltipRoot == null)
         {
@@ -1247,24 +1251,87 @@ public class PlayerSkillHUD : MonoBehaviour
         Vector2 slotBottomLeftScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[0]);
         Vector2 slotTopRightScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[2]);
         Vector2 slotTopLeftScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[1]);
+        Vector2 slotTopCenterScreen = new Vector2((slotTopLeftScreen.x + slotTopRightScreen.x) * 0.5f, slotTopRightScreen.y);
 
         Rect canvasScreenRect = GetCanvasScreenRect(uiCamera);
         float margin = Mathf.Max(0f, tooltipScreenMargin);
+        Vector2 defaultPivot = new Vector2(0.5f, 0f);
+        Vector2 defaultOffset = new Vector2(tooltipOffset.x, Mathf.Abs(tooltipOffset.y));
+        Vector2 defaultScreenTarget = slotTopCenterScreen + defaultOffset;
+        Rect defaultTooltipRect = BuildTooltipScreenRect(defaultScreenTarget, tooltipSize, defaultPivot);
 
-        bool canPlaceRight = slotTopRightScreen.x + tooltipPreferredRightOffset.x + tooltipSize.x <= canvasScreenRect.xMax - margin;
-        bool placeRight = canPlaceRight;
-        Vector2 chosenOffset = placeRight ? tooltipPreferredRightOffset : tooltipPreferredLeftOffset;
-        Vector2 pivot = placeRight ? new Vector2(0f, 0f) : new Vector2(1f, 0f);
-        Vector2 anchorScreenPoint = placeRight ? slotTopRightScreen : slotTopLeftScreen;
+        float overflowLeft = (canvasScreenRect.xMin + margin) - defaultTooltipRect.xMin;
+        float overflowRight = defaultTooltipRect.xMax - (canvasScreenRect.xMax - margin);
+        float overflowTop = defaultTooltipRect.yMax - (canvasScreenRect.yMax - margin);
+        float overflowBottom = (canvasScreenRect.yMin + margin) - defaultTooltipRect.yMin;
+
+        bool defaultFits =
+            overflowLeft <= 0f &&
+            overflowRight <= 0f &&
+            overflowTop <= 0f &&
+            overflowBottom <= 0f;
+
+        string placement = "AboveCentered";
+        float horizontalShift = 0f;
+        Vector2 selectedPivot = defaultPivot;
+        Vector2 selectedScreenTarget = defaultScreenTarget;
+
+        if (!defaultFits)
+        {
+            Vector2 clampedScreenTarget = defaultScreenTarget;
+            if (overflowRight > 0f)
+            {
+                clampedScreenTarget.x -= overflowRight;
+            }
+            else if (overflowLeft > 0f)
+            {
+                clampedScreenTarget.x += overflowLeft;
+            }
+
+            Rect clampedTooltipRect = BuildTooltipScreenRect(clampedScreenTarget, tooltipSize, defaultPivot);
+            bool clampedFitsHorizontally =
+                clampedTooltipRect.xMin >= canvasScreenRect.xMin + margin &&
+                clampedTooltipRect.xMax <= canvasScreenRect.xMax - margin;
+            bool clampedFitsVertically =
+                clampedTooltipRect.yMin >= canvasScreenRect.yMin + margin &&
+                clampedTooltipRect.yMax <= canvasScreenRect.yMax - margin;
+
+            if (clampedFitsHorizontally && clampedFitsVertically)
+            {
+                selectedScreenTarget = clampedScreenTarget;
+                horizontalShift = clampedScreenTarget.x - defaultScreenTarget.x;
+                placement = Mathf.Abs(horizontalShift) > 0.01f ? "ClampedFromAboveCentered" : "AboveCentered";
+            }
+            else
+            {
+                Vector2 leftPivot = new Vector2(1f, 0f);
+                Vector2 leftScreenTarget = slotTopLeftScreen + new Vector2(tooltipPreferredLeftOffset.x, Mathf.Abs(tooltipPreferredLeftOffset.y));
+                selectedPivot = leftPivot;
+                selectedScreenTarget = leftScreenTarget;
+                placement = "LeftOfSlot";
+            }
+        }
 
         tooltipRoot.anchorMin = new Vector2(0.5f, 0.5f);
         tooltipRoot.anchorMax = new Vector2(0.5f, 0.5f);
-        tooltipRoot.pivot = pivot;
+        tooltipRoot.pivot = selectedPivot;
 
-        Vector2 screenTarget = anchorScreenPoint + chosenOffset;
-        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRectTransform, screenTarget, uiCamera, out Vector2 localPoint))
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRectTransform, selectedScreenTarget, uiCamera, out Vector2 localPoint))
         {
-            tooltipRoot.anchoredPosition = ClampTooltipAnchoredPosition(localPoint, tooltipSize, pivot, margin);
+            Vector2 finalAnchoredPosition = ClampTooltipAnchoredPosition(localPoint, tooltipSize, selectedPivot, margin);
+            Vector2 manualOffset = Vector2.zero;
+            if (currentSlot != null && currentSlot == rSlot)
+            {
+                manualOffset = rTooltipManualOffset;
+            }
+
+            if (manualOffset != Vector2.zero)
+            {
+                finalAnchoredPosition += manualOffset;
+                finalAnchoredPosition = ClampTooltipAnchoredPosition(finalAnchoredPosition, tooltipSize, selectedPivot, margin);
+            }
+
+            tooltipRoot.anchoredPosition = finalAnchoredPosition;
         }
 
         if (debugTooltipPositioning)
@@ -1272,19 +1339,83 @@ public class PlayerSkillHUD : MonoBehaviour
             Debug.Log(
                 "[TooltipRuntimeTrace] " +
                 "event=TooltipResolved" +
+                " skillKey=" + ResolveSlotKey(slotRect) +
                 " tooltipObject=" + tooltipRoot.name +
                 " tooltipInstanceId=" + tooltipRoot.gameObject.GetInstanceID() +
                 " targetObject=" + slotRect.name +
                 " targetInstanceId=" + slotRect.gameObject.GetInstanceID() +
-                " placement=" + (placeRight ? "RightOfSlot" : "LeftOfSlot") +
+                " slotTopCenterScreen=" + slotTopCenterScreen +
                 " slotTopRightScreen=" + slotTopRightScreen +
                 " slotTopLeftScreen=" + slotTopLeftScreen +
+                " defaultScreenTarget=" + defaultScreenTarget +
                 " canvasScreenRect=" + canvasScreenRect +
                 " tooltipSize=" + tooltipSize +
-                " pivot=" + pivot +
-                " anchoredPosition=" + tooltipRoot.anchoredPosition +
+                " defaultBounds=" + defaultTooltipRect +
+                " defaultFits=" + defaultFits +
+                " overflowLeft=" + overflowLeft.ToString("F2") +
+                " overflowRight=" + overflowRight.ToString("F2") +
+                " overflowTop=" + overflowTop.ToString("F2") +
+                " overflowBottom=" + overflowBottom.ToString("F2") +
+                " placement=" + placement +
+                " horizontalShift=" + horizontalShift.ToString("F2") +
+                " pivot=" + selectedPivot +
+                " finalAnchoredPosition=" + tooltipRoot.anchoredPosition +
                 " frame=" + Time.frameCount,
                 this);
+        }
+    }
+
+    private Rect BuildTooltipScreenRect(Vector2 screenTarget, Vector2 tooltipSize, Vector2 pivot)
+    {
+        float left = screenTarget.x - (tooltipSize.x * pivot.x);
+        float bottom = screenTarget.y - (tooltipSize.y * pivot.y);
+        return Rect.MinMaxRect(left, bottom, left + tooltipSize.x, bottom + tooltipSize.y);
+    }
+
+    private string ResolveSlotKey(RectTransform slotRect)
+    {
+        if (slotRect == null)
+        {
+            return "Unknown";
+        }
+
+        if (qSlot != null && qSlot.root == slotRect)
+        {
+            return "Q";
+        }
+
+        if (wSlot != null && wSlot.root == slotRect)
+        {
+            return "W";
+        }
+
+        if (eSlot != null && eSlot.root == slotRect)
+        {
+            return "E";
+        }
+
+        if (rSlot != null && rSlot.root == slotRect)
+        {
+            return "R";
+        }
+
+        return slotRect.name;
+    }
+
+    private SkillSlotView ResolveSlotView(string skillKey)
+    {
+        switch (skillKey)
+        {
+            case "Q":
+                return qSlot;
+            case "W":
+                return wSlot;
+            case "E":
+                return eSlot;
+            case "R":
+                return rSlot;
+            default:
+                return null;
         }
     }
 

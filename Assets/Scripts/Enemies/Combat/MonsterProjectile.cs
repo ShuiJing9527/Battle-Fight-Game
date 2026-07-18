@@ -18,9 +18,12 @@ public class MonsterProjectile : MonoBehaviour
     [SerializeField, Min(0f)] private float damage = 10f;
     [SerializeField, Min(0f)] private float speed = 8f;
     [SerializeField, Min(0f)] private float lifeTime = 5f;
+    [SerializeField, Min(0f)] private float projectileMaximumTravelDistance = 30f;
     [SerializeField] private BattleDamageType damageType = BattleDamageType.Physical;
     [SerializeField] private LayerMask hitLayerMask = ~0;
     [SerializeField] private bool destroyOnHit = true;
+    [SerializeField] private bool enableSweepHitDetection = true;
+    [SerializeField, Min(0f)] private float minimumSweepRadius = 0.05f;
 
     [Header("Impact")]
     [SerializeField] private GameObject hitSplashPrefab;
@@ -72,9 +75,14 @@ public class MonsterProjectile : MonoBehaviour
     private MeshRenderer bodyMeshRenderer;
     private TrailRenderer cachedTrailRenderer;
     private ParticleSystem dropletParticle;
+    private Collider projectileCollider;
     private Material runtimeBodyMaterial;
     private Material runtimeTrailMaterial;
     private Material runtimeSplashMaterial;
+    private Vector3 previousPosition;
+    private Vector3 spawnPosition;
+    private float traveledDistance;
+    private bool damageEnabled;
 
     private void Awake()
     {
@@ -102,7 +110,11 @@ public class MonsterProjectile : MonoBehaviour
         useArcMotion = false;
         hitLayerMask = SanitizeHitLayerMask(hitLayerMask);
         spawnTime = Time.time;
+        spawnPosition = transform.position;
+        previousPosition = transform.position;
+        traveledDistance = 0f;
         hasHit = false;
+        damageEnabled = true;
 
         EnsureRuntimeVisuals();
         AlignVisualRootToDirection();
@@ -110,7 +122,22 @@ public class MonsterProjectile : MonoBehaviour
 
         if (debugProjectileLog)
         {
-            Debug.Log($"[BossAcidProjectile] launch projectile={name} source={(source != null ? source.name : "null")} speed={this.speed:F2} damage={this.damage:F2} hitMask={hitLayerMask.value} position={transform.position} direction={this.direction}", this);
+            Debug.Log(
+                "[SlimeProjectileTrace] " +
+                "event=Initialized" +
+                " projectile=" + name +
+                " instanceId=" + GetInstanceID() +
+                " damage=" + this.damage.ToString("F2") +
+                " owner=" + (source != null ? source.name : "null") +
+                " target=null" +
+                " spawnPosition=" + transform.position +
+                " maxDistance=" + projectileMaximumTravelDistance.ToString("F2") +
+                " lifetime=" + lifeTime.ToString("F2") +
+                " hasHit=" + hasHit +
+                " damageEnabled=" + damageEnabled +
+                " colliderEnabled=" + (projectileCollider != null && projectileCollider.enabled) +
+                " detectCollisions=" + (projectileCollider != null ? projectileCollider.enabled.ToString() : "false"),
+                this);
         }
     }
 
@@ -123,6 +150,9 @@ public class MonsterProjectile : MonoBehaviour
         arcConfiguredTravelTime = Mathf.Max(0.1f, configuredTravelTime > 0f ? configuredTravelTime : arcTravelTime);
         transform.position = start;
         spawnTime = Time.time;
+        spawnPosition = start;
+        previousPosition = start;
+        traveledDistance = 0f;
 
         if (debugProjectileLog)
         {
@@ -132,43 +162,81 @@ public class MonsterProjectile : MonoBehaviour
 
     private void Update()
     {
+        if (hasHit)
+        {
+            return;
+        }
+
+        Vector3 currentPosition = transform.position;
+        Vector3 nextPosition;
+
         if (useArcMotion)
         {
             float elapsed = Mathf.Max(0f, Time.time - spawnTime);
             float normalizedTime = Mathf.Clamp01(elapsed / Mathf.Max(0.1f, arcConfiguredTravelTime));
-            Vector3 nextPosition = Vector3.Lerp(arcStartPoint, arcTargetPoint, normalizedTime)
+            nextPosition = Vector3.Lerp(arcStartPoint, arcTargetPoint, normalizedTime)
                 + Vector3.up * Mathf.Sin(normalizedTime * Mathf.PI) * arcConfiguredHeight;
 
-            Vector3 movement = nextPosition - transform.position;
+            Vector3 movement = nextPosition - currentPosition;
             if (movement.sqrMagnitude > DirectionEpsilon)
             {
                 direction = movement.normalized;
             }
+        }
+        else
+        {
+            nextPosition = currentPosition + direction * speed * Time.deltaTime;
+        }
 
-            transform.position = nextPosition;
-            if (normalizedTime >= 1f && !hasHit)
+        if (TrySweepHitDetection(currentPosition, nextPosition))
+        {
+            return;
+        }
+
+        transform.position = nextPosition;
+        traveledDistance += Vector3.Distance(currentPosition, nextPosition);
+        previousPosition = transform.position;
+
+        if (useArcMotion)
+        {
+            float elapsed = Mathf.Max(0f, Time.time - spawnTime);
+            float normalizedTime = Mathf.Clamp01(elapsed / Mathf.Max(0.1f, arcConfiguredTravelTime));
+            if (normalizedTime >= 1f)
             {
+                if (TryResolveEndpointHit(transform.position))
+                {
+                    return;
+                }
+
                 hasHit = true;
+                damageEnabled = false;
+                LogProjectileDespawn("ArcEndpointNoTarget");
                 OnHit(arcTargetPoint, Vector3.up);
                 return;
             }
         }
-        else
-        {
-            transform.position += direction * speed * Time.deltaTime;
-        }
 
         UpdateVisualAnimation();
 
+        if (projectileMaximumTravelDistance > 0f && traveledDistance >= projectileMaximumTravelDistance)
+        {
+            damageEnabled = false;
+            LogProjectileDespawn("ExceededMaxDistance");
+            Destroy(gameObject);
+            return;
+        }
+
         if (Time.time - spawnTime >= lifeTime)
         {
+            damageEnabled = false;
+            LogProjectileDespawn("Expired");
             Destroy(gameObject);
         }
     }
 
     private void OnTriggerEnter(Collider other)
     {
-        TryHandleHit(other, default);
+        TryHandleHit(other, default, "Trigger");
     }
 
     private void OnCollisionEnter(Collision collision)
@@ -178,40 +246,32 @@ public class MonsterProjectile : MonoBehaviour
             return;
         }
 
-        TryHandleHit(collision.collider, collision);
+        TryHandleHit(collision.collider, collision, "Collision");
     }
 
-    private void TryHandleHit(Collider other, Collision collision)
+    private void TryHandleHit(Collider other, Collision collision, string sourceReason)
     {
-        if (hasHit || ShouldIgnoreCollision(other))
+        if (hasHit)
         {
+            LogProjectileReject("AlreadyHit", other, sourceReason);
             return;
         }
 
-        CombatHealth playerHealth = ResolvePlayerCombatHealth(other);
+        if (!damageEnabled)
+        {
+            LogProjectileReject("DamageDisabled", other, sourceReason);
+            return;
+        }
+
+        if (ShouldIgnoreCollision(other))
+        {
+            LogProjectileReject("IgnoredCollision", other, sourceReason);
+            return;
+        }
+
         Vector3 hitPoint = ResolveHitPoint(other, collision);
         Vector3 hitNormal = ResolveHitNormal(other, collision, hitPoint);
-        if (playerHealth != null)
-        {
-            hasHit = true;
-            playerHealth.TakeDamage(new BattleDamage(damage, damageType, source));
-            LogProjectileHit("player", other, hitPoint);
-            OnHit(hitPoint, hitNormal);
-            return;
-        }
-
-        if (!IsLayerInMask(other.gameObject.layer, hitLayerMask))
-        {
-            if (debugProjectileLog)
-            {
-                Debug.Log($"[BossAcidProjectile] ignored non-hit layer collider={other.name} layer={other.gameObject.layer}", this);
-            }
-            return;
-        }
-
-        hasHit = true;
-        LogProjectileHit(BattleTargetUtility.IsMonster(other, source != null ? source.transform : null) ? "enemy" : "world", other, hitPoint);
-        OnHit(hitPoint, hitNormal);
+        TryApplyHit(other, hitPoint, hitNormal, sourceReason);
     }
 
     private void OnHit(Vector3 hitPoint, Vector3 hitNormal)
@@ -227,6 +287,7 @@ public class MonsterProjectile : MonoBehaviour
     private void EnsureRuntimeVisuals()
     {
         DisableLegacyRootRenderer();
+        projectileCollider = GetComponent<Collider>();
 
         if (visualRoot == null)
         {
@@ -832,5 +893,246 @@ public class MonsterProjectile : MonoBehaviour
         }
 
         return other.GetComponentInParent<CombatHealth>();
+    }
+
+    private bool TrySweepHitDetection(Vector3 from, Vector3 to)
+    {
+        if (!enableSweepHitDetection || hasHit)
+        {
+            return false;
+        }
+
+        Vector3 delta = to - from;
+        float distance = delta.magnitude;
+        if (distance <= DirectionEpsilon)
+        {
+            return false;
+        }
+
+        Vector3 castDirection = delta / distance;
+        float castRadius = ResolveSweepRadius();
+        if (Physics.SphereCast(
+                from,
+                castRadius,
+                castDirection,
+                out RaycastHit hit,
+                distance,
+                ~0,
+                QueryTriggerInteraction.Collide))
+        {
+            if (debugProjectileLog)
+            {
+                Debug.Log(
+                    "[SlimeProjectileTrace] " +
+                    "event=SweepDetected" +
+                    " projectile=" + name +
+                    " previousPosition=" + from +
+                    " currentPosition=" + to +
+                    " travelDistanceThisFrame=" + distance.ToString("F3") +
+                    " hitCollider=" + (hit.collider != null ? hit.collider.name : "null"),
+                    this);
+            }
+
+            TryApplyHit(hit.collider, hit.point, hit.normal, "Sweep");
+            return hasHit;
+        }
+
+        return false;
+    }
+
+    private float ResolveSweepRadius()
+    {
+        if (projectileCollider is SphereCollider sphereCollider)
+        {
+            float scale = Mathf.Max(transform.lossyScale.x, transform.lossyScale.y, transform.lossyScale.z);
+            return Mathf.Max(minimumSweepRadius, sphereCollider.radius * scale);
+        }
+
+        if (projectileCollider != null)
+        {
+            Bounds bounds = projectileCollider.bounds;
+            return Mathf.Max(minimumSweepRadius, Mathf.Max(bounds.extents.x, bounds.extents.y, bounds.extents.z) * 0.5f);
+        }
+
+        return Mathf.Max(minimumSweepRadius, 0.1f);
+    }
+
+    private bool TryResolveEndpointHit(Vector3 position)
+    {
+        float radius = ResolveSweepRadius();
+        Collider[] overlaps = Physics.OverlapSphere(position, radius, ~0, QueryTriggerInteraction.Collide);
+        for (int i = 0; i < overlaps.Length; i++)
+        {
+            Collider overlap = overlaps[i];
+            if (overlap == null)
+            {
+                continue;
+            }
+
+            TryApplyHit(overlap, overlap.ClosestPoint(position), Vector3.up, "ArcEndpointOverlap");
+            if (hasHit)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private void TryApplyHit(Collider other, Vector3 hitPoint, Vector3 hitNormal, string sourceReason)
+    {
+        if (other == null)
+        {
+            LogProjectileReject("NullCollider", other, sourceReason);
+            return;
+        }
+
+        CombatHealth playerHealth = ResolvePlayerCombatHealth(other);
+        if (playerHealth != null)
+        {
+            float hpBefore = ResolveCombatHealthValue(playerHealth);
+            hasHit = true;
+            damageEnabled = false;
+            playerHealth.TakeDamage(new BattleDamage(damage, damageType, source));
+            float hpAfter = ResolveCombatHealthValue(playerHealth);
+            LogProjectileHit("player", other, hitPoint, sourceReason, playerHealth, hpBefore, hpAfter);
+            OnHit(hitPoint, hitNormal);
+            return;
+        }
+
+        if (!IsLayerInMask(other.gameObject.layer, hitLayerMask))
+        {
+            LogProjectileReject("InvalidLayer", other, sourceReason);
+            return;
+        }
+
+        hasHit = true;
+        damageEnabled = false;
+        string category = BattleTargetUtility.IsMonster(other, source != null ? source.transform : null) ? "enemy" : "world";
+        LogProjectileHit(category, other, hitPoint, sourceReason, null, float.NaN, float.NaN);
+        OnHit(hitPoint, hitNormal);
+    }
+
+    private void LogProjectileReject(string reason, Collider other, string sourceReason)
+    {
+        if (!debugProjectileLog)
+        {
+            return;
+        }
+
+        CombatHealth resolvedHealth = other != null ? ResolvePlayerCombatHealth(other) : null;
+        Debug.Log(
+            "[SlimeProjectileHitTrace] " +
+            "event=Rejected" +
+            " projectile=" + name +
+            " reason=" + reason +
+            " source=" + sourceReason +
+            " hitObject=" + (other != null ? other.name : "null") +
+            " hitHierarchyPath=" + BuildHierarchyPath(other != null ? other.transform : null) +
+            " hitLayer=" + (other != null ? LayerMask.LayerToName(other.gameObject.layer) : "None") +
+            " hitIsTrigger=" + (other != null && other.isTrigger) +
+            " attachedRigidbody=" + (other != null && other.attachedRigidbody != null ? other.attachedRigidbody.name : "null") +
+            " resolvedPlayerRoot=" + (resolvedHealth != null ? resolvedHealth.transform.root.name : "null") +
+            " resolvedHealthComponent=" + (resolvedHealth != null ? resolvedHealth.name : "null") +
+            " distanceFromSpawn=" + Vector3.Distance(spawnPosition, transform.position).ToString("F3") +
+            " flightTime=" + (Time.time - spawnTime).ToString("F3") +
+            " damageEnabled=" + damageEnabled +
+            " hasHitBefore=" + hasHit,
+            this);
+    }
+
+    private void LogProjectileHit(string category, Collider other, Vector3 hitPoint, string sourceReason, CombatHealth playerHealth, float hpBefore, float hpAfter)
+    {
+        if (!debugProjectileLog)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[SlimeProjectileHitTrace] " +
+            "event=HitDetected" +
+            " projectile=" + name +
+            " category=" + category +
+            " source=" + sourceReason +
+            " hitObject=" + (other != null ? other.name : "null") +
+            " hitHierarchyPath=" + BuildHierarchyPath(other != null ? other.transform : null) +
+            " hitLayer=" + (other != null ? LayerMask.LayerToName(other.gameObject.layer) : "None") +
+            " hitIsTrigger=" + (other != null && other.isTrigger) +
+            " attachedRigidbody=" + (other != null && other.attachedRigidbody != null ? other.attachedRigidbody.name : "null") +
+            " resolvedPlayerRoot=" + (playerHealth != null ? playerHealth.transform.root.name : "null") +
+            " resolvedHealthComponent=" + (playerHealth != null ? playerHealth.name : "null") +
+            " distanceFromSpawn=" + Vector3.Distance(spawnPosition, hitPoint).ToString("F3") +
+            " flightTime=" + (Time.time - spawnTime).ToString("F3") +
+            " damageEnabled=" + damageEnabled +
+            " hasHitBefore=" + hasHit,
+            this);
+
+        if (playerHealth != null)
+        {
+            Debug.Log(
+                "[SlimeProjectileHitTrace] " +
+                "event=DamageApplied" +
+                " projectile=" + name +
+                " damage=" + damage.ToString("F2") +
+                " playerHealthBefore=" + hpBefore.ToString("F2") +
+                " playerHealthAfter=" + hpAfter.ToString("F2"),
+                this);
+        }
+
+        Debug.Log($"[BossProjectileArc] start={arcStartPoint} target={arcTargetPoint} arcHeight={arcConfiguredHeight:F2} travelTime={arcConfiguredTravelTime:F2} hit={category}", this);
+        Debug.Log($"[BossAcidProjectile] hit category={category} collider={(other != null ? other.name : "null")} point={hitPoint} source={(source != null ? source.name : "null")}", this);
+    }
+
+    private void LogProjectileDespawn(string reason)
+    {
+        if (!debugProjectileLog)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[SlimeProjectileTrace] " +
+            "event=Despawned" +
+            " projectile=" + name +
+            " reason=" + reason +
+            " distanceFromSpawn=" + traveledDistance.ToString("F3") +
+            " flightTime=" + (Time.time - spawnTime).ToString("F3") +
+            " damageEnabled=" + damageEnabled +
+            " hasHit=" + hasHit,
+            this);
+    }
+
+    private static string BuildHierarchyPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder(target.name);
+        Transform current = target.parent;
+        while (current != null)
+        {
+            builder.Insert(0, current.name + "/");
+            current = current.parent;
+        }
+
+        return builder.ToString();
+    }
+
+    private static float ResolveCombatHealthValue(CombatHealth combatHealth)
+    {
+        if (combatHealth == null)
+        {
+            return 0f;
+        }
+
+        BattleResourceBank resourceBank = combatHealth.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return Mathf.Max(0f, resourceBank.currentHealth);
+        }
+
+        return Mathf.Max(0f, combatHealth.currentHealth);
     }
 }
