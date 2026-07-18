@@ -88,6 +88,12 @@ public class EnemyController : MonoBehaviour
     [SerializeField, Range(0f, 8f)] private float slimeProjectileVerticalScatterAngle = 3f;
     [SerializeField] private bool debugBossSlimeProjectile = false;
 
+    [Header("Projectile Attack Audio")]
+    [Tooltip("敌人实际发射粘液弹时播放的音效。留空则不播放。")]
+    [SerializeField] private AudioClip projectileFireAudioClip;
+    [Tooltip("粘液弹发射音效音量。")]
+    [SerializeField, Range(0f, 1f)] private float projectileFireAudioVolume = 1f;
+
     [Header("Boss Skill Components")]
     [SerializeField] private BossSlimeLeapSlamSkill leapSlamSkill;
     [SerializeField] private BossSlimeDevourSkill devourSkill;
@@ -123,6 +129,7 @@ public class EnemyController : MonoBehaviour
     private SlimeAnimationController slimeAnimation;
     private EnemyDebuffReceiver debuffReceiver;
     private CombatStats combatStats;
+    private AudioSource skillAudioSource;
     private Collider meleeEnemyCollider;
     private SpriteRenderer meleeEnemySpriteRenderer;
     private Quaternion initialRotation;
@@ -312,6 +319,8 @@ public class EnemyController : MonoBehaviour
     private GameObject landingVfxPrefab => leapSlamSkill != null ? leapSlamSkill.LandingVfxPrefab : null;
     private Vector3 landingVfxOffset => leapSlamSkill != null ? leapSlamSkill.LandingVfxOffset : Vector3.zero;
     private float landingVfxLifetime => leapSlamSkill != null ? leapSlamSkill.LandingVfxLifetime : 0f;
+    private AudioClip leapSlamActivationAudioClip => leapSlamSkill != null ? leapSlamSkill.ActivationAudioClip : null;
+    private float leapSlamActivationAudioVolume => leapSlamSkill != null ? leapSlamSkill.ActivationAudioVolume : 0f;
     private bool enableBossDevour => devourSkill != null && devourSkill.EnableSkill;
     private float bossDevourInitialDelay => devourSkill != null ? devourSkill.InitialDelay : 0f;
     private float bossDevourCooldown => devourSkill != null ? devourSkill.Cooldown : 0f;
@@ -441,6 +450,52 @@ public class EnemyController : MonoBehaviour
             this);
     }
 
+    private AudioSource EnsureSkillAudioSource()
+    {
+        if (skillAudioSource != null)
+        {
+            return skillAudioSource;
+        }
+
+        AudioSource[] sources = GetComponents<AudioSource>();
+        for (int i = 0; i < sources.Length; i++)
+        {
+            AudioSource candidate = sources[i];
+            if (candidate != null && candidate.spatialBlend > 0.5f)
+            {
+                skillAudioSource = candidate;
+                break;
+            }
+        }
+
+        if (skillAudioSource == null)
+        {
+            skillAudioSource = gameObject.AddComponent<AudioSource>();
+            skillAudioSource.playOnAwake = false;
+            skillAudioSource.loop = false;
+            skillAudioSource.spatialBlend = 1f;
+            skillAudioSource.dopplerLevel = 0f;
+        }
+
+        return skillAudioSource;
+    }
+
+    private void PlaySkillAudio(AudioClip clip, float volume)
+    {
+        if (clip == null || volume <= 0f)
+        {
+            return;
+        }
+
+        AudioSource source = EnsureSkillAudioSource();
+        if (source == null)
+        {
+            return;
+        }
+
+        source.PlayOneShot(clip, Mathf.Clamp01(volume));
+    }
+
     private void Start()
     {
         MonsterCombatAutoSetup.Configure(gameObject);
@@ -448,6 +503,7 @@ public class EnemyController : MonoBehaviour
         monsterIdentity = GetComponent<MonsterIdentity>();
         combatStats = GetComponent<CombatStats>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
+        EnsureSkillAudioSource();
         ResolveMeleeHitSources();
         initialRotation = transform.rotation;
         ResolvePlayerTarget();
@@ -1179,6 +1235,7 @@ public class EnemyController : MonoBehaviour
         rb.linearVelocity = Vector3.zero;
         LogBossLeapSlamConfigTraceOnce("BeginBossLeapSlam");
         BeginBossLeapBodyOverride();
+        PlaySkillAudio(leapSlamActivationAudioClip, leapSlamActivationAudioVolume);
         Debug.Log(
             "[BossLeapSlamTrace] event=LeapStarted " +
             "actionSequenceId=" + sequenceId +
@@ -6453,6 +6510,10 @@ public class EnemyController : MonoBehaviour
             monsterProjectile = projectile.AddComponent<MonsterProjectile>();
         }
         monsterProjectile.Launch(direction, projectileSpeed, ResolveCurrentAttackDamage(damageType), damageType, gameObject);
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            PlaySkillAudio(projectileFireAudioClip, projectileFireAudioVolume);
+        }
 
         if (attackStyle == MonsterAttackStyle.ElementalBoss && useArcTrajectory)
         {

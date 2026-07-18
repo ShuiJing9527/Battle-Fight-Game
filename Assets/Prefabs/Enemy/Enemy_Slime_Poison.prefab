@@ -224,7 +224,7 @@ MonoBehaviour:
   debugSpeedLogInterval: 1
   targetResolveRetryInterval: 0.25
   enableLandingVfx: 1
-  landingVfxPrefab: {fileID: 11400000, guid: 8986621e08ddbcd4fb5e8010d305b92f, type: 3}
+  landingVfxPrefab: {fileID: 11400000, guid: 52b5f4d51f084b57a850f20d9f96546e, type: 3}
   landingVfxOffset: {x: 0, y: 0, z: 0}
   landingVfxLifetime: 2
 --- !u!114 &9100000000000000021

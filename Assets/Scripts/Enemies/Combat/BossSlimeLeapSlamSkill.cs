@@ -76,6 +76,12 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     [SerializeField] private Vector3 landingVfxOffset = Vector3.zero;
     [SerializeField, Min(0f)] private float landingVfxLifetime = 2f;
 
+    [Header("Leap Slam Audio")]
+    [Tooltip("Boss 开始发动 LeapSlam 时播放的音效。留空则不播放。")]
+    [SerializeField] private AudioClip leapSlamActivationAudioClip;
+    [Tooltip("LeapSlam 触发音效音量。")]
+    [SerializeField, Range(0f, 1f)] private float leapSlamActivationAudioVolume = 1f;
+
     public bool EnableLeapSlam => enableLeapSlam;
     public float InitialDelay => initialDelay;
     public float Cooldown => cooldown;
@@ -132,6 +138,8 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     public GameObject LandingVfxPrefab => landingVfxPrefab;
     public Vector3 LandingVfxOffset => landingVfxOffset;
     public float LandingVfxLifetime => landingVfxLifetime;
+    public AudioClip ActivationAudioClip => leapSlamActivationAudioClip;
+    public float ActivationAudioVolume => leapSlamActivationAudioVolume;
 
     public string BuildConfigTrace(string source)
     {
