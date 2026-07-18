@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using UnityEngine.EventSystems;
+using System.Collections;
 
 public class RuneUIController : MonoBehaviour
 {
@@ -12,6 +13,14 @@ public class RuneUIController : MonoBehaviour
         Skill,
         Rune,
         EmptySlot
+    }
+
+    private enum TooltipPlacementCandidate
+    {
+        AboveRight,
+        AboveLeft,
+        BelowRight,
+        BelowLeft
     }
 
     [System.Serializable]
@@ -80,6 +89,8 @@ public class RuneUIController : MonoBehaviour
     private const string LogMissingSkillIconRefs = "[RuneUI] Missing external skill icon references on rune panel. Please assign qSkillIcon / wSkillIcon / eSkillIcon / rSkillIcon in the Inspector.";
     private const string RunePanelDescriptionTracePrefix = "[RunePanelDescriptionTrace] ";
     private const string RunePanelHoverTracePrefix = "[RunePanelHoverTrace] ";
+    private const string TooltipPositionTracePrefix = "[TooltipPositionTrace] ";
+    private const string TooltipRuntimeTracePrefix = "[TooltipRuntimeTrace] ";
 
     [System.Serializable]
     public class RuneSlotView
@@ -176,6 +187,10 @@ public class RuneUIController : MonoBehaviour
     private bool isSkillDescriptionHoverActive;
     private DescriptionSource currentDescriptionSource;
     private Transform runeButtonTemplate;
+    private Canvas tooltipCanvas;
+    private RectTransform tooltipCanvasRect;
+    private Camera tooltipCanvasCamera;
+    private Coroutine tooltipNextFrameTraceCoroutine;
 
     public bool IsPanelOpen => IsMainPanelVisible();
 
@@ -192,6 +207,9 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private Vector2 skillDescriptionPanelOffset = new Vector2(20f, 60f);
     [SerializeField] private Vector2 skillDescriptionPanelPadding = new Vector2(18f, 18f);
     [SerializeField, Min(120f)] private float skillDescriptionPanelMaxHeight = 320f;
+    [SerializeField] private Vector2 tooltipOffset = new Vector2(16f, 16f);
+    [SerializeField, Min(0f)] private float tooltipScreenPadding = 12f;
+    [SerializeField] private bool debugTooltipPositioning = false;
     [SerializeField] private Vector2 runeBagItemSpacing = new Vector2(0f, 8f);
     [SerializeField, Min(1)] private int runeBagColumnCount = 1;
     [SerializeField] private Vector2 runeBagItemSize = new Vector2(0f, 40f);
@@ -914,7 +932,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         EventTrigger.Entry enterEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
-        enterEntry.callback.AddListener(_ => ShowRuneDescription(rune));
+        enterEntry.callback.AddListener(_ => ShowRuneDescription(rune, button.transform as RectTransform, button.gameObject.name));
         trigger.triggers.Add(enterEntry);
 
         EventTrigger.Entry exitEntry = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
@@ -1288,7 +1306,7 @@ public class RuneUIController : MonoBehaviour
         ShowRuneDescription(rune);
     }
 
-    private void ShowRuneDescription(RuneDefinition rune)
+    private void ShowRuneDescription(RuneDefinition rune, RectTransform targetRect = null, string sourceObject = null)
     {
         if (rune == null)
         {
@@ -1303,7 +1321,7 @@ public class RuneUIController : MonoBehaviour
             ? RuneDefinition.GetLocalizedProgressiveDescription(displayRune.runeType, equippedCount)
             : displayRune.GetFullEffectDescription();
         body = string.IsNullOrWhiteSpace(body) ? $"ID: {displayRune.runeId}" : body.Trim();
-        ShowSharedDescription(string.Empty, body, false, DescriptionSource.Rune);
+        ShowSharedDescription(string.Empty, body, false, DescriptionSource.Rune, targetRect, sourceObject);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Rune" +
@@ -1311,7 +1329,7 @@ public class RuneUIController : MonoBehaviour
             " runeType=" + displayRune.runeType +
             " equippedCount=" + equippedCount +
             " bodyLength=" + body.Length +
-            " object=" + GetRuneName(rune));
+            " object=" + (string.IsNullOrWhiteSpace(sourceObject) ? GetRuneName(rune) : sourceObject));
     }
 
     private int ResolveCurrentRuneTypeEquippedCount(RuneType runeType)
@@ -1326,7 +1344,13 @@ public class RuneUIController : MonoBehaviour
         return runtimeState != null ? runtimeState.GetGlobalRuneCount(runeType) : 0;
     }
 
-    private void ShowSharedDescription(string title, string body, bool skillHover, DescriptionSource source)
+    private void ShowSharedDescription(
+        string title,
+        string body,
+        bool skillHover,
+        DescriptionSource source,
+        RectTransform targetRect = null,
+        string sourceObject = null)
     {
         EnsureSkillDescriptionPanel();
         if (skillDescriptionPanel == null || skillDescriptionTitleText == null || skillDescriptionBodyText == null)
@@ -1339,8 +1363,24 @@ public class RuneUIController : MonoBehaviour
         currentDescriptionSource = source;
         skillDescriptionTitleText.text = title ?? string.Empty;
         skillDescriptionBodyText.text = body ?? string.Empty;
-        RefreshSkillDescriptionPanelHeight();
         skillDescriptionPanel.SetActive(true);
+        EnsureTooltipDetachedOverlayParent();
+        Canvas.ForceUpdateCanvases();
+        RefreshSkillDescriptionPanelHeight();
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(skillDescriptionPanel.transform as RectTransform);
+        LogTooltipRuntimeTrace(
+            "event=TooltipShowRequested" +
+            " source=" + source +
+            " controllerObject=" + name +
+            " controllerInstanceId=" + GetInstanceID() +
+            " tooltipObject=" + skillDescriptionPanel.name +
+            " tooltipHierarchyPath=" + GetHierarchyPath(skillDescriptionPanel.transform) +
+            " tooltipInstanceId=" + skillDescriptionPanel.GetInstanceID() +
+            " targetObject=" + (targetRect != null ? targetRect.name : "null") +
+            " targetHierarchyPath=" + GetHierarchyPath(targetRect) +
+            " targetInstanceId=" + (targetRect != null ? targetRect.GetInstanceID().ToString() : "null"));
+        PositionSharedDescriptionPanel(targetRect, sourceObject);
         if (sharedDescriptionScrollRect != null)
         {
             Canvas.ForceUpdateCanvases();
@@ -1348,7 +1388,7 @@ public class RuneUIController : MonoBehaviour
         }
     }
 
-    private void ShowSkillDescriptionByKey(string key, int playerIndex)
+    private void ShowSkillDescriptionByKey(string key, int playerIndex, RectTransform targetRect = null, string sourceObject = null)
     {
         string normalizedKey = (key ?? string.Empty).Trim().ToUpperInvariant();
         if (string.IsNullOrEmpty(normalizedKey))
@@ -1371,14 +1411,16 @@ public class RuneUIController : MonoBehaviour
             SkillUIDefinitionDatabase.GetLocalizedTitle(entry),
             SkillUIDefinitionDatabase.BuildDetailBodyText(entry),
             true,
-            DescriptionSource.Skill);
+            DescriptionSource.Skill,
+            targetRect,
+            sourceObject);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=Skill" +
             " skillKey=" + normalizedKey +
             " playerIndex=" + playerIndex +
             " descriptionTextLength=" + SkillUIDefinitionDatabase.BuildDetailBodyText(entry).Length +
-            " object=" + normalizedKey + "SkillIcon");
+            " object=" + (string.IsNullOrWhiteSpace(sourceObject) ? normalizedKey + "SkillIcon" : sourceObject));
     }
 
     private void RestoreSharedDescription()
@@ -1414,7 +1456,13 @@ public class RuneUIController : MonoBehaviour
     private void ShowEmptyRuneSlotDescription(int skillIndex, int slotIndex, Transform slotTransform)
     {
         string skillKey = GetSkillKeyName(skillIndex);
-        ShowSharedDescription(LocalizeOrFallback("rune.empty_slot", LabelEmptyRuneSlot), string.Empty, false, DescriptionSource.EmptySlot);
+        ShowSharedDescription(
+            LocalizeOrFallback("rune.empty_slot", LabelEmptyRuneSlot),
+            string.Empty,
+            false,
+            DescriptionSource.EmptySlot,
+            slotTransform as RectTransform,
+            slotTransform != null ? slotTransform.name : null);
         LogRunePanelDescriptionTrace(
             "DescriptionUpdated",
             "source=EmptySlot" +
@@ -2069,7 +2117,7 @@ public class RuneUIController : MonoBehaviour
 
     private void RefreshSkillDescriptionPanelHeight()
     {
-        if (skillDescriptionPanel == null || !applyDescriptionLayoutAtRuntime)
+        if (skillDescriptionPanel == null)
         {
             return;
         }
@@ -2082,9 +2130,18 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
-        ApplySkillDescriptionPanelLayout(panelRect);
+        if (applyDescriptionLayoutAtRuntime)
+        {
+            ApplySkillDescriptionPanelLayout(panelRect);
+        }
 
-        float panelWidth = panelRect.sizeDelta.x;
+        float baseHeight = applyDescriptionLayoutAtRuntime
+            ? descriptionLayoutSettings.panelSize.y
+            : Mathf.Max(1f, panelRect.rect.height > 0f ? panelRect.rect.height : panelRect.sizeDelta.y);
+        float maxHeight = applyDescriptionLayoutAtRuntime
+            ? Mathf.Max(descriptionLayoutSettings.panelSize.y, descriptionLayoutSettings.maxHeight)
+            : Mathf.Max(baseHeight, skillDescriptionPanelMaxHeight);
+        float panelWidth = panelRect.rect.width > 0f ? panelRect.rect.width : panelRect.sizeDelta.x;
         float contentWidth = Mathf.Max(40f, panelWidth - (skillDescriptionPanelPadding.x * 2f));
         float titleHeight = 0f;
         float bodyHeight = 0f;
@@ -2105,11 +2162,14 @@ public class RuneUIController : MonoBehaviour
 
         float titleBodySpacing = titleHeight > 0f && bodyHeight > 0f ? 14f : 0f;
         float calculatedTextHeight = titleHeight + titleBodySpacing + bodyHeight;
-        float finalHeight = Mathf.Max(descriptionLayoutSettings.panelSize.y, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
-        finalHeight = Mathf.Min(finalHeight, Mathf.Max(descriptionLayoutSettings.panelSize.y, descriptionLayoutSettings.maxHeight));
+        float finalHeight = Mathf.Max(baseHeight, calculatedTextHeight + (skillDescriptionPanelPadding.y * 2f) + 18f);
+        finalHeight = Mathf.Min(finalHeight, maxHeight);
         panelRect.sizeDelta = new Vector2(panelWidth, finalHeight);
 
-        ApplySkillDescriptionTextLayout();
+        if (applyDescriptionLayoutAtRuntime)
+        {
+            ApplySkillDescriptionTextLayout();
+        }
     }
 
     private void ApplySkillDescriptionTextLayout()
@@ -2463,7 +2523,7 @@ public class RuneUIController : MonoBehaviour
             " targetPath=" + GetHierarchyPath(trigger.transform) +
             " isRuneSlot=" + IsRuneSlotName(trigger.gameObject.name) +
             " isSkillIcon=" + IsSkillIconName(trigger.gameObject.name));
-        ShowSkillDescriptionByKey(key, trigger.playerIndex);
+        ShowSkillDescriptionByKey(key, trigger.playerIndex, trigger.transform as RectTransform, trigger.gameObject.name);
     }
 
     private void HandleRuneSkillHoverExit(SkillHoverTrigger trigger)
@@ -2503,7 +2563,7 @@ public class RuneUIController : MonoBehaviour
             "skillKey=" + key +
             " playerIndex=" + trigger.playerIndex +
             " iconSelectionSource=ExternalSkillIcon");
-        ShowSkillDescriptionByKey(key, trigger.playerIndex);
+        ShowSkillDescriptionByKey(key, trigger.playerIndex, trigger.transform as RectTransform, trigger.gameObject.name);
     }
 
     public void HandleRuneSlotHoverEnter(int skillIndex, int slotIndex, RuneDefinition rune, Transform slotTransform)
@@ -2517,7 +2577,7 @@ public class RuneUIController : MonoBehaviour
 
         if (rune != null)
         {
-            ShowRuneDescription(rune);
+            ShowRuneDescription(rune, slotTransform as RectTransform, slotTransform != null ? slotTransform.name : null);
             return;
         }
 
@@ -2633,6 +2693,303 @@ public class RuneUIController : MonoBehaviour
                 " isSkillIcon=" + IsSkillIconName(triggerTransform.name));
             Destroy(trigger);
         }
+    }
+
+    private void PositionSharedDescriptionPanel(RectTransform targetRect, string sourceObject)
+    {
+        if (targetRect == null || skillDescriptionPanel == null)
+        {
+            LogTooltipRuntimeTrace(
+                "event=TooltipPositionSkipped" +
+                " reason=" + (targetRect == null ? "TargetRectNull" : "TooltipPanelMissing") +
+                " sourceObject=" + (string.IsNullOrWhiteSpace(sourceObject) ? "null" : sourceObject));
+            return;
+        }
+
+        RectTransform tooltipRect = skillDescriptionPanel.transform as RectTransform;
+        if (tooltipRect == null)
+        {
+            return;
+        }
+
+        if (!TryResolveTooltipCanvas(out Canvas canvas, out RectTransform canvasRect, out Camera canvasCamera))
+        {
+            return;
+        }
+
+        EnsureTooltipDetachedOverlayParent();
+
+        Vector2[] targetCorners = GetTargetCornersInCanvasSpace(targetRect, canvasRect, canvasCamera);
+        if (targetCorners == null)
+        {
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        LayoutRebuilder.ForceRebuildLayoutImmediate(tooltipRect);
+
+        Vector2 tooltipSize = tooltipRect.rect.size;
+        Rect canvasBounds = canvasRect.rect;
+        TooltipPlacementCandidate[] candidates =
+        {
+            TooltipPlacementCandidate.AboveRight,
+            TooltipPlacementCandidate.AboveLeft,
+            TooltipPlacementCandidate.BelowRight,
+            TooltipPlacementCandidate.BelowLeft
+        };
+
+        LogTooltipRuntimeTrace(
+            "event=PositionFunctionEntered" +
+            " targetObject=" + targetRect.name +
+            " targetHierarchyPath=" + GetHierarchyPath(targetRect) +
+            " targetInstanceId=" + targetRect.GetInstanceID() +
+            " tooltipObject=" + skillDescriptionPanel.name +
+            " tooltipInstanceId=" + skillDescriptionPanel.GetInstanceID() +
+            " anchoredPositionBefore=" + tooltipRect.anchoredPosition +
+            " tooltipSize=" + tooltipSize +
+            " canvasObject=" + canvas.name +
+            " canvasInstanceId=" + canvas.GetInstanceID() +
+            " canvasRenderMode=" + canvas.renderMode +
+            " sameCanvas=" + (targetRect.GetComponentInParent<Canvas>() == canvas));
+
+        TooltipPlacementCandidate selectedCandidate = candidates[0];
+        Vector2 selectedPivot = GetTooltipPivot(selectedCandidate);
+        Vector2 selectedPosition = GetTooltipCandidatePosition(selectedCandidate, targetCorners);
+        bool foundFit = false;
+        bool clamped = false;
+
+        for (int i = 0; i < candidates.Length; i++)
+        {
+            TooltipPlacementCandidate candidate = candidates[i];
+            Vector2 pivot = GetTooltipPivot(candidate);
+            Vector2 desiredPosition = GetTooltipCandidatePosition(candidate, targetCorners);
+            if (TooltipFitsInsideCanvas(desiredPosition, pivot, tooltipSize, canvasBounds, tooltipScreenPadding))
+            {
+                selectedCandidate = candidate;
+                selectedPivot = pivot;
+                selectedPosition = desiredPosition;
+                foundFit = true;
+                break;
+            }
+        }
+
+        if (!foundFit)
+        {
+            Vector2 unclampedPosition = selectedPosition;
+            selectedPosition = ClampTooltipInsideCanvas(selectedPosition, selectedPivot, tooltipSize, canvasBounds, tooltipScreenPadding);
+            clamped = unclampedPosition != selectedPosition;
+        }
+
+        tooltipRect.pivot = selectedPivot;
+        tooltipRect.anchorMin = new Vector2(0.5f, 0.5f);
+        tooltipRect.anchorMax = new Vector2(0.5f, 0.5f);
+        tooltipRect.anchoredPosition = selectedPosition;
+
+        LogTooltipRuntimeTrace(
+            "event=PositionFunctionCompleted" +
+            " targetObject=" + targetRect.name +
+            " selectedCandidate=" + selectedCandidate +
+            " anchoredPositionAfter=" + tooltipRect.anchoredPosition +
+            " worldPositionAfter=" + tooltipRect.position +
+            " clamped=" + clamped +
+            " flippedHorizontal=" + (selectedCandidate == TooltipPlacementCandidate.AboveLeft || selectedCandidate == TooltipPlacementCandidate.BelowLeft) +
+            " flippedVertical=" + (selectedCandidate == TooltipPlacementCandidate.BelowRight || selectedCandidate == TooltipPlacementCandidate.BelowLeft));
+
+        if (tooltipNextFrameTraceCoroutine != null)
+        {
+            StopCoroutine(tooltipNextFrameTraceCoroutine);
+        }
+
+        tooltipNextFrameTraceCoroutine = StartCoroutine(
+            TraceTooltipNextFrame(
+                tooltipRect,
+                selectedPosition,
+                targetRect != null ? targetRect.name : (sourceObject ?? "unknown")));
+
+        if (debugTooltipPositioning)
+        {
+            LogTooltipPositionTrace(
+                "target=" + (string.IsNullOrWhiteSpace(sourceObject) ? targetRect.name : sourceObject) +
+                " canvasMode=" + canvas.renderMode +
+                " tooltipSize=" + tooltipSize +
+                " preferredCandidate=" + candidates[0] +
+                " selectedCandidate=" + selectedCandidate +
+                " flippedHorizontal=" + (selectedCandidate == TooltipPlacementCandidate.AboveLeft || selectedCandidate == TooltipPlacementCandidate.BelowLeft) +
+                " flippedVertical=" + (selectedCandidate == TooltipPlacementCandidate.BelowRight || selectedCandidate == TooltipPlacementCandidate.BelowLeft) +
+                " clamped=" + clamped +
+                " finalCanvasPosition=" + selectedPosition +
+                " canvasBounds=" + canvasBounds);
+        }
+    }
+
+    private bool TryResolveTooltipCanvas(out Canvas canvas, out RectTransform canvasRect, out Camera canvasCamera)
+    {
+        if (tooltipCanvas == null)
+        {
+            tooltipCanvas = mainPanel != null ? mainPanel.GetComponentInParent<Canvas>() : null;
+            if (tooltipCanvas != null && tooltipCanvas.rootCanvas != null)
+            {
+                tooltipCanvas = tooltipCanvas.rootCanvas;
+            }
+
+            tooltipCanvasRect = tooltipCanvas != null ? tooltipCanvas.transform as RectTransform : null;
+            tooltipCanvasCamera = tooltipCanvas != null && tooltipCanvas.renderMode != RenderMode.ScreenSpaceOverlay
+                ? tooltipCanvas.worldCamera
+                : null;
+        }
+
+        canvas = tooltipCanvas;
+        canvasRect = tooltipCanvasRect;
+        canvasCamera = tooltipCanvasCamera;
+        return canvas != null && canvasRect != null;
+    }
+
+    private Vector2[] GetTargetCornersInCanvasSpace(RectTransform targetRect, RectTransform canvasRect, Camera canvasCamera)
+    {
+        if (targetRect == null || canvasRect == null)
+        {
+            return null;
+        }
+
+        Vector3[] worldCorners = new Vector3[4];
+        Vector2[] localCorners = new Vector2[4];
+        targetRect.GetWorldCorners(worldCorners);
+
+        for (int i = 0; i < worldCorners.Length; i++)
+        {
+            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(canvasCamera, worldCorners[i]);
+            if (!RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRect, screenPoint, canvasCamera, out localCorners[i]))
+            {
+                return null;
+            }
+        }
+
+        return localCorners;
+    }
+
+    private Vector2 GetTooltipPivot(TooltipPlacementCandidate candidate)
+    {
+        switch (candidate)
+        {
+            case TooltipPlacementCandidate.AboveLeft:
+                return new Vector2(1f, 0f);
+            case TooltipPlacementCandidate.BelowRight:
+                return new Vector2(0f, 1f);
+            case TooltipPlacementCandidate.BelowLeft:
+                return new Vector2(1f, 1f);
+            default:
+                return new Vector2(0f, 0f);
+        }
+    }
+
+    private Vector2 GetTooltipCandidatePosition(TooltipPlacementCandidate candidate, Vector2[] targetCorners)
+    {
+        Vector2 bottomLeft = targetCorners[0];
+        Vector2 topLeft = targetCorners[1];
+        Vector2 topRight = targetCorners[2];
+        Vector2 bottomRight = targetCorners[3];
+
+        switch (candidate)
+        {
+            case TooltipPlacementCandidate.AboveLeft:
+                return topLeft + new Vector2(-tooltipOffset.x, tooltipOffset.y);
+            case TooltipPlacementCandidate.BelowRight:
+                return bottomRight + new Vector2(tooltipOffset.x, -tooltipOffset.y);
+            case TooltipPlacementCandidate.BelowLeft:
+                return bottomLeft + new Vector2(-tooltipOffset.x, -tooltipOffset.y);
+            default:
+                return topRight + new Vector2(tooltipOffset.x, tooltipOffset.y);
+        }
+    }
+
+    private bool TooltipFitsInsideCanvas(Vector2 candidatePosition, Vector2 pivot, Vector2 tooltipSize, Rect canvasBounds, float padding)
+    {
+        float left = candidatePosition.x - tooltipSize.x * pivot.x;
+        float right = candidatePosition.x + tooltipSize.x * (1f - pivot.x);
+        float bottom = candidatePosition.y - tooltipSize.y * pivot.y;
+        float top = candidatePosition.y + tooltipSize.y * (1f - pivot.y);
+
+        return left >= canvasBounds.xMin + padding
+            && right <= canvasBounds.xMax - padding
+            && bottom >= canvasBounds.yMin + padding
+            && top <= canvasBounds.yMax - padding;
+    }
+
+    private Vector2 ClampTooltipInsideCanvas(Vector2 desiredPosition, Vector2 pivot, Vector2 tooltipSize, Rect canvasBounds, float padding)
+    {
+        float minPivotX = canvasBounds.xMin + padding + tooltipSize.x * pivot.x;
+        float maxPivotX = canvasBounds.xMax - padding - tooltipSize.x * (1f - pivot.x);
+        float minPivotY = canvasBounds.yMin + padding + tooltipSize.y * pivot.y;
+        float maxPivotY = canvasBounds.yMax - padding - tooltipSize.y * (1f - pivot.y);
+
+        return new Vector2(
+            Mathf.Clamp(desiredPosition.x, minPivotX, maxPivotX),
+            Mathf.Clamp(desiredPosition.y, minPivotY, maxPivotY));
+    }
+
+    private void EnsureTooltipDetachedOverlayParent()
+    {
+        if (skillDescriptionPanel == null)
+        {
+            return;
+        }
+
+        if (!TryResolveTooltipCanvas(out _, out RectTransform canvasRect, out _))
+        {
+            return;
+        }
+
+        RectTransform tooltipRect = skillDescriptionPanel.transform as RectTransform;
+        if (tooltipRect == null)
+        {
+            return;
+        }
+
+        if (tooltipRect.parent != canvasRect)
+        {
+            Vector3 worldPosition = tooltipRect.position;
+            Vector3 worldScale = tooltipRect.lossyScale;
+            Quaternion worldRotation = tooltipRect.rotation;
+            tooltipRect.SetParent(canvasRect, true);
+            tooltipRect.position = worldPosition;
+            tooltipRect.rotation = worldRotation;
+            tooltipRect.localScale = Vector3.one;
+            LayoutElement layoutElement = tooltipRect.GetComponent<LayoutElement>();
+            if (layoutElement == null)
+            {
+                layoutElement = tooltipRect.gameObject.AddComponent<LayoutElement>();
+            }
+
+            layoutElement.ignoreLayout = true;
+            LogTooltipRuntimeTrace(
+                "event=TooltipReparentedToCanvas" +
+                " tooltipObject=" + skillDescriptionPanel.name +
+                " tooltipHierarchyPath=" + GetHierarchyPath(skillDescriptionPanel.transform) +
+                " canvasObject=" + canvasRect.name +
+                " worldScaleBefore=" + worldScale);
+        }
+
+        skillDescriptionPanel.transform.SetAsLastSibling();
+    }
+
+    private IEnumerator TraceTooltipNextFrame(RectTransform tooltipRect, Vector2 expectedAnchoredPosition, string targetName)
+    {
+        yield return null;
+        if (tooltipRect == null)
+        {
+            yield break;
+        }
+
+        Vector2 actualAnchoredPosition = tooltipRect.anchoredPosition;
+        Vector2 delta = actualAnchoredPosition - expectedAnchoredPosition;
+        LogTooltipRuntimeTrace(
+            "event=NextFramePositionCheck" +
+            " targetObject=" + targetName +
+            " expectedAnchoredPosition=" + expectedAnchoredPosition +
+            " actualAnchoredPosition=" + actualAnchoredPosition +
+            " positionChangedAfterLayout=" + (delta.sqrMagnitude > 0.0001f) +
+            " delta=" + delta);
+        tooltipNextFrameTraceCoroutine = null;
     }
 
     private static bool IsRuneSlotName(string name)
@@ -2785,6 +3142,16 @@ public class RuneUIController : MonoBehaviour
     private void LogRunePanelHoverTrace(string eventName, string details)
     {
         Debug.Log(RunePanelHoverTracePrefix + "event=" + eventName + " " + details, this);
+    }
+
+    private void LogTooltipPositionTrace(string details)
+    {
+        Debug.Log(TooltipPositionTracePrefix + details, this);
+    }
+
+    private void LogTooltipRuntimeTrace(string details)
+    {
+        Debug.Log(TooltipRuntimeTracePrefix + details, this);
     }
 
     private int ResolveCurrentPlayerIndex()

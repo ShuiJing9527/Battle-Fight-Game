@@ -101,6 +101,10 @@ public class PlayerSkillHUD : MonoBehaviour
     [SerializeField] private float tooltipWidth = 340f;
     [SerializeField] private Vector2 tooltipPadding = new Vector2(12f, 10f);
     [SerializeField] private Vector2 tooltipOffset = new Vector2(0f, 26f);
+    [SerializeField] private float tooltipScreenMargin = 16f;
+    [SerializeField] private Vector2 tooltipPreferredRightOffset = new Vector2(18f, 18f);
+    [SerializeField] private Vector2 tooltipPreferredLeftOffset = new Vector2(-18f, 18f);
+    [SerializeField] private bool debugTooltipPositioning = true;
 
     private readonly Image[] slotIconImages = new Image[4];
     private readonly Image[] slotCooldownOverlays = new Image[4];
@@ -1143,6 +1147,17 @@ public class PlayerSkillHUD : MonoBehaviour
             return;
         }
 
+        Debug.Log(
+            "[TooltipEntryTrace] " +
+            "entry=PlayerSkillHUD.HandleSlotHoverEnter" +
+            " skillKey=" + trigger.skillKey +
+            " callerObject=" + trigger.gameObject.name +
+            " callerInstanceId=" + trigger.gameObject.GetInstanceID() +
+            " tooltipObject=" + (tooltipRoot != null ? tooltipRoot.name : "null") +
+            " tooltipInstanceId=" + (tooltipRoot != null ? tooltipRoot.gameObject.GetInstanceID().ToString() : "null") +
+            " frame=" + Time.frameCount,
+            this);
+
         int index = ResolveSlotIndex(trigger.skillKey);
         if (index >= 0 && index < slotHoverHighlights.Length && slotHoverHighlights[index] != null)
         {
@@ -1180,12 +1195,7 @@ public class PlayerSkillHUD : MonoBehaviour
         RectTransform slotRect = trigger.transform as RectTransform;
         if (slotRect != null && canvasRectTransform != null)
         {
-            Vector3 worldTopCenter = slotRect.TransformPoint(new Vector3(slotRect.rect.center.x, slotRect.rect.yMax, 0f));
-            Vector2 screenPoint = RectTransformUtility.WorldToScreenPoint(null, worldTopCenter);
-            if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRectTransform, screenPoint, null, out Vector2 localPoint))
-            {
-                tooltipRoot.anchoredPosition = localPoint + tooltipOffset;
-            }
+            PositionTooltipForSlot(slotRect, tooltipRoot.sizeDelta);
         }
 
         tooltipRoot.gameObject.SetActive(true);
@@ -1221,6 +1231,125 @@ public class PlayerSkillHUD : MonoBehaviour
 
         selectedSlotIndex = ResolveSlotIndex(trigger.skillKey);
         RefreshSelectionHighlights();
+    }
+
+    private void PositionTooltipForSlot(RectTransform slotRect, Vector2 tooltipSize)
+    {
+        if (slotRect == null || canvasRectTransform == null || tooltipRoot == null)
+        {
+            return;
+        }
+
+        Camera uiCamera = ResolveUiCamera();
+        Vector3[] worldCorners = new Vector3[4];
+        slotRect.GetWorldCorners(worldCorners);
+
+        Vector2 slotBottomLeftScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[0]);
+        Vector2 slotTopRightScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[2]);
+        Vector2 slotTopLeftScreen = RectTransformUtility.WorldToScreenPoint(uiCamera, worldCorners[1]);
+
+        Rect canvasScreenRect = GetCanvasScreenRect(uiCamera);
+        float margin = Mathf.Max(0f, tooltipScreenMargin);
+
+        bool canPlaceRight = slotTopRightScreen.x + tooltipPreferredRightOffset.x + tooltipSize.x <= canvasScreenRect.xMax - margin;
+        bool placeRight = canPlaceRight;
+        Vector2 chosenOffset = placeRight ? tooltipPreferredRightOffset : tooltipPreferredLeftOffset;
+        Vector2 pivot = placeRight ? new Vector2(0f, 0f) : new Vector2(1f, 0f);
+        Vector2 anchorScreenPoint = placeRight ? slotTopRightScreen : slotTopLeftScreen;
+
+        tooltipRoot.anchorMin = new Vector2(0.5f, 0.5f);
+        tooltipRoot.anchorMax = new Vector2(0.5f, 0.5f);
+        tooltipRoot.pivot = pivot;
+
+        Vector2 screenTarget = anchorScreenPoint + chosenOffset;
+        if (RectTransformUtility.ScreenPointToLocalPointInRectangle(canvasRectTransform, screenTarget, uiCamera, out Vector2 localPoint))
+        {
+            tooltipRoot.anchoredPosition = ClampTooltipAnchoredPosition(localPoint, tooltipSize, pivot, margin);
+        }
+
+        if (debugTooltipPositioning)
+        {
+            Debug.Log(
+                "[TooltipRuntimeTrace] " +
+                "event=TooltipResolved" +
+                " tooltipObject=" + tooltipRoot.name +
+                " tooltipInstanceId=" + tooltipRoot.gameObject.GetInstanceID() +
+                " targetObject=" + slotRect.name +
+                " targetInstanceId=" + slotRect.gameObject.GetInstanceID() +
+                " placement=" + (placeRight ? "RightOfSlot" : "LeftOfSlot") +
+                " slotTopRightScreen=" + slotTopRightScreen +
+                " slotTopLeftScreen=" + slotTopLeftScreen +
+                " canvasScreenRect=" + canvasScreenRect +
+                " tooltipSize=" + tooltipSize +
+                " pivot=" + pivot +
+                " anchoredPosition=" + tooltipRoot.anchoredPosition +
+                " frame=" + Time.frameCount,
+                this);
+        }
+    }
+
+    private Vector2 ClampTooltipAnchoredPosition(Vector2 desiredLocalPoint, Vector2 tooltipSize, Vector2 pivot, float margin)
+    {
+        Rect canvasRect = canvasRectTransform.rect;
+        float left = desiredLocalPoint.x - (tooltipSize.x * pivot.x);
+        float right = left + tooltipSize.x;
+        float bottom = desiredLocalPoint.y - (tooltipSize.y * pivot.y);
+        float top = bottom + tooltipSize.y;
+
+        float minX = canvasRect.xMin + margin;
+        float maxX = canvasRect.xMax - margin;
+        float minY = canvasRect.yMin + margin;
+        float maxY = canvasRect.yMax - margin;
+
+        if (left < minX)
+        {
+            desiredLocalPoint.x += minX - left;
+            right += minX - left;
+            left = minX;
+        }
+
+        if (right > maxX)
+        {
+            desiredLocalPoint.x -= right - maxX;
+        }
+
+        if (bottom < minY)
+        {
+            desiredLocalPoint.y += minY - bottom;
+            top += minY - bottom;
+            bottom = minY;
+        }
+
+        if (top > maxY)
+        {
+            desiredLocalPoint.y -= top - maxY;
+        }
+
+        return desiredLocalPoint;
+    }
+
+    private Camera ResolveUiCamera()
+    {
+        if (targetCanvas == null)
+        {
+            return null;
+        }
+
+        if (targetCanvas.renderMode == RenderMode.ScreenSpaceOverlay)
+        {
+            return null;
+        }
+
+        return targetCanvas.worldCamera != null ? targetCanvas.worldCamera : Camera.main;
+    }
+
+    private Rect GetCanvasScreenRect(Camera uiCamera)
+    {
+        Vector3[] corners = new Vector3[4];
+        canvasRectTransform.GetWorldCorners(corners);
+        Vector2 bottomLeft = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[0]);
+        Vector2 topRight = RectTransformUtility.WorldToScreenPoint(uiCamera, corners[2]);
+        return Rect.MinMaxRect(bottomLeft.x, bottomLeft.y, topRight.x, topRight.y);
     }
 
     private void RefreshSelectionHighlights()

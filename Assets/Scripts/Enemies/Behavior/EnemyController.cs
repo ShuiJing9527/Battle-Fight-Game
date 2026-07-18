@@ -2051,6 +2051,16 @@ public class EnemyController : MonoBehaviour
             float playerHpBefore = ResolveCombatHealthValue(targetHealth);
             float playerShieldBefore = targetHealth.GetShield();
             Debug.Log(
+                "[BossLaunchVectorTrace] " +
+                "bossPosition=" + transform.position +
+                " playerPosition=" + targetHealth.transform.position +
+                " rawDirection=" + (targetHealth.transform.position - transform.position) +
+                " horizontalDirection=" + horizontalDirection +
+                " verticalLaunchSpeed=" + Mathf.Max(0f, bossLeapSlamKnockbackVertical).ToString("F2") +
+                " finalLaunchVelocity=" + launchVelocity +
+                " worldUp=" + Vector3.up,
+                this);
+            Debug.Log(
                 "[BossLaunchBalanceTrace] " +
                 "horizontalKnockback=" + bossLeapSlamKnockbackHorizontal.ToString("F2") +
                 " verticalKnockback=" + bossLeapSlamKnockbackVertical.ToString("F2") +
@@ -2924,40 +2934,49 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        PlayerMovement playerMovement = target.GetComponentInParent<PlayerMovement>();
-        if (playerMovement != null)
-        {
-            LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", true, "controller", "PlayerMovement", "target", playerMovement.name);
-            Debug.Log(
-                "[BossLaunchRepeatTrace] event=LaunchDispatch " +
-                "frame=" + Time.frameCount +
-                " fixedTime=" + Time.fixedTime.ToString("F3") +
-                " landingSource=" + source +
-                " actionSequenceId=" + activeBossActionSequenceId +
-                " airborneSequenceId=" + bossCurrentAirborneSequenceId +
-                " forcedSequenceId=" + forcedAirborneSequenceId +
-                " target=" + playerMovement.name +
-                " launchVelocity=" + launchVelocity +
-                " alreadyLaunchedTargetThisSequence=false",
-                this);
-            if (source == BossLandingImpactSource.LeapSlam)
-            {
-                Debug.Log(
-                    "[BossLeapSlamTrace] event=LeapLaunchDispatch " +
-                    "target=" + playerMovement.name +
-                    " controllerType=PlayerMovement" +
-                    " launchVelocity=" + launchVelocity +
-                    " separationOffset=" + launchSeparationOffset,
-                    this);
-            }
-            playerMovement.ApplyExternalLaunch(launchVelocity, Mathf.Max(0f, bossLeapSlamLaunchInputLockDuration), launchSeparationOffset, sequenceId);
-            return;
-        }
+        IExternalLaunchReceiver selectedReceiver = ResolveExternalLaunchReceiver(target);
+        Player2PrototypeController tracedPlayer2 = target.GetComponentInParent<Player2PrototypeController>();
+        PlayerMovement tracedPlayerMovement = target.GetComponentInParent<PlayerMovement>();
+        Rigidbody tracedRigidbody = target.GetComponentInParent<Rigidbody>();
+        Debug.Log(
+            "[BossLaunchDispatchTrace] " +
+            "event=TargetReceived" +
+            " sequenceId=" + sequenceId +
+            " inputTransform=" + target.name +
+            " inputHierarchyPath=" + BuildHierarchyPath(target) +
+            " inputInstanceId=" + target.GetInstanceID() +
+            " inputLayer=" + target.gameObject.layer +
+            " inputPosition=" + target.position +
+            " player2ControllerFound=" + (tracedPlayer2 != null) +
+            " player2ControllerObject=" + (tracedPlayer2 != null ? tracedPlayer2.name : "null") +
+            " player2ControllerInstanceId=" + (tracedPlayer2 != null ? tracedPlayer2.GetInstanceID().ToString() : "null") +
+            " playerMovementFound=" + (tracedPlayerMovement != null) +
+            " playerMovementObject=" + (tracedPlayerMovement != null ? tracedPlayerMovement.name : "null") +
+            " playerMovementInstanceId=" + (tracedPlayerMovement != null ? tracedPlayerMovement.GetInstanceID().ToString() : "null") +
+            " receiverFound=" + (selectedReceiver != null) +
+            " receiverType=" + (selectedReceiver != null ? selectedReceiver.GetType().Name : "null") +
+            " receiverOwner=" + (selectedReceiver != null && selectedReceiver.LaunchOwnerComponent != null ? selectedReceiver.LaunchOwnerComponent.name : "null") +
+            " rigidbodyFound=" + (tracedRigidbody != null) +
+            " rigidbodyObject=" + (tracedRigidbody != null ? tracedRigidbody.name : "null") +
+            " rigidbodyInstanceId=" + (tracedRigidbody != null ? tracedRigidbody.GetInstanceID().ToString() : "null"),
+            this);
 
-        Player2PrototypeController player2 = target.GetComponentInParent<Player2PrototypeController>();
-        if (player2 != null)
+        if (selectedReceiver != null)
         {
-            LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", true, "controller", "Player2PrototypeController", "target", player2.name);
+            string controllerType = selectedReceiver.GetType().Name;
+            Component controllerOwner = selectedReceiver.LaunchOwnerComponent;
+            Rigidbody controllerBody = selectedReceiver.ExternalLaunchBody;
+            Debug.Log(
+                "[BossLaunchDispatchTrace] " +
+                "event=ControllerSelected" +
+                " sequenceId=" + sequenceId +
+                " selectedControllerType=" + controllerType +
+                " selectedControllerObject=" + (controllerOwner != null ? controllerOwner.name : "null") +
+                " selectedControllerInstanceId=" + (controllerOwner != null ? controllerOwner.GetInstanceID().ToString() : "null") +
+                " selectedRigidbodyObject=" + (controllerBody != null ? controllerBody.name : "null") +
+                " selectedRigidbodyInstanceId=" + (controllerBody != null ? controllerBody.GetInstanceID().ToString() : "null"),
+                this);
+            LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", true, "controller", controllerType, "target", controllerOwner != null ? controllerOwner.name : target.name);
             Debug.Log(
                 "[BossLaunchRepeatTrace] event=LaunchDispatch " +
                 "frame=" + Time.frameCount +
@@ -2966,7 +2985,7 @@ public class EnemyController : MonoBehaviour
                 " actionSequenceId=" + activeBossActionSequenceId +
                 " airborneSequenceId=" + bossCurrentAirborneSequenceId +
                 " forcedSequenceId=" + forcedAirborneSequenceId +
-                " target=" + player2.name +
+                " target=" + (controllerOwner != null ? controllerOwner.name : target.name) +
                 " launchVelocity=" + launchVelocity +
                 " alreadyLaunchedTargetThisSequence=false",
                 this);
@@ -2974,13 +2993,13 @@ public class EnemyController : MonoBehaviour
             {
                 Debug.Log(
                     "[BossLeapSlamTrace] event=LeapLaunchDispatch " +
-                    "target=" + player2.name +
-                    " controllerType=Player2PrototypeController" +
+                    "target=" + (controllerOwner != null ? controllerOwner.name : target.name) +
+                    " controllerType=" + controllerType +
                     " launchVelocity=" + launchVelocity +
                     " separationOffset=" + launchSeparationOffset,
                     this);
             }
-            player2.ApplyExternalLaunch(launchVelocity, Mathf.Max(0f, bossLeapSlamLaunchInputLockDuration), launchSeparationOffset, sequenceId);
+            selectedReceiver.ApplyExternalLaunch(launchVelocity, Mathf.Max(0f, bossLeapSlamLaunchInputLockDuration), launchSeparationOffset, sequenceId);
             return;
         }
 
@@ -3013,6 +3032,52 @@ public class EnemyController : MonoBehaviour
         }
 
         LogBossLandingTrace("ExternalLaunchDispatch", sequenceId, "source", source, "accepted", false, "rejectReason", "NoLaunchReceiver");
+    }
+
+    private static string BuildHierarchyPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "<null>";
+        }
+
+        System.Text.StringBuilder builder = new System.Text.StringBuilder(target.name);
+        Transform current = target.parent;
+        while (current != null)
+        {
+            builder.Insert(0, current.name + "/");
+            current = current.parent;
+        }
+
+        return builder.ToString();
+    }
+
+    private static IExternalLaunchReceiver ResolveExternalLaunchReceiver(Transform target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        MonoBehaviour[] behaviours = target.GetComponentsInParent<MonoBehaviour>(true);
+        IExternalLaunchReceiver fallbackReceiver = null;
+        for (int i = 0; i < behaviours.Length; i++)
+        {
+            MonoBehaviour behaviour = behaviours[i];
+            if (behaviour == null || !behaviour.enabled || behaviour is not IExternalLaunchReceiver receiver)
+            {
+                continue;
+            }
+
+            if (behaviour is Player2PrototypeController)
+            {
+                return receiver;
+            }
+
+            fallbackReceiver ??= receiver;
+        }
+
+        return fallbackReceiver;
     }
 
     private Vector3 ResolveBossLaunchSeparationOffset(Vector3 separationOffset)
