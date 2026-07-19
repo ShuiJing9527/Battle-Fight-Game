@@ -148,7 +148,7 @@ public class Player2Bootstrap : MonoBehaviour
         }
     }
 
-    public void SetPlayers(GameObject newPlayer01, GameObject newPlayer02, GameObject newPartyLeader = null)
+    public void SetPlayers(GameObject newPlayer01, GameObject newPlayer02, GameObject newPartyLeader = null, GameObject initialCurrentPlayer = null)
     {
         player01 = IsValidSceneObject(newPlayer01) ? newPlayer01 : null;
         player02 = IsValidSceneObject(newPlayer02) ? newPlayer02 : null;
@@ -160,21 +160,28 @@ public class Player2Bootstrap : MonoBehaviour
         ApplyInitialHealth(player01);
         ApplyInitialHealth(player02);
 
+        GameObject resolvedCurrentPlayer = IsValidSceneObject(initialCurrentPlayer) ? initialCurrentPlayer : null;
+        if (resolvedCurrentPlayer == null)
+        {
+            resolvedCurrentPlayer = partyLeader != null ? partyLeader : player01;
+        }
+
+        if (resolvedCurrentPlayer == null)
+        {
+            resolvedCurrentPlayer = player01 != null ? player01 : player02;
+        }
+
         if (player01 != null)
         {
-            player01.SetActive(true);
+            player01.SetActive(resolvedCurrentPlayer == player01);
         }
 
         if (player02 != null)
         {
-            player02.SetActive(false);
+            player02.SetActive(resolvedCurrentPlayer == player02);
         }
 
-        CurrentPlayer = partyLeader != null ? partyLeader : player01;
-        if (CurrentPlayer == null)
-        {
-            CurrentPlayer = player01 != null ? player01 : player02;
-        }
+        CurrentPlayer = resolvedCurrentPlayer;
 
         if (cameraRig == null)
         {
@@ -186,9 +193,16 @@ public class Player2Bootstrap : MonoBehaviour
             cameraRig.playerSlot = CurrentPlayer.transform;
         }
 
+        SafeRefreshSkillHud(CurrentPlayer);
+
         if (disablePlayer2AnimatorIfSharedController)
         {
             DisablePlayer2AnimatorIfUsingPlayer01Controller();
+        }
+
+        if (DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge))
+        {
+            gauge.ResetGauge();
         }
 
         initialized = CurrentPlayer != null;

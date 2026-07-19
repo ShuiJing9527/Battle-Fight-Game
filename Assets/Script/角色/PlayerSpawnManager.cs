@@ -4,6 +4,12 @@ using UnderTheStars.GenerationMap;
 [DisallowMultipleComponent]
 public class PlayerSpawnManager : MonoBehaviour
 {
+    private enum InitialSpawnPhase
+    {
+        Day,
+        Night
+    }
+
     [SerializeField] private GameObject player01Prefab;
     [SerializeField] private GameObject player02Prefab;
     [SerializeField] private bool spawnPlayer02 = true;
@@ -17,12 +23,15 @@ public class PlayerSpawnManager : MonoBehaviour
 
     private GameObject player01Instance;
     private GameObject player02Instance;
+    private bool player01InstanceOwned;
+    private bool player02InstanceOwned;
+    private bool spawnRetryQueued;
 
     public int ClearSpawnedPlayers()
     {
         int clearedCount = 0;
-        clearedCount += ClearSpawnedPlayer(ref player01Instance);
-        clearedCount += ClearSpawnedPlayer(ref player02Instance);
+        clearedCount += ClearSpawnedPlayer(ref player01Instance, ref player01InstanceOwned);
+        clearedCount += ClearSpawnedPlayer(ref player02Instance, ref player02InstanceOwned);
 
         Debug.Log(
             $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} " +
@@ -54,9 +63,32 @@ public class PlayerSpawnManager : MonoBehaviour
             return false;
         }
 
+        if (!TryResolveInitialSpawnPhase(out InitialSpawnPhase spawnPhase))
+        {
+            if (!spawnRetryQueued && isActiveAndEnabled)
+            {
+                StartCoroutine(RetrySpawnWhenDayNightReady(mapGeneration));
+            }
+
+            return true;
+        }
+
+        if (!TryResolveCharacterSelection(
+                spawnPhase,
+                out GameObject initialActivePrefab,
+                out GameObject inactivePrefab,
+                out string selectionError))
+        {
+            Debug.LogError(
+                $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+                $"skipped=True reason={selectionError}",
+                this);
+            return true;
+        }
+
         for (int attempt = 0; attempt < Mathf.Max(1, spawnSearchAttempts); attempt++)
         {
-            if (!mapGeneration.TryGetRandomGrassSafeSpawnWorldPosition(out Vector3 spawnPosition, out Vector2Int spawnCoord))
+            if (!TryGetSpawnPositionForPhase(mapGeneration, spawnPhase, out Vector3 spawnPosition, out Vector2Int spawnCoord))
             {
                 break;
             }
@@ -66,18 +98,54 @@ public class PlayerSpawnManager : MonoBehaviour
                 continue;
             }
 
-            SpawnPartyAtWorldPosition(mapGeneration, spawnPosition, spawnCoord);
+            SpawnPartyAtWorldPosition(
+                mapGeneration,
+                spawnPosition,
+                spawnCoord,
+                initialActivePrefab,
+                inactivePrefab,
+                spawnPhase);
             return true;
         }
 
-        Debug.LogWarning(
+        if (TryGetFallbackSpawnPositionForPhase(mapGeneration, spawnPhase, out Vector3 fallbackPosition, out Vector2Int fallbackCoord)
+            && !IsSpawnBlocked(fallbackPosition))
+        {
+            SpawnPartyAtWorldPosition(
+                mapGeneration,
+                fallbackPosition,
+                fallbackCoord,
+                initialActivePrefab,
+                inactivePrefab,
+                spawnPhase);
+            return true;
+        }
+
+        Debug.LogError(
             $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
-            "skipped=True reason=no-safe-grass-spawn",
+            $"skipped=True reason=no-safe-{spawnPhase.ToString().ToLowerInvariant()}-spawn",
             this);
-        return false;
+        return true;
     }
 
     public void SpawnPartyAtWorldPosition(RandomMapGeneration mapGeneration, Vector3 spawnPosition, Vector2Int spawnCoord)
+    {
+        SpawnPartyAtWorldPosition(
+            mapGeneration,
+            spawnPosition,
+            spawnCoord,
+            player01Prefab,
+            player02Prefab,
+            InitialSpawnPhase.Night);
+    }
+
+    private void SpawnPartyAtWorldPosition(
+        RandomMapGeneration mapGeneration,
+        Vector3 spawnPosition,
+        Vector2Int spawnCoord,
+        GameObject initialActivePrefab,
+        GameObject inactivePrefab,
+        InitialSpawnPhase spawnPhase)
     {
         Debug.Log(
             $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
@@ -87,61 +155,84 @@ public class PlayerSpawnManager : MonoBehaviour
             $"preExistingPlayer02Count={CountSceneObjectsNamed("Player02")}",
             this);
 
-        if (player01Prefab == null)
+        if (player01Prefab == null || player02Prefab == null)
         {
-            Debug.LogWarning(
-                $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} skipped=True reason=missing-player01-prefab",
+            Debug.LogError(
+                $"[PlayerSpawn] generationId=-1 isPlaying={Application.isPlaying} skipped=True reason=missing-player-prefab " +
+                $"player01Prefab={(player01Prefab != null ? player01Prefab.name : "null")} " +
+                $"player02Prefab={(player02Prefab != null ? player02Prefab.name : "null")}",
                 this);
             return;
         }
 
-        player01Instance = EnsurePlayerInstance(player01Instance, player01Prefab, "Player01");
+        player01Instance = EnsurePlayerInstance(player01Instance, ref player01InstanceOwned, player01Prefab, "Player01");
         if (player01Instance != null)
         {
             player01Instance.transform.position = spawnPosition + Vector3.up * player01YOffset;
-            player01Instance.SetActive(true);
             ResetMotion(player01Instance);
         }
 
-        if (spawnPlayer02 && player02Prefab != null)
+        player02Instance = EnsurePlayerInstance(player02Instance, ref player02InstanceOwned, player02Prefab, "Player02");
+        if (player02Instance != null)
         {
-            player02Instance = EnsurePlayerInstance(player02Instance, player02Prefab, "Player02");
-            if (player02Instance != null)
-            {
-                player02Instance.transform.position = spawnPosition + Vector3.right * partyMemberSpacing + Vector3.up * player02YOffset;
-                player02Instance.SetActive(true);
-                ResetMotion(player02Instance);
-            }
+            player02Instance.transform.position = spawnPosition + Vector3.up * player02YOffset;
+            ResetMotion(player02Instance);
         }
-        else if (player02Instance != null)
+
+        if (!spawnPlayer02)
         {
-            player02Instance.SetActive(false);
+            Debug.LogWarning(
+                "[PlayerSpawn] spawnPlayer02 is disabled, but twin shift gameplay expects both player prefabs to be present. " +
+                "The inactive counterpart will still be initialized for switching.",
+                this);
+        }
+
+        GameObject activeInstance = ResolveInstanceForPrefab(initialActivePrefab);
+        GameObject inactiveInstance = ResolveInstanceForPrefab(inactivePrefab);
+        if (activeInstance == null || inactiveInstance == null)
+        {
+            Debug.LogError(
+                $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
+                $"skipped=True reason=missing-runtime-instance phase={spawnPhase}",
+                this);
+            return;
         }
 
         Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
         if (bootstrap != null)
         {
-            bootstrap.SetPlayers(player01Instance, spawnPlayer02 ? player02Instance : null, player01Instance);
+            bootstrap.SetPlayers(
+                player01Instance,
+                player02Instance,
+                activeInstance,
+                activeInstance);
+        }
+        else
+        {
+            Debug.LogWarning("[PlayerSpawn] Player2Bootstrap not found. Camera/UI/current-player binding will rely on scene fallbacks.", this);
+            activeInstance.SetActive(true);
+            inactiveInstance.SetActive(false);
         }
 
         if (mapGeneration != null)
         {
-            mapGeneration.SetPlayer(player01Instance != null ? player01Instance.GetComponentInChildren<PlayerMovement>() : null);
+            mapGeneration.SetPlayer(activeInstance.GetComponentInChildren<PlayerMovement>());
         }
 
         PlayerCameraRig cameraRig = FindObjectOfType<PlayerCameraRig>();
-        if (cameraRig != null && player01Instance != null)
+        if (cameraRig != null)
         {
-            cameraRig.playerSlot = player01Instance.transform;
+            cameraRig.playerSlot = activeInstance.transform;
         }
 
         Debug.Log(
             $"[PlayerSpawn] generationId={ResolveGenerationId(mapGeneration)} isPlaying={Application.isPlaying} " +
-            $"spawned=True spawnCoord={spawnCoord} spawnPosition={spawnPosition}",
+            $"spawned=True phase={spawnPhase} activePlayer={activeInstance.name} inactivePlayer={inactiveInstance.name} " +
+            $"spawnCoord={spawnCoord} spawnPosition={spawnPosition}",
             this);
     }
 
-    private GameObject EnsurePlayerInstance(GameObject instance, GameObject prefab, string fallbackName)
+    private GameObject EnsurePlayerInstance(GameObject instance, ref bool isOwnedInstance, GameObject prefab, string fallbackName)
     {
         if (prefab == null)
         {
@@ -150,9 +241,16 @@ public class PlayerSpawnManager : MonoBehaviour
 
         if (instance == null)
         {
+            instance = FindSceneObjectByNameIncludingInactive(fallbackName);
+            isOwnedInstance = false;
+        }
+
+        if (instance == null)
+        {
             instance = Instantiate(prefab);
             instance.name = fallbackName;
             instance.transform.SetParent(transform, true);
+            isOwnedInstance = true;
         }
 
         instance.SetActive(true);
@@ -235,6 +333,191 @@ public class PlayerSpawnManager : MonoBehaviour
         return false;
     }
 
+    private bool TryResolveInitialSpawnPhase(out InitialSpawnPhase spawnPhase)
+    {
+        spawnPhase = InitialSpawnPhase.Night;
+        if (TODDayNightAdapter.TryGetIsDay(out bool isDay) && TODDayNightAdapter.TryGetIsNight(out bool isNight))
+        {
+            if (isDay == isNight)
+            {
+                Debug.LogError(
+                    $"[PlayerSpawn] Invalid day/night state. isDay={isDay} isNight={isNight} phase={TODDayNightAdapter.GetDebugPhaseName()}",
+                    this);
+                return false;
+            }
+
+            spawnPhase = isDay ? InitialSpawnPhase.Day : InitialSpawnPhase.Night;
+            return true;
+        }
+
+        Debug.LogWarning(
+            "[PlayerSpawn] Day/night state is not ready yet. Spawn will wait for the existing TOD system to initialize.",
+            this);
+        return false;
+    }
+
+    private bool TryResolveCharacterSelection(
+        InitialSpawnPhase spawnPhase,
+        out GameObject initialActivePrefab,
+        out GameObject inactivePrefab,
+        out string errorReason)
+    {
+        initialActivePrefab = null;
+        inactivePrefab = null;
+        errorReason = string.Empty;
+
+        PlayerDayNightAffinityType requiredActiveAffinity =
+            spawnPhase == InitialSpawnPhase.Day ? PlayerDayNightAffinityType.DayChild : PlayerDayNightAffinityType.NightChild;
+        PlayerDayNightAffinityType requiredInactiveAffinity =
+            spawnPhase == InitialSpawnPhase.Day ? PlayerDayNightAffinityType.NightChild : PlayerDayNightAffinityType.DayChild;
+
+        initialActivePrefab = ResolvePrefabByAffinity(requiredActiveAffinity);
+        inactivePrefab = ResolvePrefabByAffinity(requiredInactiveAffinity);
+
+        if (initialActivePrefab == null)
+        {
+            errorReason = $"missing-{requiredActiveAffinity}-prefab";
+            return false;
+        }
+
+        if (inactivePrefab == null)
+        {
+            errorReason = $"missing-{requiredInactiveAffinity}-prefab";
+            return false;
+        }
+
+        return true;
+    }
+
+    private GameObject ResolvePrefabByAffinity(PlayerDayNightAffinityType affinityType)
+    {
+        GameObject[] prefabs = { player01Prefab, player02Prefab };
+        for (int i = 0; i < prefabs.Length; i++)
+        {
+            GameObject prefab = prefabs[i];
+            if (prefab == null)
+            {
+                continue;
+            }
+
+            PlayerDayNightAffinity affinity = prefab.GetComponent<PlayerDayNightAffinity>();
+            if (affinity == null)
+            {
+                affinity = prefab.GetComponentInChildren<PlayerDayNightAffinity>(true);
+            }
+
+            if (affinity != null && affinity.AffinityType == affinityType)
+            {
+                return prefab;
+            }
+        }
+
+        return null;
+    }
+
+    private GameObject ResolveInstanceForPrefab(GameObject prefab)
+    {
+        if (prefab == null)
+        {
+            return null;
+        }
+
+        if (player01Prefab == prefab)
+        {
+            return player01Instance;
+        }
+
+        if (player02Prefab == prefab)
+        {
+            return player02Instance;
+        }
+
+        return null;
+    }
+
+    private bool TryGetSpawnPositionForPhase(
+        RandomMapGeneration mapGeneration,
+        InitialSpawnPhase spawnPhase,
+        out Vector3 spawnPosition,
+        out Vector2Int spawnCoord)
+    {
+        if (mapGeneration == null)
+        {
+            spawnPosition = Vector3.zero;
+            spawnCoord = Vector2Int.zero;
+            return false;
+        }
+
+        return spawnPhase == InitialSpawnPhase.Day
+            ? mapGeneration.TryGetRandomSafeSpawnWorldPositionForArea(AreaType.Grass, out spawnPosition, out spawnCoord)
+            : mapGeneration.TryGetRandomSafeSpawnWorldPositionForArea(AreaType.Forest, out spawnPosition, out spawnCoord);
+    }
+
+    private bool TryGetFallbackSpawnPositionForPhase(
+        RandomMapGeneration mapGeneration,
+        InitialSpawnPhase spawnPhase,
+        out Vector3 spawnPosition,
+        out Vector2Int spawnCoord)
+    {
+        if (mapGeneration == null)
+        {
+            spawnPosition = Vector3.zero;
+            spawnCoord = Vector2Int.zero;
+            return false;
+        }
+
+        return spawnPhase == InitialSpawnPhase.Day
+            ? mapGeneration.TryGetFallbackSafeSpawnWorldPositionForArea(AreaType.Grass, out spawnPosition, out spawnCoord)
+            : mapGeneration.TryGetFallbackSafeSpawnWorldPositionForArea(AreaType.Forest, out spawnPosition, out spawnCoord);
+    }
+
+    private System.Collections.IEnumerator RetrySpawnWhenDayNightReady(RandomMapGeneration mapGeneration)
+    {
+        spawnRetryQueued = true;
+
+        const int maxRetryFrames = 30;
+        for (int frame = 0; frame < maxRetryFrames; frame++)
+        {
+            yield return null;
+            if (TryResolveInitialSpawnPhase(out _))
+            {
+                spawnRetryQueued = false;
+                SpawnPartyAtRandomSafePoint(mapGeneration);
+                yield break;
+            }
+        }
+
+        spawnRetryQueued = false;
+        Debug.LogError(
+            "[PlayerSpawn] Timed out waiting for the existing TOD day/night state. Player spawn was cancelled.",
+            this);
+    }
+
+    private static GameObject FindSceneObjectByNameIncludingInactive(string targetName)
+    {
+        if (string.IsNullOrEmpty(targetName))
+        {
+            return null;
+        }
+
+        GameObject[] all = Resources.FindObjectsOfTypeAll<GameObject>();
+        for (int i = 0; i < all.Length; i++)
+        {
+            GameObject go = all[i];
+            if (go == null || !go.scene.IsValid())
+            {
+                continue;
+            }
+
+            if (go.name == targetName)
+            {
+                return go;
+            }
+        }
+
+        return null;
+    }
+
     private static int CountSceneObjectsNamed(string exactName)
     {
         if (string.IsNullOrEmpty(exactName))
@@ -266,7 +549,7 @@ public class PlayerSpawnManager : MonoBehaviour
         return mapGeneration != null ? mapGeneration.GetCurrentGenerateMapDebugId() : -1;
     }
 
-    private int ClearSpawnedPlayer(ref GameObject instance)
+    private int ClearSpawnedPlayer(ref GameObject instance, ref bool isOwnedInstance)
     {
         if (instance == null)
         {
@@ -275,6 +558,14 @@ public class PlayerSpawnManager : MonoBehaviour
 
         GameObject target = instance;
         instance = null;
+        bool shouldDestroy = isOwnedInstance;
+        isOwnedInstance = false;
+
+        if (!shouldDestroy)
+        {
+            target.SetActive(false);
+            return 1;
+        }
 
         if (Application.isPlaying)
         {

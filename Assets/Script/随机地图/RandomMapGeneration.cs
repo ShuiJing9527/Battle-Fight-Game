@@ -810,17 +810,72 @@ namespace UnderTheStars.GenerationMap
             return TryGetRandomSafeSpawnWorldPositionForArea(AreaType.Grass, out worldPosition, out spawnCoord);
         }
 
-        private bool TryGetRandomSafeSpawnWorldPositionForArea(AreaType targetAreaType, out Vector3 worldPosition, out Vector2Int spawnCoord)
+        public bool TryGetRandomForestSafeSpawnWorldPosition(out Vector3 worldPosition, out Vector2Int spawnCoord)
+        {
+            return TryGetRandomSafeSpawnWorldPositionForArea(AreaType.Forest, out worldPosition, out spawnCoord);
+        }
+
+        public bool TryGetRandomSafeSpawnWorldPositionForArea(AreaType targetAreaType, out Vector3 worldPosition, out Vector2Int spawnCoord)
         {
             worldPosition = Vector3.zero;
             spawnCoord = Vector2Int.zero;
+
+            if (!TryCollectSpawnCandidatesForArea(targetAreaType, out Tilemap refTilemap, out List<Vector2Int> candidates))
+            {
+                return false;
+            }
+
+            if (candidates.Count == 0)
+            {
+                return false;
+            }
+
+            spawnCoord = candidates[UnityEngine.Random.Range(0, candidates.Count)];
+            Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
+            worldPosition = refTilemap.GetCellCenterWorld(cellPos);
+            return true;
+        }
+
+        public bool TryGetFallbackSafeSpawnWorldPositionForArea(AreaType targetAreaType, out Vector3 worldPosition, out Vector2Int spawnCoord)
+        {
+            worldPosition = Vector3.zero;
+            spawnCoord = Vector2Int.zero;
+
+            if (!TryCollectSpawnCandidatesForArea(targetAreaType, out Tilemap refTilemap, out List<Vector2Int> candidates))
+            {
+                return false;
+            }
+
+            if (candidates.Count == 0)
+            {
+                return false;
+            }
+
+            candidates.Sort((lhs, rhs) =>
+            {
+                int yCompare = rhs.y.CompareTo(lhs.y);
+                return yCompare != 0 ? yCompare : lhs.x.CompareTo(rhs.x);
+            });
+
+            spawnCoord = candidates[0];
+            worldPosition = refTilemap.GetCellCenterWorld(new Vector3Int(spawnCoord.x, spawnCoord.y, 0));
+            return true;
+        }
+
+        private bool TryCollectSpawnCandidatesForArea(
+            AreaType targetAreaType,
+            out Tilemap refTilemap,
+            out List<Vector2Int> candidates)
+        {
+            refTilemap = null;
+            candidates = new List<Vector2Int>();
 
             if (floorPoints == null)
             {
                 return false;
             }
 
-            Tilemap refTilemap = paintTilemap != null ? paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex()) : null;
+            refTilemap = paintTilemap != null ? paintTilemap.GetFloorTilemap(ResolveReferencePaintSlotIndex()) : null;
             if (refTilemap == null)
             {
                 return false;
@@ -842,7 +897,6 @@ namespace UnderTheStars.GenerationMap
                 }
             }
 
-            List<Vector2Int> grassCandidates = new List<Vector2Int>();
             foreach (Vector2Int point in allFloorPoints)
             {
                 if (!IsSpawnPointForArea(point, allFloorPoints, areaByPoint, targetAreaType))
@@ -850,18 +904,10 @@ namespace UnderTheStars.GenerationMap
                     continue;
                 }
 
-                grassCandidates.Add(point);
+                candidates.Add(point);
             }
 
-            if (grassCandidates.Count == 0)
-            {
-                return false;
-            }
-
-            spawnCoord = grassCandidates[UnityEngine.Random.Range(0, grassCandidates.Count)];
-            Vector3Int cellPos = new Vector3Int(spawnCoord.x, spawnCoord.y, 0);
-            worldPosition = refTilemap.GetCellCenterWorld(cellPos);
-            return true;
+            return candidates.Count > 0;
         }
 
         private bool TryGetRandomSafeSpawnWorldPositionForAnyEnabledRegion(out Vector3 worldPosition, out Vector2Int spawnCoord)
