@@ -89,9 +89,9 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugBossSlimeProjectile = false;
 
     [Header("Projectile Attack Audio")]
-    [Tooltip("敌人实际发射粘液弹时播放的音效。留空则不播放。")]
+    [Tooltip("Audio clip played when the enemy actually fires a slime projectile. Leave empty to disable.")]
     [SerializeField] private AudioClip projectileFireAudioClip;
-    [Tooltip("粘液弹发射音效音量。")]
+    [Tooltip("Volume for the slime projectile fire audio.")]
     [SerializeField, Range(0f, 1f)] private float projectileFireAudioVolume = 1f;
 
     [Header("Boss Skill Components")]
@@ -658,7 +658,7 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        // 鏀诲嚮鍔ㄤ綔杩涜涓椂锛屽師鍦板仠浣忓苟淇濇寔褰撳墠鏈濆悜锛岀瓑寰呮敾鍑诲洖璋冪粨绠椼€?
+        // When the attack animation is active, stay in place and keep the current facing until the attack callback finishes.
         if (isAttackAnimationActive)
         {
             LogEnemyMeleeDecision(attackDistance, false, "AlreadyAttacking", grounded, "None", playerTarget != null ? playerTarget.name : "null", Mathf.Max(0f, nextAttackTime - Time.time), true, false, isDead);
@@ -4912,7 +4912,7 @@ public class EnemyController : MonoBehaviour
             Vector3.zero,
             Vector3.zero);
 
-        // 瑙﹀彂鏀诲嚮鍔ㄧ敾鍚庯紝鎸夊姩鐢绘椂搴忚繘鍏ュ喎鍗存仮澶嶉樁娈点€?
+        // After triggering the attack animation, enter the cooldown recovery phase based on the animation timing.
         if (slimeAnimation != null)
         {
             LogSlimeAttackLifecycle("PlayAttackAnimation", pendingAttackTarget, "SlimeAnimation");
@@ -6538,7 +6538,7 @@ public class EnemyController : MonoBehaviour
 
         BattleDamageType damageType = ResolvePrimaryDamageType();
 
-        // 鎶曞皠鐗╁嚭鐢熺偣缁存寔鍦ㄨ鑹插墠涓婃柟锛岄伩鍏嶅拰鏈綋纰版挒浣撻噸鍙犮€?
+        // Keep the projectile spawn point above and in front of the character to avoid overlapping the main body collider.
         GameObject projectile = CreateProjectileObject();
         if (projectile == null)
         {

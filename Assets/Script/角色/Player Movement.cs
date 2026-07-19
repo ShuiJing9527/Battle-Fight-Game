@@ -4,17 +4,17 @@ using UnityEngine.InputSystem;
 public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
 {
     [Header("Movement - Base Speed")]
-    [Tooltip("隗定牡譎ｮ騾夂ｧｻ蜉ｨ逧・渕遑騾溷ｺｦ縲１layer01 荳・Player02 蜿ｯ蛻・悪蝨ｨ蜷・・螳樔ｾ倶ｸ雁黒迢ｬ隹・紛縲・")]
+    [Tooltip("Base movement speed used before player-specific scaling and speed-stat bonuses are applied.")]
     [InspectorName("baseMoveSpeed")]
     public float moveSpeed = 5f;
 
-    [Tooltip("蝓ｺ遑遘ｻ蜉ｨ騾溷ｺｦ逧・｢晏､也ｼｩ謾ｾ縲るｻ倩ｮ､ 1 陦ｨ遉ｺ菫晄戟蜴溷ｧ句渕遑騾溷ｺｦ縲・")]
+    [Tooltip("Multiplier applied to the base movement speed. A value of 1 keeps the original speed.")]
     [SerializeField, Min(0f)] private float playerBaseMoveSpeedScale = 1.0f;
 
-    [Tooltip("SPD 豈剰ｶ・ｿ・1 轤ｹ譌ｶ・悟ｯｹ譎ｮ騾夂ｧｻ蜉ｨ騾溷ｺｦ謠蝉ｾ帷噪豈比ｾ句刈謌舌るｻ倩ｮ､ 0.0075 荳取立蜈ｬ蠑丈ｸ閾ｴ縲・")]
+    [Tooltip("Additional movement speed gained per point of SPD. Default is 0.0075 per point.")]
     [SerializeField, Min(0f)] private float speedStatMoveRatio = 0.0075f;
 
-    [Tooltip("譎ｮ騾夂ｧｻ蜉ｨ逧・怙扈磯溷ｺｦ遑ｬ荳企剞縲ょ宵蠖ｱ蜩崎ｵｰ霍ｯ/霍第ｭ･・御ｸ榊ｽｱ蜩肴橿閭ｽ菴咲ｧｻ縲・")]
+    [Tooltip("Upper limit for the final movement speed after all scaling is applied.")]
     [SerializeField, Min(0f)] private float maxActualMoveSpeed = 30f;
 
     public Rigidbody rb;

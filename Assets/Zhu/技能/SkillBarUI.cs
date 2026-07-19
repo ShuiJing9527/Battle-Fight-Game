@@ -5,7 +5,7 @@ public class SkillBarUI : MonoBehaviour
     public SkillDataReader dataReader;
     public SkillSlotUI[] skillSlots;
 
-    [Header("刷新间隔（秒）")]
+    [Header("Refresh Interval (Seconds)")]
     public float refreshInterval = 0.1f;
 
     private float _timer;
@@ -17,12 +17,12 @@ public class SkillBarUI : MonoBehaviour
 
     void Update()
     {
-        // 定时刷新，不是每帧都跑
+        // Refresh on a timer instead of every frame.
         _timer += Time.deltaTime;
         if (_timer < refreshInterval) return;
         _timer = 0f;
 
-        // 全判空，缺任何东西都直接跳过，绝不报错
+        // Guard against missing references and skip safely.
         if (dataReader == null || skillSlots == null || skillSlots.Length == 0)
             return;
 

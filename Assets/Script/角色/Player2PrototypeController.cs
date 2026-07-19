@@ -729,8 +729,8 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
         ResolveRRenderCamera();
 
-        // 鍒濆鍖栧喎鍗翠笌钃濋噺绯荤粺
-        // 鍏ㄥ眬鍐峰嵈鍊掕鏃?+ 鑷姩鍥炶摑
+        // Initialize the cooldown and mana system.
+        // Update global cooldown timers and automatic mana recovery.
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
     }
 
@@ -830,7 +830,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        // 鍏ㄥ眬鍐峰嵈鍊掕鏃?+ 鑷姩鍥炶摑
+        // Update global cooldown timers and automatic mana recovery.
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
 
         if (Keyboard.current.qKey.wasPressedThisFrame)
@@ -5091,15 +5091,15 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         if (mat.HasProperty("_TintColor")) mat.SetColor("_TintColor", color);
     }
 
-    // 鍐呴儴鍒ゆ柇锛氭妧鑳芥槸鍚︽弧瓒抽噴鏀炬潯浠?
-    // 鍐呴儴鍒ゆ柇锛氭妧鑳芥槸鍚︽弧瓒抽噴鏀炬潯浠?
+    // Internal check: whether the skill can be cast.
+    // Internal check: whether the skill can be cast.
     private bool CanCastSkill(int index)
     {
         if (cooldownManager == null) return true;
         return cooldownManager.IsSkillCastable(index);
     }
 
-    // 鍐呴儴娑堣€楋細鎵ｈ摑 + 杩涘叆鍐峰嵈
+    // Internal consume: spend mana and start cooldown.
     private bool TryConsumeSkill(int index)
     {
         if (cooldownManager == null)
@@ -5110,7 +5110,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         return cooldownManager.TryConsumeSkillResource(index);
     }
 
-    // ========== UI 鍙鎺ュ彛锛岀粰鎶€鑳芥爮UI璋冪敤 ==========
+    // ========== Read-only UI accessors for the skill bar ==========
     public float GetSkillCurrentCD(int index)
     {
         if (cooldownManager == null) return 0f;

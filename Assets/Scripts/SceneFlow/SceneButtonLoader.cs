@@ -82,7 +82,12 @@ public class SceneButtonLoader : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[RestartTrace] Restart requested targetScene={sceneName} loader={name}#{GetInstanceID()} timeScaleBefore={Time.timeScale:F2}", this);
+        Time.timeScale = 1f;
+        AudioListener.pause = false;
+        Debug.Log($"[RestartTrace] Time.timeScale restored to {Time.timeScale:F2} before loading {sceneName}", this);
         GameLocalization.MarkFormalGameStart();
+        Debug.Log($"[RestartTrace] Loading battle scene={sceneName}", this);
         SceneManager.LoadScene(sceneName);
     }
 }

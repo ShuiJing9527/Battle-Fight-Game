@@ -991,8 +991,19 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        if (BattleTargetUtility.IsPlayer(gameObject))
+        {
+            Debug.Log($"[PlayerDeathTrace] HP reached zero on {name}", this);
+        }
+
         dead = true;
         Died?.Invoke(killer);
+
+        if (BattleTargetUtility.IsPlayer(gameObject))
+        {
+            Debug.Log("[PlayerDeathTrace] Death event invoked", this);
+        }
+
         TriggerAnimation(deathTrigger);
 
         if (destroyOnDeath)

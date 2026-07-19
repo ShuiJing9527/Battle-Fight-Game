@@ -13,15 +13,15 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     private static readonly string[] TerrainObstacleKeywords = { "wall", "airwall", "obstacle", "barrier", "block" };
     private static readonly string[] EnemyLikeKeywords = { "enemy", "monster", "elite", "boss", "slime" };
 
-    [Header("E - 灵体疾行 / 核心参数")]
+    [Header("E - Spirit Sprint / Base")]
     [SerializeField, Min(0f)] private float eCooldown = 10f;
     [SerializeField, Min(0f)] private float eDuration = 3f;
     [SerializeField, Min(0f)] private float eManaCost = 30f;
 
-    [Header("E - 灵体疾行 / 移动")]
+    [Header("E - Spirit Sprint / Movement")]
     [SerializeField, Min(0f)] private float eMoveSpeedMultiplier = 2.25f;
 
-    [Header("E - 灵体疾行 / 回复")]
+    [Header("E - Spirit Sprint / Recovery")]
     [SerializeField, Min(0f)] private float eHealPerTick = 0f;
     [SerializeField, Range(0f, 1f)] private float eHealPercentPerSecond = 0.10f;
     [SerializeField, Min(0.01f)] private float eHealTickInterval = 0.5f;
@@ -29,7 +29,7 @@ public class Player1Skill_E_BrokenDash : Player01SkillBase
     [SerializeField, Min(1f)] private float nightBuffPostDashSkillDamageMultiplier = 1.2f;
     [SerializeField, Min(0f)] private float nightBuffPostDashSkillDamageBoostDuration = 5f;
 
-    [Header("E - 灵体疾行 / 灵体状态")]
+    [Header("E - Spirit Sprint / Spirit State")]
     [FormerlySerializedAs("ignoreObstacleCollision")]
     [SerializeField] private bool eIgnoreTerrainCollision = true;
     [SerializeField] private bool eIgnoreEnemyCollision = true;

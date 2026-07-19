@@ -40,13 +40,14 @@ public class BattleSceneResultRouter : MonoBehaviour
 
     private void Awake()
     {
-        RefreshBindings();
-        SubscribeEvents();
+        Debug.Log($"[RestartTrace] BattleSceneResultRouter Awake scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}", this);
+        ResetForNewBattle();
     }
 
     private void OnEnable()
     {
-        RefreshBindings();
+        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnEnable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}", this);
+        RefreshBindings(forceRebind: false);
         SubscribeEvents();
     }
 
@@ -57,7 +58,7 @@ public class BattleSceneResultRouter : MonoBehaviour
             return;
         }
 
-        RefreshBindings();
+        RefreshBindings(forceRebind: false);
         SubscribeEvents();
 
         if (difficultyDirector != null && difficultyDirector.CurrentPhase == DifficultyPhase.Victory)
@@ -74,29 +75,43 @@ public class BattleSceneResultRouter : MonoBehaviour
 
     private void OnDisable()
     {
+        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnDisable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
         UnsubscribeEvents();
     }
 
     private void OnDestroy()
     {
+        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnDestroy scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
         UnsubscribeEvents();
     }
 
-    private void RefreshBindings()
+    private void ResetForNewBattle()
     {
-        if (player01Health == null)
-        {
-            player01Health = FindPlayerHealth("Player01", typeof(Player01SkillController));
-        }
+        resultTriggered = false;
+        UnsubscribeEvents();
+        player01Health = null;
+        player02Health = null;
+        difficultyDirector = null;
+        Debug.Log($"[RestartTrace] Router reset for new battle scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
+        RefreshBindings(forceRebind: true);
+        SubscribeEvents();
+    }
 
-        if (player02Health == null)
-        {
-            player02Health = FindPlayerHealth("Player02", typeof(Player2PrototypeController));
-        }
+    private void RefreshBindings(bool forceRebind)
+    {
+        CombatHealth resolvedPlayer01 = FindPlayerHealth("Player01", typeof(Player01SkillController), gameObject.scene);
+        CombatHealth resolvedPlayer02 = FindPlayerHealth("Player02", typeof(Player2PrototypeController), gameObject.scene);
+        EnemyDifficultyDirector resolvedDirector = FindSceneDifficultyDirector(gameObject.scene);
 
-        if (difficultyDirector == null)
+        if (forceRebind || player01Health != resolvedPlayer01 || player02Health != resolvedPlayer02 || difficultyDirector != resolvedDirector)
         {
-            difficultyDirector = FindObjectOfType<EnemyDifficultyDirector>();
+            UnsubscribeEvents();
+            player01Health = resolvedPlayer01;
+            player02Health = resolvedPlayer02;
+            difficultyDirector = resolvedDirector;
+            Debug.Log(
+                $"[RestartTrace] Router bound scene={gameObject.scene.name} player01={GetObjectDebugLabel(player01Health)} player02={GetObjectDebugLabel(player02Health)} difficultyDirector={GetObjectDebugLabel(difficultyDirector)}",
+                this);
         }
     }
 
@@ -126,16 +141,19 @@ public class BattleSceneResultRouter : MonoBehaviour
         if (player01Health != null && subscribedPlayer01)
         {
             player01Health.Died -= HandlePlayerDeath;
+            Debug.Log($"[RestartTrace] Router unbound old player01={GetObjectDebugLabel(player01Health)}", this);
         }
 
         if (player02Health != null && subscribedPlayer02)
         {
             player02Health.Died -= HandlePlayerDeath;
+            Debug.Log($"[RestartTrace] Router unbound old player02={GetObjectDebugLabel(player02Health)}", this);
         }
 
         if (difficultyDirector != null && subscribedVictory)
         {
             difficultyDirector.OnVictory -= HandleVictory;
+            Debug.Log($"[RestartTrace] Router unbound old difficultyDirector={GetObjectDebugLabel(difficultyDirector)}", this);
         }
 
         subscribedPlayer01 = false;
@@ -150,6 +168,8 @@ public class BattleSceneResultRouter : MonoBehaviour
             return;
         }
 
+        Debug.Log($"[PlayerDeathTrace] Death callback received from {ResolveDeadPlayerLabel()}", this);
+
         if (difficultyDirector != null && difficultyDirector.CurrentPhase == DifficultyPhase.Victory)
         {
             TriggerGameWin();
@@ -158,6 +178,7 @@ public class BattleSceneResultRouter : MonoBehaviour
 
         if (IsAnyPlayerDead())
         {
+            Debug.Log("[PlayerDeathTrace] GameOver requested", this);
             TriggerGameOver();
         }
     }
@@ -175,6 +196,7 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         resultTriggered = true;
+        Debug.Log("[PlayerDeathTrace] GameOver entered", this);
         Debug.Log("[BattleSceneResultRouter] GameOver triggered because a player died.", this);
         SceneManager.LoadScene(GameOverSceneName);
     }
@@ -200,13 +222,13 @@ public class BattleSceneResultRouter : MonoBehaviour
         return IsPlayerDead(player01Health) || IsPlayerDead(player02Health);
     }
 
-    private static CombatHealth FindPlayerHealth(string objectName, Type controllerType)
+    private static CombatHealth FindPlayerHealth(string objectName, Type controllerType, Scene targetScene)
     {
         CombatHealth[] allHealth = Resources.FindObjectsOfTypeAll<CombatHealth>();
         for (int i = 0; i < allHealth.Length; i++)
         {
             CombatHealth candidate = allHealth[i];
-            if (candidate == null || candidate.gameObject == null || !candidate.gameObject.scene.IsValid())
+            if (!IsCandidateInScene(candidate, targetScene))
             {
                 continue;
             }
@@ -220,7 +242,7 @@ public class BattleSceneResultRouter : MonoBehaviour
         for (int i = 0; i < allHealth.Length; i++)
         {
             CombatHealth candidate = allHealth[i];
-            if (candidate == null || candidate.gameObject == null || !candidate.gameObject.scene.IsValid())
+            if (!IsCandidateInScene(candidate, targetScene))
             {
                 continue;
             }
@@ -232,5 +254,74 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static EnemyDifficultyDirector FindSceneDifficultyDirector(Scene targetScene)
+    {
+        EnemyDifficultyDirector[] directors = Resources.FindObjectsOfTypeAll<EnemyDifficultyDirector>();
+        for (int i = 0; i < directors.Length; i++)
+        {
+            EnemyDifficultyDirector candidate = directors[i];
+            if (candidate == null || candidate.gameObject == null)
+            {
+                continue;
+            }
+
+            Scene candidateScene = candidate.gameObject.scene;
+            if (!candidateScene.IsValid() || !candidateScene.isLoaded || candidateScene != targetScene)
+            {
+                continue;
+            }
+
+            return candidate;
+        }
+
+        return null;
+    }
+
+    private static bool IsCandidateInScene(CombatHealth candidate, Scene targetScene)
+    {
+        if (candidate == null || candidate.gameObject == null)
+        {
+            return false;
+        }
+
+        Scene candidateScene = candidate.gameObject.scene;
+        return candidateScene.IsValid() && candidateScene.isLoaded && candidateScene == targetScene;
+    }
+
+    private string ResolveDeadPlayerLabel()
+    {
+        if (IsPlayerDead(player01Health))
+        {
+            return GetObjectDebugLabel(player01Health);
+        }
+
+        if (IsPlayerDead(player02Health))
+        {
+            return GetObjectDebugLabel(player02Health);
+        }
+
+        return "unknown";
+    }
+
+    private static string GetObjectDebugLabel(UnityEngine.Object target)
+    {
+        if (target == null)
+        {
+            return "null";
+        }
+
+        if (target is Component component)
+        {
+            return $"{component.name}#{component.GetInstanceID()}";
+        }
+
+        if (target is GameObject gameObject)
+        {
+            return $"{gameObject.name}#{gameObject.GetInstanceID()}";
+        }
+
+        return $"{target.name}#{target.GetInstanceID()}";
     }
 }

@@ -2,19 +2,19 @@ using UnityEngine;
 
 public class SkillSFXByKey : MonoBehaviour
 {
-    [Header("闪现")]
+    [Header("Flash")]
     public KeyCode flashKey = KeyCode.Q;
     public AudioClip flashSfx;
 
-    [Header("急行 / 加速")]
+    [Header("Dash / Movement")]
     public KeyCode dashKey = KeyCode.E;
     public AudioClip dashSfx;
 
-    [Header("通用技能")]
+    [Header("Generic Skill")]
     public KeyCode skillKey = KeyCode.None;
     public AudioClip skillSfx;
 
-    [Header("音量")]
+    [Header("Volume")]
     [Range(0f, 1f)] public float volume = 1f;
 
     public void PlaySfxForSkillLabel(string skillLabel)
