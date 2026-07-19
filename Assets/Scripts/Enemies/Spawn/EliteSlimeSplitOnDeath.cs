@@ -103,6 +103,23 @@ public class EliteSlimeSplitOnDeath : MonoBehaviour
             return;
         }
 
+        if (identity.bossRole == MonsterBossRole.FinalBoss || identity.bossRole == MonsterBossRole.SplitBoss)
+        {
+            if (debugSplitLogs)
+            {
+                Debug.Log(
+                    "[EnemySplitConflictTrace] " +
+                    "event=ConflictDetected" +
+                    " object=" + name +
+                    " conflictType=LegacyEliteSplitInvokedOnNewBossSplitRole" +
+                    " resolvedBy=SkipLegacySplit" +
+                    " bossRole=" + identity.bossRole,
+                    this);
+            }
+
+            return;
+        }
+
         EnemySpawner resolvedSpawner = spawner;
         if (resolvedSpawner == null)
         {

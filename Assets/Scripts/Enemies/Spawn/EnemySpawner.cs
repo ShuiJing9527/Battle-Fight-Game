@@ -329,6 +329,7 @@ public class EnemySpawner : MonoBehaviour
     private readonly Dictionary<int, string> rankGeometryApplySources = new Dictionary<int, string>();
     private readonly HashSet<int> finalMomentBossEnemyIds = new HashSet<int>();
     private readonly Dictionary<int, UltimateBossModifiers> ultimateBossModifiersByEnemyId = new Dictionary<int, UltimateBossModifiers>();
+    private readonly Dictionary<int, PhaseSplitBossModifiers> phaseSplitBossModifiersByEnemyId = new Dictionary<int, PhaseSplitBossModifiers>();
     private int resolvedEnemyLayer = -1;
     private bool enemyLayerCollisionConfigured;
     private bool finalMomentBossTriggered;
@@ -354,6 +355,16 @@ public class EnemySpawner : MonoBehaviour
         public float specialDefenseMultiplier;
         public float speedMultiplier;
         public int remainingEnemyCount;
+    }
+
+    private struct PhaseSplitBossModifiers
+    {
+        public float hpMultiplier;
+        public float attackMultiplier;
+        public float defenseMultiplier;
+        public float specialAttackMultiplier;
+        public float specialDefenseMultiplier;
+        public float speedMultiplier;
     }
 
     private void Start()
@@ -1356,6 +1367,91 @@ public class EnemySpawner : MonoBehaviour
         }
     }
 
+    public bool IsFinalMomentBoss(GameObject enemy)
+    {
+        return enemy != null && finalMomentBossEnemyIds.Contains(enemy.GetInstanceID());
+    }
+
+    public Transform ResolveActivePlayerTargetForExternalSystems()
+    {
+        return ResolveActivePlayerTarget();
+    }
+
+    public void RefreshMonsterRuntimeScaling(GameObject enemy, bool refillCurrentHealth = false)
+    {
+        ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth);
+    }
+
+    public void ApplyRuntimeSplitChildModifiers(
+        GameObject spawnedEnemy,
+        float healthRatio,
+        float attackRatio,
+        float defenseRatio,
+        float speedRatio,
+        float scaleRatio)
+    {
+        ApplySplitChildModifiers(spawnedEnemy, healthRatio, attackRatio, defenseRatio, speedRatio, scaleRatio);
+    }
+
+    public void SetPhaseSplitBossModifiers(
+        GameObject boss,
+        float hpMultiplier,
+        float attackMultiplier,
+        float defenseMultiplier,
+        float specialAttackMultiplier,
+        float specialDefenseMultiplier,
+        float speedMultiplier,
+        bool refreshRuntimeScaling = true,
+        bool refillCurrentHealth = false)
+    {
+        if (boss == null)
+        {
+            return;
+        }
+
+        int enemyId = boss.GetInstanceID();
+        phaseSplitBossModifiersByEnemyId[enemyId] = new PhaseSplitBossModifiers
+        {
+            hpMultiplier = Mathf.Max(0.01f, hpMultiplier),
+            attackMultiplier = Mathf.Max(0.01f, attackMultiplier),
+            defenseMultiplier = Mathf.Max(0.01f, defenseMultiplier),
+            specialAttackMultiplier = Mathf.Max(0.01f, specialAttackMultiplier),
+            specialDefenseMultiplier = Mathf.Max(0.01f, specialDefenseMultiplier),
+            speedMultiplier = Mathf.Max(0.01f, speedMultiplier)
+        };
+
+        if (refreshRuntimeScaling)
+        {
+            ApplyCurrentMultiplierToMonster(boss, refillCurrentHealth);
+        }
+    }
+
+    public void ClearPhaseSplitBossModifiers(GameObject boss, bool refreshRuntimeScaling = true, bool refillCurrentHealth = false)
+    {
+        if (boss == null)
+        {
+            return;
+        }
+
+        phaseSplitBossModifiersByEnemyId.Remove(boss.GetInstanceID());
+        if (refreshRuntimeScaling)
+        {
+            ApplyCurrentMultiplierToMonster(boss, refillCurrentHealth);
+        }
+    }
+
+    public GameObject ResolveBossSplitPrefabForSpecies(MonsterSpecies species)
+    {
+        List<GameObject> sourcePool = ResolvePool(bossEnemyPrefabs, fallbackBossEnemyPrefabs);
+        return ResolveNormalSplitPrefab(sourcePool, species);
+    }
+
+    public GameObject ResolveEliteSummonPrefabForSpecies(MonsterSpecies species)
+    {
+        List<GameObject> sourcePool = ResolvePool(eliteEnemyPrefabs, fallbackEliteEnemyPrefabs);
+        return ResolveNormalSplitPrefab(sourcePool, species);
+    }
+
     private void ApplyRankGeometry(GameObject enemy, MonsterRank rank, string source)
     {
         if (enemy == null)
@@ -1955,6 +2051,16 @@ public class EnemySpawner : MonoBehaviour
             specialBossSpecialAttackMultiplier = Mathf.Max(specialBossSpecialAttackMultiplier, Mathf.Max(0.01f, ultimateModifiers.specialAttackMultiplier));
             specialBossSpecialDefenseMultiplier = Mathf.Max(specialBossSpecialDefenseMultiplier, Mathf.Max(0.01f, ultimateModifiers.specialDefenseMultiplier));
             specialBossSpeedMultiplier = Mathf.Max(specialBossSpeedMultiplier, Mathf.Max(0.01f, ultimateModifiers.speedMultiplier));
+        }
+
+        if (rank == MonsterRank.Boss && phaseSplitBossModifiersByEnemyId.TryGetValue(enemyId, out PhaseSplitBossModifiers phaseSplitModifiers))
+        {
+            specialBossHpMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.hpMultiplier);
+            specialBossAttackMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.attackMultiplier);
+            specialBossDefenseMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.defenseMultiplier);
+            specialBossSpecialAttackMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.specialAttackMultiplier);
+            specialBossSpecialDefenseMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.specialDefenseMultiplier);
+            specialBossSpeedMultiplier *= Mathf.Max(0.01f, phaseSplitModifiers.speedMultiplier);
         }
 
         if (isCleanupBoss)
@@ -3699,22 +3805,14 @@ public class EnemySpawner : MonoBehaviour
             phaseSplit = cleanupBoss.AddComponent<CleanupBossPhaseSplit>();
         }
 
-        phaseSplit.Initialize(
-            this,
-            cleanupBoss,
-            cleanupBossPhaseSplitEnabled,
-            cleanupBossSplitHealthThresholds,
-            cleanupBossSplitCountPerThreshold,
-            cleanupBossSplitScatterRadius,
-            cleanupBossSplitChildRank,
-            cleanupBossSplitChildHealthRatio,
-            cleanupBossSplitChildAttackRatio,
-            cleanupBossSplitChildDefenseRatio,
-            cleanupBossSplitChildSpeedRatio,
-            cleanupBossSplitChildScaleRatio,
-            cleanupBossSplitChildrenCanSplit,
-            cleanupBossRewardMultiplier,
-            debugCleanupBossPhaseSplit);
+        BossSlimeFinalSplitController finalSplitController = cleanupBoss.GetComponent<BossSlimeFinalSplitController>();
+        if (finalSplitController == null)
+        {
+            finalSplitController = cleanupBoss.AddComponent<BossSlimeFinalSplitController>();
+        }
+        finalSplitController.Initialize(this);
+        phaseSplit.enabled = false;
+        return;
     }
 
     private int CountAliveNonBossEnemies()
@@ -3762,6 +3860,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(enemy.GetInstanceID());
             finalMomentBossEnemyIds.Remove(enemy.GetInstanceID());
             ultimateBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
+            phaseSplitBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
             playerRuneScalingSnapshots.Remove(enemy.GetInstanceID());
             Destroy(enemy);
         }
@@ -3909,6 +4008,7 @@ public class EnemySpawner : MonoBehaviour
             {
                 finalMomentBossEnemyIds.Remove(enemy.GetInstanceID());
                 ultimateBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
+                phaseSplitBossModifiersByEnemyId.Remove(enemy.GetInstanceID());
                 playerRuneScalingSnapshots.Remove(enemy.GetInstanceID());
             }
         }
@@ -3949,6 +4049,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(staleKeys[i]);
             finalMomentBossEnemyIds.Remove(staleKeys[i]);
             ultimateBossModifiersByEnemyId.Remove(staleKeys[i]);
+            phaseSplitBossModifiersByEnemyId.Remove(staleKeys[i]);
             playerRuneScalingSnapshots.Remove(staleKeys[i]);
         }
     }
@@ -3968,6 +4069,7 @@ public class EnemySpawner : MonoBehaviour
             monsterBaseSnapshots.Remove(destroyedEnemy.GetInstanceID());
             finalMomentBossEnemyIds.Remove(destroyedEnemy.GetInstanceID());
             ultimateBossModifiersByEnemyId.Remove(destroyedEnemy.GetInstanceID());
+            phaseSplitBossModifiersByEnemyId.Remove(destroyedEnemy.GetInstanceID());
             playerRuneScalingSnapshots.Remove(destroyedEnemy.GetInstanceID());
         }
 

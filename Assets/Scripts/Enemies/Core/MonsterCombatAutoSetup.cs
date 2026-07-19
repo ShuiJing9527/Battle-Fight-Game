@@ -42,7 +42,7 @@ public static class MonsterCombatAutoSetup
         identity.attackStyle = ResolveAttackStyle(identity);
 
         SyncExistingStats(monster, identity);
-        EnsureRuntimeComponents(monster);
+        EnsureRuntimeComponents(monster, identity);
         EnsureRankVisual(monster, identity);
     }
 
@@ -244,7 +244,7 @@ public static class MonsterCombatAutoSetup
                species == MonsterSpecies.RainbowSlime;
     }
 
-    private static void EnsureRuntimeComponents(GameObject monster)
+    private static void EnsureRuntimeComponents(GameObject monster, MonsterIdentity identity)
     {
         if (monster.GetComponent<WorldHealthBar>() == null)
         {
@@ -254,6 +254,13 @@ public static class MonsterCombatAutoSetup
         if (monster.GetComponent<EliteSlimeSplitOnDeath>() == null)
         {
             monster.AddComponent<EliteSlimeSplitOnDeath>();
+        }
+
+        if (identity != null &&
+            identity.rank == MonsterRank.Boss &&
+            monster.GetComponent<SplitBossMinionController>() == null)
+        {
+            monster.AddComponent<SplitBossMinionController>();
         }
     }
 

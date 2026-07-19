@@ -319,6 +319,14 @@ public class EnemyController : MonoBehaviour
     private GameObject landingVfxPrefab => leapSlamSkill != null ? leapSlamSkill.LandingVfxPrefab : null;
     private Vector3 landingVfxOffset => leapSlamSkill != null ? leapSlamSkill.LandingVfxOffset : Vector3.zero;
     private float landingVfxLifetime => leapSlamSkill != null ? leapSlamSkill.LandingVfxLifetime : 0f;
+    private float landingVfxScaleMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingVfxScaleMultiplier : 1f;
+    private float landingVfxVerticalOffset => leapSlamSkill != null ? leapSlamSkill.LandingVfxVerticalOffset : 0f;
+    private float landingVfxLifetimeMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingVfxLifetimeMultiplier : 1f;
+    private float landingVfxEmissionMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingVfxEmissionMultiplier : 1f;
+    private float landingVfxParticleSizeMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingVfxParticleSizeMultiplier : 1f;
+    private float landingVfxSpeedMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingVfxSpeedMultiplier : 1f;
+    private bool enableLandingShockwave => leapSlamSkill != null && leapSlamSkill.EnableLandingShockwave;
+    private float landingShockwaveScaleMultiplier => leapSlamSkill != null ? leapSlamSkill.LandingShockwaveScaleMultiplier : 1f;
     private AudioClip leapSlamActivationAudioClip => leapSlamSkill != null ? leapSlamSkill.ActivationAudioClip : null;
     private float leapSlamActivationAudioVolume => leapSlamSkill != null ? leapSlamSkill.ActivationAudioVolume : 0f;
     private bool enableBossDevour => devourSkill != null && devourSkill.EnableSkill;
@@ -799,6 +807,51 @@ public class EnemyController : MonoBehaviour
     public void SetTarget(Transform target, string source)
     {
         AssignTarget(target, source);
+    }
+
+    public void SetBossTimedSplitEnabled(bool enabled)
+    {
+        enableBossTimedSplit = enabled;
+    }
+
+    public void AbortCombatForExternalPhase(string reason = "ExternalPhase")
+    {
+        CancelInvoke(nameof(FinishAttackRecovery));
+
+        if (bossRangedAttackRoutine != null)
+        {
+            StopCoroutine(bossRangedAttackRoutine);
+            bossRangedAttackRoutine = null;
+        }
+
+        if (bossSpecialAttackRoutine != null)
+        {
+            StopCoroutine(bossSpecialAttackRoutine);
+            bossSpecialAttackRoutine = null;
+        }
+
+        if (bossAttackRecoveryRoutine != null)
+        {
+            StopCoroutine(bossAttackRecoveryRoutine);
+            bossAttackRecoveryRoutine = null;
+        }
+
+        if (activeBossAttackRoutine != null)
+        {
+            StopCoroutine(activeBossAttackRoutine);
+            activeBossAttackRoutine = null;
+        }
+
+        attackInProgress = false;
+        attackHitFrameTriggeredThisAttack = false;
+        pendingAttackTarget = null;
+        lastMeleeAttackResult = reason;
+        if (rb != null)
+        {
+            rb.linearVelocity = Vector3.zero;
+        }
+
+        ReleaseBossActionLock(reason, activeBossActionSequenceId);
     }
 
     public void ConfigureRuntime(float moveSpeed, float stopDistance, float attackRange, float attackHitRange, float attackCooldown, float attackDamage, MonsterAttackStyle attackStyle, float attackIntervalMultiplier = 1f, float outgoingDamageMultiplier = 1f)
@@ -2827,7 +2880,16 @@ public class EnemyController : MonoBehaviour
             landingPosition,
             landingVfxOffset,
             landingVfxLifetime,
-            Quaternion.identity);
+            Quaternion.identity,
+            new EnemyLandingVfxUtility.LandingVfxRuntimeTuning(
+                landingVfxScaleMultiplier,
+                landingVfxVerticalOffset,
+                landingVfxLifetimeMultiplier,
+                landingVfxEmissionMultiplier,
+                landingVfxParticleSizeMultiplier,
+                landingVfxSpeedMultiplier,
+                enableLandingShockwave,
+                landingShockwaveScaleMultiplier));
     }
 
     private void PlayLandingVfxSafely(Vector3 landingPosition, int sequenceId, BossLandingImpactSource source)

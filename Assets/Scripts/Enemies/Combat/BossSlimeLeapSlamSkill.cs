@@ -76,6 +76,24 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     [SerializeField] private Vector3 landingVfxOffset = Vector3.zero;
     [SerializeField, Min(0f)] private float landingVfxLifetime = 2f;
 
+    [Header("Boss Landing VFX Tuning")]
+    [Tooltip("Boss落地特效整体缩放倍率。")]
+    [SerializeField, Min(0f)] private float landingVfxScaleMultiplier = 2f;
+    [Tooltip("Boss落地特效播放高度偏移。正值向上。")]
+    [SerializeField] private float landingVfxVerticalOffset = 0.1f;
+    [Tooltip("Boss落地特效额外持续时间倍率。")]
+    [SerializeField, Min(0.1f)] private float landingVfxLifetimeMultiplier = 1.35f;
+    [Tooltip("Boss落地特效粒子数量倍率。")]
+    [SerializeField, Min(0f)] private float landingVfxEmissionMultiplier = 2f;
+    [Tooltip("Boss落地特效粒子尺寸倍率。")]
+    [SerializeField, Min(0f)] private float landingVfxParticleSizeMultiplier = 1.6f;
+    [Tooltip("Boss落地特效粒子速度倍率。")]
+    [SerializeField, Min(0f)] private float landingVfxSpeedMultiplier = 1.4f;
+    [Tooltip("是否启用 Boss 落地冲击圈子系统。")]
+    [SerializeField] private bool enableLandingShockwave = true;
+    [Tooltip("Boss 落地冲击圈额外缩放倍率。")]
+    [SerializeField, Min(0f)] private float landingShockwaveScaleMultiplier = 1f;
+
     [Header("Leap Slam Audio")]
     [Tooltip("Boss 开始发动 LeapSlam 时播放的音效。留空则不播放。")]
     [SerializeField] private AudioClip leapSlamActivationAudioClip;
@@ -138,6 +156,14 @@ public class BossSlimeLeapSlamSkill : MonoBehaviour
     public GameObject LandingVfxPrefab => landingVfxPrefab;
     public Vector3 LandingVfxOffset => landingVfxOffset;
     public float LandingVfxLifetime => landingVfxLifetime;
+    public float LandingVfxScaleMultiplier => landingVfxScaleMultiplier;
+    public float LandingVfxVerticalOffset => landingVfxVerticalOffset;
+    public float LandingVfxLifetimeMultiplier => landingVfxLifetimeMultiplier;
+    public float LandingVfxEmissionMultiplier => landingVfxEmissionMultiplier;
+    public float LandingVfxParticleSizeMultiplier => landingVfxParticleSizeMultiplier;
+    public float LandingVfxSpeedMultiplier => landingVfxSpeedMultiplier;
+    public bool EnableLandingShockwave => enableLandingShockwave;
+    public float LandingShockwaveScaleMultiplier => landingShockwaveScaleMultiplier;
     public AudioClip ActivationAudioClip => leapSlamActivationAudioClip;
     public float ActivationAudioVolume => leapSlamActivationAudioVolume;
 
