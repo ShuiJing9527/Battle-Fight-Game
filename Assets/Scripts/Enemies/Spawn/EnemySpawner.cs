@@ -341,6 +341,7 @@ public class EnemySpawner : MonoBehaviour
     private Coroutine normalReinforcementCoroutine;
     private Coroutine eliteSpawnCoroutine;
     private Coroutine monsterGrowthCoroutine;
+    private bool subscribedToInitialGraceEnd;
     private bool externalTestPauseActive;
     private float nextBossHurtboxRuntimeRefreshTime;
     private int lastBossHurtboxRuntimeConfigHash;
@@ -369,13 +370,18 @@ public class EnemySpawner : MonoBehaviour
 
     private void Start()
     {
-        ResolveDifficultyDirector();
+        SubscribeDifficultyDirectorEvents();
         CachePrefabPools();
         ResolveEnemyLayer();
         ConfigureEnemyLayerCollision();
         ResolvePlayerTarget();
         InitializeTodTracking();
         EnsureSpawnerCoroutinesRunning();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeDifficultyDirectorEvents();
     }
 
     public void PauseSpawningForExternalTest()
@@ -620,11 +626,25 @@ public class EnemySpawner : MonoBehaviour
     {
         while (true)
         {
+            EnemyDifficultyDirector director = ResolveDifficultyDirector();
+            if (director != null && director.IsInitialGraceActive)
+            {
+                yield return new WaitForSeconds(Mathf.Max(0.05f, director.RemainingInitialGraceTime));
+                continue;
+            }
+
             float waitSeconds = Random.Range(
                 Mathf.Max(0.1f, Mathf.Min(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax)),
                 Mathf.Max(Mathf.Min(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax) + 0.1f, Mathf.Max(monsterStatGrowthIntervalMin, monsterStatGrowthIntervalMax)));
 
             yield return new WaitForSeconds(waitSeconds);
+
+            director = ResolveDifficultyDirector();
+            if (director != null && director.IsInitialGraceActive)
+            {
+                continue;
+            }
+
             ApplyMonsterGrowthRoll();
         }
     }
@@ -4088,7 +4108,51 @@ public class EnemySpawner : MonoBehaviour
             difficultyDirector = EnemyDifficultyDirector.GetOrCreateInstance();
         }
 
+        SubscribeDifficultyDirectorEvents();
+
         return difficultyDirector;
+    }
+
+    private void SubscribeDifficultyDirectorEvents()
+    {
+        if (difficultyDirector == null)
+        {
+            difficultyDirector = EnemyDifficultyDirector.GetOrCreateInstance();
+        }
+
+        if (difficultyDirector == null || subscribedToInitialGraceEnd)
+        {
+            return;
+        }
+
+        difficultyDirector.OnInitialGraceEnded += HandleInitialGraceEnded;
+        subscribedToInitialGraceEnd = true;
+    }
+
+    private void UnsubscribeDifficultyDirectorEvents()
+    {
+        if (difficultyDirector == null || !subscribedToInitialGraceEnd)
+        {
+            return;
+        }
+
+        difficultyDirector.OnInitialGraceEnded -= HandleInitialGraceEnded;
+        subscribedToInitialGraceEnd = false;
+    }
+
+    private void HandleInitialGraceEnded()
+    {
+        CleanupTrackedEnemies();
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            GameObject enemy = aliveEnemies[i];
+            if (enemy == null)
+            {
+                continue;
+            }
+
+            CacheMonsterBaseSnapshot(enemy);
+        }
     }
 
     private bool CanSpawnByDifficulty(string source)

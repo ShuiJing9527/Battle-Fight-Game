@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum DifficultyPhase
@@ -21,6 +22,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [SerializeField, Min(0f)] private float finalRushStartTime = 600f;
     [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
     [SerializeField, Min(0f)] private float finalRushDuration = 180f;
+
+    [Header("Initial Grace")]
+    [Tooltip("How long monster combat stat growth stays buffered at the start of the run.")]
+    [SerializeField, Min(0f)] private float initialGraceDuration = 30f;
+    [Tooltip("Combat stat multiplier applied to monsters during the initial grace period.")]
+    [SerializeField, Range(0.1f, 1f)] private float initialMonsterStrengthMultiplier = 0.8f;
 
     [Header("Base Multipliers")]
     [Tooltip("Base HP multiplier for the first difficulty layer. 1 means unchanged.")]
@@ -99,6 +106,9 @@ public class EnemyDifficultyDirector : MonoBehaviour
     private int totalEnemyKills;
     private int spawnedBossCountByKills;
     private const float FinalRushBonusLevelInterval = 5f;
+    private readonly HashSet<EnemyDifficultyTrackedEnemy> trackedEnemies = new HashSet<EnemyDifficultyTrackedEnemy>();
+    private bool initialGraceStartLogged;
+    private bool initialGraceEndHandled;
 
     public static EnemyDifficultyDirector Instance
     {
@@ -136,9 +146,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
     }
 
     public event Action OnVictory;
+    public event Action OnInitialGraceEnded;
 
     public DifficultyPhase CurrentPhase => currentPhase;
     public float ElapsedTime => elapsedTime;
+    public float CombatProgressionElapsedTime => Mathf.Max(0f, elapsedTime - Mathf.Max(0f, initialGraceDuration));
+    public float RemainingInitialGraceTime => Mathf.Max(0f, Mathf.Max(0f, initialGraceDuration) - elapsedTime);
     public int CurrentNormalDifficultyLevel => Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(Mathf.Max(0f, elapsedTime), Mathf.Max(0f, finalRushStartTime)) / Mathf.Max(1f, normalLevelInterval)));
     public int CurrentFinalRushDifficultyLevel => ResolveCurrentFinalRushDifficultyLevel();
     public int CurrentDifficultyLevel => Mathf.Max(0, CurrentNormalDifficultyLevel + CurrentFinalRushDifficultyLevel);
@@ -146,6 +159,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
     public bool IsFinalRushActive => currentPhase == DifficultyPhase.FinalRush;
     public bool CanSpawnEnemies => currentPhase == DifficultyPhase.Normal || currentPhase == DifficultyPhase.FinalRush;
     public bool ShouldAllowSpawning => CanSpawnEnemies;
+    public bool IsInitialGraceActive => elapsedTime < Mathf.Max(0f, initialGraceDuration);
 
     /// <summary>
     /// Reconfigures the battle clock before gameplay starts. This is used by
@@ -158,12 +172,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
         finalRushDuration = Mathf.Max(0f, finalRushDurationSeconds);
     }
 
-    public float CurrentHpMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseHealthMultiplier) * (1f + CurrentDifficultyLevel * hpGrowthPerLevel), finalRushHpMultiplier);
-    public float CurrentAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseAttackMultiplier) * (1f + CurrentDifficultyLevel * attackGrowthPerLevel), finalRushAttackMultiplier);
-    public float CurrentDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseDefenseMultiplier) * (1f + CurrentDifficultyLevel * defenseGrowthPerLevel), finalRushDefenseMultiplier);
-    public float CurrentSpecialAttackMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialAttackMultiplier) * (1f + CurrentDifficultyLevel * specialAttackGrowthPerLevel), finalRushSpecialAttackMultiplier);
-    public float CurrentSpecialDefenseMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpecialDefenseMultiplier) * (1f + CurrentDifficultyLevel * specialDefenseGrowthPerLevel), finalRushSpecialDefenseMultiplier);
-    public float CurrentSpeedMultiplier => ResolvePerSpawnMultiplier(Mathf.Max(0.01f, baseSpeedMultiplier) * (1f + CurrentDifficultyLevel * speedGrowthPerLevel), finalRushSpeedMultiplier);
+    public float CurrentHpMultiplier => ResolveCombatStatMultiplier(baseHealthMultiplier, hpGrowthPerLevel, finalRushHpMultiplier, applyInitialGraceMultiplier: true);
+    public float CurrentAttackMultiplier => ResolveCombatStatMultiplier(baseAttackMultiplier, attackGrowthPerLevel, finalRushAttackMultiplier, applyInitialGraceMultiplier: true);
+    public float CurrentDefenseMultiplier => ResolveCombatStatMultiplier(baseDefenseMultiplier, defenseGrowthPerLevel, finalRushDefenseMultiplier, applyInitialGraceMultiplier: true);
+    public float CurrentSpecialAttackMultiplier => ResolveCombatStatMultiplier(baseSpecialAttackMultiplier, specialAttackGrowthPerLevel, finalRushSpecialAttackMultiplier, applyInitialGraceMultiplier: true);
+    public float CurrentSpecialDefenseMultiplier => ResolveCombatStatMultiplier(baseSpecialDefenseMultiplier, specialDefenseGrowthPerLevel, finalRushSpecialDefenseMultiplier, applyInitialGraceMultiplier: true);
+    public float CurrentSpeedMultiplier => ResolveCombatStatMultiplier(baseSpeedMultiplier, speedGrowthPerLevel, finalRushSpeedMultiplier, applyInitialGraceMultiplier: false);
     public float CurrentSpawnIntervalMultiplier => ResolveSpawnIntervalMultiplier();
     public int CurrentExtraMaxAlive => ResolveExtraMaxAlive();
     public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
@@ -190,6 +204,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
 
         LogDifficultySnapshot();
+        LogInitialGraceStartIfNeeded();
     }
 
     private void Update()
@@ -198,7 +213,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
         CheckVictoryFromRemainingEnemies();
     }
 
-    public void ApplyDifficultyToEnemy(GameObject enemy)
+    public void ApplyDifficultyToEnemy(GameObject enemy, bool recaptureBaseStats = true, bool preserveCurrentHealth = false)
     {
         if (enemy == null)
         {
@@ -211,18 +226,33 @@ public class EnemyDifficultyDirector : MonoBehaviour
             return;
         }
 
-        float baseHp = stats.maxHealth;
-        float baseAttack = stats.physicalAttack;
-        float baseDefense = stats.physicalDefense;
-        float baseSpecialAttack = stats.specialAttack;
-        float baseSpecialDefense = stats.specialDefense;
-        float baseSpeed = stats.speed;
+        EnemyDifficultyTrackedEnemy trackedEnemy = enemy.GetComponent<EnemyDifficultyTrackedEnemy>();
+        if (trackedEnemy == null)
+        {
+            trackedEnemy = enemy.AddComponent<EnemyDifficultyTrackedEnemy>();
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        trackedEnemy.Initialize(this, identity != null && identity.rank == MonsterRank.Boss);
+
+        if (recaptureBaseStats || !trackedEnemy.HasBaseStats)
+        {
+            trackedEnemy.CaptureBaseStats(stats);
+        }
+
+        float baseHp = trackedEnemy.BaseHealth;
+        float baseAttack = trackedEnemy.BaseAttack;
+        float baseDefense = trackedEnemy.BaseDefense;
+        float baseSpecialAttack = trackedEnemy.BaseSpecialAttack;
+        float baseSpecialDefense = trackedEnemy.BaseSpecialDefense;
+        float baseSpeed = trackedEnemy.BaseSpeed;
         float hpMultiplier = CurrentHpMultiplier;
         float attackMultiplier = CurrentAttackMultiplier;
         float defenseMultiplier = CurrentDefenseMultiplier;
         float specialAttackMultiplier = CurrentSpecialAttackMultiplier;
         float specialDefenseMultiplier = CurrentSpecialDefenseMultiplier;
         float speedMultiplier = CurrentSpeedMultiplier;
+        float previousCurrentHealth = ResolveCurrentHealth(enemy, stats);
 
         stats.maxHealth = Mathf.Max(1f, Mathf.Round(baseHp * hpMultiplier));
         stats.physicalAttack = Mathf.Max(0f, Mathf.Round(baseAttack * attackMultiplier));
@@ -236,24 +266,19 @@ public class EnemyDifficultyDirector : MonoBehaviour
         if (resourceBank != null)
         {
             resourceBank.maxHealth = stats.maxHealth;
-            resourceBank.currentHealth = stats.maxHealth;
+            resourceBank.currentHealth = preserveCurrentHealth
+                ? Mathf.Min(previousCurrentHealth, stats.maxHealth)
+                : stats.maxHealth;
         }
 
         if (combatHealth != null)
         {
             combatHealth.stats = stats;
             combatHealth.resourceBank = resourceBank;
-            combatHealth.currentHealth = stats.maxHealth;
+            combatHealth.currentHealth = preserveCurrentHealth
+                ? Mathf.Min(previousCurrentHealth, stats.maxHealth)
+                : stats.maxHealth;
         }
-
-        EnemyDifficultyTrackedEnemy trackedEnemy = enemy.GetComponent<EnemyDifficultyTrackedEnemy>();
-        if (trackedEnemy == null)
-        {
-            trackedEnemy = enemy.AddComponent<EnemyDifficultyTrackedEnemy>();
-        }
-
-        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
-        trackedEnemy.Initialize(this, identity != null && identity.rank == MonsterRank.Boss);
 
         if (debugScaleLogs)
         {
@@ -366,7 +391,15 @@ public class EnemyDifficultyDirector : MonoBehaviour
             return;
         }
 
+        float previousElapsedTime = elapsedTime;
         elapsedTime += Time.deltaTime;
+
+        if (!initialGraceEndHandled &&
+            previousElapsedTime < Mathf.Max(0f, initialGraceDuration) &&
+            elapsedTime >= Mathf.Max(0f, initialGraceDuration))
+        {
+            HandleInitialGraceEnd();
+        }
 
         if (currentPhase == DifficultyPhase.Normal && elapsedTime >= finalRushStartTime)
         {
@@ -493,6 +526,19 @@ public class EnemyDifficultyDirector : MonoBehaviour
         return Mathf.Max(0.01f, normalMultiplier);
     }
 
+    private float ResolveCombatStatMultiplier(float baseMultiplier, float growthPerLevel, float finalRushMultiplier, bool applyInitialGraceMultiplier)
+    {
+        float resolvedBaseMultiplier = Mathf.Max(0.01f, baseMultiplier);
+        float growthMultiplier = 1f + CurrentCombatDifficultyLevel * Mathf.Max(0f, growthPerLevel);
+        float combinedMultiplier = ResolvePerSpawnMultiplier(resolvedBaseMultiplier * growthMultiplier, finalRushMultiplier);
+        if (applyInitialGraceMultiplier && IsInitialGraceActive)
+        {
+            combinedMultiplier *= Mathf.Clamp(initialMonsterStrengthMultiplier, 0.1f, 1f);
+        }
+
+        return Mathf.Max(0.01f, combinedMultiplier);
+    }
+
     private float ResolveSpawnIntervalMultiplier()
     {
         float multiplier = 1f / (1f + CurrentDifficultyLevel * Mathf.Max(0f, spawnRateGrowthPerLevel));
@@ -550,11 +596,117 @@ public class EnemyDifficultyDirector : MonoBehaviour
     {
         Log(
             "[EnemyDifficulty] " +
-            $"elapsed={elapsedTime:F1} phase={currentPhase} level={CurrentDifficultyLevel} " +
+            $"elapsed={elapsedTime:F1} combatElapsed={CombatProgressionElapsedTime:F1} phase={currentPhase} level={CurrentDifficultyLevel} combatLevel={CurrentCombatDifficultyLevel} " +
             $"hpMul={CurrentHpMultiplier:F2} atkMul={CurrentAttackMultiplier:F2} defMul={CurrentDefenseMultiplier:F2} " +
             $"sAtkMul={CurrentSpecialAttackMultiplier:F2} sDefMul={CurrentSpecialDefenseMultiplier:F2} spdMul={CurrentSpeedMultiplier:F2} " +
             $"spawnIntervalMul={CurrentSpawnIntervalMultiplier:F2} extraMaxAlive={CurrentExtraMaxAlive} " +
             $"spawnStopped={!CanSpawnEnemies}");
+    }
+
+    private void LogInitialGraceStartIfNeeded()
+    {
+        if (initialGraceStartLogged || initialGraceDuration <= 0f || initialMonsterStrengthMultiplier >= 1f)
+        {
+            return;
+        }
+
+        initialGraceStartLogged = true;
+        Debug.Log(
+            $"[MonsterStrength] Initial grace period started: multiplier={initialMonsterStrengthMultiplier:F2}, duration={initialGraceDuration:F1}s.",
+            this);
+    }
+
+    private void HandleInitialGraceEnd()
+    {
+        if (initialGraceEndHandled)
+        {
+            return;
+        }
+
+        initialGraceEndHandled = true;
+        RefreshTrackedEnemiesAfterGraceEnd();
+        OnInitialGraceEnded?.Invoke();
+        Debug.Log("[MonsterStrength] Grace period ended. Normal strength restored; progression timer started.", this);
+    }
+
+    private void RefreshTrackedEnemiesAfterGraceEnd()
+    {
+        if (trackedEnemies.Count == 0)
+        {
+            return;
+        }
+
+        List<EnemyDifficultyTrackedEnemy> refreshBuffer = new List<EnemyDifficultyTrackedEnemy>(trackedEnemies);
+        for (int i = 0; i < refreshBuffer.Count; i++)
+        {
+            EnemyDifficultyTrackedEnemy trackedEnemy = refreshBuffer[i];
+            if (trackedEnemy == null || !trackedEnemy.ShouldRefreshDifficulty)
+            {
+                continue;
+            }
+
+            ApplyDifficultyToEnemy(trackedEnemy.gameObject, recaptureBaseStats: false, preserveCurrentHealth: true);
+        }
+    }
+
+    internal void RegisterTrackedEnemy(EnemyDifficultyTrackedEnemy trackedEnemy)
+    {
+        if (trackedEnemy == null)
+        {
+            return;
+        }
+
+        trackedEnemies.Add(trackedEnemy);
+    }
+
+    internal void UnregisterTrackedEnemy(EnemyDifficultyTrackedEnemy trackedEnemy)
+    {
+        if (trackedEnemy == null)
+        {
+            return;
+        }
+
+        trackedEnemies.Remove(trackedEnemy);
+    }
+
+    private int CurrentCombatDifficultyLevel => Mathf.Max(0, CurrentCombatNormalDifficultyLevel + CurrentCombatFinalRushDifficultyLevel);
+
+    private int CurrentCombatNormalDifficultyLevel =>
+        Mathf.Max(0, Mathf.FloorToInt(Mathf.Min(Mathf.Max(0f, CombatProgressionElapsedTime), Mathf.Max(0f, finalRushStartTime)) / Mathf.Max(1f, normalLevelInterval)));
+
+    private int CurrentCombatFinalRushDifficultyLevel => ResolveCurrentCombatFinalRushDifficultyLevel();
+
+    private int ResolveCurrentCombatFinalRushDifficultyLevel()
+    {
+        if (CombatProgressionElapsedTime < finalRushStartTime)
+        {
+            return 0;
+        }
+
+        float clampedFinalRushElapsed = Mathf.Max(0f, Mathf.Min(CombatProgressionElapsedTime, FinalRushEndTime) - finalRushStartTime);
+        return Mathf.Max(0, Mathf.FloorToInt(clampedFinalRushElapsed / Mathf.Max(0.1f, FinalRushBonusLevelInterval)));
+    }
+
+    private static float ResolveCurrentHealth(GameObject enemy, CombatStats stats)
+    {
+        if (enemy == null)
+        {
+            return stats != null ? stats.maxHealth : 0f;
+        }
+
+        CombatHealth combatHealth = enemy.GetComponent<CombatHealth>();
+        if (combatHealth != null)
+        {
+            return Mathf.Max(0f, combatHealth.currentHealth);
+        }
+
+        BattleResourceBank resourceBank = enemy.GetComponent<BattleResourceBank>();
+        if (resourceBank != null)
+        {
+            return Mathf.Max(0f, resourceBank.currentHealth);
+        }
+
+        return stats != null ? Mathf.Max(0f, stats.maxHealth) : 0f;
     }
 
     private void Log(string message)
@@ -596,12 +748,21 @@ public sealed class EnemyDifficultyTrackedEnemy : MonoBehaviour
     private bool isBoss;
     private bool subscribed;
     private bool deathNotified;
+    private bool hasBaseStats;
+    private float baseHealth;
+    private float baseAttack;
+    private float baseDefense;
+    private float baseSpecialAttack;
+    private float baseSpecialDefense;
+    private float baseSpeed;
 
     public void Initialize(EnemyDifficultyDirector owner, bool boss)
     {
         director = owner;
         isBoss = boss;
         combatHealth = GetComponent<CombatHealth>();
+        deathNotified = false;
+        director?.RegisterTrackedEnemy(this);
 
         if (combatHealth == null || subscribed)
         {
@@ -612,8 +773,39 @@ public sealed class EnemyDifficultyTrackedEnemy : MonoBehaviour
         subscribed = true;
     }
 
+    public bool HasBaseStats => hasBaseStats;
+    public float BaseHealth => baseHealth;
+    public float BaseAttack => baseAttack;
+    public float BaseDefense => baseDefense;
+    public float BaseSpecialAttack => baseSpecialAttack;
+    public float BaseSpecialDefense => baseSpecialDefense;
+    public float BaseSpeed => baseSpeed;
+    public bool ShouldRefreshDifficulty => isActiveAndEnabled && gameObject.activeInHierarchy && (combatHealth == null || !combatHealth.IsDead);
+
+    public void CaptureBaseStats(CombatStats stats)
+    {
+        if (stats == null)
+        {
+            return;
+        }
+
+        hasBaseStats = true;
+        baseHealth = stats.maxHealth;
+        baseAttack = stats.physicalAttack;
+        baseDefense = stats.physicalDefense;
+        baseSpecialAttack = stats.specialAttack;
+        baseSpecialDefense = stats.specialDefense;
+        baseSpeed = stats.speed;
+    }
+
+    private void OnDisable()
+    {
+        director?.UnregisterTrackedEnemy(this);
+    }
+
     private void OnDestroy()
     {
+        director?.UnregisterTrackedEnemy(this);
         if (combatHealth != null && subscribed)
         {
             combatHealth.Died -= HandleDied;
