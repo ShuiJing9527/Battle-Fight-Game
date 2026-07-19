@@ -2184,7 +2184,9 @@ public class EnemyController : MonoBehaviour
                 out float fallbackAngle,
                 out Vector3 separationOffset);
 
-            float damage = Mathf.Max(0f, bossLeapSlamLandingDamage);
+            float configuredDamage = Mathf.Max(0f, bossLeapSlamLandingDamage);
+            float attackScale = MonsterDayNightAffinity.ResolveAttackScale(gameObject, BattleDamageType.Physical);
+            float damage = configuredDamage * attackScale;
             Vector3 launchVelocity = horizontalDirection * Mathf.Max(0f, bossLeapSlamKnockbackHorizontal) + Vector3.up * Mathf.Max(0f, bossLeapSlamKnockbackVertical);
             float playerHpBefore = ResolveCombatHealthValue(targetHealth);
             float playerShieldBefore = targetHealth.GetShield();
@@ -2254,6 +2256,8 @@ public class EnemyController : MonoBehaviour
                     "[BossLeapSlamTrace] event=LeapDamageApplying " +
                     "actionSequenceId=" + sequenceId +
                     " target=" + targetHealth.name +
+                    " configuredDamage=" + configuredDamage.ToString("F2") +
+                    " attackScale=" + attackScale.ToString("F2") +
                     " damage=" + damage.ToString("F2"),
                     this);
             }

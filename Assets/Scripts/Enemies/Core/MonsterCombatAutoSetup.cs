@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public static class MonsterCombatAutoSetup
 {
@@ -262,6 +263,17 @@ public static class MonsterCombatAutoSetup
         {
             monster.AddComponent<SplitBossMinionController>();
         }
+
+        if (identity != null && BattleTargetUtility.IsMonster(monster))
+        {
+            MonsterDayNightAffinity affinity = monster.GetComponent<MonsterDayNightAffinity>();
+            if (affinity == null)
+            {
+                affinity = monster.AddComponent<MonsterDayNightAffinity>();
+            }
+
+            affinity.NotifyStatsInitialized();
+        }
     }
 
     private static void EnsureRankVisual(GameObject monster, MonsterIdentity identity)
@@ -368,4 +380,239 @@ public sealed class MonsterStatVarianceState : MonoBehaviour
     public float physicalDefenseMultiplier = 1f;
     public float specialDefenseMultiplier = 1f;
     public float speedMultiplier = 1f;
+}
+
+[DisallowMultipleComponent]
+public sealed class MonsterDayNightAffinity : MonoBehaviour
+{
+    private enum MonsterAffinityState
+    {
+        Unknown,
+        Day,
+        Night
+    }
+
+    [Header("Polling")]
+    [Tooltip("How often the boss checks the existing TOD day/night state when no change event is available.")]
+    [SerializeField, Min(0.05f)] private float stateCheckInterval = 0.25f;
+    [Tooltip("How long to wait for the existing TOD day/night state to become available before logging an error.")]
+    [SerializeField, Min(0.1f)] private float initializationTimeout = 2f;
+
+    private CombatStats stats;
+    private MonsterIdentity identity;
+    private Coroutine runtimeCoroutine;
+    private MonsterAffinityState currentState = MonsterAffinityState.Unknown;
+    private bool baseStatsCaptured;
+    private bool missingStateLogged;
+    private float basePhysicalAttack;
+    private float baseSpecialAttack;
+    private float basePhysicalDefense;
+    private float baseSpecialDefense;
+
+    public void NotifyStatsInitialized()
+    {
+        CacheReferences();
+        baseStatsCaptured = false;
+        missingStateLogged = false;
+        currentState = MonsterAffinityState.Unknown;
+    }
+
+    private void OnEnable()
+    {
+        NotifyStatsInitialized();
+        if (runtimeCoroutine == null)
+        {
+            runtimeCoroutine = StartCoroutine(RuntimeLoop());
+        }
+    }
+
+    private void OnDisable()
+    {
+        if (runtimeCoroutine != null)
+        {
+            StopCoroutine(runtimeCoroutine);
+            runtimeCoroutine = null;
+        }
+    }
+
+    public static float ResolveAttackScale(GameObject owner, BattleDamageType damageType)
+    {
+        if (owner == null)
+        {
+            return 1f;
+        }
+
+        MonsterDayNightAffinity affinity = owner.GetComponent<MonsterDayNightAffinity>();
+        if (affinity == null)
+        {
+            affinity = owner.GetComponentInParent<MonsterDayNightAffinity>();
+        }
+
+        return affinity != null ? affinity.ResolveCurrentScale(damageType) : 1f;
+    }
+
+    private IEnumerator RuntimeLoop()
+    {
+        yield return null;
+
+        CacheReferences();
+        if (!IsEligibleMonster())
+        {
+            runtimeCoroutine = null;
+            yield break;
+        }
+
+        float startTime = Time.unscaledTime;
+        while (enabled)
+        {
+            if (!baseStatsCaptured)
+            {
+                CaptureBaseStats();
+            }
+
+            if (TryResolveState(out MonsterAffinityState resolvedState))
+            {
+                ApplyStateIfNeeded(resolvedState);
+                break;
+            }
+
+            if (!missingStateLogged && Time.unscaledTime - startTime >= Mathf.Max(0.1f, initializationTimeout))
+            {
+                missingStateLogged = true;
+                Debug.LogError(
+                    "[MonsterDayNightAffinity] Failed to resolve day/night state from TODDayNightAdapter within timeout. Monster affinity was not applied yet. object=" + name,
+                    this);
+            }
+
+            yield return null;
+        }
+
+        while (enabled)
+        {
+            if (!baseStatsCaptured)
+            {
+                CaptureBaseStats();
+            }
+
+            if (TryResolveState(out MonsterAffinityState resolvedState))
+            {
+                ApplyStateIfNeeded(resolvedState);
+            }
+
+            yield return new WaitForSeconds(Mathf.Max(0.05f, stateCheckInterval));
+        }
+
+        runtimeCoroutine = null;
+    }
+
+    private void CacheReferences()
+    {
+        if (stats == null)
+        {
+            stats = GetComponent<CombatStats>();
+        }
+
+        if (identity == null)
+        {
+            identity = GetComponent<MonsterIdentity>();
+        }
+    }
+
+    private bool IsEligibleMonster()
+    {
+        if (stats == null)
+        {
+            Debug.LogError("[MonsterDayNightAffinity] Missing CombatStats. Monster affinity cannot be applied. object=" + name, this);
+            return false;
+        }
+
+        if (identity == null)
+        {
+            Debug.LogError("[MonsterDayNightAffinity] Missing MonsterIdentity. Monster affinity cannot be applied. object=" + name, this);
+            return false;
+        }
+
+        return BattleTargetUtility.IsMonster(gameObject);
+    }
+
+    private void CaptureBaseStats()
+    {
+        if (baseStatsCaptured || stats == null)
+        {
+            return;
+        }
+
+        basePhysicalAttack = Mathf.Max(0f, stats.physicalAttack);
+        baseSpecialAttack = Mathf.Max(0f, stats.specialAttack);
+        basePhysicalDefense = Mathf.Max(0f, stats.physicalDefense);
+        baseSpecialDefense = Mathf.Max(0f, stats.specialDefense);
+        baseStatsCaptured = true;
+    }
+
+    private bool TryResolveState(out MonsterAffinityState resolvedState)
+    {
+        resolvedState = MonsterAffinityState.Unknown;
+        if (!TODDayNightAdapter.TryGetIsDay(out bool isDay) || !TODDayNightAdapter.TryGetIsNight(out bool isNight))
+        {
+            return false;
+        }
+
+        if (isDay == isNight)
+        {
+            return false;
+        }
+
+        resolvedState = isDay ? MonsterAffinityState.Day : MonsterAffinityState.Night;
+        return true;
+    }
+
+    private void ApplyStateIfNeeded(MonsterAffinityState resolvedState)
+    {
+        if (!baseStatsCaptured || stats == null || resolvedState == MonsterAffinityState.Unknown || currentState == resolvedState)
+        {
+            return;
+        }
+
+        switch (resolvedState)
+        {
+            case MonsterAffinityState.Day:
+                stats.physicalAttack = RoundCombatStat(basePhysicalAttack, 1f);
+                stats.specialAttack = RoundCombatStat(baseSpecialAttack, 1f);
+                stats.physicalDefense = RoundCombatStat(basePhysicalDefense, 2f);
+                stats.specialDefense = RoundCombatStat(baseSpecialDefense, 2f);
+                Debug.Log("[MonsterDayNightAffinity] " + name + " Day applied: DEF x2, SP.DEF x2.", this);
+                break;
+            case MonsterAffinityState.Night:
+                stats.physicalAttack = RoundCombatStat(basePhysicalAttack, 2f);
+                stats.specialAttack = RoundCombatStat(baseSpecialAttack, 2f);
+                stats.physicalDefense = RoundCombatStat(basePhysicalDefense, 1f);
+                stats.specialDefense = RoundCombatStat(baseSpecialDefense, 1f);
+                Debug.Log("[MonsterDayNightAffinity] " + name + " Night applied: ATK x2, SP.ATK x2.", this);
+                break;
+        }
+
+        currentState = resolvedState;
+    }
+
+    private float ResolveCurrentScale(BattleDamageType damageType)
+    {
+        if (!baseStatsCaptured || stats == null)
+        {
+            return 1f;
+        }
+
+        float baseValue = damageType == BattleDamageType.Physical ? basePhysicalAttack : baseSpecialAttack;
+        if (baseValue <= 0f)
+        {
+            return 1f;
+        }
+
+        float currentValue = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
+        return Mathf.Max(0f, currentValue) / baseValue;
+    }
+
+    private static float RoundCombatStat(float baseValue, float multiplier)
+    {
+        return Mathf.Max(0f, Mathf.Round(Mathf.Max(0f, baseValue) * Mathf.Max(0f, multiplier)));
+    }
 }

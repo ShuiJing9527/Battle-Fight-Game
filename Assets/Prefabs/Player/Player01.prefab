@@ -835,6 +835,27 @@ MonoBehaviour:
   rb: {fileID: 7237885085105757803}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1
+  minimumExternalLaunchRetriggerInterval: 0.15
+  externalLaunchMinimumLockDuration: 0.15
+  externalLaunchMaximumAirborneDuration: 2.5
+  externalLaunchGroundProbeDistance: 0.2
+  externalLaunchLandingConfirmFrames: 2
+  externalLaunchGroundSkin: 0.02
+  externalLaunchLeaveGroundDistance: 0.05
+  externalLaunchStartGroundCorrectionMax: 0.15
+  externalLaunchStartGroundSkin: 0.03
+  enableExternalLaunchRiseSafety: 1
+  externalLaunchRiseSafetyImpulse: 7
+  externalLaunchMinimumAcceptedUpwardVelocity: 1
+  externalLaunchMinimumAcceptedRiseDistance: 0.02
+  externalLaunchRiseVerificationSteps: 2
+  externalLaunchMinorGroundPenetrationMaxCorrection: 0.1
+  externalLaunchFallRecoveryDistance: 6
+  globalFallRecoveryDistance: 8
+  safeGroundUpdateMaxPenetration: 0.02
+  externalLaunchCollisionDetectionMode: 2
+  debugExternalLaunchMotion: 1
+  debugPlayerAirborneLanding: 0
 --- !u!114 &3400739130519414288
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -847,7 +868,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 20000
+  maxHealth: 200
   physicalAttack: 24
   physicalDefense: 14
   specialAttack: 18

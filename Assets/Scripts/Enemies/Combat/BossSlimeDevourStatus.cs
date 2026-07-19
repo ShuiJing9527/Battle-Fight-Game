@@ -96,8 +96,10 @@ public class BossSlimeDevourStatus : MonoBehaviour
             {
                 float valuePassedToTakeDamage = ResolveDamageValuePassedToHealth(
                     combatHealth,
+                    damageSource,
                     BattleDamageType.Special,
                     config.InitialDamage,
+                    out float scaledDamage,
                     out float targetDefense);
                 float healthBefore = ResolveCombatHealthValue(combatHealth);
                 float shieldBefore = combatHealth.GetShield();
@@ -106,6 +108,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
                     "event=InitialDamageApplying " +
                     "target=" + combatHealth.name +
                     " configuredDamage=" + config.InitialDamage.ToString("F2") +
+                    " scaledDamage=" + scaledDamage.ToString("F2") +
                     " damagePassedToHealth=" + valuePassedToTakeDamage.ToString("F2") +
                     " targetDefense=" + targetDefense.ToString("F2") +
                     " sequenceId=" + ownerSequenceId,
@@ -209,8 +212,10 @@ public class BossSlimeDevourStatus : MonoBehaviour
                         config.MaximumTickDamage);
                     float valuePassedToTakeDamage = ResolveDamageValuePassedToHealth(
                         combatHealth,
+                        damageSource,
                         BattleDamageType.Special,
                         configuredTickDamage,
+                        out float scaledDamage,
                         out float targetDefense);
 
                     Debug.Log(
@@ -220,6 +225,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
                         " target=" + combatHealth.name +
                         " tickIndex=" + damageTickIndex +
                         " calculatedDamage=" + configuredTickDamage.ToString("F2") +
+                        " scaledDamage=" + scaledDamage.ToString("F2") +
                         " damagePassedToHealth=" + valuePassedToTakeDamage.ToString("F2") +
                         " targetDefense=" + targetDefense.ToString("F2") +
                         " elapsedDevourTime=" + elapsed.ToString("F2"),
@@ -473,14 +479,17 @@ public class BossSlimeDevourStatus : MonoBehaviour
 
     private static float ResolveDamageValuePassedToHealth(
         CombatHealth health,
+        GameObject damageSource,
         BattleDamageType damageType,
         float configuredDamage,
+        out float scaledDamage,
         out float targetDefense)
     {
         targetDefense = 0f;
+        scaledDamage = Mathf.Max(0f, configuredDamage) * MonsterDayNightAffinity.ResolveAttackScale(damageSource, damageType);
         if (health == null)
         {
-            return configuredDamage;
+            return scaledDamage;
         }
 
         CombatStats stats = health.stats != null ? health.stats : health.GetComponent<CombatStats>();
@@ -491,7 +500,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
                 : Mathf.Max(0f, stats.specialDefense);
         }
 
-        return Mathf.Max(0f, configuredDamage + targetDefense);
+        return Mathf.Max(0f, scaledDamage + targetDefense);
     }
 
     private void LogTickDamageSequenceStopped(string reason)
