@@ -833,264 +833,24 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         // 鍏ㄥ眬鍐峰嵈鍊掕鏃?+ 鑷姩鍥炶摑
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
 
-        // Q 鎶€鑳?
         if (Keyboard.current.qKey.wasPressedThisFrame)
         {
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log("[SkillCD] Player02 Q pressed", this);
-            }
-
-            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-            if (skillHud != null && skillHud.IsSkillOnCooldown("Q"))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 Q blocked by HUD cooldown", this);
-                }
-
-                return;
-            }
-
-            if (!CanCastSkill(0))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 Q blocked by runtime cooldown or MP", this);
-                }
-
-                return;
-            }
-
-            bool consumeSucceeded = TryConsumeSkill(0);
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 Q consume result = {consumeSucceeded}", this);
-            }
-
-            if (!consumeSucceeded)
-            {
-                return;
-            }
-
-            bool castSucceeded = qSkill != null ? qSkill.Cast() : TryCastQFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 Q cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                cooldownManager?.RefundSkillResource(0);
-                return;
-            }
-
-            NotifyDayNightGaugeSkillCast(0, "Player02 Q");
-
-            if (skillHud != null)
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 Q start HUD cooldown", this);
-                }
-
-                skillHud.StartSkillCooldown("Q", ResolveSkillCooldownSeconds(qSkill, "Q"));
-            }
+            TryRequestSkillCast("Q", 0, qSkill, TryCastQFallback);
         }
 
-        // W 鎶€鑳?
         if (Keyboard.current.wKey.wasPressedThisFrame)
         {
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log("[SkillCD] Player02 W pressed", this);
-            }
-
-            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-            if (skillHud != null && skillHud.IsSkillOnCooldown("W"))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 W blocked by HUD cooldown", this);
-                }
-
-                return;
-            }
-
-            if (!CanCastSkill(1))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 W blocked by runtime cooldown or MP", this);
-                }
-
-                return;
-            }
-
-            bool consumeSucceeded = TryConsumeSkill(1);
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 W consume result = {consumeSucceeded}", this);
-            }
-
-            if (!consumeSucceeded)
-            {
-                return;
-            }
-
-            bool castSucceeded = wSkill != null ? wSkill.Cast() : TryCastWFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 W cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                cooldownManager?.RefundSkillResource(1);
-                return;
-            }
-
-            NotifyDayNightGaugeSkillCast(1, "Player02 W");
-
-            if (skillHud != null)
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 W start HUD cooldown", this);
-                }
-
-                skillHud.StartSkillCooldown("W", ResolveSkillCooldownSeconds(wSkill, "W"));
-            }
+            TryRequestSkillCast("W", 1, wSkill, TryCastWFallback);
         }
 
-        // E 鎶€鑳?
         if (Keyboard.current.eKey.wasPressedThisFrame)
         {
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log("[SkillCD] Player02 E pressed", this);
-            }
-
-            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-            if (skillHud != null && skillHud.IsSkillOnCooldown("E"))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 E blocked by HUD cooldown", this);
-                }
-
-                return;
-            }
-
-            if (!CanCastSkill(2))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 E blocked by runtime cooldown or MP", this);
-                }
-
-                return;
-            }
-
-            bool consumeSucceeded = TryConsumeSkill(2);
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 E consume result = {consumeSucceeded}", this);
-            }
-
-            if (!consumeSucceeded)
-            {
-                return;
-            }
-
-            bool castSucceeded = eSkill != null ? eSkill.Cast() : TryCastEFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 E cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                cooldownManager?.RefundSkillResource(2);
-                return;
-            }
-
-            NotifyDayNightGaugeSkillCast(2, "Player02 E");
-
-            if (skillHud != null)
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 E start HUD cooldown", this);
-                }
-
-                skillHud.StartSkillCooldown("E", ResolveSkillCooldownSeconds(eSkill, "E"));
-            }
+            TryRequestSkillCast("E", 2, eSkill, TryCastEFallback);
         }
 
-        // R 鎶€鑳?
         if (Keyboard.current.rKey.wasPressedThisFrame)
         {
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log("[SkillCD] Player02 R pressed", this);
-            }
-
-            PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
-            if (skillHud != null && skillHud.IsSkillOnCooldown("R"))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 R blocked by HUD cooldown", this);
-                }
-
-                return;
-            }
-
-            if (!CanCastSkill(3))
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 R blocked by runtime cooldown or MP", this);
-                }
-
-                return;
-            }
-
-            bool consumeSucceeded = TryConsumeSkill(3);
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 R consume result = {consumeSucceeded}", this);
-            }
-
-            if (!consumeSucceeded)
-            {
-                return;
-            }
-
-            bool castSucceeded = rSkill != null ? rSkill.Cast() : TryCastRFallback();
-            if (debugSkillCooldownFlow)
-            {
-                Debug.Log($"[SkillCD] Player02 R cast result = {castSucceeded}", this);
-            }
-
-            if (!castSucceeded)
-            {
-                cooldownManager?.RefundSkillResource(3);
-                return;
-            }
-
-            NotifyDayNightGaugeSkillCast(3, "Player02 R");
-
-            if (skillHud != null)
-            {
-                if (debugSkillCooldownFlow)
-                {
-                    Debug.Log("[SkillCD] Player02 R start HUD cooldown", this);
-                }
-
-                skillHud.StartSkillCooldown("R", ResolveSkillCooldownSeconds(rSkill, "R"));
-            }
+            TryRequestSkillCast("R", 3, rSkill, TryCastRFallback);
         }
     }
 
@@ -2785,13 +2545,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
     public void CastQ()
     {
-        if (qSkill != null)
-        {
-            qSkill.Cast();
-            return;
-        }
-
-        CastQLegacy();
+        TryRequestSkillCast("Q", 0, qSkill, TryCastQFallback);
     }
 
     private void CastQLegacy()
@@ -2849,18 +2603,17 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
     private bool TryCastQFallback()
     {
-        CastQ();
+        CastQLegacy();
         return true;
     }
 
     public void CastW()
     {
-        if (wSkill != null)
-        {
-            wSkill.Cast();
-            return;
-        }
+        TryRequestSkillCast("W", 1, wSkill, TryCastWFallback);
+    }
 
+    private bool TryCastWFallback()
+    {
         if (wSkillRoutine != null)
         {
             StopCoroutine(wSkillRoutine);
@@ -2869,26 +2622,12 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
         CleanupWVisuals();
         wSkillRoutine = StartCoroutine(ShieldRoutine());
-    }
-
-    private bool TryCastWFallback()
-    {
-        CastW();
         return true;
     }
 
     public void CastE()
     {
-        if (eSkill != null)
-        {
-            eSkill.Cast();
-            return;
-        }
-
-        if (!isDashing)
-        {
-            StartCoroutine(DashRoutine());
-        }
+        TryRequestSkillCast("E", 2, eSkill, TryCastEFallback);
     }
 
     private bool TryCastEFallback()
@@ -2898,25 +2637,102 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return false;
         }
 
-        CastE();
+        StartCoroutine(DashRoutine());
         return true;
     }
 
     public void CastR()
     {
-        if (rSkill != null)
-        {
-            rSkill.Cast();
-            return;
-        }
-
-        Debug.LogWarning(LegacyRDisabledWarning, this);
+        TryRequestSkillCast("R", 3, rSkill, TryCastRFallback);
     }
 
     private bool TryCastRFallback()
     {
         Debug.LogWarning(LegacyRDisabledWarning, this);
         return false;
+    }
+
+    private bool TryRequestSkillCast(string keyLabel, int skillIndex, PlayerSkillBase skill, System.Func<bool> fallbackCast)
+    {
+        if (debugSkillCooldownFlow)
+        {
+            Debug.Log($"[SkillCD] Player02 {keyLabel} pressed", this);
+        }
+
+        PlayerSkillHUD skillHud = FindObjectOfType<PlayerSkillHUD>();
+        if (skillHud != null && skillHud.IsSkillOnCooldown(keyLabel))
+        {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 {keyLabel} blocked by HUD cooldown", this);
+            }
+
+            return false;
+        }
+
+        if (!CanCastSkill(skillIndex))
+        {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 {keyLabel} blocked by runtime cooldown or MP", this);
+            }
+
+            return false;
+        }
+
+        bool consumeSucceeded = TryConsumeSkill(skillIndex);
+        if (debugSkillCooldownFlow)
+        {
+            Debug.Log($"[SkillCD] Player02 {keyLabel} consume result = {consumeSucceeded}", this);
+        }
+
+        if (!consumeSucceeded)
+        {
+            return false;
+        }
+
+        bool castSucceeded = skill != null ? skill.Cast() : (fallbackCast != null && fallbackCast());
+        if (debugSkillCooldownFlow)
+        {
+            Debug.Log($"[SkillCD] Player02 {keyLabel} cast result = {castSucceeded}", this);
+        }
+
+        if (!castSucceeded)
+        {
+            cooldownManager?.RefundSkillResource(skillIndex);
+            return false;
+        }
+
+        NotifyDayNightGaugeSkillCast(skillIndex, $"Player02 {keyLabel}");
+
+        if (skillHud != null)
+        {
+            if (debugSkillCooldownFlow)
+            {
+                Debug.Log($"[SkillCD] Player02 {keyLabel} start HUD cooldown", this);
+            }
+
+            skillHud.StartSkillCooldown(keyLabel, ResolveSkillCooldownSeconds(skill, keyLabel));
+        }
+
+        NotifySkillCastAudio(keyLabel);
+
+        return true;
+    }
+
+    private void NotifySkillCastAudio(string keyLabel)
+    {
+        SkillSFXByKey[] skillSfxPlayers = GetComponents<SkillSFXByKey>();
+        for (int i = 0; i < skillSfxPlayers.Length; i++)
+        {
+            SkillSFXByKey skillSfxPlayer = skillSfxPlayers[i];
+            if (skillSfxPlayer == null)
+            {
+                continue;
+            }
+
+            skillSfxPlayer.PlaySfxForSkillLabel(keyLabel);
+        }
     }
 
     // Legacy R fallback disabled. Current R is Player2Skill_R_DivineStarRain.

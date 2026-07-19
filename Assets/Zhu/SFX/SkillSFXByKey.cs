@@ -17,19 +17,46 @@ public class SkillSFXByKey : MonoBehaviour
     [Header("音量")]
     [Range(0f, 1f)] public float volume = 1f;
 
-    private void Update()
+    public void PlaySfxForSkillLabel(string skillLabel)
     {
-        if (flashKey != KeyCode.None && Input.GetKeyDown(flashKey))
+        if (string.IsNullOrWhiteSpace(skillLabel))
+        {
+            return;
+        }
+
+        switch (skillLabel.Trim().ToUpperInvariant())
+        {
+            case "Q":
+                PlayFlashSfx();
+                break;
+            case "E":
+                PlayDashSfx();
+                break;
+            case "R":
+                PlaySkillSfx();
+                break;
+        }
+    }
+
+    public void PlayFlashSfx()
+    {
+        if (flashSfx != null)
         {
             AudioManager.Instance?.PlaySFX(flashSfx, volume);
         }
+    }
 
-        if (dashKey != KeyCode.None && Input.GetKeyDown(dashKey))
+    public void PlayDashSfx()
+    {
+        if (dashSfx != null)
         {
             AudioManager.Instance?.PlaySFX(dashSfx, volume);
         }
+    }
 
-        if (skillKey != KeyCode.None && Input.GetKeyDown(skillKey))
+    public void PlaySkillSfx()
+    {
+        if (skillSfx != null)
         {
             AudioManager.Instance?.PlaySFX(skillSfx, volume);
         }

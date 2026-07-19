@@ -776,6 +776,8 @@ public class Player01SkillController : MonoBehaviour
 
             SyncSkillHudCooldown(keyLabel, skillHud);
         }
+
+        NotifySkillCastAudio(keyLabel);
     }
 
     public void SyncSkillHudCooldown(string keyLabel)
@@ -846,6 +848,21 @@ public class Player01SkillController : MonoBehaviour
                 return rCooldown;
             default:
                 return 0f;
+        }
+    }
+
+    private void NotifySkillCastAudio(string keyLabel)
+    {
+        SkillSFXByKey[] skillSfxPlayers = GetComponents<SkillSFXByKey>();
+        for (int i = 0; i < skillSfxPlayers.Length; i++)
+        {
+            SkillSFXByKey skillSfxPlayer = skillSfxPlayers[i];
+            if (skillSfxPlayer == null)
+            {
+                continue;
+            }
+
+            skillSfxPlayer.PlaySfxForSkillLabel(keyLabel);
         }
     }
 
