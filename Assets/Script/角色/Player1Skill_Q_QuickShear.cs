@@ -182,12 +182,14 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     private void OnDisable()
     {
+        TwinStateCombatBonus.ReleaseNightChildSkillCast(Controller != null ? Controller.gameObject : gameObject, SkillIndex, currentRuneCastId);
         StopActiveScissorTimeline();
         StopQMovementLockRoutine();
     }
 
     private void OnDestroy()
     {
+        TwinStateCombatBonus.ReleaseNightChildSkillCast(Controller != null ? Controller.gameObject : gameObject, SkillIndex, currentRuneCastId);
         StopActiveScissorTimeline();
         StopQMovementLockRoutine();
     }
@@ -424,6 +426,14 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
                 combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
+                TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
+                    Controller != null ? Controller.gameObject : gameObject,
+                    combatHealth,
+                    BattleDamageType.Physical,
+                    SkillIndex,
+                    currentRuneCastId,
+                    this,
+                    "Player01 Q");
                 float afterHealth = ResolveCurrentHealth(combatHealth);
                 float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(SkillIndex, combatHealth, actualDamage);
@@ -1228,6 +1238,8 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     protected override void OnCastFinished()
     {
+        TwinStateCombatBonus.ReleaseNightChildSkillCast(Controller != null ? Controller.gameObject : gameObject, SkillIndex, currentRuneCastId);
+        currentRuneCastId = -1;
         Debug.Log("[Player01 Q Lock] OnCastFinished requested unlock", this);
 
         if (qLifestealTotalThisCast > 0f)

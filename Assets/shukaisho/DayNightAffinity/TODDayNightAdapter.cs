@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Reflection;
 using AHD2TimeOfDay;
 using UnityEngine;
@@ -47,6 +48,87 @@ public static class TODDayNightAdapter
 
         TODController controller = ResolveController();
         return controller != null ? controller.name : "Unavailable";
+    }
+
+    public static bool TryGetCurrentTimeHours(out float currentTimeHours)
+    {
+        currentTimeHours = 0f;
+        object parameters = ResolveParameters();
+        if (parameters == null)
+        {
+            return false;
+        }
+
+        if (TryReadFloat(parameters, out currentTimeHours, "CurrentTime", "_currentTime", "currentTime"))
+        {
+            currentTimeHours = NormalizeHour(currentTimeHours);
+            return true;
+        }
+
+        return false;
+    }
+
+    public static bool TryGetSunriseSunsetHours(out float sunriseHour, out float sunsetHour)
+    {
+        sunriseHour = 0f;
+        sunsetHour = 0f;
+
+        object parameters = ResolveParameters();
+        if (parameters == null)
+        {
+            return false;
+        }
+
+        if (!TryReadMember(parameters, "timeOfDays", out object timeOfDaysRaw) || !(timeOfDaysRaw is TimeOfDay[] timeOfDays) || timeOfDays.Length == 0)
+        {
+            return false;
+        }
+
+        TimeOfDay[] ordered = new TimeOfDay[timeOfDays.Length];
+        int orderedCount = 0;
+        for (int i = 0; i < timeOfDays.Length; i++)
+        {
+            if (timeOfDays[i] == null)
+            {
+                continue;
+            }
+
+            ordered[orderedCount++] = timeOfDays[i];
+        }
+
+        if (orderedCount < 2)
+        {
+            return false;
+        }
+
+        System.Array.Sort(ordered, 0, orderedCount, Comparer<TimeOfDay>.Create((a, b) => a.CurrentTODTime.CompareTo(b.CurrentTODTime)));
+
+        bool sunriseFound = false;
+        bool sunsetFound = false;
+        for (int i = 0; i < orderedCount; i++)
+        {
+            TimeOfDay current = ordered[i];
+            TimeOfDay previous = ordered[(i - 1 + orderedCount) % orderedCount];
+            if (current == null || previous == null)
+            {
+                continue;
+            }
+
+            bool currentIsNight = current.dayOrNight;
+            bool previousIsNight = previous.dayOrNight;
+            if (previousIsNight && !currentIsNight)
+            {
+                sunriseHour = NormalizeHour(current.CurrentTODTime);
+                sunriseFound = true;
+            }
+            else if (!previousIsNight && currentIsNight)
+            {
+                sunsetHour = NormalizeHour(current.CurrentTODTime);
+                sunsetFound = true;
+            }
+        }
+
+        return sunriseFound && sunsetFound;
     }
 
     private static bool TryReadDayNightValue(out float value)
@@ -132,6 +214,22 @@ public static class TODDayNightAdapter
         }
 
         return false;
+    }
+
+    private static float NormalizeHour(float value)
+    {
+        if (float.IsNaN(value) || float.IsInfinity(value))
+        {
+            return 0f;
+        }
+
+        value %= 24f;
+        if (value < 0f)
+        {
+            value += 24f;
+        }
+
+        return value;
     }
 
     private static bool TryReadMember(object source, string memberName, out object value)

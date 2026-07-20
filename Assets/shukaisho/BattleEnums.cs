@@ -66,6 +66,11 @@ public struct BattleDamage
     public BattleDamageType damageType;
     public GameObject source;
     public bool isCritical;
+    public bool bypassAttackerMultipliers;
+    public bool bypassAmbientAffinity;
+    public bool bypassAffinityModifier;
+    public bool suppressGaugeNotification;
+    public string debugTag;
 
     public BattleDamage(float amount, BattleDamageType damageType, GameObject source, bool isCritical = false)
     {
@@ -73,5 +78,10 @@ public struct BattleDamage
         this.damageType = damageType;
         this.source = source;
         this.isCritical = isCritical;
+        bypassAttackerMultipliers = false;
+        bypassAmbientAffinity = false;
+        bypassAffinityModifier = false;
+        suppressGaugeNotification = false;
+        debugTag = string.Empty;
     }
 }

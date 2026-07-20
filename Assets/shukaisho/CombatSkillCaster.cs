@@ -74,6 +74,8 @@ public class CombatSkillCaster : MonoBehaviour
             attackPoint = transform;
         }
 
+        TwinStateCombatBonus.EnsureFormalStateStatus(gameObject);
+
         if (Application.isPlaying)
         {
             RuntimeRuneScaling.ForceRefresh($"{nameof(CombatSkillCaster)}.{nameof(Awake)}:{name}");

@@ -59,6 +59,7 @@ public class RuneBagUI : MonoBehaviour
     private RuneDefinition selectedRune;
     private Player2Bootstrap cachedBootstrap;
     private CombatSkillCaster skillCaster;
+    private GameObject currentPlayer;
     private Vector3 panelBaseScale = Vector3.one;
     private bool panelBaseScaleCaptured;
     private bool pauseApplied;
@@ -260,6 +261,7 @@ public class RuneBagUI : MonoBehaviour
             return;
         }
 
+        SyncDisplayedSkillSlotsFromCurrentPlayer();
         int count = Mathf.Min(skillSlots.Length, skillSlotUIs.Length);
         for (int i = 0; i < count; i++)
         {
@@ -354,12 +356,20 @@ public class RuneBagUI : MonoBehaviour
             return;
         }
 
+        if (GetAvailableRuneCount(selectedRune) <= 0)
+        {
+            Debug.LogWarning("[RuneBagUI] No available copy of the selected rune.");
+            RefreshAll();
+            return;
+        }
+
         int runeSlotIndex = Mathf.Clamp(skillIndex, 0, skill.equippedRunes.Length - 1);
         skill.equippedRunes[runeSlotIndex] = selectedRune;
         slot.equippedRune = selectedRune;
         skillCaster.RefreshRuneState();
 
         Debug.Log($"[RuneBagUI] Equipped {GetRuneName(selectedRune)} to {slot.skillName} slot {runeSlotIndex}");
+        RefreshRuneList();
         RefreshSkillSlots();
     }
 
@@ -513,15 +523,33 @@ public class RuneBagUI : MonoBehaviour
 
     private int CountEquippedRuneCopies(RuneDefinition rune)
     {
-        if (rune == null || skillCaster == null || skillSlots == null)
+        if (rune == null)
         {
             return 0;
         }
 
         int count = 0;
-        for (int skillIndex = 0; skillIndex < skillSlots.Length; skillIndex++)
+        CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
+        for (int casterIndex = 0; casterIndex < casters.Length; casterIndex++)
         {
-            BattleSkill skill = skillCaster.GetSkill(skillIndex);
+            count += CountEquippedRuneCopies(casters[casterIndex], rune);
+        }
+
+        return count;
+    }
+
+    private int CountEquippedRuneCopies(CombatSkillCaster caster, RuneDefinition rune)
+    {
+        if (caster == null || rune == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        int skillCount = skillSlots != null ? skillSlots.Length : 0;
+        for (int skillIndex = 0; skillIndex < skillCount; skillIndex++)
+        {
+            BattleSkill skill = caster.GetSkill(skillIndex);
             if (skill == null || skill.equippedRunes == null)
             {
                 continue;
@@ -537,6 +565,35 @@ public class RuneBagUI : MonoBehaviour
         }
 
         return count;
+    }
+
+    private int CountRuneCopiesInInventory(RuneDefinition rune)
+    {
+        if (rune == null || runeInventory == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int i = 0; i < runeInventory.Count; i++)
+        {
+            if (RuneMatches(runeInventory.GetRune(i), rune))
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+    private int GetAvailableRuneCount(RuneDefinition rune)
+    {
+        if (rune == null)
+        {
+            return 0;
+        }
+
+        return Mathf.Max(0, CountRuneCopiesInInventory(rune) - CountEquippedRuneCopies(rune));
     }
 
     private string GetRuneStackKey(RuneDefinition rune)
@@ -727,9 +784,19 @@ public class RuneBagUI : MonoBehaviour
             runeInventory = ResolveSharedRuneInventory();
         }
 
-        if (skillCaster == null)
+        GameObject resolvedCurrentPlayer = ResolveCurrentPlayer();
+        bool playerChanged = currentPlayer != resolvedCurrentPlayer;
+        currentPlayer = resolvedCurrentPlayer;
+
+        if (playerChanged)
         {
-            skillCaster = ResolveSharedSkillCaster();
+            ClearDisplayedSkillSlots();
+            ClearSelectedRune();
+        }
+
+        if (skillCaster == null || !DoesSkillCasterBelongToCurrentPlayer(skillCaster, currentPlayer))
+        {
+            skillCaster = ResolveCurrentPlayerSkillCaster(currentPlayer);
         }
     }
 
@@ -767,26 +834,66 @@ public class RuneBagUI : MonoBehaviour
         return null;
     }
 
-    private CombatSkillCaster ResolveSharedSkillCaster()
+    private GameObject ResolveCurrentPlayer()
     {
-        if (cachedBootstrap != null)
+        if (cachedBootstrap != null && cachedBootstrap.CurrentPlayer != null)
         {
-            GameObject current = cachedBootstrap.CurrentPlayer;
-            if (current != null)
+            return cachedBootstrap.CurrentPlayer;
+        }
+
+        CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
+        for (int i = 0; i < casters.Length; i++)
+        {
+            CombatSkillCaster caster = casters[i];
+            if (caster != null && caster.isActiveAndEnabled && caster.gameObject.activeInHierarchy)
             {
-                CombatSkillCaster currentCaster = current.GetComponent<CombatSkillCaster>();
-                if (currentCaster != null)
-                {
-                    return currentCaster;
-                }
+                Debug.LogWarning("[RuneBagUI] Falling back to active CombatSkillCaster because Player2Bootstrap.CurrentPlayer is unavailable.");
+                return caster.gameObject;
+            }
+        }
+
+        if (casters != null && casters.Length > 0 && casters[0] != null)
+        {
+            Debug.LogWarning("[RuneBagUI] Falling back to the first CombatSkillCaster because no current player could be resolved.");
+            return casters[0].gameObject;
+        }
+
+        return null;
+    }
+
+    private CombatSkillCaster ResolveCurrentPlayerSkillCaster(GameObject player)
+    {
+        if (player != null)
+        {
+            CombatSkillCaster playerCaster = player.GetComponent<CombatSkillCaster>();
+            if (playerCaster != null)
+            {
+                return playerCaster;
             }
 
+            playerCaster = player.GetComponentInChildren<CombatSkillCaster>(true);
+            if (playerCaster != null)
+            {
+                return playerCaster;
+            }
+        }
+
+        if (cachedBootstrap != null)
+        {
             GameObject leader = cachedBootstrap.PartyLeader;
-            if (leader != null)
+            if (leader != null && leader != player)
             {
                 CombatSkillCaster leaderCaster = leader.GetComponent<CombatSkillCaster>();
                 if (leaderCaster != null)
                 {
+                    Debug.LogWarning("[RuneBagUI] Falling back to the party leader CombatSkillCaster because the current player caster could not be resolved.");
+                    return leaderCaster;
+                }
+
+                leaderCaster = leader.GetComponentInChildren<CombatSkillCaster>(true);
+                if (leaderCaster != null)
+                {
+                    Debug.LogWarning("[RuneBagUI] Falling back to the party leader child CombatSkillCaster because the current player caster could not be resolved.");
                     return leaderCaster;
                 }
             }
@@ -795,10 +902,74 @@ public class RuneBagUI : MonoBehaviour
         CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
         if (casters != null && casters.Length > 0)
         {
+            Debug.LogWarning("[RuneBagUI] Falling back to the first CombatSkillCaster in scene because the current player caster could not be resolved.");
             return casters[0];
         }
 
         return null;
+    }
+
+    private bool DoesSkillCasterBelongToCurrentPlayer(CombatSkillCaster candidate, GameObject player)
+    {
+        if (candidate == null || player == null)
+        {
+            return false;
+        }
+
+        return candidate.gameObject == player || candidate.transform.IsChildOf(player.transform);
+    }
+
+    private void SyncDisplayedSkillSlotsFromCurrentPlayer()
+    {
+        if (skillSlots == null)
+        {
+            return;
+        }
+
+        for (int skillIndex = 0; skillIndex < skillSlots.Length; skillIndex++)
+        {
+            SkillSlot slot = skillSlots[skillIndex];
+            if (slot == null)
+            {
+                continue;
+            }
+
+            slot.equippedRune = GetDisplayedEquippedRune(skillIndex);
+        }
+    }
+
+    private RuneDefinition GetDisplayedEquippedRune(int skillIndex)
+    {
+        if (skillCaster == null)
+        {
+            return null;
+        }
+
+        BattleSkill skill = skillCaster.GetSkill(skillIndex);
+        if (skill == null || skill.equippedRunes == null || skill.equippedRunes.Length <= 0)
+        {
+            return null;
+        }
+
+        int runeSlotIndex = Mathf.Clamp(skillIndex, 0, skill.equippedRunes.Length - 1);
+        return skill.equippedRunes[runeSlotIndex];
+    }
+
+    private void ClearDisplayedSkillSlots()
+    {
+        if (skillSlots == null)
+        {
+            return;
+        }
+
+        for (int i = 0; i < skillSlots.Length; i++)
+        {
+            SkillSlot slot = skillSlots[i];
+            if (slot != null)
+            {
+                slot.equippedRune = null;
+            }
+        }
     }
 
     private void CapturePanelBaseScale()

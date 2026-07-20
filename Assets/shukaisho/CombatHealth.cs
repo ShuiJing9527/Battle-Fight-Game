@@ -239,18 +239,26 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        float outgoingDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
-        CombatStats attackerStats = BattleStatUtility.GetCombatStats(damage.source);
-        if (attackerStats != null)
+        float outgoingDamage = damage.bypassAttackerMultipliers
+            ? Mathf.Max(0f, damage.amount)
+            : BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
+        CombatStats attackerStats = !damage.bypassAttackerMultipliers ? BattleStatUtility.GetCombatStats(damage.source) : null;
+        if (!damage.bypassAttackerMultipliers && attackerStats != null)
         {
             outgoingDamage *= Mathf.Max(0f, attackerStats.outgoingDamageMultiplier);
         }
         damage.amount = outgoingDamage;
         float reducedDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
         float finalDamage = reducedDamage;
-        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _);
+        if (!damage.bypassAffinityModifier)
+        {
+            bool includeAmbientAffinity = !damage.bypassAttackerMultipliers && !damage.bypassAmbientAffinity;
+            finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _, includeAmbientAffinity);
+        }
         float afterAffinityDamage = finalDamage;
         GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
+        finalDamage = TwinStateCombatBonus.ApplyNightChildIncomingDamageReduction(gameObject, resolvedMonsterSource, finalDamage, this, damage.debugTag);
+        float afterTwinReductionDamage = finalDamage;
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
         {
@@ -297,6 +305,10 @@ public class CombatHealth : MonoBehaviour
             {
                 noEffectiveDamageReason = "DayNightModifierReducedToZero";
             }
+            else if (afterTwinReductionDamage <= 0f)
+            {
+                noEffectiveDamageReason = "TwinStateReductionReducedToZero";
+            }
             else if (afterRuneDamage <= 0f)
             {
                 noEffectiveDamageReason = "RuneIncomingMultiplierReducedToZero";
@@ -332,6 +344,7 @@ public class CombatHealth : MonoBehaviour
                 " outgoingDamage=" + outgoingDamage.ToString("F2") +
                 " reducedDamage=" + reducedDamage.ToString("F2") +
                 " afterAffinityDamage=" + afterAffinityDamage.ToString("F2") +
+                " afterTwinReductionDamage=" + afterTwinReductionDamage.ToString("F2") +
                 " afterRuneDamage=" + afterRuneDamage.ToString("F2") +
                 " afterIncomingMultiplierDamage=" + afterIncomingMultiplierDamage.ToString("F2") +
                 " afterShieldDamage=" + afterShieldDamage.ToString("F2") +
@@ -347,7 +360,7 @@ public class CombatHealth : MonoBehaviour
         }
 
         bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(damage.amount, outgoingDamage, resolvedDamageBeforeShieldAndGuard);
-        if (shouldNotifyGaugeHit)
+        if (shouldNotifyGaugeHit && !damage.suppressGaugeNotification)
         {
             bool notifiedGauge = DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(damage.source, gameObject);
             if (!notifiedGauge)
@@ -452,28 +465,40 @@ public class CombatHealth : MonoBehaviour
 
     public void ApplyDirectDamage(float amount, GameObject source, DamagePopupType popupType, bool isCritical = false)
     {
+        ApplyDirectDamage(new BattleDamage(amount, BattleDamageType.Physical, source, isCritical), popupType);
+    }
+
+    public void ApplyDirectDamage(BattleDamage damage, DamagePopupType popupType)
+    {
         if (dead)
         {
             DayNightGaugeHitFlowLog("ApplyDirectDamage skipped reason=target-dead", gameObject);
             return;
         }
 
-        if (ShouldIgnoreDamageFrom(source))
+        if (ShouldIgnoreDamageFrom(damage.source))
         {
-            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=ignored-source source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)}", gameObject);
+            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=ignored-source source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
-        if (TryEvadeDamage(source, out _))
+        if (TryEvadeDamage(damage.source, out _))
         {
             ShowMissPopup();
-            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=miss source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)}", gameObject);
+            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=miss source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
             return;
         }
 
-        float finalDamage = BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(source, amount);
-        finalDamage = DayNightAffinityDamageModifier.ApplyModifier(source, gameObject, finalDamage, out _);
-        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(source);
+        float finalDamage = damage.bypassAttackerMultipliers
+            ? Mathf.Max(0f, damage.amount)
+            : BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
+        if (!damage.bypassAffinityModifier)
+        {
+            bool includeAmbientAffinity = !damage.bypassAttackerMultipliers && !damage.bypassAmbientAffinity;
+            finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _, includeAmbientAffinity);
+        }
+        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
+        finalDamage = TwinStateCombatBonus.ApplyNightChildIncomingDamageReduction(gameObject, resolvedMonsterSource, finalDamage, this, damage.debugTag);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
         {
@@ -493,31 +518,31 @@ public class CombatHealth : MonoBehaviour
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
         }
 
-        bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(amount, amount, resolvedDamageBeforeShield);
-        if (shouldNotifyGaugeHit)
+        bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(damage.amount, finalDamage, resolvedDamageBeforeShield);
+        if (shouldNotifyGaugeHit && !damage.suppressGaugeNotification)
         {
-            bool notifiedGauge = DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(source, gameObject);
+            bool notifiedGauge = DayNightAffinityDamageModifier.NotifySuccessfulPlayerHit(damage.source, gameObject);
             if (!notifiedGauge)
             {
                 DayNightGaugeHitFlowLog(
-                    $"ApplyDirectDamage gauge-notified=False source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)} inputDamage={amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
+                    $"ApplyDirectDamage gauge-notified=False source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} inputDamage={damage.amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
                     gameObject);
             }
         }
         else
         {
             DayNightGaugeHitFlowLog(
-                $"ApplyDirectDamage skipped reason=no-effective-damage-resolution source={GetDebugObjectName(source)} target={GetDebugObjectName(gameObject)} inputDamage={amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
+                $"ApplyDirectDamage skipped reason=no-effective-damage-resolution source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} inputDamage={damage.amount:F2} preShieldDamage={resolvedDamageBeforeShield:F2} finalDamage={finalDamage:F2}",
                 gameObject);
         }
 
         if (finalDamage > 0f)
         {
-            ThornCounterEntryLog("ApplyDirectDamage", gameObject, source, finalDamage);
+            ThornCounterEntryLog("ApplyDirectDamage", gameObject, damage.source, finalDamage);
             ThornCounterEntryLog(
                 "ApplyDirectDamage:ResolvedSource",
                 gameObject,
-                resolvedMonsterSource != null ? resolvedMonsterSource : source,
+                resolvedMonsterSource != null ? resolvedMonsterSource : damage.source,
                 finalDamage);
             bool targetIsPlayer = BattleTargetUtility.IsPlayer(gameObject);
             runeRuntimeState = ResolveRuneRuntimeState();
@@ -539,14 +564,14 @@ public class CombatHealth : MonoBehaviour
                 runeRuntimeState.NotifyIncomingMonsterDamage(resolvedMonsterSource, finalDamage);
             }
 
-            Damaged?.Invoke(finalDamage, source);
-            ShowDamagePopup(finalDamage, popupType, isCritical);
+            Damaged?.Invoke(finalDamage, damage.source);
+            ShowDamagePopup(finalDamage, popupType, damage.isCritical);
             TriggerAnimation(hitTrigger);
         }
 
         if (currentHealth <= 0f)
         {
-            Die(source);
+            Die(damage.source);
         }
     }
 

@@ -809,7 +809,12 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        attackerHealth.ApplyDirectDamage(damage, gameObject, DamagePopupType.Normal, false);
+        BattleDamage retaliationDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
+        {
+            bypassAmbientAffinity = true,
+            debugTag = "BaseThornReflect"
+        };
+        attackerHealth.ApplyDirectDamage(retaliationDamage, DamagePopupType.Normal);
         TryTriggerThornDrain(damage, "BaseThornReflect");
     }
 
@@ -908,7 +913,12 @@ public class RuneRuntimeState : MonoBehaviour
             if (!damagedCombatTargets.Contains(attackerHealth) && attackerHealth != combatHealth)
             {
                 float beforeHealth = ResolveCurrentHealth(attackerHealth);
-                attackerHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
+                BattleDamage burstRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
+                {
+                    bypassAmbientAffinity = true,
+                    debugTag = "ThornCounter"
+                };
+                attackerHealth.ApplyDirectDamage(burstRetaliationDamage, DamagePopupType.Normal);
                 float afterHealth = ResolveCurrentHealth(attackerHealth);
                 damagedCombatTargets.Add(attackerHealth);
                 hitCount++;
@@ -932,7 +942,12 @@ public class RuneRuntimeState : MonoBehaviour
                     }
 
                     float beforeHealth = ResolveCurrentHealth(targetHealth);
-                    targetHealth.ApplyDirectDamage(burstDamage, gameObject, DamagePopupType.Normal, false);
+                    BattleDamage areaRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
+                    {
+                        bypassAmbientAffinity = true,
+                        debugTag = "ThornCounter"
+                    };
+                    targetHealth.ApplyDirectDamage(areaRetaliationDamage, DamagePopupType.Normal);
                     float afterHealth = ResolveCurrentHealth(targetHealth);
                     hitCount++;
                     DevThornCounterLog($"Applied damage to {targetHealth.name} result={Mathf.Max(0f, beforeHealth - afterHealth):F2}");
@@ -1111,7 +1126,12 @@ public class RuneRuntimeState : MonoBehaviour
         suppressReactiveAutoEffects = true;
         try
         {
-            attackerHealth.ApplyDirectDamage(damage, gameObject, DamagePopupType.Normal, false);
+            BattleDamage backlashDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
+            {
+                bypassAmbientAffinity = true,
+                debugTag = "ThornSet4Retaliation"
+            };
+            attackerHealth.ApplyDirectDamage(backlashDamage, DamagePopupType.Normal);
         }
         finally
         {

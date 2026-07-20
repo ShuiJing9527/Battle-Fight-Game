@@ -967,7 +967,10 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        CacheBootstrap();
+        GameObject resolvedCurrentPlayer = cachedBootstrap != null ? cachedBootstrap.CurrentPlayer : null;
         RuneUIContextResolver.Resolve(
+            resolvedCurrentPlayer,
             out currentPlayer,
             out currentRuneLibrary,
             out currentSkillCaster,
@@ -1514,7 +1517,14 @@ public class RuneUIController : MonoBehaviour
             return;
         }
 
+        GameObject previousPlayer = currentPlayer;
         ResolveCurrentPlayerContext();
+        if (previousPlayer != currentPlayer)
+        {
+            SetSelectedRune(null);
+            RestoreSharedDescription();
+        }
+
         RefreshRuneList();
         RefreshSkillSlots();
         RefreshSkillInfoVisuals();
@@ -3261,6 +3271,7 @@ public class RuneUIController : MonoBehaviour
 public static class RuneUIContextResolver
 {
     public static bool Resolve(
+        GameObject explicitCurrentPlayer,
         out GameObject player,
         out RuneLibrary runeLibrary,
         out CombatSkillCaster skillCaster,
@@ -3271,51 +3282,89 @@ public static class RuneUIContextResolver
         skillCaster = null;
         runeInventory = null;
 
+        player = ResolveCurrentPlayer(explicitCurrentPlayer);
+        if (player != null)
+        {
+            skillCaster = ResolveComponentForCurrentPlayer<CombatSkillCaster>(player);
+        }
+
+        runeInventory = FindSharedRuneInventory();
+        if (runeInventory == null && player != null)
+        {
+            runeInventory = ResolveComponentForCurrentPlayer<RuneInventory>(player);
+        }
+
+        runeLibrary = FindSharedRuneLibrary();
+        return player != null || runeLibrary != null || runeInventory != null || skillCaster != null;
+    }
+
+    public static bool Resolve(
+        out GameObject player,
+        out RuneLibrary runeLibrary,
+        out CombatSkillCaster skillCaster,
+        out RuneInventory runeInventory)
+    {
+        return Resolve(null, out player, out runeLibrary, out skillCaster, out runeInventory);
+    }
+
+    private static GameObject ResolveCurrentPlayer(GameObject explicitCurrentPlayer)
+    {
+        if (explicitCurrentPlayer != null)
+        {
+            return explicitCurrentPlayer;
+        }
+
+        Player2Bootstrap bootstrap = Object.FindObjectOfType<Player2Bootstrap>(true);
+        if (bootstrap != null && bootstrap.CurrentPlayer != null)
+        {
+            return bootstrap.CurrentPlayer;
+        }
+
         CombatSkillCaster[] casters = Object.FindObjectsOfType<CombatSkillCaster>(true);
         for (int i = 0; i < casters.Length; i++)
         {
             CombatSkillCaster caster = casters[i];
             if (caster != null && caster.isActiveAndEnabled && caster.gameObject.activeInHierarchy)
             {
-                skillCaster = caster;
-                player = caster.gameObject;
-                break;
+                Debug.LogWarning("[RuneUI] Falling back to active CombatSkillCaster because Player2Bootstrap.CurrentPlayer is unavailable.");
+                return caster.gameObject;
             }
         }
 
-        if (player == null && casters.Length > 0)
+        if (casters != null && casters.Length > 0 && casters[0] != null)
         {
-            skillCaster = casters[0];
-            if (skillCaster != null)
-            {
-                player = skillCaster.gameObject;
-            }
+            Debug.LogWarning("[RuneUI] Falling back to the first CombatSkillCaster because no active current player could be resolved.");
+            return casters[0].gameObject;
         }
 
-        if (player != null)
+        return null;
+    }
+
+    private static T ResolveComponentForCurrentPlayer<T>(GameObject player) where T : Component
+    {
+        if (player == null)
         {
-            if (skillCaster == null)
-            {
-                skillCaster = player.GetComponentInChildren<CombatSkillCaster>(true) ?? player.GetComponent<CombatSkillCaster>();
-            }
+            return null;
         }
 
-        runeInventory = FindSharedRuneInventory();
-        if (runeInventory == null && player != null)
+        T component = player.GetComponent<T>();
+        if (component != null)
         {
-            runeInventory = player.GetComponentInChildren<RuneInventory>(true) ?? player.GetComponent<RuneInventory>();
+            return component;
         }
 
-        if (runeLibrary == null)
+        return player.GetComponentInChildren<T>(true);
+    }
+
+    private static RuneLibrary FindSharedRuneLibrary()
+    {
+        RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
+        if (libraries != null && libraries.Length > 0)
         {
-            RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
-            if (libraries != null && libraries.Length > 0)
-            {
-                runeLibrary = libraries[0];
-            }
+            return libraries[0];
         }
 
-        return player != null || runeLibrary != null || runeInventory != null || skillCaster != null;
+        return null;
     }
 
     private static RuneInventory FindSharedRuneInventory()

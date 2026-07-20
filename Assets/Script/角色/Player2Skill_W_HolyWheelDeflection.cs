@@ -548,7 +548,6 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float outgoingDamageMultiplier = Mathf.Max(0f, ResolveRuneOutgoingDamageMultiplier());
         float physicalFinalDamage = Mathf.Max(1f, (physicalRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.physicalDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier) * outgoingDamageMultiplier);
         float specialFinalDamage = Mathf.Max(1f, (specialRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier) * outgoingDamageMultiplier);
-
         if (combatHealth != null && combatHealth.gameObject != Owner.gameObject)
         {
             combatHealth.ApplyDirectDamage(physicalFinalDamage, Owner.gameObject, DamagePopupType.Physical);

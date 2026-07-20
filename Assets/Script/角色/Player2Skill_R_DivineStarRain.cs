@@ -263,6 +263,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private int remainingRVisibleStarBladeSpawnBudget;
     // Day Child state is independent from day/night phase.
     private bool dayChildStateActiveThisCast;
+    private TwinStateCombatBonus.DayChildRSnapshot dayChildRTwinSnapshot;
     private bool dayBuffDamageLoggedThisCast;
     private bool dayBuffAuraHealLoggedThisCast;
     protected override int SkillIndex => 3;
@@ -311,6 +312,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         remainingRVisibleStarBladeSpawnBudget = 0;
         activeRuneCastId = -1;
         dayChildStateActiveThisCast = false;
+        dayChildRTwinSnapshot = default(TwinStateCombatBonus.DayChildRSnapshot);
         dayBuffDamageLoggedThisCast = false;
         dayBuffAuraHealLoggedThisCast = false;
         ResetRuneCastContext();
@@ -364,6 +366,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         float finalRotationSpeed = ResolveFinalSwarmRotationSpeed(totalStarBladeCount);
         runeRuntimeState = ResolveRuneRuntimeState();
         dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
+        dayChildRTwinSnapshot = TwinStateCombatBonus.CreateDayChildRSnapshot(Owner != null ? Owner.gameObject : gameObject, this);
         dayBuffDamageLoggedThisCast = false;
         dayBuffAuraHealLoggedThisCast = false;
         PrepareRuneCastContext();
@@ -1162,6 +1165,11 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                         dayBuffDamageLoggedThisCast = true;
                         Debug.Log($"[SecondBuffDebug] Player02 R day buff damage bonus active x{DayBuffDamageMultiplier:F2}.", this);
                     }
+                }
+
+                if (dayChildRTwinSnapshot.stateActive)
+                {
+                    damageAmount *= dayChildRTwinSnapshot.multiplier;
                 }
 
                 if (dayChildStateActiveThisCast && RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus radianceMark) && radianceMark.Consume())

@@ -938,6 +938,7 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         thrustPhaseTargets.Clear();
         killCreditTargets.Clear();
         preferredNeedleTarget = null;
+        TwinStateCombatBonus.ReleaseNightChildSkillCast(Controller != null ? Controller.gameObject : gameObject, SkillIndex, currentRuneCastId);
         currentRuneCastId = -1;
         thrustVfxTriggered = false;
         thrustHitTriggered = false;
@@ -1020,6 +1021,15 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         {
             combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, gameObject));
         }
+
+        TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
+            Controller != null ? Controller.gameObject : gameObject,
+            combatHealth,
+            BattleDamageType.Special,
+            SkillIndex,
+            currentRuneCastId,
+            this,
+            "Player01 R");
 
         float afterEffectiveHealth = ResolveCurrentEffectiveHealth(combatHealth);
         float afterHealth = ResolveCurrentHealth(combatHealth);

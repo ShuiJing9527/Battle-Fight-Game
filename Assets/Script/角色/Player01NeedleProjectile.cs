@@ -119,6 +119,14 @@ public class Player01NeedleProjectile : MonoBehaviour
         {
             float beforeHealth = ResolveCurrentHealth(combatHealth);
             combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Special, source));
+            TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
+                source,
+                combatHealth,
+                BattleDamageType.Special,
+                skillSlotIndex,
+                runeCastId,
+                this,
+                "Player01 R Projectile");
             float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
             ResolveRuneRuntimeState()?.NotifyMonsterDamagedBySkill(skillSlotIndex, combatHealth, actualDamage);
             dealtDamage = actualDamage > 0f ? actualDamage : resolvedDamage;

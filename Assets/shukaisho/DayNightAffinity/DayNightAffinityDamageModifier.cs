@@ -7,7 +7,7 @@ public static class DayNightAffinityDamageModifier
     private const float SkillGaugeGainMin = 5f;
     private const float SkillGaugeGainMax = 30f;
 
-    public static float ApplyModifier(GameObject attacker, GameObject defender, float damage, out float multiplier)
+    public static float ApplyModifier(GameObject attacker, GameObject defender, float damage, out float multiplier, bool includeAmbientAffinity = true)
     {
         multiplier = 1f;
         if (damage <= 0f || attacker == null || defender == null)
@@ -42,17 +42,23 @@ public static class DayNightAffinityDamageModifier
 
         if (attackerIsPlayer && defenderIsMonster && attackerAffinity != null)
         {
+            if (includeAmbientAffinity && attackerAffinity.IsDayChild && AmbientDayNightAffinityBonus.IsDaytime())
+            {
+                multiplier *= AmbientDayNightAffinityBonus.GetDayChildAmbientOutgoingMultiplier(attacker, defender, "PlayerVsMonster");
+                reason = "day-child-ambient-player-vs-monster";
+            }
+
             if (attackerAffinity.IsNightChild && attackerNightChildFavorable)
             {
                 multiplier *= 1.5f;
-                reason = "night-child-favorable-player-vs-monster";
+                reason = AppendReason(reason, "night-child-favorable-player-vs-monster");
             }
             else if (attackerAffinity.IsDayChild && attackerDayChildFavorable)
             {
                 multiplier *= 1.5f;
-                reason = "day-child-favorable-player-vs-monster";
+                reason = AppendReason(reason, "day-child-favorable-player-vs-monster");
             }
-            else
+            else if (reason == "no-applicable-rule" || reason == "day-child-ambient-player-vs-monster")
             {
                 reason = ResolvePlayerAttackMissReason(
                     attackerAffinity,
@@ -64,16 +70,24 @@ public static class DayNightAffinityDamageModifier
         }
         else if (attackerIsMonster && defenderIsPlayer && defenderAffinity != null)
         {
+            if (includeAmbientAffinity && defenderAffinity.IsNightChild && AmbientDayNightAffinityBonus.IsNighttime())
+            {
+                multiplier *= AmbientDayNightAffinityBonus.GetNightChildAmbientIncomingMultiplier(defender, defender, "MonsterVsPlayer");
+                reason = "night-child-ambient-monster-vs-player";
+            }
+
             if (defenderAffinity.IsNightChild)
             {
                 if (defenderHasNightChildState)
                 {
                     multiplier *= defenderNightChildFavorable ? 0.5f : 2f;
-                    reason = defenderNightChildFavorable
+                    reason = AppendReason(
+                        reason,
+                        defenderNightChildFavorable
                         ? "night-child-favorable-monster-vs-player-resist"
-                        : "night-child-unfavorable-monster-vs-player-penalty";
+                        : "night-child-unfavorable-monster-vs-player-penalty");
                 }
-                else
+                else if (reason == "no-applicable-rule" || reason == "night-child-ambient-monster-vs-player")
                 {
                     reason = "night-child-state-inactive";
                 }
@@ -83,16 +97,18 @@ public static class DayNightAffinityDamageModifier
                 if (defenderHasDayChildState)
                 {
                     multiplier *= defenderDayChildFavorable ? 0.5f : 2f;
-                    reason = defenderDayChildFavorable
+                    reason = AppendReason(
+                        reason,
+                        defenderDayChildFavorable
                         ? "day-child-favorable-monster-vs-player-resist"
-                        : "day-child-unfavorable-monster-vs-player-penalty";
+                        : "day-child-unfavorable-monster-vs-player-penalty");
                 }
-                else
+                else if (reason == "no-applicable-rule")
                 {
                     reason = "day-child-state-inactive";
                 }
             }
-            else
+            else if (reason == "no-applicable-rule")
             {
                 reason = "defender-affinity-none";
             }
@@ -108,6 +124,21 @@ public static class DayNightAffinityDamageModifier
         LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, isDay, isNight, attackerHasDayChildState, attackerHasNightChildState, defenderHasDayChildState, defenderHasNightChildState, damage, multiplier, reason);
 
         return finalDamage;
+    }
+
+    private static string AppendReason(string currentReason, string nextReason)
+    {
+        if (string.IsNullOrEmpty(nextReason))
+        {
+            return currentReason;
+        }
+
+        if (string.IsNullOrEmpty(currentReason) || currentReason == "no-applicable-rule")
+        {
+            return nextReason;
+        }
+
+        return currentReason + "+" + nextReason;
     }
 
     public static bool NotifySuccessfulPlayerHit(GameObject attacker, GameObject defender)

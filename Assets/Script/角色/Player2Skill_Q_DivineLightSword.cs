@@ -641,6 +641,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 continue;
             }
 
+            damageAmount *= TwinStateCombatBonus.GetDayChildQDamageMultiplier(source, this);
             damageAmount += ConsumeRuneFirstHitBonusDamage(runeCastId);
             float finalDamage = BattleStatUtility.ApplyCriticalDamage(source, damageAmount, out bool isCritical);
             if (debugCriticalLog)
