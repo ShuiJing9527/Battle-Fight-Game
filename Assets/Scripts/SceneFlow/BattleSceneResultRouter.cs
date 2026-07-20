@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -13,11 +14,16 @@ public class BattleSceneResultRouter : MonoBehaviour
     [SerializeField] private CombatHealth player01Health;
     [SerializeField] private CombatHealth player02Health;
     [SerializeField] private EnemyDifficultyDirector difficultyDirector;
+    [SerializeField] private EnemySpawner enemySpawner;
+    [Header("Debug")]
+    [SerializeField] private bool debugRestartTrace;
+    [SerializeField, Min(0.1f)] private float bindingRetryInterval = 0.33f;
 
     private bool resultTriggered;
     private bool subscribedPlayer01;
     private bool subscribedPlayer02;
     private bool subscribedVictory;
+    private float nextBindingRetryTime;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
     private static void AutoCreateForBattleScene()
@@ -40,13 +46,13 @@ public class BattleSceneResultRouter : MonoBehaviour
 
     private void Awake()
     {
-        Debug.Log($"[RestartTrace] BattleSceneResultRouter Awake scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}", this);
+        LogRestartTrace($"BattleSceneResultRouter Awake scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}");
         ResetForNewBattle();
     }
 
     private void OnEnable()
     {
-        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnEnable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}", this);
+        LogRestartTrace($"BattleSceneResultRouter OnEnable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)} resultTriggered={resultTriggered}");
         RefreshBindings(forceRebind: false);
         SubscribeEvents();
     }
@@ -75,13 +81,13 @@ public class BattleSceneResultRouter : MonoBehaviour
 
     private void OnDisable()
     {
-        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnDisable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
+        LogRestartTrace($"BattleSceneResultRouter OnDisable scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}");
         UnsubscribeEvents();
     }
 
     private void OnDestroy()
     {
-        Debug.Log($"[RestartTrace] BattleSceneResultRouter OnDestroy scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
+        LogRestartTrace($"BattleSceneResultRouter OnDestroy scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}");
         UnsubscribeEvents();
     }
 
@@ -92,26 +98,47 @@ public class BattleSceneResultRouter : MonoBehaviour
         player01Health = null;
         player02Health = null;
         difficultyDirector = null;
-        Debug.Log($"[RestartTrace] Router reset for new battle scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}", this);
+        enemySpawner = null;
+        nextBindingRetryTime = 0f;
+        LogRestartTrace($"Router reset for new battle scene={gameObject.scene.name} router={GetObjectDebugLabel(gameObject)}");
         RefreshBindings(forceRebind: true);
         SubscribeEvents();
     }
 
     private void RefreshBindings(bool forceRebind)
     {
+        bool missingBinding =
+            player01Health == null ||
+            player02Health == null ||
+            difficultyDirector == null ||
+            enemySpawner == null;
+
+        if (!forceRebind && !missingBinding)
+        {
+            return;
+        }
+
+        if (!forceRebind && Time.unscaledTime < nextBindingRetryTime)
+        {
+            return;
+        }
+
+        nextBindingRetryTime = Time.unscaledTime + Mathf.Max(0.1f, bindingRetryInterval);
+
         CombatHealth resolvedPlayer01 = FindPlayerHealth("Player01", typeof(Player01SkillController), gameObject.scene);
         CombatHealth resolvedPlayer02 = FindPlayerHealth("Player02", typeof(Player2PrototypeController), gameObject.scene);
-        EnemyDifficultyDirector resolvedDirector = FindSceneDifficultyDirector(gameObject.scene);
+        EnemyDifficultyDirector resolvedDirector = FindSceneComponent<EnemyDifficultyDirector>(gameObject.scene);
+        EnemySpawner resolvedSpawner = FindSceneComponent<EnemySpawner>(gameObject.scene);
 
-        if (forceRebind || player01Health != resolvedPlayer01 || player02Health != resolvedPlayer02 || difficultyDirector != resolvedDirector)
+        if (forceRebind || player01Health != resolvedPlayer01 || player02Health != resolvedPlayer02 || difficultyDirector != resolvedDirector || enemySpawner != resolvedSpawner)
         {
             UnsubscribeEvents();
             player01Health = resolvedPlayer01;
             player02Health = resolvedPlayer02;
             difficultyDirector = resolvedDirector;
-            Debug.Log(
-                $"[RestartTrace] Router bound scene={gameObject.scene.name} player01={GetObjectDebugLabel(player01Health)} player02={GetObjectDebugLabel(player02Health)} difficultyDirector={GetObjectDebugLabel(difficultyDirector)}",
-                this);
+            enemySpawner = resolvedSpawner;
+            LogRestartTrace(
+                $"Router bound scene={gameObject.scene.name} player01={GetObjectDebugLabel(player01Health)} player02={GetObjectDebugLabel(player02Health)} difficultyDirector={GetObjectDebugLabel(difficultyDirector)} enemySpawner={GetObjectDebugLabel(enemySpawner)}");
         }
     }
 
@@ -141,19 +168,19 @@ public class BattleSceneResultRouter : MonoBehaviour
         if (player01Health != null && subscribedPlayer01)
         {
             player01Health.Died -= HandlePlayerDeath;
-            Debug.Log($"[RestartTrace] Router unbound old player01={GetObjectDebugLabel(player01Health)}", this);
+            LogRestartTrace($"Router unbound old player01={GetObjectDebugLabel(player01Health)}");
         }
 
         if (player02Health != null && subscribedPlayer02)
         {
             player02Health.Died -= HandlePlayerDeath;
-            Debug.Log($"[RestartTrace] Router unbound old player02={GetObjectDebugLabel(player02Health)}", this);
+            LogRestartTrace($"Router unbound old player02={GetObjectDebugLabel(player02Health)}");
         }
 
         if (difficultyDirector != null && subscribedVictory)
         {
             difficultyDirector.OnVictory -= HandleVictory;
-            Debug.Log($"[RestartTrace] Router unbound old difficultyDirector={GetObjectDebugLabel(difficultyDirector)}", this);
+            LogRestartTrace($"Router unbound old difficultyDirector={GetObjectDebugLabel(difficultyDirector)}");
         }
 
         subscribedPlayer01 = false;
@@ -168,7 +195,7 @@ public class BattleSceneResultRouter : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[PlayerDeathTrace] Death callback received from {ResolveDeadPlayerLabel()}", this);
+        LogPlayerDeathTrace($"Death callback received from {ResolveDeadPlayerLabel()}");
 
         if (difficultyDirector != null && difficultyDirector.CurrentPhase == DifficultyPhase.Victory)
         {
@@ -178,7 +205,7 @@ public class BattleSceneResultRouter : MonoBehaviour
 
         if (IsAnyPlayerDead())
         {
-            Debug.Log("[PlayerDeathTrace] GameOver requested", this);
+            LogPlayerDeathTrace("GameOver requested");
             TriggerGameOver();
         }
     }
@@ -196,8 +223,8 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         resultTriggered = true;
-        Debug.Log("[PlayerDeathTrace] GameOver entered", this);
-        Debug.Log("[BattleSceneResultRouter] GameOver triggered because a player died.", this);
+        FreezeBattleBeforeResultScene();
+        LogPlayerDeathTrace("GameOver entered");
         SceneManager.LoadScene(GameOverSceneName);
     }
 
@@ -209,6 +236,7 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         resultTriggered = true;
+        FreezeBattleBeforeResultScene();
         SceneManager.LoadScene(GameWinSceneName);
     }
 
@@ -224,7 +252,7 @@ public class BattleSceneResultRouter : MonoBehaviour
 
     private static CombatHealth FindPlayerHealth(string objectName, Type controllerType, Scene targetScene)
     {
-        CombatHealth[] allHealth = Resources.FindObjectsOfTypeAll<CombatHealth>();
+        CombatHealth[] allHealth = FindSceneComponents<CombatHealth>(targetScene);
         for (int i = 0; i < allHealth.Length; i++)
         {
             CombatHealth candidate = allHealth[i];
@@ -256,27 +284,26 @@ public class BattleSceneResultRouter : MonoBehaviour
         return null;
     }
 
-    private static EnemyDifficultyDirector FindSceneDifficultyDirector(Scene targetScene)
+    private void FreezeBattleBeforeResultScene()
     {
-        EnemyDifficultyDirector[] directors = Resources.FindObjectsOfTypeAll<EnemyDifficultyDirector>();
-        for (int i = 0; i < directors.Length; i++)
+        Time.timeScale = 0f;
+        AudioListener.pause = true;
+
+        if (enemySpawner == null)
         {
-            EnemyDifficultyDirector candidate = directors[i];
-            if (candidate == null || candidate.gameObject == null)
-            {
-                continue;
-            }
-
-            Scene candidateScene = candidate.gameObject.scene;
-            if (!candidateScene.IsValid() || !candidateScene.isLoaded || candidateScene != targetScene)
-            {
-                continue;
-            }
-
-            return candidate;
+            enemySpawner = FindSceneComponent<EnemySpawner>(gameObject.scene);
         }
 
-        return null;
+        if (enemySpawner != null)
+        {
+            enemySpawner.PauseSpawningForExternalTest();
+            enemySpawner.enabled = false;
+        }
+
+        if (difficultyDirector != null)
+        {
+            difficultyDirector.enabled = false;
+        }
     }
 
     private static bool IsCandidateInScene(CombatHealth candidate, Scene targetScene)
@@ -288,6 +315,42 @@ public class BattleSceneResultRouter : MonoBehaviour
 
         Scene candidateScene = candidate.gameObject.scene;
         return candidateScene.IsValid() && candidateScene.isLoaded && candidateScene == targetScene;
+    }
+
+    private static T FindSceneComponent<T>(Scene targetScene) where T : Component
+    {
+        T[] all = FindSceneComponents<T>(targetScene);
+        return all.Length > 0 ? all[0] : null;
+    }
+
+    private static T[] FindSceneComponents<T>(Scene targetScene) where T : Component
+    {
+        if (!targetScene.IsValid() || !targetScene.isLoaded)
+        {
+            return Array.Empty<T>();
+        }
+
+        GameObject[] roots = targetScene.GetRootGameObjects();
+        List<T> results = new List<T>();
+        for (int i = 0; i < roots.Length; i++)
+        {
+            GameObject root = roots[i];
+            if (root == null)
+            {
+                continue;
+            }
+
+            T[] components = root.GetComponentsInChildren<T>(true);
+            for (int j = 0; j < components.Length; j++)
+            {
+                if (components[j] != null)
+                {
+                    results.Add(components[j]);
+                }
+            }
+        }
+
+        return results.ToArray();
     }
 
     private string ResolveDeadPlayerLabel()
@@ -323,5 +386,25 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         return $"{target.name}#{target.GetInstanceID()}";
+    }
+
+    private void LogRestartTrace(string message)
+    {
+        if (!debugRestartTrace)
+        {
+            return;
+        }
+
+        Debug.Log("[RestartTrace] " + message, this);
+    }
+
+    private void LogPlayerDeathTrace(string message)
+    {
+        if (!debugRestartTrace)
+        {
+            return;
+        }
+
+        Debug.Log("[PlayerDeathTrace] " + message, this);
     }
 }

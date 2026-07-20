@@ -3,6 +3,8 @@ using UnityEngine;
 public class RuneDropManager : MonoBehaviour
 {
     private const float DefaultDropYOffset = 0.3f;
+    private const float DefaultMinRuneScatterRadius = 1.25f;
+    private const float DefaultMaxRuneScatterRadius = 2.25f;
 
     public static RuneDropManager Instance { get; private set; }
 
@@ -16,8 +18,20 @@ public class RuneDropManager : MonoBehaviour
     [Header("Drop Offset")]
     [SerializeField, Min(0f)] private float dropYOffset = DefaultDropYOffset;
 
+    [Header("Rune Scatter")]
+    [SerializeField, Min(0f)] private float minRuneScatterRadius = DefaultMinRuneScatterRadius;
+    [SerializeField, Min(0f)] private float maxRuneScatterRadius = DefaultMaxRuneScatterRadius;
+
+    [Header("Debug")]
+    [SerializeField] private bool debugRuneDropTraceLog = false;
+
+    [Header("Testing")]
+    [Tooltip("勾选后，所有世界符文仍会正常掉落，但不会加入背包或销毁。取消勾选后恢复正常自动拾取。")]
+    [SerializeField] private bool pauseWorldRunePickupForTesting;
+
     private bool warnedMissingLibrary;
     private bool warnedMissingPrefabs;
+    private bool lastAppliedPauseWorldRunePickupForTesting;
 
     private void Awake()
     {
@@ -25,6 +39,29 @@ public class RuneDropManager : MonoBehaviour
         {
             Instance = this;
         }
+
+        SyncWorldRunePickupPause(force: true);
+    }
+
+    private void OnEnable()
+    {
+        SyncWorldRunePickupPause(force: true);
+    }
+
+    private void Update()
+    {
+        SyncWorldRunePickupPause(force: false);
+    }
+
+    private void OnValidate()
+    {
+        if (!Application.isPlaying)
+        {
+            lastAppliedPauseWorldRunePickupForTesting = pauseWorldRunePickupForTesting;
+            return;
+        }
+
+        SyncWorldRunePickupPause(force: false);
     }
 
     private void OnDestroy()
@@ -61,7 +98,7 @@ public class RuneDropManager : MonoBehaviour
             return null;
         }
 
-        Vector3 spawnPosition = position + Vector3.up * GetDropYOffset();
+        Vector3 spawnPosition = ResolveSpawnPosition(position);
         GameObject pickupObject = Instantiate(prefab, spawnPosition, Quaternion.identity);
         pickupObject.name = rune.runeType == RuneType.None ? "RuneDrop" : $"RuneDrop_{rune.runeType}";
         RunePickup pickup = pickupObject.GetComponent<RunePickup>();
@@ -73,6 +110,12 @@ public class RuneDropManager : MonoBehaviour
         pickup.SetRune(rune);
         pickup.destroyAfterPickup = true;
         pickupObject.SetActive(true);
+
+        if (debugRuneDropTraceLog)
+        {
+            Debug.Log($"[RuneDropTrace] Spawn rune={pickupObject.name}, position={spawnPosition}", pickupObject);
+        }
+
         return pickup;
     }
 
@@ -97,15 +140,14 @@ public class RuneDropManager : MonoBehaviour
         {
             float? eliteRoll;
             int settingsCount = NormalizeDropCount(rank, dropSettings.RollRuneDropCount(rank, luck, ownedRuneCount, out eliteRoll));
-            Debug.Log(
-                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={settingsCount} eliteRoll={(eliteRoll.HasValue ? eliteRoll.Value.ToString("F4") : "n/a")} settings={(dropSettings != null ? dropSettings.name : "null")} highRuneDropTestMode={(dropSettings != null ? dropSettings.IsHighRuneDropTestMode : false)}",
-                this);
+            LogRuneDropDiagnostic(
+                $"rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={settingsCount} eliteRoll={(eliteRoll.HasValue ? eliteRoll.Value.ToString("F4") : "n/a")} settings={(dropSettings != null ? dropSettings.name : "null")} highRuneDropTestMode={(dropSettings != null ? dropSettings.IsHighRuneDropTestMode : false)}");
             return settingsCount;
         }
 
         if (rank == MonsterRank.Normal)
         {
-            Debug.Log($"[RuneDropManagerDiag] rank=Normal luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true", this);
+            LogRuneDropDiagnostic($"rank=Normal luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true");
             return 0;
         }
 
@@ -115,9 +157,8 @@ public class RuneDropManager : MonoBehaviour
             float thirdRuneChance = ApplyOwnedRuneDropDecay(0.05f, ownedRuneCount);
             float secondOrThirdRuneChance = ApplyOwnedRuneDropDecay(0.35f, ownedRuneCount);
             int eliteCount = NormalizeDropCount(rank, eliteRoll < thirdRuneChance ? 3 : (eliteRoll < secondOrThirdRuneChance ? 2 : 1));
-            Debug.Log(
-                $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={eliteCount} eliteRoll={eliteRoll:F4} settings=null highRuneDropTestMode=true",
-                this);
+            LogRuneDropDiagnostic(
+                $"rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={eliteCount} eliteRoll={eliteRoll:F4} settings=null highRuneDropTestMode=true");
             return eliteCount;
         }
 
@@ -142,9 +183,8 @@ public class RuneDropManager : MonoBehaviour
         }
 
         int finalCount = NormalizeDropCount(rank, ClampRuneDropCountByRank(rank, count));
-        Debug.Log(
-            $"[RuneDropManagerDiag] rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={finalCount} eliteRoll=n/a settings=null highRuneDropTestMode=true",
-            this);
+        LogRuneDropDiagnostic(
+            $"rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={finalCount} eliteRoll=n/a settings=null highRuneDropTestMode=true");
         return finalCount;
     }
 
@@ -221,6 +261,27 @@ public class RuneDropManager : MonoBehaviour
         return dropSettings != null ? dropSettings.DropYOffset : Mathf.Max(0f, dropYOffset);
     }
 
+    private Vector3 ResolveSpawnPosition(Vector3 basePosition)
+    {
+        Vector3 spawnPosition = basePosition + Vector3.up * GetDropYOffset();
+        Vector3 horizontalOffset = ResolveHorizontalScatterOffset();
+        return spawnPosition + horizontalOffset;
+    }
+
+    private Vector3 ResolveHorizontalScatterOffset()
+    {
+        float minRadius = Mathf.Max(0f, minRuneScatterRadius);
+        float maxRadius = Mathf.Max(minRadius, maxRuneScatterRadius);
+        if (maxRadius <= 0f)
+        {
+            return Vector3.zero;
+        }
+
+        float angle = Random.Range(0f, Mathf.PI * 2f);
+        float distance = Random.Range(minRadius, maxRadius);
+        return new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * distance;
+    }
+
     private void WarnMissingLibraryOnce()
     {
         if (warnedMissingLibrary)
@@ -241,5 +302,26 @@ public class RuneDropManager : MonoBehaviour
 
         warnedMissingPrefabs = true;
         Debug.LogWarning("[RuneDropManager] Missing rune drop prefabs.", this);
+    }
+
+    private void SyncWorldRunePickupPause(bool force)
+    {
+        if (!force && lastAppliedPauseWorldRunePickupForTesting == pauseWorldRunePickupForTesting)
+        {
+            return;
+        }
+
+        lastAppliedPauseWorldRunePickupForTesting = pauseWorldRunePickupForTesting;
+        RunePickup.SetWorldRunePickupPaused(pauseWorldRunePickupForTesting);
+    }
+
+    private void LogRuneDropDiagnostic(string message)
+    {
+        if (!debugRuneDropTraceLog)
+        {
+            return;
+        }
+
+        Debug.Log("[RuneDropManagerDiag] " + message, this);
     }
 }

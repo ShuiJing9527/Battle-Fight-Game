@@ -90,6 +90,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private GameObject panelPrefab;
     [SerializeField] private KeyCode toggleKey = KeyCode.I;
     [SerializeField] private bool debugToggleLog = false;
+    [SerializeField] private bool debugPanelOpenTiming = false;
     [SerializeField] private bool debugCharacterLocalization = false;
     [SerializeField] private bool usePanelOverrideSorting = true;
     [SerializeField] private int panelSortingOrder = 500;
@@ -214,6 +215,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private float nextBootstrapLookupTime;
     private float nextBaseSnapshotWarmupTime;
     private float previousTimeScale = 1f;
+    private double lastPanelInputDetectedRealtime = -1d;
+    private int panelOpenTraceSequence;
     private static bool warnedMissingPanelPrefab;
 
     private Player2Bootstrap cachedBootstrap;
@@ -237,6 +240,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void Awake()
     {
+        LogPanelOpenTrace("Awake");
         if (!AcquirePrimaryInstance())
         {
             return;
@@ -249,6 +253,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void Start()
     {
+        LogPanelOpenTrace("Start");
         if (primaryInstance != this)
         {
             return;
@@ -261,6 +266,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void OnEnable()
     {
+        LogPanelOpenTrace("OnEnable");
         if (primaryInstance != this)
         {
             return;
@@ -273,6 +279,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void OnDisable()
     {
+        LogPanelOpenTrace("OnDisable");
         if (primaryInstance != this)
         {
             return;
@@ -334,6 +341,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (Input.GetKeyDown(toggleKey))
         {
+            BeginPanelOpenTraceInput();
+            LogPanelOpenTrace("ToggleRequested");
             TogglePanel();
         }
 
@@ -1017,6 +1026,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private bool EnsurePanelReady()
     {
+        LogPanelOpenTrace("EnsurePanelBegin");
         if (!initialized || panelRoot == null)
         {
             Initialize();
@@ -1027,11 +1037,14 @@ public class PlayerAttributePanelUI : MonoBehaviour
             panelRoot.gameObject.SetActive(isVisible);
         }
 
-        return initialized && panelRoot != null;
+        bool ready = initialized && panelRoot != null;
+        LogPanelOpenTrace("EnsurePanelEnd");
+        return ready;
     }
 
     public void OpenPanel()
     {
+        LogPanelOpenTrace("OpenPanelEnter");
         if (!EnsurePanelReady())
         {
             if (!warnedShowPanelFailed)
@@ -1043,26 +1056,28 @@ public class PlayerAttributePanelUI : MonoBehaviour
         }
 
         warnedShowPanelFailed = false;
+        EnsurePanelDisplayHierarchy();
+        isVisible = true;
+        EnsurePanelVisibleImmediate();
+        LogPanelOpenTrace("SetActiveTrue");
+        PauseGameForPanel();
+        LogPanelOpenTrace("OverlayOpened");
+        LogToggleState("ShowPanel active");
         CloseRunePanelsForExclusiveDisplay();
 
-        if (panelRoot == null)
-        {
-            return;
-        }
-
-        EnsurePanelDisplayHierarchy();
-        panelRoot.gameObject.SetActive(true);
-        panelRoot.SetAsLastSibling();
-        isVisible = true;
-        LogToggleState("ShowPanel active");
-
+        LogPanelOpenTrace("RefreshPlayerCacheBegin");
         RefreshPlayerCache(force: true);
+        LogPanelOpenTrace("RefreshPlayerCacheEnd");
+        LogPanelOpenTrace("RefreshPanelBegin");
         RefreshPanel();
+        LogPanelOpenTrace("RefreshPanelEnd");
+        LogPanelOpenTrace("PreviewBegin");
         ForceRefreshPreview();
+        LogPanelOpenTrace("PreviewEnd");
         nextRefreshTime = Time.unscaledTime + refreshInterval;
 
-        PauseGameForPanel();
         LogToggleState("ShowPanel success");
+        LogPanelOpenTrace("OpenPanelExit");
     }
 
     public void ClosePanel()
@@ -1105,9 +1120,36 @@ public class PlayerAttributePanelUI : MonoBehaviour
         SetPreviewVisible(false);
     }
 
+    private void EnsurePanelVisibleImmediate()
+    {
+        if (panelRoot == null)
+        {
+            return;
+        }
+
+        panelRoot.gameObject.SetActive(true);
+        panelRoot.SetAsLastSibling();
+
+        EnsurePanelDisplayHierarchy();
+        if (panelCanvas != null)
+        {
+            panelCanvas.enabled = true;
+        }
+
+        CanvasGroup panelCanvasGroup = panelRoot.GetComponent<CanvasGroup>();
+        if (panelCanvasGroup != null)
+        {
+            panelCanvasGroup.alpha = 1f;
+            panelCanvasGroup.interactable = true;
+            panelCanvasGroup.blocksRaycasts = true;
+        }
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(panelRoot);
+    }
+
     private void RefreshPlayerCache(bool force)
     {
-        if ((force || cachedBootstrap == null) && Time.unscaledTime >= nextBootstrapLookupTime)
+        if (force || ((cachedBootstrap == null) && Time.unscaledTime >= nextBootstrapLookupTime))
         {
             cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
             nextBootstrapLookupTime = Time.unscaledTime + 1f;
@@ -1510,7 +1552,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private GameObject ResolveCurrentPlayerForBaseSnapshot(bool forceBootstrapRefresh)
     {
-        if ((forceBootstrapRefresh || cachedBootstrap == null) && Time.unscaledTime >= nextBootstrapLookupTime)
+        if (forceBootstrapRefresh || ((cachedBootstrap == null) && Time.unscaledTime >= nextBootstrapLookupTime))
         {
             cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
             nextBootstrapLookupTime = Time.unscaledTime + 1f;
@@ -3872,6 +3914,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
         if (primaryInstance == null)
         {
             primaryInstance = this;
+            LogPanelOpenTrace("PrimaryInstanceAssigned");
             return true;
         }
 
@@ -3880,13 +3923,61 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return true;
         }
 
-        if (debugToggleLog)
+        if (debugToggleLog || debugPanelOpenTiming)
         {
             Debug.LogWarning("[PlayerAttributePanelUI] Duplicate controller disabled: " + GetTransformPath(transform), this);
         }
 
         enabled = false;
         return false;
+    }
+
+    private void BeginPanelOpenTraceInput()
+    {
+        if (!debugPanelOpenTiming)
+        {
+            return;
+        }
+
+        panelOpenTraceSequence++;
+        lastPanelInputDetectedRealtime = Time.realtimeSinceStartupAsDouble;
+        LogPanelOpenTrace("InputDetected");
+    }
+
+    private void LogPanelOpenTrace(string eventName)
+    {
+        if (!debugPanelOpenTiming)
+        {
+            return;
+        }
+
+        double realtime = Time.realtimeSinceStartupAsDouble;
+        double elapsed = lastPanelInputDetectedRealtime >= 0d
+            ? realtime - lastPanelInputDetectedRealtime
+            : -1d;
+        bool panelActive = panelRoot != null && panelRoot.gameObject.activeSelf;
+        bool panelParentActive = panelRoot != null && panelRoot.gameObject.activeInHierarchy;
+        string sceneName = gameObject.scene.IsValid() ? gameObject.scene.name : "<invalid>";
+        string panelPath = panelRoot != null ? GetTransformPath(panelRoot) : "<null>";
+
+        Debug.Log(
+            "[CharacterPanelTrace] " + eventName +
+            " realtime=" + realtime.ToString("F4") +
+            " elapsed=" + (elapsed >= 0d ? elapsed.ToString("F4") : "n/a") +
+            " request=" + panelOpenTraceSequence +
+            " instanceID=" + GetInstanceID() +
+            " object=" + name +
+            " scene=" + sceneName +
+            " enabled=" + enabled +
+            " activeInHierarchy=" + gameObject.activeInHierarchy +
+            " panelRootNull=" + (panelRoot == null) +
+            " panelRootActiveSelf=" + panelActive +
+            " panelRootActiveInHierarchy=" + panelParentActive +
+            " isOpen=" + isVisible +
+            " toggleKey=" + toggleKey +
+            " controllerPath=" + GetTransformPath(transform) +
+            " panelPath=" + panelPath,
+            this);
     }
 
     private static string GetTransformPath(Transform current)

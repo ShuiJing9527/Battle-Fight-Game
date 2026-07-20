@@ -1,5 +1,6 @@
 using Cysharp.Threading.Tasks;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -21,6 +22,7 @@ namespace UnderTheStars.GenerationMap
         [SerializeField] private float wallColliderHeight = 2f;
         [SerializeField] private string wallColliderRootName = "Merged Wall Colliders";
         [SerializeField] private bool debugOceanWallColliders = false;
+        [SerializeField] private bool debugMapGenerationLogs = false;
 
         private Transform wallColliderRoot;
         private readonly List<RectInt> builtWallColliderRects = new List<RectInt>();
@@ -54,7 +56,10 @@ namespace UnderTheStars.GenerationMap
                 tile.ClearAllTiles();
             }
 
-            wallColliderTilemap.ClearAllTiles();
+            if (IsTilemapUsable(wallColliderTilemap))
+            {
+                wallColliderTilemap.ClearAllTiles();
+            }
             ClearWallCollidersComplete();
         }
 
@@ -84,11 +89,28 @@ namespace UnderTheStars.GenerationMap
             tilemap.SetTile(new Vector3Int(point.x, point.y, 0), null);
         }
 
-        private async UniTask PaintTile(HashSet<Vector2Int> points, Tilemap tilemap, TileBase tile)
+        private async UniTask PaintTile(
+            HashSet<Vector2Int> points,
+            Tilemap tilemap,
+            TileBase tile,
+            CancellationToken cancellationToken,
+            int generationSessionId,
+            System.Func<bool> isGenerationCurrent)
         {
+            bool hasLoggedInvalidTilemap = false;
+            if (ShouldStopPainting(tilemap, cancellationToken, generationSessionId, isGenerationCurrent, ref hasLoggedInvalidTilemap))
+            {
+                return;
+            }
+
             int count = 0;
             foreach (var point in points)
             {
+                if (ShouldStopPainting(tilemap, cancellationToken, generationSessionId, isGenerationCurrent, ref hasLoggedInvalidTilemap))
+                {
+                    return;
+                }
+
                 Vector3Int tilePoint = new Vector3Int(point.x, point.y, 0);
                 tilemap.SetTile(tilePoint, tile);
 
@@ -96,12 +118,22 @@ namespace UnderTheStars.GenerationMap
                 if (count >= 500)
                 {
                     count = 0;
-                    await UniTask.NextFrame();
+                    await UniTask.NextFrame(cancellationToken: cancellationToken);
+
+                    if (ShouldStopPainting(tilemap, cancellationToken, generationSessionId, isGenerationCurrent, ref hasLoggedInvalidTilemap))
+                    {
+                        return;
+                    }
                 }
             }
         }
 
-        public UniTask PaintFloorTile(HashSet<Vector2Int> points, int tileIndex)
+        public UniTask PaintFloorTile(
+            HashSet<Vector2Int> points,
+            int tileIndex,
+            CancellationToken cancellationToken = default,
+            int generationSessionId = 0,
+            System.Func<bool> isGenerationCurrent = null)
         {
             if (points == null || floorTilemap == null || floorTile == null)
             {
@@ -120,10 +152,16 @@ namespace UnderTheStars.GenerationMap
                 return UniTask.CompletedTask;
             }
 
-            return PaintTile(points, floorTilemap[tileIndex], floorTile[tileIndex]);
+            return PaintTile(points, floorTilemap[tileIndex], floorTile[tileIndex], cancellationToken, generationSessionId, isGenerationCurrent);
         }
 
-        public UniTask PaintFloorTile(HashSet<Vector2Int> points, int tilemapIndex, int tileAssetIndex)
+        public UniTask PaintFloorTile(
+            HashSet<Vector2Int> points,
+            int tilemapIndex,
+            int tileAssetIndex,
+            CancellationToken cancellationToken = default,
+            int generationSessionId = 0,
+            System.Func<bool> isGenerationCurrent = null)
         {
             if (points == null || floorTilemap == null || floorTile == null)
             {
@@ -148,22 +186,34 @@ namespace UnderTheStars.GenerationMap
                 return UniTask.CompletedTask;
             }
 
-            return PaintTile(points, floorTilemap[tilemapIndex], floorTile[tileAssetIndex]);
+            return PaintTile(points, floorTilemap[tilemapIndex], floorTile[tileAssetIndex], cancellationToken, generationSessionId, isGenerationCurrent);
         }
 
         public UniTask PaintWallTile(
             HashSet<Vector2Int> points,
             HashSet<Vector2Int> finalWalkablePoints = null,
-            HashSet<Vector2Int> generatedShoreSandPoints = null)
+            HashSet<Vector2Int> generatedShoreSandPoints = null,
+            CancellationToken cancellationToken = default,
+            int generationSessionId = 0,
+            System.Func<bool> isGenerationCurrent = null)
         {
-            return PaintWallTileAsync(points, finalWalkablePoints, generatedShoreSandPoints);
+            return PaintWallTileAsync(points, finalWalkablePoints, generatedShoreSandPoints, cancellationToken, generationSessionId, isGenerationCurrent);
         }
 
         private async UniTask PaintWallTileAsync(
             HashSet<Vector2Int> points,
             HashSet<Vector2Int> finalWalkablePoints,
-            HashSet<Vector2Int> generatedShoreSandPoints)
+            HashSet<Vector2Int> generatedShoreSandPoints,
+            CancellationToken cancellationToken,
+            int generationSessionId,
+            System.Func<bool> isGenerationCurrent)
         {
+            bool hasLoggedInvalidTilemap = false;
+            if (ShouldStopPainting(wallColliderTilemap, cancellationToken, generationSessionId, isGenerationCurrent, ref hasLoggedInvalidTilemap))
+            {
+                return;
+            }
+
             WallColliderClearStats clearStats = ClearWallCollidersComplete();
 
             debugWallPoints = points != null ? new HashSet<Vector2Int>(points) : new HashSet<Vector2Int>();
@@ -172,26 +222,29 @@ namespace UnderTheStars.GenerationMap
 
             if (points == null || points.Count == 0)
             {
-                Debug.Log(
+                LogMapGenerationTrace(
                     $"[RandomMap.OceanWallCollider] wallPointCount=0 oldColliderCount={clearStats.oldColliderCount} " +
                     $"deletedColliderCount={clearStats.deletedColliderCount} newColliderCount=0 mergedHorizontalSegmentCount=0 " +
-                    $"mergedVerticalSegmentCount=0 rejectedOversizedColliderCount=0 colliderOverlapWithWalkableCount=0 maximumColliderSize=(0.0,0.0)",
-                    this);
+                    $"mergedVerticalSegmentCount=0 rejectedOversizedColliderCount=0 colliderOverlapWithWalkableCount=0 maximumColliderSize=(0.0,0.0)");
                 return;
             }
 
-            await PaintTile(points, wallColliderTilemap, wallColliderTile);
+            await PaintTile(points, wallColliderTilemap, wallColliderTile, cancellationToken, generationSessionId, isGenerationCurrent);
+            if (ShouldStopPainting(wallColliderTilemap, cancellationToken, generationSessionId, isGenerationCurrent, ref hasLoggedInvalidTilemap))
+            {
+                return;
+            }
+
             WallColliderBuildStats buildStats = RebuildWallColliders(points, finalWalkablePoints, generatedShoreSandPoints);
 
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.OceanWallCollider] wallPointCount={points.Count} oldColliderCount={clearStats.oldColliderCount} " +
                 $"deletedColliderCount={clearStats.deletedColliderCount} newColliderCount={buildStats.newColliderCount} " +
                 $"mergedHorizontalSegmentCount={buildStats.mergedHorizontalSegmentCount} " +
                 $"mergedVerticalSegmentCount={buildStats.mergedVerticalSegmentCount} " +
                 $"rejectedOversizedColliderCount={buildStats.rejectedOversizedColliderCount} " +
                 $"colliderOverlapWithWalkableCount={buildStats.colliderOverlapWithWalkableCount} " +
-                $"maximumColliderSize=({buildStats.maximumColliderSize.x:F1},{buildStats.maximumColliderSize.y:F1})",
-                this);
+                $"maximumColliderSize=({buildStats.maximumColliderSize.x:F1},{buildStats.maximumColliderSize.y:F1})");
         }
 
         private WallColliderBuildStats RebuildWallColliders(
@@ -263,7 +316,7 @@ namespace UnderTheStars.GenerationMap
             debugFinalWalkablePoints.Clear();
             debugGeneratedShorePoints.Clear();
 
-            if (wallColliderRoot == null)
+            if (wallColliderRoot == null && IsTilemapUsable(wallColliderTilemap))
             {
                 Transform existingRoot = wallColliderTilemap.transform.Find(wallColliderRootName);
                 if (existingRoot != null)
@@ -272,13 +325,13 @@ namespace UnderTheStars.GenerationMap
                 }
             }
 
-            if (wallColliderTilemap != null)
+            if (IsTilemapUsable(wallColliderTilemap))
             {
                 wallColliderTilemap.ClearAllTiles();
             }
 
             HashSet<Component> colliderComponents = new HashSet<Component>();
-            if (wallColliderTilemap != null)
+            if (IsTilemapUsable(wallColliderTilemap))
             {
                 AddComponents(colliderComponents, wallColliderTilemap.GetComponentsInChildren<Collider>(true));
                 AddComponents(colliderComponents, wallColliderTilemap.GetComponentsInChildren<Collider2D>(true));
@@ -318,6 +371,51 @@ namespace UnderTheStars.GenerationMap
             wallColliderRoot = null;
             stats.deletedColliderCount = stats.oldColliderCount;
             return stats;
+        }
+
+        private bool ShouldStopPainting(
+            Tilemap tilemap,
+            CancellationToken cancellationToken,
+            int generationSessionId,
+            System.Func<bool> isGenerationCurrent,
+            ref bool hasLoggedInvalidTilemap)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (isGenerationCurrent != null && !isGenerationCurrent())
+            {
+                throw new System.OperationCanceledException(cancellationToken);
+            }
+
+            if (!IsTilemapUsable(tilemap))
+            {
+                if (!hasLoggedInvalidTilemap)
+                {
+                    hasLoggedInvalidTilemap = true;
+                    Debug.LogWarning($"[MapGenerationTrace] Tilemap invalid, stop session={generationSessionId}", this);
+                }
+
+                throw new System.OperationCanceledException(cancellationToken);
+            }
+
+            return false;
+        }
+
+        private static bool IsTilemapUsable(Tilemap tilemap)
+        {
+            if (tilemap == null)
+            {
+                return false;
+            }
+
+            GameObject tilemapObject = tilemap.gameObject;
+            if (tilemapObject == null)
+            {
+                return false;
+            }
+
+            UnityEngine.SceneManagement.Scene scene = tilemapObject.scene;
+            return scene.IsValid() && scene.isLoaded;
         }
 
         private List<RectInt> BuildWallColliderRects(HashSet<Vector2Int> points, ref WallColliderBuildStats stats)
@@ -606,6 +704,16 @@ namespace UnderTheStars.GenerationMap
                     Mathf.Abs(cellSize.y) * rect.height);
                 Gizmos.DrawWireCube(center, size);
             }
+        }
+
+        private void LogMapGenerationTrace(string message)
+        {
+            if (!debugMapGenerationLogs)
+            {
+                return;
+            }
+
+            Debug.Log(message, this);
         }
     }
 }

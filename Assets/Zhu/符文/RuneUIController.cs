@@ -219,6 +219,7 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private bool buildUiAtRuntime = false;
     [SerializeField] private bool applyInventoryLayoutAtRuntime = false;
     [SerializeField] private bool applyDescriptionLayoutAtRuntime = false;
+    [SerializeField] private bool debugRuneUiTraceLogs = false;
     [SerializeField] private RuneInventoryLayoutSettings inventoryLayoutSettings = new RuneInventoryLayoutSettings();
     [SerializeField] private RuneDescriptionLayoutSettings descriptionLayoutSettings = new RuneDescriptionLayoutSettings();
 
@@ -373,7 +374,7 @@ public class RuneUIController : MonoBehaviour
         RefreshRuneList();
         RefreshSkillSlots();
         RefreshSkillInfoVisuals();
-        Debug.Log("[RuneUI] Open panel, pause game, hide HUD", this);
+        LogRuneUiTrace("Open panel, pause game, hide HUD");
     }
 
     public void ClosePanel()
@@ -390,7 +391,7 @@ public class RuneUIController : MonoBehaviour
 
         SetOldHudVisible(true);
         SetPauseState(false);
-        Debug.Log($"[RuneUI] Close panel, restore timeScale={Time.timeScale}, show HUD", this);
+        LogRuneUiTrace($"Close panel, restore timeScale={Time.timeScale}, show HUD");
     }
 
     public void RefreshRuneList()
@@ -638,7 +639,7 @@ public class RuneUIController : MonoBehaviour
             if (!RuneMatches(selectedRune, equippedRune))
             {
                 SetSelectedRune(equippedRune);
-                Debug.Log($"[RuneUI] Selected equipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}", this);
+                LogRuneUiTrace($"Selected equipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}");
                 return;
             }
 
@@ -646,7 +647,7 @@ public class RuneUIController : MonoBehaviour
             currentSkillCaster.RefreshRuneState();
             RefreshRuneList();
             RefreshSkillSlots();
-            Debug.Log($"[RuneUI] Unequipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}", this);
+            LogRuneUiTrace($"Unequipped rune from {GetSkillKeyName(skillIndex)} slot {slotIndex}");
             return;
         }
 
@@ -3107,22 +3108,52 @@ public class RuneUIController : MonoBehaviour
 
     private void LogRunePanelDescriptionTrace(string eventName, string details)
     {
+        if (!debugRuneUiTraceLogs)
+        {
+            return;
+        }
+
         Debug.Log(RunePanelDescriptionTracePrefix + "event=" + eventName + " " + details, this);
     }
 
     private void LogRunePanelHoverTrace(string eventName, string details)
     {
+        if (!debugRuneUiTraceLogs)
+        {
+            return;
+        }
+
         Debug.Log(RunePanelHoverTracePrefix + "event=" + eventName + " " + details, this);
     }
 
     private void LogTooltipPositionTrace(string details)
     {
+        if (!debugTooltipPositioning)
+        {
+            return;
+        }
+
         Debug.Log(TooltipPositionTracePrefix + details, this);
     }
 
     private void LogTooltipRuntimeTrace(string details)
     {
+        if (!debugTooltipPositioning)
+        {
+            return;
+        }
+
         Debug.Log(TooltipRuntimeTracePrefix + details, this);
+    }
+
+    private void LogRuneUiTrace(string message)
+    {
+        if (!debugRuneUiTraceLogs)
+        {
+            return;
+        }
+
+        Debug.Log("[RuneUI] " + message, this);
     }
 
     private int ResolveCurrentPlayerIndex()

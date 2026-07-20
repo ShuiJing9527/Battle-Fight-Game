@@ -121,6 +121,8 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugBossMeleeHit = true;
     [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
+    [SerializeField, Min(0.02f)] private float expensiveAiUpdateInterval = 0.1f;
+    [SerializeField, Min(0.02f)] private float separationUpdateInterval = 0.15f;
     [SerializeField, Min(0.05f)] private float targetResolveRetryInterval = 0.25f;
 
     private Rigidbody rb;
@@ -129,6 +131,7 @@ public class EnemyController : MonoBehaviour
     private SlimeAnimationController slimeAnimation;
     private EnemyDebuffReceiver debuffReceiver;
     private CombatStats combatStats;
+    private CombatHealth combatHealth;
     private AudioSource skillAudioSource;
     private Collider meleeEnemyCollider;
     private SpriteRenderer meleeEnemySpriteRenderer;
@@ -142,10 +145,13 @@ public class EnemyController : MonoBehaviour
     private float nextSpeedDiagnosticTime;
     private float nextChaseDiagnosticTime;
     private float nextTargetResolveTime;
+    private float nextExpensiveAiUpdateTime;
+    private float nextSeparationUpdateTime;
     private float nextBossRangedDecisionLogTime;
     private float nextBossMeleeDecisionLogTime;
     private float nextEnemyMeleeDecisionLogTime;
     private float nextBossLaunchDebugTime;
+    private Vector3 cachedSeparationDirection;
     private Vector3 lastGroundProbeOrigin;
     private bool lastGroundProbeHit;
     private string lastGroundHitName = "None";
@@ -510,6 +516,7 @@ public class EnemyController : MonoBehaviour
         rb = GetComponent<Rigidbody>();
         monsterIdentity = GetComponent<MonsterIdentity>();
         combatStats = GetComponent<CombatStats>();
+        combatHealth = GetComponent<CombatHealth>();
         slimeAnimation = GetComponent<SlimeAnimationController>();
         EnsureSkillAudioSource();
         ResolveMeleeHitSources();
@@ -525,6 +532,7 @@ public class EnemyController : MonoBehaviour
             slimeAnimation.OnAttackHit += HandleAttackHit;
         }
 
+        InitializeAiUpdateScheduling();
         ResolveDebuffReceiver();
     }
 
@@ -574,8 +582,10 @@ public class EnemyController : MonoBehaviour
 
         Vector3 toPlayer = playerTarget.position - transform.position;
         toPlayer.y = 0f;
-        float centerDistance = Vector3.Distance(playerTarget.position, transform.position);
-        float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
+        float verticalCenterDifferenceValue = playerTarget.position.y - transform.position.y;
+        float horizontalCenterDistanceSqr = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
+        float horizontalCenterDistance = Mathf.Sqrt(horizontalCenterDistanceSqr);
+        float centerDistance = Mathf.Sqrt(horizontalCenterDistanceSqr + verticalCenterDifferenceValue * verticalCenterDifferenceValue);
         float verticalDifference = ResolveVerticalCombatDifference(playerTarget, out float verticalCenterDifference);
         float horizontalEdgeDistance = ResolveHorizontalEdgeDistance(playerTarget, out Vector3 enemyClosestPoint, out Vector3 playerClosestPoint);
         float attackDistance = ResolveAttackDistance(horizontalCenterDistance, horizontalEdgeDistance);
@@ -586,8 +596,7 @@ public class EnemyController : MonoBehaviour
         bool isAttackAnimationActive = attackInProgress || (slimeAnimation != null && slimeAnimation.IsAttacking);
         bool hasPhysicalContact = horizontalEdgeDistance <= EdgeDistanceEpsilon;
         bool insideStopDistance = horizontalEdgeDistance <= Mathf.Max(0f, stopDistance) + EdgeDistanceEpsilon;
-        CombatHealth health = GetComponent<CombatHealth>();
-        bool isDead = health != null && health.IsDead;
+        bool isDead = combatHealth != null && combatHealth.IsDead;
         bool cooldownReady = Time.time >= nextAttackTime;
         bool canMove = rb != null && !attackInProgress;
         string currentState = playerTarget == null
@@ -723,7 +732,7 @@ public class EnemyController : MonoBehaviour
         Vector3 direction = toPlayer / safeHorizontalCenterDistance;
         if (enableEnemySoftAvoidance)
         {
-            Vector3 separationDirection = ResolveEnemySeparationDirection();
+            Vector3 separationDirection = ResolveEnemySeparationDirection(horizontalCenterDistanceSqr, isDead);
             Vector3 combinedDirection = direction + separationDirection * Mathf.Max(0f, enemySeparationWeight);
             combinedDirection.y = 0f;
             if (combinedDirection.sqrMagnitude > MovementZeroEpsilon * MovementZeroEpsilon)
@@ -4029,7 +4038,8 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
-        float horizontalCenterDistance = new Vector2(toPlayer.x, toPlayer.z).magnitude;
+        float horizontalCenterDistanceSqr = toPlayer.x * toPlayer.x + toPlayer.z * toPlayer.z;
+        float horizontalCenterDistance = Mathf.Sqrt(horizontalCenterDistanceSqr);
         if (horizontalCenterDistance <= MovementZeroEpsilon)
         {
             rb.linearVelocity = Vector3.zero;
@@ -4040,7 +4050,7 @@ public class EnemyController : MonoBehaviour
         Vector3 direction = toPlayer / horizontalCenterDistance;
         if (enableEnemySoftAvoidance)
         {
-            Vector3 separationDirection = ResolveEnemySeparationDirection();
+            Vector3 separationDirection = ResolveEnemySeparationDirection(horizontalCenterDistanceSqr, combatHealth != null && combatHealth.IsDead);
             Vector3 combinedDirection = direction + separationDirection * Mathf.Max(0f, enemySeparationWeight);
             combinedDirection.y = 0f;
             if (combinedDirection.sqrMagnitude > MovementZeroEpsilon * MovementZeroEpsilon)
@@ -4755,13 +4765,34 @@ public class EnemyController : MonoBehaviour
             this);
     }
 
-    private Vector3 ResolveEnemySeparationDirection()
+    private Vector3 ResolveEnemySeparationDirection(float sqrDistanceToTarget, bool isDead)
     {
         float separationRadius = Mathf.Max(0f, enemySeparationRadius);
         if (!enableEnemySoftAvoidance || separationRadius <= 0.01f || enemySeparationMaxNeighbors <= 0)
         {
             return Vector3.zero;
         }
+
+        if (isDead || !isActiveAndEnabled)
+        {
+            cachedSeparationDirection = Vector3.zero;
+            return Vector3.zero;
+        }
+
+        float now = Time.time;
+        if (sqrDistanceToTarget > 225f)
+        {
+            cachedSeparationDirection = Vector3.zero;
+            nextSeparationUpdateTime = now + Mathf.Max(0.02f, separationUpdateInterval);
+            return Vector3.zero;
+        }
+
+        if (now < nextSeparationUpdateTime)
+        {
+            return cachedSeparationDirection;
+        }
+
+        nextSeparationUpdateTime = now + Mathf.Max(0.02f, separationUpdateInterval);
 
         if (separationHits == null || separationHits.Length != Mathf.Max(1, enemySeparationMaxNeighbors))
         {
@@ -4779,6 +4810,7 @@ public class EnemyController : MonoBehaviour
 
         if (hitCount <= 0)
         {
+            cachedSeparationDirection = Vector3.zero;
             return Vector3.zero;
         }
 
@@ -4822,12 +4854,14 @@ public class EnemyController : MonoBehaviour
 
         if (neighborCount <= 0 || separation.sqrMagnitude <= 0.0001f)
         {
+            cachedSeparationDirection = Vector3.zero;
             return Vector3.zero;
         }
 
         separation /= neighborCount;
         separation.y = 0f;
-        return separation.normalized;
+        cachedSeparationDirection = separation.normalized;
+        return cachedSeparationDirection;
     }
 
     private void BeginAttack()
@@ -5996,7 +6030,17 @@ public class EnemyController : MonoBehaviour
 
     private void ResolvePlayerTarget()
     {
+        if (TryUseBootstrapCurrentPlayer())
+        {
+            return;
+        }
+
         if (HasUsableTarget(playerTarget))
+        {
+            return;
+        }
+
+        if (Time.time < nextExpensiveAiUpdateTime)
         {
             return;
         }
@@ -6006,12 +6050,18 @@ public class EnemyController : MonoBehaviour
             return;
         }
 
+        nextExpensiveAiUpdateTime = Time.time + Mathf.Max(0.02f, expensiveAiUpdateInterval);
         nextTargetResolveTime = Time.time + Mathf.Max(0.05f, targetResolveRetryInterval);
         TryResolveTarget("AutoReacquire");
     }
 
     private bool TryResolveTarget(string source)
     {
+        if (TryUseBootstrapCurrentPlayer())
+        {
+            return true;
+        }
+
         if (HasUsableTarget(playerTarget))
         {
             return true;
@@ -6062,6 +6112,28 @@ public class EnemyController : MonoBehaviour
         return target != null && target.gameObject != null && target.gameObject.activeInHierarchy;
     }
 
+    private bool TryUseBootstrapCurrentPlayer()
+    {
+        if (playerBootstrap == null)
+        {
+            return false;
+        }
+
+        playerBootstrap.EnsureInitializedForSpawn();
+        Transform currentPlayer = playerBootstrap.CurrentPlayerTransform;
+        if (!HasUsableTarget(currentPlayer))
+        {
+            return false;
+        }
+
+        if (playerTarget != currentPlayer)
+        {
+            AssignTarget(currentPlayer, "BootstrapCurrentPlayer");
+        }
+
+        return true;
+    }
+
     private void AssignTarget(Transform target, string source, string oldTargetNameOverride = null)
     {
         string oldTargetName = oldTargetNameOverride ?? (playerTarget != null ? playerTarget.name : "null");
@@ -6070,6 +6142,14 @@ public class EnemyController : MonoBehaviour
         Debug.Log(
             $"[EnemyTargetResolve] enemy={name} oldTarget={oldTargetName} newTarget={(playerTarget != null ? playerTarget.name : "null")} success={(playerTarget != null)} source={source}{(playerTarget == null ? " reason=NoActivePlayerFound" : string.Empty)}",
             this);
+    }
+
+    private void InitializeAiUpdateScheduling()
+    {
+        float expensiveInterval = Mathf.Max(0.02f, expensiveAiUpdateInterval);
+        float cachedSeparationInterval = Mathf.Max(0.02f, separationUpdateInterval);
+        nextExpensiveAiUpdateTime = Time.time + Random.Range(0f, expensiveInterval);
+        nextSeparationUpdateTime = Time.time + Random.Range(0f, cachedSeparationInterval);
     }
 
     public string BuildRuntimeDebugSummary(Transform fallbackTarget = null)

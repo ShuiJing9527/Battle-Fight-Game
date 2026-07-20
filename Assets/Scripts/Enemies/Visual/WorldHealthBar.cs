@@ -25,16 +25,41 @@ public class WorldHealthBar : MonoBehaviour
     private MonsterIdentity monsterIdentity;
     private MonsterRankVisual rankVisual;
     private Transform cameraTransform;
+    private Renderer visualRenderer;
     private bool initialized;
     private bool usingFallbackBar;
+    private bool healthVisualDirty = true;
+    private bool barVisible = true;
     private float backgroundLocalZ;
     private float fillLocalZ;
+    private float nextCameraResolveTime;
+    private float lastKnownCurrentHealth = float.NaN;
+    private float lastKnownMaxHealth = float.NaN;
+    private float lastKnownShield = float.NaN;
+    private float lastKnownMaxShield = float.NaN;
     private string configSource = "Default";
     private void Awake()
     {
         RefreshHealthBindings();
         RefreshVisualBindings();
         EnsureBarInitialized();
+    }
+
+    private void OnEnable()
+    {
+        RefreshHealthBindings();
+        SubscribeHealthEvents();
+        healthVisualDirty = true;
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeHealthEvents();
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeHealthEvents();
     }
 
     private void LateUpdate()
@@ -45,21 +70,28 @@ public class WorldHealthBar : MonoBehaviour
             return;
         }
 
-        if (cameraTransform == null && Camera.main != null)
+        RefreshHealthBindings();
+        RefreshVisualBindings();
+        EnsureCameraCached();
+
+        bool isVisible = IsBarRelevantForCamera();
+        SetBarVisible(isVisible);
+        if (!isVisible)
         {
-            cameraTransform = Camera.main.transform;
+            return;
         }
 
         Vector3 anchorPosition = ResolveHealthBarWorldPosition(forceLog: false);
-        barInstanceRoot.position = anchorPosition;
-        if (cameraTransform != null)
+        if (barInstanceRoot.position != anchorPosition)
+        {
+            barInstanceRoot.position = anchorPosition;
+        }
+        if (cameraTransform != null && barInstanceRoot.rotation != cameraTransform.rotation)
         {
             barInstanceRoot.rotation = cameraTransform.rotation;
         }
 
-        RefreshHealthBindings();
-        float ratio = ResolveHealthRatio();
-        ApplyBarSize(ratio);
+        RefreshBarVisualsIfNeeded(force: false);
     }
 
     public void RefreshWorldPositionForDebug()
@@ -91,6 +123,8 @@ public class WorldHealthBar : MonoBehaviour
         {
             barInstanceRoot.position = ResolveHealthBarWorldPosition(forceLog: debug);
         }
+
+        healthVisualDirty = true;
     }
 
     private void EnsureBarInitialized()
@@ -115,6 +149,9 @@ public class WorldHealthBar : MonoBehaviour
         CacheRendererReferencesFromChildren();
         EnsureRendererSprites();
         CacheDepthOffsets();
+        RefreshVisualBindings();
+        SubscribeHealthEvents();
+        RefreshBarVisualsIfNeeded(force: true);
     }
 
     private float ResolveHealthRatio()
@@ -304,6 +341,12 @@ public class WorldHealthBar : MonoBehaviour
             {
                 combatHealth = GetComponentInChildren<CombatHealth>(true);
             }
+
+            if (combatHealth != null)
+            {
+                SubscribeHealthEvents();
+                healthVisualDirty = true;
+            }
         }
     }
 
@@ -325,6 +368,11 @@ public class WorldHealthBar : MonoBehaviour
             {
                 rankVisual = GetComponentInParent<MonsterRankVisual>();
             }
+        }
+
+        if (visualRenderer == null)
+        {
+            visualRenderer = ResolveVisualRenderer();
         }
     }
 
@@ -411,6 +459,149 @@ public class WorldHealthBar : MonoBehaviour
         }
 
         return GetComponentInChildren<Renderer>(true);
+    }
+
+    private void EnsureCameraCached()
+    {
+        if (cameraTransform != null)
+        {
+            return;
+        }
+
+        if (Time.unscaledTime < nextCameraResolveTime)
+        {
+            return;
+        }
+
+        Camera mainCamera = Camera.main;
+        cameraTransform = mainCamera != null ? mainCamera.transform : null;
+        nextCameraResolveTime = Time.unscaledTime + 0.5f;
+    }
+
+    private bool IsBarRelevantForCamera()
+    {
+        if (visualRenderer == null)
+        {
+            visualRenderer = ResolveVisualRenderer();
+        }
+
+        return visualRenderer == null || visualRenderer.isVisible;
+    }
+
+    private void SetBarVisible(bool visible)
+    {
+        if (barInstanceRoot == null || barVisible == visible)
+        {
+            return;
+        }
+
+        barVisible = visible;
+        barInstanceRoot.gameObject.SetActive(visible);
+        if (visible)
+        {
+            healthVisualDirty = true;
+        }
+    }
+
+    private void RefreshBarVisualsIfNeeded(bool force)
+    {
+        if (!TryReadHealthSnapshot(out float currentHealth, out float maxHealth, out float currentShield, out float maxShield))
+        {
+            if (force || healthVisualDirty)
+            {
+                ApplyBarSize(-1f);
+                healthVisualDirty = false;
+            }
+            return;
+        }
+
+        bool valuesChanged =
+            force ||
+            healthVisualDirty ||
+            !Mathf.Approximately(lastKnownCurrentHealth, currentHealth) ||
+            !Mathf.Approximately(lastKnownMaxHealth, maxHealth) ||
+            !Mathf.Approximately(lastKnownShield, currentShield) ||
+            !Mathf.Approximately(lastKnownMaxShield, maxShield);
+
+        if (!valuesChanged)
+        {
+            return;
+        }
+
+        lastKnownCurrentHealth = currentHealth;
+        lastKnownMaxHealth = maxHealth;
+        lastKnownShield = currentShield;
+        lastKnownMaxShield = maxShield;
+        float ratio = maxHealth > 0f ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
+        ApplyBarSize(ratio);
+        healthVisualDirty = false;
+    }
+
+    private bool TryReadHealthSnapshot(out float currentHealth, out float maxHealth, out float currentShield, out float maxShield)
+    {
+        currentHealth = 0f;
+        maxHealth = 0f;
+        currentShield = 0f;
+        maxShield = 0f;
+        if (combatHealth == null)
+        {
+            return false;
+        }
+
+        currentHealth = combatHealth.currentHealth;
+        maxHealth = combatHealth.MaxHealthValue;
+        currentShield = combatHealth.GetShield();
+        maxShield = combatHealth.GetMaxShield();
+
+        if (combatHealth.resourceBank != null)
+        {
+            currentHealth = combatHealth.resourceBank.currentHealth;
+            maxHealth = combatHealth.resourceBank.maxHealth;
+        }
+
+        return true;
+    }
+
+    private void SubscribeHealthEvents()
+    {
+        if (combatHealth == null)
+        {
+            return;
+        }
+
+        combatHealth.Damaged -= HandleHealthChanged;
+        combatHealth.OnShieldChanged -= HandleShieldChanged;
+        combatHealth.Died -= HandleDeath;
+        combatHealth.Damaged += HandleHealthChanged;
+        combatHealth.OnShieldChanged += HandleShieldChanged;
+        combatHealth.Died += HandleDeath;
+    }
+
+    private void UnsubscribeHealthEvents()
+    {
+        if (combatHealth == null)
+        {
+            return;
+        }
+
+        combatHealth.Damaged -= HandleHealthChanged;
+        combatHealth.OnShieldChanged -= HandleShieldChanged;
+        combatHealth.Died -= HandleDeath;
+    }
+
+    private void HandleHealthChanged(float _, GameObject __)
+    {
+        healthVisualDirty = true;
+    }
+
+    private void HandleShieldChanged(float _, float __)
+    {
+        healthVisualDirty = true;
+    }
+
+    private void HandleDeath(GameObject _)
+    {
+        healthVisualDirty = true;
     }
 
     private static Sprite GetWhiteSprite()

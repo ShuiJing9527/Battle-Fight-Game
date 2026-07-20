@@ -47,6 +47,8 @@ public class CombatSkillCaster : MonoBehaviour
     public Transform attackPoint;
     public LayerMask enemyLayer = ~0;
     public BattleDamageType damageType = BattleDamageType.Physical;
+    [Header("Debug")]
+    [SerializeField] private bool debugMeleeHitTrace = false;
 
     private BattleResourceBank resourceBank;
     private RuneRuntimeState runeRuntimeState;
@@ -70,6 +72,11 @@ public class CombatSkillCaster : MonoBehaviour
         if (attackPoint == null)
         {
             attackPoint = transform;
+        }
+
+        if (Application.isPlaying)
+        {
+            RuntimeRuneScaling.ForceRefresh($"{nameof(CombatSkillCaster)}.{nameof(Awake)}:{name}");
         }
     }
 
@@ -133,6 +140,10 @@ public class CombatSkillCaster : MonoBehaviour
     {
         EnsureDefaultSkills();
         runeRuntimeState?.RebuildFromEquippedRunes();
+        if (Application.isPlaying)
+        {
+            RuntimeRuneScaling.ForceRefresh($"{nameof(CombatSkillCaster)}.{nameof(RefreshRuneState)}:{name}");
+        }
     }
 
     public void ExecuteThornCounter(int skillIndex, CombatHealth target)
@@ -204,15 +215,18 @@ public class CombatSkillCaster : MonoBehaviour
                 }
             }
 
-            Debug.Log(
-                "[PlayerMeleeHitDebug] " +
-                "skill=" + (skill != null ? skill.skillName : "UnknownSkill") +
-                " attackPosition=" + point.position +
-                " attackRadius=" + skill.attackRange.ToString("F2") +
-                " hitColliderCount=" + colliders.Length +
-                " hitIndex=" + hit +
-                " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
-                this);
+            if (debugMeleeHitTrace)
+            {
+                Debug.Log(
+                    "[PlayerMeleeHitDebug] " +
+                    "skill=" + (skill != null ? skill.skillName : "UnknownSkill") +
+                    " attackPosition=" + point.position +
+                    " attackRadius=" + skill.attackRange.ToString("F2") +
+                    " hitColliderCount=" + colliders.Length +
+                    " hitIndex=" + hit +
+                    " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+                    this);
+            }
         }
     }
 
@@ -331,6 +345,10 @@ public class CombatSkillCaster : MonoBehaviour
         if (rebuildRuneState && runeRuntimeState != null)
         {
             runeRuntimeState.RebuildFromEquippedRunes();
+            if (Application.isPlaying)
+            {
+                RuntimeRuneScaling.ForceRefresh($"{nameof(CombatSkillCaster)}.{nameof(EnsureDefaultSkills)}:{name}");
+            }
         }
         }
         finally

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
@@ -45,6 +46,7 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     private float nextDebugManaLogTime;
     private CombatStats combatStats;
     private RuneRuntimeState runeRuntimeState;
+    private readonly Dictionary<string, float> manaRegenMultipliers = new Dictionary<string, float>();
 
     private void Awake()
     {
@@ -92,12 +94,12 @@ public class PlayerSkillCooldownManager : MonoBehaviour
         if (resourceBank != null)
         {
             resourceBank.maxEnergy = Mathf.Max(resourceBank.maxEnergy, maxMana);
-            resourceBank.currentEnergy = Mathf.Min(resourceBank.maxEnergy, resourceBank.currentEnergy + manaRecoverPerSecond * deltaTime);
+            resourceBank.currentEnergy = Mathf.Min(resourceBank.maxEnergy, resourceBank.currentEnergy + GetEffectiveManaRecoverPerSecond() * deltaTime);
             runtimeCurrentMana = resourceBank.currentEnergy;
         }
         else
         {
-            runtimeCurrentMana = Mathf.Min(maxMana, runtimeCurrentMana + manaRecoverPerSecond * deltaTime);
+            runtimeCurrentMana = Mathf.Min(maxMana, runtimeCurrentMana + GetEffectiveManaRecoverPerSecond() * deltaTime);
         }
 
         if (debugManaRegen && Time.time >= nextDebugManaLogTime)
@@ -105,9 +107,36 @@ public class PlayerSkillCooldownManager : MonoBehaviour
             nextDebugManaLogTime = Time.time + Mathf.Max(0.1f, debugManaRegenInterval);
             float currentMana = GetCurrentMana();
             float maxCurrentMana = GetMaxMana();
-            Debug.Log($"[Player MP Regen] regenPerSecond={manaRecoverPerSecond:F2}", this);
+            Debug.Log($"[Player MP Regen] regenPerSecond={GetEffectiveManaRecoverPerSecond():F2}", this);
             Debug.Log($"[Player MP Regen] currentMP={currentMana:F2} / maxMP={maxCurrentMana:F2}", this);
         }
+    }
+
+    public void SetManaRegenMultiplier(object source, float multiplier)
+    {
+        string key = GetModifierKey(source);
+        if (string.IsNullOrEmpty(key))
+        {
+            return;
+        }
+
+        manaRegenMultipliers[key] = Mathf.Max(0f, multiplier);
+    }
+
+    public void RemoveManaRegenMultiplier(object source)
+    {
+        string key = GetModifierKey(source);
+        if (string.IsNullOrEmpty(key))
+        {
+            return;
+        }
+
+        manaRegenMultipliers.Remove(key);
+    }
+
+    public float GetEffectiveManaRecoverPerSecond()
+    {
+        return Mathf.Max(0f, manaRecoverPerSecond * GetManaRegenMultiplierProduct());
     }
 
     public bool IsSkillCastable(int skillIndex)
@@ -323,5 +352,21 @@ public class PlayerSkillCooldownManager : MonoBehaviour
     private float ResolveCooldownMultiplier()
     {
         return BattleStatUtility.GetCooldownMultiplier(combatStats);
+    }
+
+    private float GetManaRegenMultiplierProduct()
+    {
+        float product = 1f;
+        foreach (KeyValuePair<string, float> entry in manaRegenMultipliers)
+        {
+            product *= Mathf.Max(0f, entry.Value);
+        }
+
+        return product;
+    }
+
+    private static string GetModifierKey(object source)
+    {
+        return source == null ? string.Empty : source.GetType().FullName + "#" + source.GetHashCode();
     }
 }

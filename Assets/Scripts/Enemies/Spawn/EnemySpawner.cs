@@ -288,6 +288,7 @@ public class EnemySpawner : MonoBehaviour
     [Header("Target")]
     public Transform playerTarget;
     public string playerTag = "Player";
+    [SerializeField, Min(0.05f)] private float playerResolveRetryInterval = 0.5f;
 
     [Header("Enemy Collision")]
     [SerializeField] private string enemyLayerName = "Enemy";
@@ -305,6 +306,7 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private EnemyDifficultyDirector difficultyDirector;
     [SerializeField] private bool debugDifficultySpawnLogs = false;
     [SerializeField] private bool debugScalingBreakdown = false;
+    [SerializeField, Min(0.05f)] private float trackedEnemyCleanupInterval = 0.25f;
 
     [Header("Player Rune Monster Scaling")]
     [SerializeField] private bool enablePlayerRuneStrengthScaling = true;
@@ -330,6 +332,8 @@ public class EnemySpawner : MonoBehaviour
     private readonly HashSet<int> finalMomentBossEnemyIds = new HashSet<int>();
     private readonly Dictionary<int, UltimateBossModifiers> ultimateBossModifiersByEnemyId = new Dictionary<int, UltimateBossModifiers>();
     private readonly Dictionary<int, PhaseSplitBossModifiers> phaseSplitBossModifiersByEnemyId = new Dictionary<int, PhaseSplitBossModifiers>();
+    private readonly HashSet<int> aliveInstanceIds = new HashSet<int>();
+    private readonly List<int> staleTrackedEnemyIds = new List<int>();
     private int resolvedEnemyLayer = -1;
     private bool enemyLayerCollisionConfigured;
     private bool finalMomentBossTriggered;
@@ -344,6 +348,9 @@ public class EnemySpawner : MonoBehaviour
     private bool subscribedToInitialGraceEnd;
     private bool externalTestPauseActive;
     private float nextBossHurtboxRuntimeRefreshTime;
+    private float nextPlayerResolveTime;
+    private float nextTrackedEnemyCleanupTime;
+    private bool trackedEnemyCleanupDirty = true;
     private int lastBossHurtboxRuntimeConfigHash;
     public bool IsExternalTestPauseActive => externalTestPauseActive;
 
@@ -371,16 +378,19 @@ public class EnemySpawner : MonoBehaviour
     private void Start()
     {
         SubscribeDifficultyDirectorEvents();
+        RuntimeRuneScaling.ScalingChanged += HandleRuntimeRuneScalingChanged;
         CachePrefabPools();
         ResolveEnemyLayer();
         ConfigureEnemyLayerCollision();
         ResolvePlayerTarget();
         InitializeTodTracking();
+        RuntimeRuneScaling.ForceRefresh($"{nameof(EnemySpawner)}.{nameof(Start)}");
         EnsureSpawnerCoroutinesRunning();
     }
 
     private void OnDestroy()
     {
+        RuntimeRuneScaling.ScalingChanged -= HandleRuntimeRuneScalingChanged;
         UnsubscribeDifficultyDirectorEvents();
     }
 
@@ -1277,6 +1287,7 @@ public class EnemySpawner : MonoBehaviour
         }
 
         aliveEnemies.Add(enemy);
+        trackedEnemyCleanupDirty = true;
         CacheMonsterBaseSnapshot(enemy);
         ConfigureSpawnedEnemyPhysics(enemy);
         ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: true);
@@ -1400,6 +1411,32 @@ public class EnemySpawner : MonoBehaviour
     public void RefreshMonsterRuntimeScaling(GameObject enemy, bool refillCurrentHealth = false)
     {
         ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth);
+    }
+
+    private void HandleRuntimeRuneScalingChanged(RuntimeRuneScaling.Snapshot snapshot)
+    {
+        playerRuneScalingSnapshots.Clear();
+        for (int i = 0; i < aliveEnemies.Count; i++)
+        {
+            GameObject enemy = aliveEnemies[i];
+            if (!IsEnemyAliveForTracking(enemy))
+            {
+                continue;
+            }
+
+            ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: false);
+        }
+
+        if (debugPlayerRuneMonsterScaling)
+        {
+            Debug.Log(
+                "[MonsterRuneScalingTrace] " +
+                "event=GlobalRuneScalingChanged " +
+                $"totalEquippedRuneCount={snapshot.totalEquippedCount} " +
+                $"bonusRate={snapshot.bonusRate:P0} " +
+                $"finalMultiplier={snapshot.multiplier:F2}",
+                this);
+        }
     }
 
     public void ApplyRuntimeSplitChildModifiers(
@@ -2127,6 +2164,11 @@ public class EnemySpawner : MonoBehaviour
 
         ConfigureEnemyController(enemy, stats);
         ApplyCleanupBossVisualScale(enemy, snapshot, isCleanupBoss);
+        MonsterDayNightAffinity affinity = enemy.GetComponent<MonsterDayNightAffinity>();
+        if (affinity != null)
+        {
+            affinity.NotifyStatsInitialized();
+        }
 
         if (debugScalingBreakdown)
         {
@@ -2220,19 +2262,14 @@ public class EnemySpawner : MonoBehaviour
     private PlayerRuneScalingSnapshot CreatePlayerRuneScalingSnapshot()
     {
         int runeCount = 0;
-        string playerName = "None";
+        string playerName = "Player01+Player02";
         string countSource = "Disabled";
 
         if (enablePlayerRuneStrengthScaling)
         {
-            Transform activePlayer = ResolveActivePlayerTarget();
-            if (activePlayer == null)
-            {
-                ResolvePlayerTarget();
-                activePlayer = ResolveActivePlayerTarget();
-            }
-
-            runeCount = ResolveEquippedRuneCountForMonsterScaling(activePlayer, out playerName, out countSource);
+            RuntimeRuneScaling.Snapshot snapshot = RuntimeRuneScaling.GetCurrentSnapshot();
+            runeCount = snapshot.totalEquippedCount;
+            countSource = $"TotalEquipped(Player01={snapshot.player01Source},Player02={snapshot.player02Source})";
         }
 
         float strengthMultiplier = CalculateRuneStrengthMultiplier(runeCount, strengthIncreasePerEquippedRune);
@@ -2255,89 +2292,10 @@ public class EnemySpawner : MonoBehaviour
 
     public static int ResolveEquippedRuneCountForMonsterScaling(Transform player, out string playerName, out string countSource)
     {
-        playerName = player != null ? player.name : "None";
-        countSource = "None";
-
-        if (player != null)
-        {
-            CombatSkillCaster caster = player.GetComponentInParent<CombatSkillCaster>();
-            if (caster == null)
-            {
-                caster = player.GetComponentInChildren<CombatSkillCaster>(true);
-            }
-
-            if (caster != null)
-            {
-                return ResolveEquippedRuneCountFromCaster(caster, out countSource);
-            }
-        }
-
-        CombatSkillCaster[] casters = FindObjectsOfType<CombatSkillCaster>(true);
-        int bestCount = 0;
-        for (int i = 0; i < casters.Length; i++)
-        {
-            CombatSkillCaster caster = casters[i];
-            if (caster == null || !caster.gameObject.activeInHierarchy)
-            {
-                continue;
-            }
-
-            int count = ResolveEquippedRuneCountFromCaster(caster, out string source);
-            if (count < bestCount)
-            {
-                continue;
-            }
-
-            bestCount = count;
-            playerName = caster.name;
-            countSource = "FallbackHighestActiveCaster:" + source;
-        }
-
-        return bestCount;
-    }
-
-    private static int ResolveEquippedRuneCountFromCaster(CombatSkillCaster caster, out string countSource)
-    {
-        countSource = "MissingCaster";
-        if (caster == null)
-        {
-            return 0;
-        }
-
-        RuneRuntimeState runtimeState = caster.GetComponent<RuneRuntimeState>();
-        if (runtimeState != null)
-        {
-            countSource = "RuneRuntimeState.GlobalRuneCounts";
-            return
-                runtimeState.GetGlobalRuneCount(RuneType.Life) +
-                runtimeState.GetGlobalRuneCount(RuneType.Shield) +
-                runtimeState.GetGlobalRuneCount(RuneType.Mana) +
-                runtimeState.GetGlobalRuneCount(RuneType.Thorn) +
-                runtimeState.GetGlobalRuneCount(RuneType.Luck);
-        }
-
-        countSource = "CombatSkillCaster.EquippedRunesFallback";
-        int count = 0;
-        for (int skillIndex = 0; skillIndex < 4; skillIndex++)
-        {
-            BattleSkill skill = caster.TryGetSkillRaw(skillIndex);
-            if (skill == null || skill.equippedRunes == null)
-            {
-                continue;
-            }
-
-            int slotLimit = Mathf.Min(Mathf.Max(0, skill.runeSlotCount), skill.equippedRunes.Length);
-            for (int slotIndex = 0; slotIndex < slotLimit; slotIndex++)
-            {
-                RuneDefinition rune = skill.equippedRunes[slotIndex];
-                if (rune != null && rune.IsConfigured() && rune.runeType != RuneType.None)
-                {
-                    count++;
-                }
-            }
-        }
-
-        return count;
+        RuntimeRuneScaling.Snapshot snapshot = RuntimeRuneScaling.GetCurrentSnapshot();
+        playerName = "Player01+Player02";
+        countSource = $"TotalEquipped(Player01={snapshot.player01Source},Player02={snapshot.player02Source})";
+        return snapshot.totalEquippedCount;
     }
 
     private void ConfigureEnemyController(GameObject enemy, CombatStats stats)
@@ -2615,15 +2573,6 @@ public class EnemySpawner : MonoBehaviour
 
     private void ResolvePlayerTarget()
     {
-        if (playerBootstrap == null)
-        {
-            playerBootstrap = FindObjectOfType<Player2Bootstrap>();
-            if (playerBootstrap != null)
-            {
-                playerBootstrap.EnsureInitializedForSpawn();
-            }
-        }
-
         Transform activePlayer = ResolveActivePlayerTarget();
         if (activePlayer != null)
         {
@@ -2631,10 +2580,32 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
+        if (Time.time < nextPlayerResolveTime)
+        {
+            return;
+        }
+
+        nextPlayerResolveTime = Time.time + Mathf.Max(0.05f, playerResolveRetryInterval);
+
+        if (playerBootstrap == null)
+        {
+            playerBootstrap = FindObjectOfType<Player2Bootstrap>();
+            if (playerBootstrap != null)
+            {
+                playerBootstrap.EnsureInitializedForSpawn();
+                activePlayer = ResolveActivePlayerTarget();
+                if (activePlayer != null)
+                {
+                    playerTarget = activePlayer;
+                    return;
+                }
+            }
+        }
+
         if (!string.IsNullOrEmpty(playerTag))
         {
             GameObject playerObject = GameObject.FindWithTag(playerTag);
-            if (playerObject != null)
+            if (playerObject != null && playerObject.activeInHierarchy)
             {
                 playerTarget = playerObject.transform;
             }
@@ -4015,11 +3986,21 @@ public class EnemySpawner : MonoBehaviour
 
     private void CleanupTrackedEnemies()
     {
+        if (!trackedEnemyCleanupDirty && Time.time < nextTrackedEnemyCleanupTime)
+        {
+            return;
+        }
+
+        trackedEnemyCleanupDirty = false;
+        nextTrackedEnemyCleanupTime = Time.time + Mathf.Max(0.05f, trackedEnemyCleanupInterval);
+        aliveInstanceIds.Clear();
+
         for (int i = aliveEnemies.Count - 1; i >= 0; i--)
         {
             GameObject enemy = aliveEnemies[i];
             if (IsEnemyAliveForTracking(enemy))
             {
+                aliveInstanceIds.Add(enemy.GetInstanceID());
                 continue;
             }
 
@@ -4033,50 +4014,37 @@ public class EnemySpawner : MonoBehaviour
             }
         }
 
-        List<int> staleKeys = null;
+        staleTrackedEnemyIds.Clear();
         foreach (KeyValuePair<int, MonsterBaseSnapshot> pair in monsterBaseSnapshots)
         {
-            bool exists = false;
-            for (int i = 0; i < aliveEnemies.Count; i++)
-            {
-                if (aliveEnemies[i] != null && aliveEnemies[i].GetInstanceID() == pair.Key)
-                {
-                    exists = true;
-                    break;
-                }
-            }
-
-            if (exists)
+            if (aliveInstanceIds.Contains(pair.Key))
             {
                 continue;
             }
 
-            if (staleKeys == null)
-            {
-                staleKeys = new List<int>();
-            }
-
-            staleKeys.Add(pair.Key);
+            staleTrackedEnemyIds.Add(pair.Key);
         }
 
-        if (staleKeys == null)
+        if (staleTrackedEnemyIds.Count <= 0)
         {
             return;
         }
 
-        for (int i = 0; i < staleKeys.Count; i++)
+        for (int i = 0; i < staleTrackedEnemyIds.Count; i++)
         {
-            monsterBaseSnapshots.Remove(staleKeys[i]);
-            finalMomentBossEnemyIds.Remove(staleKeys[i]);
-            ultimateBossModifiersByEnemyId.Remove(staleKeys[i]);
-            phaseSplitBossModifiersByEnemyId.Remove(staleKeys[i]);
-            playerRuneScalingSnapshots.Remove(staleKeys[i]);
+            int staleId = staleTrackedEnemyIds[i];
+            monsterBaseSnapshots.Remove(staleId);
+            finalMomentBossEnemyIds.Remove(staleId);
+            ultimateBossModifiersByEnemyId.Remove(staleId);
+            phaseSplitBossModifiersByEnemyId.Remove(staleId);
+            playerRuneScalingSnapshots.Remove(staleId);
         }
     }
 
     public void OnEnemyDestroyed(GameObject destroyedEnemy)
     {
         NotifyDifficultyDirectorOfEnemyDeath(destroyedEnemy);
+        trackedEnemyCleanupDirty = true;
 
         if (destroyedEnemy != null)
         {
@@ -4098,6 +4066,7 @@ public class EnemySpawner : MonoBehaviour
 
     public void OnEnemyDestroyed()
     {
+        trackedEnemyCleanupDirty = true;
         CleanupTrackedEnemies();
     }
 

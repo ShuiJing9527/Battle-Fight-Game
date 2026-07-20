@@ -397,6 +397,8 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
     [SerializeField, Min(0.05f)] private float stateCheckInterval = 0.25f;
     [Tooltip("How long to wait for the existing TOD day/night state to become available before logging an error.")]
     [SerializeField, Min(0.1f)] private float initializationTimeout = 2f;
+    [Header("Debug")]
+    [SerializeField] private bool debugAffinityLogs = false;
 
     private CombatStats stats;
     private MonsterIdentity identity;
@@ -412,9 +414,8 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
     public void NotifyStatsInitialized()
     {
         CacheReferences();
-        baseStatsCaptured = false;
         missingStateLogged = false;
-        currentState = MonsterAffinityState.Unknown;
+        RefreshBaseStatsAndReapplyCurrentState();
     }
 
     private void OnEnable()
@@ -465,11 +466,6 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
         float startTime = Time.unscaledTime;
         while (enabled)
         {
-            if (!baseStatsCaptured)
-            {
-                CaptureBaseStats();
-            }
-
             if (TryResolveState(out MonsterAffinityState resolvedState))
             {
                 ApplyStateIfNeeded(resolvedState);
@@ -489,11 +485,6 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
 
         while (enabled)
         {
-            if (!baseStatsCaptured)
-            {
-                CaptureBaseStats();
-            }
-
             if (TryResolveState(out MonsterAffinityState resolvedState))
             {
                 ApplyStateIfNeeded(resolvedState);
@@ -537,7 +528,7 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
 
     private void CaptureBaseStats()
     {
-        if (baseStatsCaptured || stats == null)
+        if (stats == null)
         {
             return;
         }
@@ -547,6 +538,16 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
         basePhysicalDefense = Mathf.Max(0f, stats.physicalDefense);
         baseSpecialDefense = Mathf.Max(0f, stats.specialDefense);
         baseStatsCaptured = true;
+    }
+
+    private void RefreshBaseStatsAndReapplyCurrentState()
+    {
+        CaptureBaseStats();
+        currentState = MonsterAffinityState.Unknown;
+        if (TryResolveState(out MonsterAffinityState resolvedState))
+        {
+            ApplyStateForce(resolvedState);
+        }
     }
 
     private bool TryResolveState(out MonsterAffinityState resolvedState)
@@ -573,21 +574,39 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
             return;
         }
 
+        ApplyStateForce(resolvedState);
+    }
+
+    private void ApplyStateForce(MonsterAffinityState resolvedState)
+    {
+        if (!baseStatsCaptured || stats == null || resolvedState == MonsterAffinityState.Unknown)
+        {
+            return;
+        }
+
+        float affinityMultiplier = RuntimeRuneScaling.GetTotalEquippedRuneMultiplier();
+
         switch (resolvedState)
         {
             case MonsterAffinityState.Day:
                 stats.physicalAttack = RoundCombatStat(basePhysicalAttack, 1f);
                 stats.specialAttack = RoundCombatStat(baseSpecialAttack, 1f);
-                stats.physicalDefense = RoundCombatStat(basePhysicalDefense, 2f);
-                stats.specialDefense = RoundCombatStat(baseSpecialDefense, 2f);
-                Debug.Log("[MonsterDayNightAffinity] " + name + " Day applied: DEF x2, SP.DEF x2.", this);
+                stats.physicalDefense = RoundCombatStat(basePhysicalDefense, affinityMultiplier);
+                stats.specialDefense = RoundCombatStat(baseSpecialDefense, affinityMultiplier);
+                if (debugAffinityLogs)
+                {
+                    Debug.Log($"[MonsterAffinity] Day defense multiplier={affinityMultiplier:F2} object={name}", this);
+                }
                 break;
             case MonsterAffinityState.Night:
-                stats.physicalAttack = RoundCombatStat(basePhysicalAttack, 2f);
-                stats.specialAttack = RoundCombatStat(baseSpecialAttack, 2f);
+                stats.physicalAttack = RoundCombatStat(basePhysicalAttack, affinityMultiplier);
+                stats.specialAttack = RoundCombatStat(baseSpecialAttack, affinityMultiplier);
                 stats.physicalDefense = RoundCombatStat(basePhysicalDefense, 1f);
                 stats.specialDefense = RoundCombatStat(baseSpecialDefense, 1f);
-                Debug.Log("[MonsterDayNightAffinity] " + name + " Night applied: ATK x2, SP.ATK x2.", this);
+                if (debugAffinityLogs)
+                {
+                    Debug.Log($"[MonsterAffinity] Night attack multiplier={affinityMultiplier:F2} object={name}", this);
+                }
                 break;
         }
 

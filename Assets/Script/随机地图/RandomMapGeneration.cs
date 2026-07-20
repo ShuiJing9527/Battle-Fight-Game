@@ -1,6 +1,7 @@
 ﻿using Cysharp.Threading.Tasks;
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 using UnityEngine.Tilemaps;
 
@@ -96,6 +97,8 @@ namespace UnderTheStars.GenerationMap
 
         [Header("Performance")]
         [SerializeField] private bool collectGarbageAfterReset = false;
+        [Header("Debug")]
+        [SerializeField] private bool debugMapGenerationLogs = false;
 
         private HashSet<Vector2Int>[,] floorPoints;// Floor points
         private HashSet<Vector2Int>[,] propsPoints;// Prop points
@@ -133,6 +136,7 @@ namespace UnderTheStars.GenerationMap
         private int currentGenerateMapDebugId;
         private int playerSpawnedGenerationId = -1;
         private bool isGenerateMapDebugInProgress;
+        private CancellationTokenSource mapGenerationCts;
         private int shoreGenerationInvocationCount;
         private bool hasCompletedFirstShoreGeneration;
         private readonly HashSet<Vector2Int> diagnosticKnownShorePoints = new HashSet<Vector2Int>();
@@ -402,6 +406,16 @@ namespace UnderTheStars.GenerationMap
             GenerateMap();
         }
 
+        private void OnDisable()
+        {
+            CancelMapGeneration("disable");
+        }
+
+        private void OnDestroy()
+        {
+            CancelMapGeneration("destroy");
+        }
+
         private void OnValidate()
         {
             EnsureRegionGenerateOptions();
@@ -411,35 +425,67 @@ namespace UnderTheStars.GenerationMap
             cleanupIterations = Mathf.Max(1, cleanupIterations);
         }
 
-        public async void GenerateMap()
+        public void GenerateMap()
         {
-            if (isGenerateMapDebugInProgress)
-            {
-                Debug.LogWarning(
-                    $"[RandomMap.GenerateCall] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
-                    "accepted=False skipped reason=already-generating",
-                    this);
-                return;
-            }
+            RunGenerateMapAsync().Forget();
+        }
+
+        private async UniTask RunGenerateMapAsync()
+        {
+            bool replacedActiveGeneration = isGenerateMapDebugInProgress;
+            CancelMapGeneration("new generation");
 
             currentGenerateMapDebugId = ++generateMapDebugCallSequence;
             int generationId = currentGenerateMapDebugId;
-            Debug.Log(
+            CancellationTokenSource generationCts = CancellationTokenSource.CreateLinkedTokenSource(this.GetCancellationTokenOnDestroy());
+            mapGenerationCts = generationCts;
+            CancellationToken cancellationToken = generationCts.Token;
+
+            LogMapGenerationTrace(
                 $"[RandomMap.GenerateCall] generationId={generationId} isPlaying={Application.isPlaying} " +
-                $"accepted=True frameCount={Time.frameCount} scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}",
-                this);
+                $"accepted=True frameCount={Time.frameCount} scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name} " +
+                $"replacedActiveGeneration={replacedActiveGeneration}");
+            LogMapGenerationTrace(
+                $"[MapGenerationTrace] Start generation session={generationId}, scene={UnityEngine.SceneManagement.SceneManager.GetActiveScene().name}");
 
             isGenerateMapDebugInProgress = true;
 
             try
             {
-                ClearGeneratedMap();
+                await GenerateMapAsync(generationId, cancellationToken);
 
-                if (!IsGenerationStillCurrent(generationId))
+                if (!generationCts.IsCancellationRequested && IsGenerationStillCurrent(generationId))
                 {
-                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-clear", this);
-                    return;
+                    LogMapGenerationTrace($"[MapGenerationTrace] Generation completed session={generationId}");
                 }
+            }
+            catch (OperationCanceledException)
+            {
+                // Map generation cancellation is expected during scene unload, object disable, and session replacement.
+            }
+            finally
+            {
+                if (ReferenceEquals(mapGenerationCts, generationCts))
+                {
+                    mapGenerationCts = null;
+                }
+
+                generationCts.Dispose();
+
+                if (IsGenerationStillCurrent(generationId))
+                {
+                    isGenerateMapDebugInProgress = false;
+                }
+            }
+        }
+
+        private async UniTask GenerateMapAsync(int generationId, CancellationToken cancellationToken)
+        {
+            try
+            {
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
+                ClearGeneratedMap();
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
 
                 ResetMapData();
 
@@ -453,47 +499,32 @@ namespace UnderTheStars.GenerationMap
                 var regionPoints = InitMapRegion();
                 var checkAllFloor = GeneraterFloorPoints(regionPoints);
                 checkAllFloor = PostProcessActiveRegionFloors(checkAllFloor);
-                await GeneraterWallPointsAsync(checkAllFloor);
-
-                if (!IsGenerationStillCurrent(generationId))
-                {
-                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-wall-points", this);
-                    return;
-                }
+                await GeneraterWallPointsAsync(checkAllFloor, generationId, cancellationToken);
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
 
                 List<UniTask> paintTasks = new List<UniTask>(activeRegionLayouts.Length);
                 for (int i = 0; i < activeRegionLayouts.Length; i++)
                 {
-                    paintTasks.Add(PaintActiveRegionTilemap(activeRegionLayouts[i]));
+                    paintTasks.Add(PaintActiveRegionTilemap(activeRegionLayouts[i], generationId, cancellationToken));
                 }
 
                 await UniTask.WhenAll(paintTasks);
-
-                if (!IsGenerationStillCurrent(generationId))
-                {
-                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-paint", this);
-                    return;
-                }
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
 
                 await GenerateShoreSandAsync(generationId);
-
-                if (!IsGenerationStillCurrent(generationId))
-                {
-                    Debug.LogWarning($"[RandomMap.GenerateCall] generationId={generationId} aborted reason=stale-after-shore", this);
-                    return;
-                }
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
 
                 RebuildFinalWaterAndWallState();
                 SpawnPropsOnFloor();
-                await PanintWallTilemap();
+                await PanintWallTilemap(generationId, cancellationToken);
+                EnsureGenerationIsStillCurrent(generationId, cancellationToken);
 
                 if (Application.isPlaying)
                 {
                     bool alreadySpawned = playerSpawnedGenerationId == generationId;
-                    Debug.Log(
+                    LogMapGenerationTrace(
                         $"[PlayerSpawn] generationId={generationId} isPlaying={Application.isPlaying} " +
-                        $"alreadySpawnedThisGeneration={alreadySpawned}",
-                        this);
+                        $"alreadySpawnedThisGeneration={alreadySpawned}");
 
                     if (!alreadySpawned)
                     {
@@ -503,36 +534,43 @@ namespace UnderTheStars.GenerationMap
                 }
                 else
                 {
-                    Debug.Log(
+                    LogMapGenerationTrace(
                         $"[PlayerSpawn] generationId={generationId} isPlaying={Application.isPlaying} " +
-                        "skipped=True reason=not-playing alreadySpawnedThisGeneration=False",
-                        this);
+                        "skipped=True reason=not-playing alreadySpawnedThisGeneration=False");
                 }
             }
             finally
             {
-                isGenerateMapDebugInProgress = false;
+                if (IsGenerationStillCurrent(generationId))
+                {
+                    isGenerateMapDebugInProgress = false;
+                }
             }
         }
 
-        private UniTask PanintWallTilemap()
+        private UniTask PanintWallTilemap(int generationId, CancellationToken cancellationToken)
         {
             return paintTilemap.PaintWallTile(
                 wallColliderPoints,
                 currentFinalWalkablePoints,
-                generatedShoreSandPoints);
+                generatedShoreSandPoints,
+                cancellationToken,
+                generationId,
+                () => IsGenerationStillCurrent(generationId));
         }
 
-        private async UniTask GeneraterWallPointsAsync(HashSet<Vector2Int> checkAllFloor)
+        private async UniTask GeneraterWallPointsAsync(HashSet<Vector2Int> checkAllFloor, int generationId, CancellationToken cancellationToken)
         {
+            EnsureGenerationIsStillCurrent(generationId, cancellationToken);
             int beforeCount = wallColliderPoints != null ? wallColliderPoints.Count : 0;
             wallColliderPoints = new HashSet<Vector2Int>();
             wallColliderPoints = RandomMapGenerationAlgorithms.GenraterWallPoints(checkAllFloor);
             LogMapDataMutation(nameof(wallColliderPoints), beforeCount, wallColliderPoints != null ? wallColliderPoints.Count : 0, nameof(GeneraterWallPointsAsync));
-            await UniTask.NextFrame();
+            await UniTask.NextFrame(cancellationToken: cancellationToken);
+            EnsureGenerationIsStillCurrent(generationId, cancellationToken);
         }
 
-        private UniTask PaintActiveRegionTilemap(ActiveRegionLayout layout)
+        private UniTask PaintActiveRegionTilemap(ActiveRegionLayout layout, int generationId, CancellationToken cancellationToken)
         {
             if (floorPoints == null ||
                 layout.gridX < 0 || layout.gridX >= floorPoints.GetLength(0) ||
@@ -545,7 +583,10 @@ namespace UnderTheStars.GenerationMap
                 ? paintTilemap.PaintFloorTile(
                     floorPoints[layout.gridX, layout.gridY],
                     layout.renderTilemapIndex,
-                    layout.option != null ? layout.option.paintSlotIndex : layout.renderTilemapIndex)
+                    layout.option != null ? layout.option.paintSlotIndex : layout.renderTilemapIndex,
+                    cancellationToken,
+                    generationId,
+                    () => IsGenerationStillCurrent(generationId))
                 : UniTask.CompletedTask;
         }
 
@@ -646,10 +687,9 @@ namespace UnderTheStars.GenerationMap
         {
             if (!Application.isPlaying)
             {
-                Debug.Log(
+                LogMapGenerationTrace(
                     $"[PlayerSpawn] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
-                    $"skipped=True reason=not-playing alreadySpawnedThisGeneration={playerSpawnedGenerationId == currentGenerateMapDebugId}",
-                    this);
+                    $"skipped=True reason=not-playing alreadySpawnedThisGeneration={playerSpawnedGenerationId == currentGenerateMapDebugId}");
                 return;
             }
 
@@ -729,8 +769,8 @@ namespace UnderTheStars.GenerationMap
 
             spawnTarget.position = spawnBasePosition;
 
-            Debug.Log($"Player placed. Cell:{spawnCoord} -> World:{worldSpawnPos}");
-            Debug.Log($"[SPAWN] Spawn target = {spawnTarget.name}");
+            LogMapGenerationTrace($"Player placed. Cell:{spawnCoord} -> World:{worldSpawnPos}");
+            LogMapGenerationTrace($"[SPAWN] Spawn target = {spawnTarget.name}");
         }
 
         public void SetPlayer(PlayerMovement playerMovement)
@@ -3440,24 +3480,22 @@ namespace UnderTheStars.GenerationMap
 
         private void LogMapDataMutation(string collectionName, int beforeCount, int afterCount, string currentMethod)
         {
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.MapDataMutation] collectionName={collectionName} beforeCount={beforeCount} afterCount={afterCount} " +
                 $"currentMethod={currentMethod} frameCount={Time.frameCount} hasCompletedFirstShoreGeneration={hasCompletedFirstShoreGeneration} " +
-                $"stackTrace={Environment.StackTrace}",
-                this);
+                $"stackTrace={Environment.StackTrace}");
         }
 
         private void LogShoreGenerationBegin(int generationId, int invocationIndex)
         {
             PlayerPositionDiagnostic playerDiagnostic = GetCurrentPlayerPositionDiagnostic();
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.ShoreGenerationBegin] frameCount={Time.frameCount} generationId={generationId} callCount={invocationIndex} " +
                 $"playerWorldPosition={(playerDiagnostic.hasPlayer ? playerDiagnostic.worldPosition.ToString() : "unavailable")} " +
                 $"playerGridPoint={(playerDiagnostic.hasPlayer ? playerDiagnostic.gridPoint.ToString() : "unavailable")} " +
                 $"currentGrassCount={CountCurrentGrassPoints()} currentWaterCount={CountCurrentWaterPoints()} " +
                 $"currentShoreCount={(generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0)} " +
-                $"stackTrace={Environment.StackTrace}",
-                this);
+                $"stackTrace={Environment.StackTrace}");
         }
 
         private void LogGrassChangedToShore(
@@ -3467,11 +3505,10 @@ namespace UnderTheStars.GenerationMap
             string methodName)
         {
             PlayerPositionDiagnostic playerDiagnostic = GetCurrentPlayerPositionDiagnostic();
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.GrassChangedToShore] gridPoint={point} beforeClassification={beforeClassification} afterClassification={afterClassification} " +
                 $"methodName={methodName} frameCount={Time.frameCount} playerGridPoint={(playerDiagnostic.hasPlayer ? playerDiagnostic.gridPoint.ToString() : "unavailable")} " +
-                $"stackTrace={Environment.StackTrace}",
-                this);
+                $"stackTrace={Environment.StackTrace}");
         }
 
         private void LogLateShoreCreated(
@@ -3485,11 +3522,10 @@ namespace UnderTheStars.GenerationMap
                 ? Vector2.Distance((Vector2)playerDiagnostic.gridPoint, (Vector2)point)
                 : -1f;
 
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.LateShoreCreated] frameCount={Time.frameCount} gridPoint={point} worldPosition={worldPosition} " +
                 $"previousClassification={previousClassification} distanceFromPlayerInTiles={distanceInTiles:F2} " +
-                $"shoreGenerationCallIndex={invocationIndex} stackTrace={Environment.StackTrace}",
-                this);
+                $"shoreGenerationCallIndex={invocationIndex} stackTrace={Environment.StackTrace}");
         }
 
         private UniTask GenerateShoreSandAsync(int generationId)
@@ -3514,14 +3550,13 @@ namespace UnderTheStars.GenerationMap
                     0L,
                     (long)Math.Round((Time.realtimeSinceStartupAsDouble - generationStartRealtime) * 1000d));
 
-                Debug.Log(
+                LogMapGenerationTrace(
                     $"[RandomMap.ShoreGenerationComplete] generationId={generationId} " +
                     $"totalCandidateCount={completionStats.totalCandidateCount} totalGeneratedCount={completionStats.totalGeneratedCount} " +
                     $"generatedShoreSandPointsCount={completionStats.generatedShoreSandPointsCount} instantiatedObjectCount={completionStats.instantiatedObjectCount} " +
                     $"generationStartTime={completionStats.generationStartTime} generationEndTime={completionStats.generationEndTime} " +
                     $"elapsedMilliseconds={completionStats.elapsedMilliseconds} completedBeforePlayerSpawn={completionStats.completedBeforePlayerSpawn} " +
-                    $"completedBeforeEnemySpawn={completionStats.completedBeforeEnemySpawn}",
-                    this);
+                    $"completedBeforeEnemySpawn={completionStats.completedBeforeEnemySpawn}");
 
                 if (generatedShoreSandPoints != null)
                 {
@@ -3740,13 +3775,12 @@ namespace UnderTheStars.GenerationMap
             string secondaryDirections = currentSecondaryBeachLayoutDirections != null && currentSecondaryBeachLayoutDirections.Count > 0
                 ? string.Join(",", currentSecondaryBeachLayoutDirections)
                 : "None";
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.BeachLayout] generationId={currentGenerateMapDebugId} mainDirection={currentResolvedMainBeachDirectionLabel} " +
                 $"mainBeachFailureReason={currentMainBeachFailureReason} baseShoreCount={(currentBaseShorePoints != null ? currentBaseShorePoints.Count : 0)} " +
                 $"ordinaryExpandedPointCount={ordinaryExpandedPointCount} mainBeachPointCount={currentMainBeachPointCount} secondaryBeachRegionCount={currentSecondaryBeachRegionCount} " +
                 $"secondaryBeachPointCount={currentSecondaryBeachPointCount} secondaryDirections={secondaryDirections} " +
-                $"finalShorePointCount={finalShorePlacementPoints.Count}",
-                this);
+                $"finalShorePointCount={finalShorePlacementPoints.Count}");
 
             Transform parent = ResolveGeneratedShoreSandParent();
             int previousGeneratedShoreCount = generatedShoreSandPoints != null ? generatedShoreSandPoints.Count : 0;
@@ -3819,9 +3853,8 @@ namespace UnderTheStars.GenerationMap
 #if UNITY_EDITOR || DEVELOPMENT_BUILD
                 if (placements[i].usesGrassTransitionDirectionMapping)
                 {
-                    Debug.Log(
-                        $"[ShoreSand.GrassTransitionRotation] point={point} inlandDirection={placements[i].direction} finalWorldY={NormalizeYaw(finalRotation.eulerAngles.y):F1}",
-                        this);
+                    LogMapGenerationTrace(
+                        $"[ShoreSand.GrassTransitionRotation] point={point} inlandDirection={placements[i].direction} finalWorldY={NormalizeYaw(finalRotation.eulerAngles.y):F1}");
                 }
 #endif
             }
@@ -4007,10 +4040,9 @@ namespace UnderTheStars.GenerationMap
         {
             if (wallColliderPoints == null || wallColliderPoints.Count == 0)
             {
-                Debug.Log(
+                LogMapGenerationTrace(
                     $"[RandomMap.Clear] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
-                    "wallFilterSkipped=True reason=no-wall-candidates",
-                    this);
+                    "wallFilterSkipped=True reason=no-wall-candidates");
                 return;
             }
 
@@ -4046,10 +4078,9 @@ namespace UnderTheStars.GenerationMap
 
             wallColliderPoints = filteredWallPoints;
 
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.GenerateCall] generationId={currentGenerateMapDebugId} isPlaying={Application.isPlaying} " +
-                $"wallPointSemantic=candidate-blocked-cells wallFilterBefore={beforeCount} wallFilterAfter={wallColliderPoints.Count}",
-                this);
+                $"wallPointSemantic=candidate-blocked-cells wallFilterBefore={beforeCount} wallFilterAfter={wallColliderPoints.Count}");
         }
 
         private Dictionary<Vector2Int, int> BuildInwardShoreDepthMap(
@@ -4262,10 +4293,9 @@ namespace UnderTheStars.GenerationMap
                 {
                     rejectedCandidateCount += mainRejectedCount;
                     currentMainBeachFailureReason = "no-safe-main-segment";
-                    Debug.Log(
+                    LogMapGenerationTrace(
                         $"[RandomMap.MainBeachAttempt] direction={attemptedDirection} candidateSegmentCount={candidateSegmentCount} " +
-                        $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount=0 failureReason={currentMainBeachFailureReason}",
-                        this);
+                        $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount=0 failureReason={currentMainBeachFailureReason}");
                     continue;
                 }
 
@@ -4288,10 +4318,9 @@ namespace UnderTheStars.GenerationMap
                 string failureReason = generatedNewPointCount > 0
                     ? "success"
                     : mainResult.stoppedReason;
-                Debug.Log(
+                LogMapGenerationTrace(
                     $"[RandomMap.MainBeachAttempt] direction={attemptedDirection} candidateSegmentCount={candidateSegmentCount} " +
-                    $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount={generatedNewPointCount} failureReason={failureReason}",
-                    this);
+                    $"bestSegmentLength={bestSegmentLength} budget={mainBeachTargetArea} generatedNewPointCount={generatedNewPointCount} failureReason={failureReason}");
 
                 if (generatedNewPointCount <= 0)
                 {
@@ -6325,32 +6354,27 @@ namespace UnderTheStars.GenerationMap
             int rejectedCandidateCount,
             string stoppedReason)
         {
-            Debug.Log(
-                $"[ShoreSand.DirectionalWideBeach] batch={batchId} phase={phase} callIndex={callIndex} selectedMainDirection={selectedMainDirection} baseOrdinaryGrassPointCount={baseOrdinaryGrassPointCount} targetBeachArea={targetBeachArea} mainBeachTargetArea={mainBeachTargetArea} actualMainBeachArea={actualMainBeachArea} secondaryBeachTargetArea={secondaryBeachTargetArea} actualSecondaryBeachArea={actualSecondaryBeachArea} totalActualDirectionalBeachArea={totalActualDirectionalBeachArea} achievedGrassRatio={achievedGrassRatio:F3} selectedMainSegmentLength={selectedMainSegmentLength} selectedSecondaryBeachCount={selectedSecondaryBeachCount} rejectedCandidateCount={rejectedCandidateCount} stoppedReason={stoppedReason}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.DirectionalWideBeach] batch={batchId} phase={phase} callIndex={callIndex} selectedMainDirection={selectedMainDirection} baseOrdinaryGrassPointCount={baseOrdinaryGrassPointCount} targetBeachArea={targetBeachArea} mainBeachTargetArea={mainBeachTargetArea} actualMainBeachArea={actualMainBeachArea} secondaryBeachTargetArea={secondaryBeachTargetArea} actualSecondaryBeachArea={actualSecondaryBeachArea} totalActualDirectionalBeachArea={totalActualDirectionalBeachArea} achievedGrassRatio={achievedGrassRatio:F3} selectedMainSegmentLength={selectedMainSegmentLength} selectedSecondaryBeachCount={selectedSecondaryBeachCount} rejectedCandidateCount={rejectedCandidateCount} stoppedReason={stoppedReason}");
         }
 
         private void LogDirectionalWideBeachCandidateSummary(DirectionalWideBeachCandidateDiagnostics diagnostics)
         {
-            Debug.Log(
-                $"[ShoreSand.DirectionalWideBeach.CandidatePipeline] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} sourcePointCount={diagnostics.sourcePointCount} rejectedDepthNotZero={diagnostics.rejectedDepthNotZero} rejectedNotOrdinaryShoreCandidate={diagnostics.rejectedNotOrdinaryShoreCandidate} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} rejectedSelectedDirectionPosition={diagnostics.rejectedSelectedDirectionPosition} rejectedLegacyDirectionalFilter={diagnostics.rejectedLegacyDirectionalFilter} rejectedExcludedOrUsed={diagnostics.rejectedExcludedOrUsed} rejectedMissingAreaEntry={diagnostics.rejectedMissingAreaEntry} rejectedMissingImmediateOrdinaryGrassSupport={diagnostics.rejectedMissingImmediateOrdinaryGrassSupport} rejectedUnhandledBranch={diagnostics.rejectedUnhandledBranch} acceptedCandidatePointCount={diagnostics.rawCandidatePointCount} accountedPointCount={diagnostics.accountedPointCount} unaccountedPointCount={diagnostics.unaccountedPointCount} pipelineInvariantValid={diagnostics.pipelineInvariantValid}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.DirectionalWideBeach.CandidatePipeline] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} sourcePointCount={diagnostics.sourcePointCount} rejectedDepthNotZero={diagnostics.rejectedDepthNotZero} rejectedNotOrdinaryShoreCandidate={diagnostics.rejectedNotOrdinaryShoreCandidate} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} rejectedSelectedDirectionPosition={diagnostics.rejectedSelectedDirectionPosition} rejectedLegacyDirectionalFilter={diagnostics.rejectedLegacyDirectionalFilter} rejectedExcludedOrUsed={diagnostics.rejectedExcludedOrUsed} rejectedMissingAreaEntry={diagnostics.rejectedMissingAreaEntry} rejectedMissingImmediateOrdinaryGrassSupport={diagnostics.rejectedMissingImmediateOrdinaryGrassSupport} rejectedUnhandledBranch={diagnostics.rejectedUnhandledBranch} acceptedCandidatePointCount={diagnostics.rawCandidatePointCount} accountedPointCount={diagnostics.accountedPointCount} unaccountedPointCount={diagnostics.unaccountedPointCount} pipelineInvariantValid={diagnostics.pipelineInvariantValid}");
 
-            Debug.Log(
-                $"[ShoreSand.DirectionalWideBeach.CandidateSummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} selectedDirection={diagnostics.selectedDirection} rawCandidatePointCount={diagnostics.rawCandidatePointCount} connectedComponentCount={diagnostics.connectedComponentCount} acceptedSegmentCount={diagnostics.acceptedSegmentCount} rejectedTooShort={diagnostics.rejectedTooShort} rejectedBranch={diagnostics.rejectedBranch} rejectedClosedLoop={diagnostics.rejectedClosedLoop} rejectedPathOrder={diagnostics.rejectedPathOrder} rejectedCurvature={diagnostics.rejectedCurvature} rejectedInlandSupport={diagnostics.rejectedInlandSupport} rejectedDirectionalMismatch={diagnostics.rejectedDirectionalMismatch} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDuplicateOrOverlap={diagnostics.rejectedDuplicateOrOverlap} rejectedOther={diagnostics.rejectedUnknown}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.DirectionalWideBeach.CandidateSummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} selectedDirection={diagnostics.selectedDirection} rawCandidatePointCount={diagnostics.rawCandidatePointCount} connectedComponentCount={diagnostics.connectedComponentCount} acceptedSegmentCount={diagnostics.acceptedSegmentCount} rejectedTooShort={diagnostics.rejectedTooShort} rejectedBranch={diagnostics.rejectedBranch} rejectedClosedLoop={diagnostics.rejectedClosedLoop} rejectedPathOrder={diagnostics.rejectedPathOrder} rejectedCurvature={diagnostics.rejectedCurvature} rejectedInlandSupport={diagnostics.rejectedInlandSupport} rejectedDirectionalMismatch={diagnostics.rejectedDirectionalMismatch} rejectedNoAnyExteriorOceanContact={diagnostics.rejectedNoAnyExteriorOceanContact} rejectedDuplicateOrOverlap={diagnostics.rejectedDuplicateOrOverlap} rejectedOther={diagnostics.rejectedUnknown}");
 
-            Debug.Log(
-                $"[ShoreSand.DirectionalWideBeach.ConnectivitySummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} candidateCountBeforeEnclosedFilter={diagnostics.candidateCountBeforeEnclosedFilter} candidateCountBeforeEnclosedFilterMeaning=source-rejectedDepthNotZero-rejectedNotOrdinaryShoreCandidate-rejectedExcludedOrUsed-rejectedMissingAreaEntry-rejectedSelectedDirectionPosition-rejectedLegacyDirectionalFilter rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} componentCountCardinalOnly={diagnostics.componentCountCardinalOnly} componentCountWithRestrictedDiagonal={diagnostics.componentCountWithRestrictedDiagonal} longestCardinalComponentLength={diagnostics.longestCardinalComponentLength} longestRestrictedDiagonalComponentLength={diagnostics.longestRestrictedDiagonalComponentLength}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.DirectionalWideBeach.ConnectivitySummary] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} candidateCountBeforeEnclosedFilter={diagnostics.candidateCountBeforeEnclosedFilter} candidateCountBeforeEnclosedFilterMeaning=source-rejectedDepthNotZero-rejectedNotOrdinaryShoreCandidate-rejectedExcludedOrUsed-rejectedMissingAreaEntry-rejectedSelectedDirectionPosition-rejectedLegacyDirectionalFilter rejectedDirectCardinalEnclosedWater={diagnostics.rejectedDirectCardinalEnclosedWater} rejectedDiagonalOnlyEnclosedWater={diagnostics.rejectedDiagonalOnlyEnclosedWater} rejectedExteriorAndEnclosedConflict={diagnostics.rejectedExteriorAndEnclosedConflict} componentCountCardinalOnly={diagnostics.componentCountCardinalOnly} componentCountWithRestrictedDiagonal={diagnostics.componentCountWithRestrictedDiagonal} longestCardinalComponentLength={diagnostics.longestCardinalComponentLength} longestRestrictedDiagonalComponentLength={diagnostics.longestRestrictedDiagonalComponentLength}");
 
             if (diagnostics.unaccountedPointSamples != null)
             {
                 for (int i = 0; i < diagnostics.unaccountedPointSamples.Count && i < 10; i++)
                 {
-                    Debug.Log(
-                        $"[ShoreSand.DirectionalWideBeach.UnaccountedPoint] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} {diagnostics.unaccountedPointSamples[i]}",
-                        this);
+                    LogMapGenerationTrace(
+                        $"[ShoreSand.DirectionalWideBeach.UnaccountedPoint] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} {diagnostics.unaccountedPointSamples[i]}");
                 }
             }
 
@@ -6362,9 +6386,8 @@ namespace UnderTheStars.GenerationMap
             for (int i = 0; i < diagnostics.topRejectedSegments.Count && i < 5; i++)
             {
                 DirectionalWideBeachRejectedSegmentInfo info = diagnostics.topRejectedSegments[i];
-                Debug.Log(
-                    $"[ShoreSand.DirectionalWideBeach.RejectedSegment] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} reason={info.reason} length={info.length} start={info.startPoint} end={info.endPoint} curvature={info.curvatureRatio:F3} averageInlandSupport={info.averageInlandSupport} exteriorOceanContactCount={info.exteriorOceanContactCount} branchPointCount={info.branchPointCount} nearEnclosedWaterCount={info.nearEnclosedWaterCount}",
-                    this);
+                LogMapGenerationTrace(
+                    $"[ShoreSand.DirectionalWideBeach.RejectedSegment] batch={diagnostics.batchId} phase={diagnostics.phase} callIndex={diagnostics.callIndex} reason={info.reason} length={info.length} start={info.startPoint} end={info.endPoint} curvature={info.curvatureRatio:F3} averageInlandSupport={info.averageInlandSupport} exteriorOceanContactCount={info.exteriorOceanContactCount} branchPointCount={info.branchPointCount} nearEnclosedWaterCount={info.nearEnclosedWaterCount}");
             }
         }
 
@@ -7202,10 +7225,9 @@ namespace UnderTheStars.GenerationMap
                 }
             }
 
-            Debug.Log(
+            LogMapGenerationTrace(
                 $"[RandomMap.BaseShoreIntegrity] baseShoreCount={currentBaseShorePoints.Count} finalShoreCount={finalShorePoints.Count} " +
-                $"missingBaseShoreCount={missingBaseShoreCount} missingSamplePoints={(missingSamples.Count > 0 ? string.Join(",", missingSamples) : "None")}",
-                this);
+                $"missingBaseShoreCount={missingBaseShoreCount} missingSamplePoints={(missingSamples.Count > 0 ? string.Join(",", missingSamples) : "None")}");
         }
 
         private HashSet<Vector2Int> BuildAllowedBeachPointSet()
@@ -9359,9 +9381,8 @@ namespace UnderTheStars.GenerationMap
                 ? selectedPrimaryGrassDirection.Value.ToString()
                 : "None";
 
-            Debug.Log(
-                $"[ShoreSand.GrassBoundaryFix] point={placement.point} beforeType={GetShoreSandPlacementDebugType(placement)} grassNeighborCount={grassNeighborCount} grassNeighborDirs={directionList} adjacentTwoGrass={isAdjacentTwoGrass} oppositeTwoGrass={isOppositeTwoGrass} changedToGrassTransition={changedToGrassTransition} selectedPrimaryGrassDir={selectedDirection} reason={reason}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.GrassBoundaryFix] point={placement.point} beforeType={GetShoreSandPlacementDebugType(placement)} grassNeighborCount={grassNeighborCount} grassNeighborDirs={directionList} adjacentTwoGrass={isAdjacentTwoGrass} oppositeTwoGrass={isOppositeTwoGrass} changedToGrassTransition={changedToGrassTransition} selectedPrimaryGrassDir={selectedDirection} reason={reason}");
         }
 
         [System.Diagnostics.Conditional("UNITY_EDITOR")]
@@ -9734,9 +9755,8 @@ namespace UnderTheStars.GenerationMap
                 ? NormalizeYaw(currentSnapshot.explicitYaw).ToString("F1")
                 : "N/A";
 
-            Debug.Log(
-                $"[ShoreSand.ClassificationDebug] batch={batchId} stage={stageName} point={currentSnapshot.point} depth={currentSnapshot.depth} maxDepth={currentSnapshot.maxDepth} prefab={currentSnapshot.prefabType} previousPrefab={previousPrefabType} ordinaryGrassDirs={FormatDirectionList(currentSnapshot.ordinaryGrassDirections)} grassNeighborCount={currentSnapshot.ordinaryGrassNeighborCount} seaDirs={FormatDirectionList(currentSnapshot.seaDirections)} direction={currentSnapshot.direction} previousDirection={previousDirection} explicitYaw={currentExplicitYaw} previousExplicitYaw={previousExplicitYaw} isConnector={currentSnapshot.isConnector} touchesShoreWater={currentSnapshot.touchesShoreWater} changedPrefab={changedPrefab} changedDirectionOrYaw={changedDirectionOrYaw}",
-                this);
+            LogMapGenerationTrace(
+                $"[ShoreSand.ClassificationDebug] batch={batchId} stage={stageName} point={currentSnapshot.point} depth={currentSnapshot.depth} maxDepth={currentSnapshot.maxDepth} prefab={currentSnapshot.prefabType} previousPrefab={previousPrefabType} ordinaryGrassDirs={FormatDirectionList(currentSnapshot.ordinaryGrassDirections)} grassNeighborCount={currentSnapshot.ordinaryGrassNeighborCount} seaDirs={FormatDirectionList(currentSnapshot.seaDirections)} direction={currentSnapshot.direction} previousDirection={previousDirection} explicitYaw={currentExplicitYaw} previousExplicitYaw={previousExplicitYaw} isConnector={currentSnapshot.isConnector} touchesShoreWater={currentSnapshot.touchesShoreWater} changedPrefab={changedPrefab} changedDirectionOrYaw={changedDirectionOrYaw}");
         }
 
         private bool ContainsPlacementPoint(List<ShoreSandPlacement> placements, Vector2Int point)
@@ -10972,6 +10992,38 @@ namespace UnderTheStars.GenerationMap
         private bool IsGenerationStillCurrent(int generationId)
         {
             return currentGenerateMapDebugId == generationId;
+        }
+
+        private void EnsureGenerationIsStillCurrent(int generationId, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (!IsGenerationStillCurrent(generationId))
+            {
+                throw new OperationCanceledException(cancellationToken);
+            }
+        }
+
+        private void CancelMapGeneration(string reason)
+        {
+            if (mapGenerationCts == null || mapGenerationCts.IsCancellationRequested)
+            {
+                return;
+            }
+
+            LogMapGenerationTrace(
+                $"[MapGenerationTrace] Cancel generation session={currentGenerateMapDebugId}, reason={reason}");
+            mapGenerationCts.Cancel();
+        }
+
+        private void LogMapGenerationTrace(string message)
+        {
+            if (!debugMapGenerationLogs)
+            {
+                return;
+            }
+
+            Debug.Log(message, this);
         }
 
         private static int CountChildren(Transform parent)

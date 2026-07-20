@@ -10,6 +10,8 @@ public class SceneButtonLoader : MonoBehaviour
     [SerializeField, Min(0f)] private float demoFinalRushStartTime = 90f;
     [SerializeField, Min(0f)] private float demoFinalRushDuration = 30f;
     [SerializeField, Min(0f)] private float demoPlayerDamageMultiplier = 2f;
+    [Header("Debug")]
+    [SerializeField] private bool debugRestartTrace;
 
     private bool waitingForDemoBattle;
 
@@ -82,12 +84,22 @@ public class SceneButtonLoader : MonoBehaviour
             return;
         }
 
-        Debug.Log($"[RestartTrace] Restart requested targetScene={sceneName} loader={name}#{GetInstanceID()} timeScaleBefore={Time.timeScale:F2}", this);
+        LogRestartTrace($"Restart requested targetScene={sceneName} loader={name}#{GetInstanceID()} timeScaleBefore={Time.timeScale:F2}");
         Time.timeScale = 1f;
         AudioListener.pause = false;
-        Debug.Log($"[RestartTrace] Time.timeScale restored to {Time.timeScale:F2} before loading {sceneName}", this);
+        LogRestartTrace($"Time.timeScale restored to {Time.timeScale:F2} before loading {sceneName}");
         GameLocalization.MarkFormalGameStart();
-        Debug.Log($"[RestartTrace] Loading battle scene={sceneName}", this);
+        LogRestartTrace($"Loading battle scene={sceneName}");
         SceneManager.LoadScene(sceneName);
+    }
+
+    private void LogRestartTrace(string message)
+    {
+        if (!debugRestartTrace)
+        {
+            return;
+        }
+
+        Debug.Log("[RestartTrace] " + message, this);
     }
 }

@@ -85,6 +85,7 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [SerializeField] private int quickShearCritFlashSortingOrder = 80;
     [SerializeField] private Color quickShearCritFlashColor = Color.white;
     [SerializeField] private Color quickShearSuperCritFlashColor = new Color(1f, 0.78f, 0.15f, 1f);
+    [SerializeField] private bool debugMeleeHitTrace = false;
 
     private readonly System.Collections.Generic.HashSet<CombatHealth> castDamagedCombatTargets = new System.Collections.Generic.HashSet<CombatHealth>();
     private static readonly System.Collections.Generic.HashSet<string> MissingQuickShearStatsWarnings = new System.Collections.Generic.HashSet<string>();
@@ -439,14 +440,17 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
             debugEntries.Add(BuildMeleeHitDebugEntry(hit, identity, false, "duplicate-combat-health", false, 0f, 0f, finalDamage, finalDamage));
         }
 
-        Debug.Log(
-            "[PlayerMeleeHitDebug] " +
-            "skill=Player1Skill_Q_QuickShear " +
-            "attackPosition=" + center +
-            " attackRadius=" + Mathf.Max(0.1f, qRange).ToString("F2") +
-            " hitColliderCount=" + hits.Length +
-            " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
-            this);
+        if (debugMeleeHitTrace)
+        {
+            Debug.Log(
+                "[PlayerMeleeHitDebug] " +
+                "skill=Player1Skill_Q_QuickShear " +
+                "attackPosition=" + center +
+                " attackRadius=" + Mathf.Max(0.1f, qRange).ToString("F2") +
+                " hitColliderCount=" + hits.Length +
+                " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+                this);
+        }
 
         return totalDamageDealt;
     }

@@ -26,6 +26,7 @@ public class CombatHealth : MonoBehaviour
     [SerializeField] private Color missDamageColor = new Color(0.75f, 0.95f, 1f, 1f);
     [SerializeField] private Vector3 damagePopupOffset = new Vector3(0f, 1f, 0f);
     [SerializeField] private Vector2 damagePopupRandomOffset = new Vector2(0.3f, 0.15f);
+    [SerializeField] private bool debugPlayerDeathTrace = false;
 
     public event Action<GameObject> Died;
     public event Action<float, GameObject> Damaged;
@@ -993,7 +994,7 @@ public class CombatHealth : MonoBehaviour
 
         if (BattleTargetUtility.IsPlayer(gameObject))
         {
-            Debug.Log($"[PlayerDeathTrace] HP reached zero on {name}", this);
+            LogPlayerDeathTrace($"HP reached zero on {name}");
         }
 
         dead = true;
@@ -1001,7 +1002,7 @@ public class CombatHealth : MonoBehaviour
 
         if (BattleTargetUtility.IsPlayer(gameObject))
         {
-            Debug.Log("[PlayerDeathTrace] Death event invoked", this);
+            LogPlayerDeathTrace("Death event invoked");
         }
 
         TriggerAnimation(deathTrigger);
@@ -1094,5 +1095,15 @@ public class CombatHealth : MonoBehaviour
         }
 
         return path;
+    }
+
+    private void LogPlayerDeathTrace(string message)
+    {
+        if (!debugPlayerDeathTrace)
+        {
+            return;
+        }
+
+        Debug.Log("[PlayerDeathTrace] " + message, this);
     }
 }

@@ -479,7 +479,10 @@ public class EnemyDifficultyDirector : MonoBehaviour
         cleanupBossInstance = cleanupBoss;
         spawnStoppedBossVictoryArmed = true;
         bossDefeated = false;
-        Debug.Log($"[CleanupBossVictory] cleanup boss armed boss={cleanupBoss.name}", this);
+        if (debugLogs)
+        {
+            Debug.Log($"[CleanupBossVictory] cleanup boss armed boss={cleanupBoss.name}", this);
+        }
     }
 
     public bool HasFinalRushStarted => finalRushStarted;
@@ -611,9 +614,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
 
         initialGraceStartLogged = true;
-        Debug.Log(
-            $"[MonsterStrength] Initial grace period started: multiplier={initialMonsterStrengthMultiplier:F2}, duration={initialGraceDuration:F1}s.",
-            this);
+        if (debugLogs)
+        {
+            Debug.Log(
+                $"[MonsterStrength] Initial grace period started: multiplier={initialMonsterStrengthMultiplier:F2}, duration={initialGraceDuration:F1}s.",
+                this);
+        }
     }
 
     private void HandleInitialGraceEnd()
@@ -626,7 +632,10 @@ public class EnemyDifficultyDirector : MonoBehaviour
         initialGraceEndHandled = true;
         RefreshTrackedEnemiesAfterGraceEnd();
         OnInitialGraceEnded?.Invoke();
-        Debug.Log("[MonsterStrength] Grace period ended. Normal strength restored; progression timer started.", this);
+        if (debugLogs)
+        {
+            Debug.Log("[MonsterStrength] Grace period ended. Normal strength restored; progression timer started.", this);
+        }
     }
 
     private void RefreshTrackedEnemiesAfterGraceEnd()

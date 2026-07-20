@@ -30,6 +30,8 @@ public class SoulPickup : MonoBehaviour
     [SerializeField, Min(0f)] private float absorbDelay = 2.0f;
     [SerializeField, Min(0f)] private float absorbSpeed = 8f;
     [SerializeField, Min(0f)] private float pickupDistance = 0.35f;
+    [SerializeField, Min(0f)] private float maxLifetime = 30f;
+    [SerializeField, Min(0.1f)] private float playerResolveRetryInterval = 0.5f;
     [SerializeField, Min(0f)] private float hoverHeight = 0.6f;
     [SerializeField, Min(0f)] private float hoverAmplitude = 0.12f;
     [SerializeField, Min(0f)] private float hoverSpeed = 3f;
@@ -54,8 +56,10 @@ public class SoulPickup : MonoBehaviour
     private Player2Bootstrap cachedBootstrap;
     private Collider pickupCollider;
     private Renderer[] cachedRenderers;
+    private Transform cachedTransform;
     private Vector3 spawnPosition;
     private float spawnTime;
+    private float nextPlayerResolveRetryTime;
     private bool absorbed;
     private bool absorbTargetLogged;
     private bool noTargetLogged;
@@ -66,11 +70,16 @@ public class SoulPickup : MonoBehaviour
     private bool warnedMissingSoulPopupPrefab;
     private static SoulPickupFloatingText defaultSoulPickupFloatingTextPrefab;
     private static bool attemptedLoadDefaultSoulPickupFloatingTextPrefab;
+    private static Player2Bootstrap sharedBootstrap;
+    private static Transform sharedPlayerTransform;
+    private static float nextSharedPlayerResolveTime;
 
     private void Awake()
     {
+        cachedTransform = transform;
         spawnPosition = transform.position;
         spawnTime = Time.time;
+        nextPlayerResolveRetryTime = Time.time + Random.Range(0f, Mathf.Max(0.1f, playerResolveRetryInterval));
 
         CacheReferences();
         EnsureTriggerCollider();
@@ -81,6 +90,7 @@ public class SoulPickup : MonoBehaviour
     {
         spawnPosition = transform.position;
         spawnTime = Time.time;
+        nextPlayerResolveRetryTime = Time.time + Random.Range(0f, Mathf.Max(0.1f, playerResolveRetryInterval));
         absorbed = false;
         absorbTargetLogged = false;
         noTargetLogged = false;
@@ -112,7 +122,18 @@ public class SoulPickup : MonoBehaviour
             return;
         }
 
+        if (maxLifetime > 0f && Time.time - spawnTime >= maxLifetime)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         UpdateHaloRingRotation();
+
+        if (Mathf.Approximately(Time.timeScale, 0f))
+        {
+            return;
+        }
 
         Transform target = ResolveCurrentPlayerTransform();
         Vector3 hoverOffset = GetHoverOffset();
@@ -125,7 +146,7 @@ public class SoulPickup : MonoBehaviour
                 Debug.LogWarning("[SoulPickup] no target player found", this);
             }
             SetAbsorbingVisualState(false);
-            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
+            cachedTransform.position = Vector3.Lerp(cachedTransform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
             return;
         }
 
@@ -137,16 +158,17 @@ public class SoulPickup : MonoBehaviour
         if (Time.time < spawnTime + absorbDelay)
         {
             SetAbsorbingVisualState(false);
-            transform.position = Vector3.Lerp(transform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
+            cachedTransform.position = Vector3.Lerp(cachedTransform.position, spawnPosition + hoverOffset, Time.deltaTime * Mathf.Max(1f, absorbSpeed * HoverMoveSpeedMultiplier));
             return;
         }
 
         SetAbsorbingVisualState(true);
         Vector3 targetPoint = target.position + Vector3.up * targetChestHeight;
         Vector3 moveTarget = Vector3.Lerp(targetPoint + hoverOffset * AbsorbHoverBlend, targetPoint, AbsorbTargetBlend);
-        transform.position = Vector3.MoveTowards(transform.position, moveTarget, absorbSpeed * Time.deltaTime);
+        cachedTransform.position = Vector3.MoveTowards(cachedTransform.position, moveTarget, absorbSpeed * Time.deltaTime);
 
-        if (Vector3.Distance(transform.position, targetPoint) <= pickupDistance)
+        float pickupDistanceSqr = pickupDistance * pickupDistance;
+        if ((cachedTransform.position - targetPoint).sqrMagnitude <= pickupDistanceSqr)
         {
             ApplySoulToTarget(target);
         }
@@ -236,32 +258,29 @@ public class SoulPickup : MonoBehaviour
 
     private Transform ResolveCurrentPlayerTransform()
     {
-        if (cachedBootstrap == null)
+        Transform sharedTarget = sharedPlayerTransform;
+        if (HasUsablePlayerTransform(sharedTarget))
         {
-            cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
+            return sharedTarget;
         }
 
-        if (cachedBootstrap != null && cachedBootstrap.CurrentPlayerTransform != null && cachedBootstrap.CurrentPlayerTransform.gameObject.activeInHierarchy)
+        if (cachedBootstrap != null && HasUsablePlayerTransform(cachedBootstrap.CurrentPlayerTransform))
         {
-            return cachedBootstrap.CurrentPlayerTransform;
+            sharedBootstrap = cachedBootstrap;
+            sharedPlayerTransform = cachedBootstrap.CurrentPlayerTransform;
+            return sharedPlayerTransform;
         }
 
-        GameObject activePlayer = GameObject.FindWithTag("Player");
-        if (activePlayer != null && activePlayer.activeInHierarchy)
+        if (Time.time < nextPlayerResolveRetryTime)
         {
-            return activePlayer.transform;
+            return null;
         }
 
-        GameObject player01 = FindSceneObjectByNameIncludingInactive("Player01");
-        if (player01 != null && player01.activeInHierarchy)
+        nextPlayerResolveRetryTime = Time.time + Mathf.Max(0.1f, playerResolveRetryInterval);
+        if (TryResolveSharedPlayerTransform())
         {
-            return player01.transform;
-        }
-
-        GameObject player02 = FindSceneObjectByNameIncludingInactive("Player02");
-        if (player02 != null && player02.activeInHierarchy)
-        {
-            return player02.transform;
+            cachedBootstrap = sharedBootstrap;
+            return sharedPlayerTransform;
         }
 
         return null;
@@ -288,11 +307,21 @@ public class SoulPickup : MonoBehaviour
 
     private void CacheReferences()
     {
+        if (cachedTransform == null)
+        {
+            cachedTransform = transform;
+        }
+
         pickupCollider = GetComponent<Collider>();
         cachedRenderers = GetComponentsInChildren<Renderer>(true);
-        if (cachedBootstrap == null)
+        if (HasUsablePlayerTransform(sharedPlayerTransform))
         {
-            cachedBootstrap = FindObjectOfType<Player2Bootstrap>();
+            cachedBootstrap = sharedBootstrap;
+        }
+        else if (cachedBootstrap == null && Time.time >= nextSharedPlayerResolveTime)
+        {
+            TryResolveSharedPlayerTransform();
+            cachedBootstrap = sharedBootstrap;
         }
     }
 
@@ -545,28 +574,37 @@ public class SoulPickup : MonoBehaviour
         return defaultSoulPickupFloatingTextPrefab;
     }
 
-    private static GameObject FindSceneObjectByNameIncludingInactive(string targetName)
+    private static bool TryResolveSharedPlayerTransform()
     {
-        if (string.IsNullOrEmpty(targetName))
+        if (Time.time < nextSharedPlayerResolveTime && HasUsablePlayerTransform(sharedPlayerTransform))
         {
-            return null;
+            return true;
         }
 
-        GameObject[] all = Resources.FindObjectsOfTypeAll<GameObject>();
-        for (int i = 0; i < all.Length; i++)
-        {
-            GameObject go = all[i];
-            if (go == null || !go.scene.IsValid())
-            {
-                continue;
-            }
+        nextSharedPlayerResolveTime = Time.time + 0.5f;
 
-            if (go.name == targetName)
+        if (sharedBootstrap == null)
+        {
+            sharedBootstrap = Object.FindObjectOfType<Player2Bootstrap>();
+        }
+
+        if (sharedBootstrap != null)
+        {
+            sharedBootstrap.EnsureInitializedForSpawn();
+            Transform currentPlayer = sharedBootstrap.CurrentPlayerTransform;
+            if (HasUsablePlayerTransform(currentPlayer))
             {
-                return go;
+                sharedPlayerTransform = currentPlayer;
+                return true;
             }
         }
 
-        return null;
+        sharedPlayerTransform = null;
+        return false;
+    }
+
+    private static bool HasUsablePlayerTransform(Transform candidate)
+    {
+        return candidate != null && candidate.gameObject != null && candidate.gameObject.activeInHierarchy;
     }
 }

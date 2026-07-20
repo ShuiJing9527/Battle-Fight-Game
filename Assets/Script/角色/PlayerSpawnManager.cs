@@ -230,6 +230,8 @@ public class PlayerSpawnManager : MonoBehaviour
             $"spawned=True phase={spawnPhase} activePlayer={activeInstance.name} inactivePlayer={inactiveInstance.name} " +
             $"spawnCoord={spawnCoord} spawnPosition={spawnPosition}",
             this);
+
+        RuntimeRuneScaling.ForceRefresh($"{nameof(PlayerSpawnManager)}.{nameof(SpawnPartyAtWorldPosition)}:{spawnPhase}");
     }
 
     private GameObject EnsurePlayerInstance(GameObject instance, ref bool isOwnedInstance, GameObject prefab, string fallbackName)

@@ -154,11 +154,13 @@ public class RuneRuntimeState : MonoBehaviour
         thornCounterReadyTime = 0f;
         lastMonsterDamageTime = Time.time;
         shieldGeneratedSinceLastMonsterDamage = false;
+        RuntimeRuneScaling.SetDebugLogging(runeDebugLog);
         RebuildFromEquippedRunes();
     }
 
     private void OnEnable()
     {
+        RuntimeRuneScaling.SetDebugLogging(runeDebugLog);
         RebuildFromEquippedRunes();
     }
 
@@ -270,6 +272,16 @@ public class RuneRuntimeState : MonoBehaviour
         int count = 0;
         globalRuneCounts.TryGetValue(runeType, out count);
         return count;
+    }
+
+    public int GetTotalEquippedRuneCount()
+    {
+        return
+            GetGlobalRuneCount(RuneType.Life) +
+            GetGlobalRuneCount(RuneType.Shield) +
+            GetGlobalRuneCount(RuneType.Mana) +
+            GetGlobalRuneCount(RuneType.Thorn) +
+            GetGlobalRuneCount(RuneType.Luck);
     }
 
     public int NotifySkillCastStarted(int skillIndex)
@@ -1766,6 +1778,11 @@ public class RuneRuntimeState : MonoBehaviour
     [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
     private void DevThornCounterLog(string message)
     {
+        if (!debugRuneThornCounter)
+        {
+            return;
+        }
+
         Debug.Log($"[ThornCounter] {message}", this);
     }
 
@@ -1773,6 +1790,11 @@ public class RuneRuntimeState : MonoBehaviour
     [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
     private void DevThornCounterEntryLog(GameObject attacker, float damageAmount)
     {
+        if (!debugRuneThornCounter)
+        {
+            return;
+        }
+
         Debug.Log(
             $"[ThornCounter] Notify entered. attacker={(attacker != null ? attacker.name : "<null>")}, damage={damageAmount:F2}",
             this);
@@ -2146,6 +2168,11 @@ public class RuneRuntimeState : MonoBehaviour
     [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
     private void ManaRuneLog(string message)
     {
+        if (!runeDebugLog)
+        {
+            return;
+        }
+
         Debug.Log($"[ManaRune] {message}", this);
     }
 
@@ -2169,4 +2196,252 @@ public class RuneRuntimeState : MonoBehaviour
         Debug.Log($"[RuneSetBonusTrace] {message}", this);
     }
 
+}
+
+public static class RuntimeRuneScaling
+{
+    private static bool debugLoggingEnabled;
+
+    public readonly struct Snapshot : System.IEquatable<Snapshot>
+    {
+        public readonly int player01EquippedCount;
+        public readonly int player02EquippedCount;
+        public readonly int totalEquippedCount;
+        public readonly float bonusRate;
+        public readonly float multiplier;
+        public readonly string player01Source;
+        public readonly string player02Source;
+
+        public Snapshot(
+            int player01EquippedCount,
+            int player02EquippedCount,
+            string player01Source,
+            string player02Source)
+        {
+            this.player01EquippedCount = Mathf.Max(0, player01EquippedCount);
+            this.player02EquippedCount = Mathf.Max(0, player02EquippedCount);
+            totalEquippedCount = this.player01EquippedCount + this.player02EquippedCount;
+            bonusRate = totalEquippedCount * 0.05f;
+            multiplier = 1f + bonusRate;
+            this.player01Source = string.IsNullOrWhiteSpace(player01Source) ? "None" : player01Source;
+            this.player02Source = string.IsNullOrWhiteSpace(player02Source) ? "None" : player02Source;
+        }
+
+        public bool Equals(Snapshot other)
+        {
+            return player01EquippedCount == other.player01EquippedCount
+                && player02EquippedCount == other.player02EquippedCount
+                && totalEquippedCount == other.totalEquippedCount
+                && Mathf.Approximately(bonusRate, other.bonusRate)
+                && Mathf.Approximately(multiplier, other.multiplier)
+                && string.Equals(player01Source, other.player01Source, System.StringComparison.Ordinal)
+                && string.Equals(player02Source, other.player02Source, System.StringComparison.Ordinal);
+        }
+
+        public override bool Equals(object obj)
+        {
+            return obj is Snapshot other && Equals(other);
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                int hash = player01EquippedCount;
+                hash = (hash * 397) ^ player02EquippedCount;
+                hash = (hash * 397) ^ totalEquippedCount;
+                hash = (hash * 397) ^ bonusRate.GetHashCode();
+                hash = (hash * 397) ^ multiplier.GetHashCode();
+                hash = (hash * 397) ^ (player01Source != null ? player01Source.GetHashCode() : 0);
+                hash = (hash * 397) ^ (player02Source != null ? player02Source.GetHashCode() : 0);
+                return hash;
+            }
+        }
+    }
+
+    public static event System.Action<Snapshot> ScalingChanged;
+
+    private static Snapshot currentSnapshot;
+    private static bool hasSnapshot;
+    private static bool warnedNoPlayers;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetStatics()
+    {
+        currentSnapshot = default;
+        hasSnapshot = false;
+        warnedNoPlayers = false;
+        ScalingChanged = null;
+    }
+
+    public static Snapshot GetCurrentSnapshot()
+    {
+        if (!hasSnapshot)
+        {
+            ForceRefresh("LazyInit");
+        }
+
+        return currentSnapshot;
+    }
+
+    public static int GetTotalEquippedRuneCount()
+    {
+        return GetCurrentSnapshot().totalEquippedCount;
+    }
+
+    public static float GetTotalEquippedRuneBonusRate()
+    {
+        return GetCurrentSnapshot().bonusRate;
+    }
+
+    public static float GetTotalEquippedRuneMultiplier()
+    {
+        return GetCurrentSnapshot().multiplier;
+    }
+
+    public static void ForceRefresh(string reason)
+    {
+        Snapshot nextSnapshot = BuildSnapshot();
+        bool changed = !hasSnapshot || !currentSnapshot.Equals(nextSnapshot);
+        currentSnapshot = nextSnapshot;
+        hasSnapshot = true;
+
+        LogSnapshot(reason, nextSnapshot);
+
+        if (changed)
+        {
+            ScalingChanged?.Invoke(nextSnapshot);
+        }
+    }
+
+    private static Snapshot BuildSnapshot()
+    {
+        int player01Count = ResolvePlayerEquippedRuneCount("Player01", typeof(Player01SkillController), out string player01Source);
+        int player02Count = ResolvePlayerEquippedRuneCount("Player02", typeof(Player2PrototypeController), out string player02Source);
+
+        if (!warnedNoPlayers && player01Count <= 0 && player02Count <= 0)
+        {
+            warnedNoPlayers = true;
+            Debug.LogWarning("[RuntimeRuneScaling] No valid Player01/Player02 equipped rune data found yet. Using 0 until runtime data becomes available.");
+        }
+        else if (player01Count > 0 || player02Count > 0)
+        {
+            warnedNoPlayers = false;
+        }
+
+        return new Snapshot(player01Count, player02Count, player01Source, player02Source);
+    }
+
+    private static int ResolvePlayerEquippedRuneCount(string explicitName, System.Type controllerType, out string source)
+    {
+        source = "MissingPlayer";
+        CombatSkillCaster caster = FindPlayerCaster(explicitName, controllerType);
+        if (caster == null)
+        {
+            return 0;
+        }
+
+        return CountEquippedRunes(caster, out source);
+    }
+
+    private static CombatSkillCaster FindPlayerCaster(string explicitName, System.Type controllerType)
+    {
+        CombatSkillCaster[] casters = Object.FindObjectsOfType<CombatSkillCaster>(true);
+        for (int i = 0; i < casters.Length; i++)
+        {
+            CombatSkillCaster candidate = casters[i];
+            if (!IsLoadedSceneCaster(candidate))
+            {
+                continue;
+            }
+
+            if (string.Equals(candidate.gameObject.name, explicitName, System.StringComparison.Ordinal))
+            {
+                return candidate;
+            }
+        }
+
+        for (int i = 0; i < casters.Length; i++)
+        {
+            CombatSkillCaster candidate = casters[i];
+            if (!IsLoadedSceneCaster(candidate))
+            {
+                continue;
+            }
+
+            if (controllerType != null && candidate.GetComponent(controllerType) != null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private static bool IsLoadedSceneCaster(CombatSkillCaster caster)
+    {
+        return caster != null
+            && caster.gameObject != null
+            && caster.gameObject.scene.IsValid()
+            && caster.gameObject.scene.isLoaded;
+    }
+
+    private static int CountEquippedRunes(CombatSkillCaster caster, out string source)
+    {
+        source = "CombatSkillCaster.EquippedRunesFallback";
+        if (caster == null)
+        {
+            return 0;
+        }
+
+        RuneRuntimeState runtimeState = caster.GetComponent<RuneRuntimeState>()
+            ?? caster.GetComponentInParent<RuneRuntimeState>()
+            ?? caster.GetComponentInChildren<RuneRuntimeState>(true);
+        if (runtimeState != null)
+        {
+            source = "RuneRuntimeState.TotalEquippedRuneCount";
+            return runtimeState.GetTotalEquippedRuneCount();
+        }
+
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < 4; skillIndex++)
+        {
+            BattleSkill skill = caster.TryGetSkillRaw(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            int slotLimit = Mathf.Min(Mathf.Max(0, skill.runeSlotCount), skill.equippedRunes.Length);
+            for (int slotIndex = 0; slotIndex < slotLimit; slotIndex++)
+            {
+                RuneDefinition rune = skill.equippedRunes[slotIndex];
+                if (rune != null && rune.IsConfigured() && rune.runeType != RuneType.None)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static void LogSnapshot(string reason, Snapshot snapshot)
+    {
+        if (!debugLoggingEnabled)
+        {
+            return;
+        }
+
+        Debug.Log($"[RuntimeRuneScaling] reason={reason} Player01 equipped={snapshot.player01EquippedCount} source={snapshot.player01Source}");
+        Debug.Log($"[RuntimeRuneScaling] reason={reason} Player02 equipped={snapshot.player02EquippedCount} source={snapshot.player02Source}");
+        Debug.Log($"[RuntimeRuneScaling] reason={reason} Total equipped={snapshot.totalEquippedCount}");
+        Debug.Log($"[RuntimeRuneScaling] reason={reason} Bonus rate={snapshot.bonusRate:P0}");
+        Debug.Log($"[RuntimeRuneScaling] reason={reason} Final multiplier={snapshot.multiplier:F2}");
+    }
+
+    public static void SetDebugLogging(bool enabled)
+    {
+        debugLoggingEnabled = enabled;
+    }
 }

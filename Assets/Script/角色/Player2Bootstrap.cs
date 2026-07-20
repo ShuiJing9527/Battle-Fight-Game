@@ -4,6 +4,8 @@ using UnityEngine.Serialization;
 
 public class Player2Bootstrap : MonoBehaviour
 {
+    private const string TwinShiftRewardShieldSourceId = "TwinShiftReward";
+
     [Header("Party Members")]
     [SerializeField] private GameObject player01;
     [SerializeField] private GameObject player02;
@@ -37,6 +39,7 @@ public class Player2Bootstrap : MonoBehaviour
     [SerializeField, Min(0f)] private float twinShiftShieldDuration = 5f;
     [SerializeField] private TwinShiftVfxPlayer twinShiftVfxPlayer;
     [SerializeField] private bool debugTwinShiftBuff = false;
+    [SerializeField] private bool debugPartyLogs = false;
 
     public GameObject CurrentPlayer { get; private set; }
     public Transform CurrentPlayerTransform => CurrentPlayer != null ? CurrentPlayer.transform : null;
@@ -60,6 +63,16 @@ public class Player2Bootstrap : MonoBehaviour
     private void Start()
     {
         InitializePartyIfNeeded();
+    }
+
+    private void OnDisable()
+    {
+        ClearAllTransitionBlessings("BattleEnd");
+    }
+
+    private void OnDestroy()
+    {
+        ClearAllTransitionBlessings("Destroy");
     }
 
     private void Update()
@@ -181,6 +194,7 @@ public class Player2Bootstrap : MonoBehaviour
             player02.SetActive(resolvedCurrentPlayer == player02);
         }
 
+        ClearAllTransitionBlessings("Initialization");
         CurrentPlayer = resolvedCurrentPlayer;
 
         if (cameraRig == null)
@@ -209,8 +223,11 @@ public class Player2Bootstrap : MonoBehaviour
 
         if (initialized)
         {
-            Debug.Log($"[PARTY] Leader = {(partyLeader != null ? partyLeader.name : "null")}", this);
-            Debug.Log($"[PARTY] Current Player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
+            if (debugPartyLogs)
+            {
+                Debug.Log($"[PARTY] Leader = {(partyLeader != null ? partyLeader.name : "null")}", this);
+                Debug.Log($"[PARTY] Current Player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
+            }
         }
     }
 
@@ -229,7 +246,10 @@ public class Player2Bootstrap : MonoBehaviour
             Player2PrototypeController activeSkill = CurrentPlayer.GetComponent<Player2PrototypeController>();
             if (activeSkill != null && activeSkill.HasActiveRuntimeSkill)
             {
-                Debug.Log("[PLAYER SWITCH] Cannot switch while skill is active.", this);
+                if (debugPartyLogs)
+                {
+                    Debug.Log("[PLAYER SWITCH] Cannot switch while skill is active.", this);
+                }
                 return;
             }
         }
@@ -239,7 +259,10 @@ public class Player2Bootstrap : MonoBehaviour
             if (TrySwitchPlayer())
             {
                 RefreshOverlayPanelsForCurrentPlayer();
-                Debug.Log($"[PARTY] Switched current player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
+                if (debugPartyLogs)
+                {
+                    Debug.Log($"[PARTY] Switched current player = {(CurrentPlayer != null ? CurrentPlayer.name : "null")}", this);
+                }
             }
         }
         catch (System.Exception ex)
@@ -275,6 +298,8 @@ public class Player2Bootstrap : MonoBehaviour
             Debug.LogError($"[TwinShift] post-switch settlement failed previous={GetObjectName(previousPlayer)} new={GetObjectName(nextPlayer)}", this);
             return false;
         }
+
+        ApplyTransitionBlessing(nextPlayer);
 
         return true;
     }
@@ -375,6 +400,7 @@ public class Player2Bootstrap : MonoBehaviour
 
         SafeAssignCameraTarget(nextActive);
         SafeRefreshSkillHud(nextActive);
+        ClearTransitionBlessing(previousPlayer, "SwitchOut");
         nextInactive.SetActive(false);
     }
 
@@ -507,13 +533,11 @@ public class Player2Bootstrap : MonoBehaviour
             shieldAmount = maxHp * twinShiftShieldMaxHpRatio;
             if (shieldAmount > 0f)
             {
-                PlayerTimedShieldStatus timedShield = newPlayer.GetComponent<PlayerTimedShieldStatus>();
-                if (timedShield == null)
+                PlayerTimedShieldStatus timedShield = PlayerTimedShieldStatus.GetOrAdd(newPlayer, TwinShiftRewardShieldSourceId);
+                if (timedShield != null)
                 {
-                    timedShield = newPlayer.AddComponent<PlayerTimedShieldStatus>();
+                    timedShield.ApplyShield(shieldAmount, twinShiftShieldDuration);
                 }
-
-                timedShield.ApplyShield(shieldAmount, twinShiftShieldDuration);
             }
         }
 
@@ -684,6 +708,18 @@ public class Player2Bootstrap : MonoBehaviour
         }
     }
 
+    public void RefreshCurrentPlayerPresentation()
+    {
+        if (CurrentPlayer == null)
+        {
+            return;
+        }
+
+        SafeAssignCameraTarget(CurrentPlayer);
+        SafeRefreshSkillHud(CurrentPlayer);
+        RefreshOverlayPanelsForCurrentPlayer();
+    }
+
     public void EnsureInitializedForSpawn()
     {
         InitializePartyIfNeeded();
@@ -752,6 +788,61 @@ public class Player2Bootstrap : MonoBehaviour
                 controllers[i].Reinitialize();
             }
         }
+    }
+
+    private void ApplyTransitionBlessing(GameObject target)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        TwinTransitionBlessingStatus status = ResolveTransitionBlessingStatus(target);
+        if (status == null)
+        {
+            return;
+        }
+
+        status.ApplyBlessingForSwitchIn(ResolveAffinityType(target));
+        RefreshCurrentPlayerPresentation();
+    }
+
+    private void ClearTransitionBlessing(GameObject target, string reason)
+    {
+        if (target == null)
+        {
+            return;
+        }
+
+        TwinTransitionBlessingStatus status = target.GetComponent<TwinTransitionBlessingStatus>();
+        if (status == null)
+        {
+            return;
+        }
+
+        status.ClearBlessing(reason);
+    }
+
+    private void ClearAllTransitionBlessings(string reason)
+    {
+        ClearTransitionBlessing(player01, reason);
+        ClearTransitionBlessing(player02, reason);
+    }
+
+    private static TwinTransitionBlessingStatus ResolveTransitionBlessingStatus(GameObject target)
+    {
+        if (target == null)
+        {
+            return null;
+        }
+
+        TwinTransitionBlessingStatus status = target.GetComponent<TwinTransitionBlessingStatus>();
+        if (status != null)
+        {
+            return status;
+        }
+
+        return target.AddComponent<TwinTransitionBlessingStatus>();
     }
 
     public float GetCharacterHeightOffset(GameObject character)
@@ -1167,8 +1258,381 @@ public class Player2Bootstrap : MonoBehaviour
         return null;
     }
 
-    private static bool IsValidSceneObject(GameObject go)
+private static bool IsValidSceneObject(GameObject go)
     {
         return go != null && go.scene.IsValid();
+    }
+}
+
+[DisallowMultipleComponent]
+public sealed class TwinTransitionBlessingStatus : MonoBehaviour
+{
+    private const string RadianceBlessingName = "Radiance Blessing";
+    private const string NightfallFavorName = "Nightfall Favor";
+    private const string NightfallFavorShieldSourceId = "TwinTransition.NightfallFavor";
+
+    private enum BlessingKind
+    {
+        None,
+        RadianceBlessing,
+        NightfallFavor
+    }
+
+    [SerializeField] private bool debugLifecycle;
+
+    private BlessingKind activeBlessing;
+    private CombatStats combatStats;
+    private CombatHealth combatHealth;
+    private PlayerSkillCooldownManager cooldownManager;
+    private PlayerTimedShieldStatus nightfallShieldStatus;
+    private float appliedPhysicalAttackBonus;
+    private float appliedSpecialAttackBonus;
+    private float appliedPhysicalDefenseBonus;
+    private float appliedSpecialDefenseBonus;
+    private bool deathSubscribed;
+
+    public bool HasActiveBlessing => activeBlessing != BlessingKind.None;
+
+    private void Awake()
+    {
+        ResolveReferences();
+        SubscribeDeathEventIfNeeded();
+    }
+
+    private void OnEnable()
+    {
+        ResolveReferences();
+        SubscribeDeathEventIfNeeded();
+    }
+
+    private void Update()
+    {
+        if (activeBlessing == BlessingKind.None)
+        {
+            return;
+        }
+
+        ResolveReferences();
+
+        if (combatHealth != null && combatHealth.IsDead)
+        {
+            ClearBlessing("Death");
+            return;
+        }
+
+        if (activeBlessing == BlessingKind.RadianceBlessing)
+        {
+            if (combatStats != null)
+            {
+                SyncStatMultiplier(ref combatStats.physicalDefense, ref appliedPhysicalDefenseBonus, 1.5f);
+                SyncStatMultiplier(ref combatStats.specialDefense, ref appliedSpecialDefenseBonus, 1.5f);
+            }
+
+            cooldownManager?.SetManaRegenMultiplier(this, 1.5f);
+
+            if (DayNightAffinityDamageModifier.HasNightChildState(gameObject))
+            {
+                ClearBlessing("NightChildActivated");
+            }
+
+            return;
+        }
+
+        if (combatStats != null)
+        {
+            SyncStatMultiplier(ref combatStats.physicalAttack, ref appliedPhysicalAttackBonus, 1.5f);
+            SyncStatMultiplier(ref combatStats.specialAttack, ref appliedSpecialAttackBonus, 1.5f);
+        }
+
+        if (DayNightAffinityDamageModifier.HasDayChildState(gameObject))
+        {
+            ClearBlessing("DayChildActivated");
+        }
+    }
+
+    private void OnDisable()
+    {
+        UnsubscribeDeathEventIfNeeded();
+        if (activeBlessing != BlessingKind.None)
+        {
+            ClearBlessing("BattleEnd");
+        }
+    }
+
+    private void OnDestroy()
+    {
+        UnsubscribeDeathEventIfNeeded();
+        if (activeBlessing != BlessingKind.None)
+        {
+            ClearBlessing("Destroy");
+        }
+    }
+
+    public void ApplyBlessingForSwitchIn(PlayerDayNightAffinityType affinityType)
+    {
+        if (affinityType == PlayerDayNightAffinityType.NightChild)
+        {
+            ApplyRadianceBlessing();
+            return;
+        }
+
+        if (affinityType == PlayerDayNightAffinityType.DayChild)
+        {
+            ApplyNightfallFavor();
+        }
+    }
+
+    public void ClearBlessing(string reason)
+    {
+        if (activeBlessing == BlessingKind.None)
+        {
+            return;
+        }
+
+        if (activeBlessing == BlessingKind.RadianceBlessing)
+        {
+            cooldownManager?.RemoveManaRegenMultiplier(this);
+        }
+        else if (activeBlessing == BlessingKind.NightfallFavor)
+        {
+            ResolveNightfallShieldStatus()?.ClearShield();
+        }
+
+        RevertAllAppliedBonuses();
+
+        string blessingName = GetBlessingName(activeBlessing);
+        activeBlessing = BlessingKind.None;
+
+        if (combatHealth != null)
+        {
+            combatHealth.NotifyShieldStateChanged();
+        }
+
+        DebugLifecycle($"Removed {blessingName}, reason={reason}");
+        RefreshCurrentPlayerPresentationIfNeeded();
+    }
+
+    private void ApplyRadianceBlessing()
+    {
+        ResolveReferences();
+        SubscribeDeathEventIfNeeded();
+
+        if (combatHealth != null && combatHealth.IsDead)
+        {
+            return;
+        }
+
+        if (DayNightAffinityDamageModifier.HasNightChildState(gameObject))
+        {
+            ClearBlessing("NightChildActivated");
+            return;
+        }
+
+        PrepareForBlessing(BlessingKind.RadianceBlessing);
+        activeBlessing = BlessingKind.RadianceBlessing;
+
+        if (combatStats != null)
+        {
+            SyncStatMultiplier(ref combatStats.physicalDefense, ref appliedPhysicalDefenseBonus, 1.5f);
+            SyncStatMultiplier(ref combatStats.specialDefense, ref appliedSpecialDefenseBonus, 1.5f);
+        }
+
+        cooldownManager?.SetManaRegenMultiplier(this, 1.5f);
+
+        DebugLifecycle($"Applied Radiance Blessing to {ResolvePlayerLabel()}");
+        RefreshCurrentPlayerPresentationIfNeeded();
+    }
+
+    private void ApplyNightfallFavor()
+    {
+        ResolveReferences();
+        SubscribeDeathEventIfNeeded();
+
+        if (combatHealth != null && combatHealth.IsDead)
+        {
+            return;
+        }
+
+        if (DayNightAffinityDamageModifier.HasDayChildState(gameObject))
+        {
+            ClearBlessing("DayChildActivated");
+            return;
+        }
+
+        PrepareForBlessing(BlessingKind.NightfallFavor);
+        activeBlessing = BlessingKind.NightfallFavor;
+
+        if (combatStats != null)
+        {
+            SyncStatMultiplier(ref combatStats.physicalAttack, ref appliedPhysicalAttackBonus, 1.5f);
+            SyncStatMultiplier(ref combatStats.specialAttack, ref appliedSpecialAttackBonus, 1.5f);
+        }
+
+        float shieldAmount = combatHealth != null ? Mathf.Max(0f, combatHealth.MaxHealthValue) : 0f;
+        if (shieldAmount > 0f)
+        {
+            ResolveNightfallShieldStatus()?.ApplyPersistentShield(shieldAmount);
+            combatHealth?.NotifyShieldStateChanged();
+        }
+
+        DebugLifecycle($"Applied Nightfall Favor to {ResolvePlayerLabel()}, shield={shieldAmount:F2}");
+        RefreshCurrentPlayerPresentationIfNeeded();
+    }
+
+    private void PrepareForBlessing(BlessingKind newBlessing)
+    {
+        if (activeBlessing != BlessingKind.None && activeBlessing != newBlessing)
+        {
+            ClearBlessing("Replaced");
+        }
+
+        if (newBlessing != BlessingKind.RadianceBlessing)
+        {
+            cooldownManager?.RemoveManaRegenMultiplier(this);
+        }
+    }
+
+    private void ResolveReferences()
+    {
+        if (combatStats == null)
+        {
+            combatStats = GetComponent<CombatStats>();
+        }
+
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        if (cooldownManager == null)
+        {
+            cooldownManager = GetComponent<PlayerSkillCooldownManager>();
+        }
+    }
+
+    private void SubscribeDeathEventIfNeeded()
+    {
+        if (deathSubscribed || combatHealth == null)
+        {
+            return;
+        }
+
+        combatHealth.Died += HandleOwnerDied;
+        deathSubscribed = true;
+    }
+
+    private void UnsubscribeDeathEventIfNeeded()
+    {
+        if (!deathSubscribed || combatHealth == null)
+        {
+            return;
+        }
+
+        combatHealth.Died -= HandleOwnerDied;
+        deathSubscribed = false;
+    }
+
+    private void HandleOwnerDied(GameObject _)
+    {
+        ClearBlessing("Death");
+    }
+
+    private PlayerTimedShieldStatus ResolveNightfallShieldStatus()
+    {
+        if (nightfallShieldStatus != null)
+        {
+            return nightfallShieldStatus;
+        }
+
+        nightfallShieldStatus = PlayerTimedShieldStatus.GetOrAdd(gameObject, NightfallFavorShieldSourceId);
+        return nightfallShieldStatus;
+    }
+
+    private void RevertAllAppliedBonuses()
+    {
+        if (combatStats == null)
+        {
+            appliedPhysicalAttackBonus = 0f;
+            appliedSpecialAttackBonus = 0f;
+            appliedPhysicalDefenseBonus = 0f;
+            appliedSpecialDefenseBonus = 0f;
+            return;
+        }
+
+        RemoveAppliedBonus(ref combatStats.physicalAttack, ref appliedPhysicalAttackBonus);
+        RemoveAppliedBonus(ref combatStats.specialAttack, ref appliedSpecialAttackBonus);
+        RemoveAppliedBonus(ref combatStats.physicalDefense, ref appliedPhysicalDefenseBonus);
+        RemoveAppliedBonus(ref combatStats.specialDefense, ref appliedSpecialDefenseBonus);
+    }
+
+    private void SyncStatMultiplier(ref float statValue, ref float appliedBonus, float multiplier)
+    {
+        float rawWithoutBlessing = Mathf.Max(0f, statValue - appliedBonus);
+        float desiredBonus = Mathf.Max(0f, rawWithoutBlessing * Mathf.Max(0f, multiplier - 1f));
+        statValue = rawWithoutBlessing + desiredBonus;
+        appliedBonus = desiredBonus;
+    }
+
+    private void RemoveAppliedBonus(ref float statValue, ref float appliedBonus)
+    {
+        if (appliedBonus <= 0f)
+        {
+            return;
+        }
+
+        statValue = Mathf.Max(0f, statValue - appliedBonus);
+        appliedBonus = 0f;
+    }
+
+    private void RefreshCurrentPlayerPresentationIfNeeded()
+    {
+        Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+        if (bootstrap != null && bootstrap.CurrentPlayer == gameObject)
+        {
+            bootstrap.RefreshCurrentPlayerPresentation();
+        }
+    }
+
+    private string ResolvePlayerLabel()
+    {
+        PlayerDayNightAffinity affinity = GetComponent<PlayerDayNightAffinity>();
+        if (affinity != null)
+        {
+            if (affinity.AffinityType == PlayerDayNightAffinityType.NightChild)
+            {
+                return "Player01";
+            }
+
+            if (affinity.AffinityType == PlayerDayNightAffinityType.DayChild)
+            {
+                return "Player02";
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(name) ? "Player" : name;
+    }
+
+    private string GetBlessingName(BlessingKind blessing)
+    {
+        switch (blessing)
+        {
+            case BlessingKind.RadianceBlessing:
+                return RadianceBlessingName;
+            case BlessingKind.NightfallFavor:
+                return NightfallFavorName;
+            default:
+                return "None";
+        }
+    }
+
+    private void DebugLifecycle(string message)
+    {
+        if (!debugLifecycle)
+        {
+            return;
+        }
+
+        Debug.Log($"[TwinTransitionBuff] {message}", this);
+        Debug.Log($"[TwinTransitionBuff.Debug] owner={name} state={activeBlessing} {message}", this);
     }
 }

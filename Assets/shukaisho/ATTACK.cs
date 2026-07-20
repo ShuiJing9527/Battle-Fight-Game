@@ -161,15 +161,18 @@ public class ATTACK : MonoBehaviour
                 this);
         }
 
-        Debug.Log(
-            "[PlayerMeleeHitDebug] " +
-            "skill=ATTACK " +
-            "attackPosition=" + attackCenter +
-            " attackRadius=" + resolvedAttackRadius.ToString("F2") +
-            " attackForwardDistance=" + resolvedForwardDistance.ToString("F2") +
-            " hitColliderCount=" + hitEnemies.Length +
-            " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
-            this);
+        if (debugPlayerHit)
+        {
+            Debug.Log(
+                "[PlayerMeleeHitDebug] " +
+                "skill=ATTACK " +
+                "attackPosition=" + attackCenter +
+                " attackRadius=" + resolvedAttackRadius.ToString("F2") +
+                " attackForwardDistance=" + resolvedForwardDistance.ToString("F2") +
+                " hitColliderCount=" + hitEnemies.Length +
+                " details=" + (debugEntries.Count > 0 ? string.Join(" | ", debugEntries) : "none"),
+                this);
+        }
     }
 
     void HandleAnimation()
