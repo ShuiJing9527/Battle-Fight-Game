@@ -246,7 +246,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -376,7 +376,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Toggle
   m_Navigation:
     m_Mode: 3
@@ -1103,7 +1103,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "BATTLE \nFLGHT \nGAME"
+  m_text: "\u8F89\u66AE\u53CC\u751F"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
   m_sharedMaterial: {fileID: 2140474, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
@@ -1130,8 +1130,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 85
-  m_fontSizeBase: 85
+  m_fontSize: 180
+  m_fontSizeBase: 180
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -1505,6 +1505,7 @@ GameObject:
   - component: {fileID: 717417299}
   - component: {fileID: 717417298}
   - component: {fileID: 717417300}
+  - component: {fileID: 900000003}
   m_Layer: 5
   m_Name: Over
   m_TagString: Untagged
@@ -2183,7 +2184,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: "BATTLE \nFLGHT \nGAME"
+  m_text: "\u8F89\u66AE\u53CC\u751F"
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
   m_sharedMaterial: {fileID: 2140474, guid: 8a89fa14b10d46a99122fd4f73fca9a2, type: 2}
@@ -2210,8 +2211,8 @@ MonoBehaviour:
   m_faceColor:
     serializedVersion: 2
     rgba: 4294967295
-  m_fontSize: 85
-  m_fontSizeBase: 85
+  m_fontSize: 180
+  m_fontSizeBase: 180
   m_fontWeight: 400
   m_enableAutoSizing: 0
   m_fontSizeMin: 18
@@ -2693,20 +2694,6 @@ MonoBehaviour:
     musicVolume: 1
     sfxVolume: 1
     fullscreen: 0
---- !u!114 &1570221545
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1570221541}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 71e4c2f9b86d4f0fa3c1d7e95b2a6408, type: 3}
-  m_Name:
-  m_EditorClassIdentifier: Assembly-CSharp::GameLocalization
-  cjkFont: {fileID: 11400000, guid: 6235999b7260f1b45855e09e28884a47, type: 2}
-  japaneseFont: {fileID: 11400000, guid: da47f109c18cc4b4db894d698b64d241, type: 2}
 --- !u!4 &1570221544
 Transform:
   m_ObjectHideFlags: 0
@@ -2722,6 +2709,20 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1570221545
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1570221541}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 71e4c2f9b86d4f0fa3c1d7e95b2a6408, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::GameLocalization
+  cjkFont: {fileID: 11400000, guid: 6235999b7260f1b45855e09e28884a47, type: 2}
+  japaneseFont: {fileID: 11400000, guid: da47f109c18cc4b4db894d698b64d241, type: 2}
 --- !u!1 &1596888613
 GameObject:
   m_ObjectHideFlags: 0
@@ -3021,6 +3022,7 @@ GameObject:
   - component: {fileID: 1814582574}
   - component: {fileID: 1814582573}
   - component: {fileID: 1814582572}
+  - component: {fileID: 900000002}
   m_Layer: 5
   m_Name: Setting
   m_TagString: Untagged
@@ -3398,6 +3400,7 @@ GameObject:
   - component: {fileID: 2036436340}
   - component: {fileID: 2036436339}
   - component: {fileID: 2036436338}
+  - component: {fileID: 900000001}
   m_Layer: 5
   m_Name: Start
   m_TagString: Untagged
@@ -4064,6 +4067,102 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
+--- !u!114 &900000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2036436336}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!114 &900000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1814582570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!114 &900000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 717417296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

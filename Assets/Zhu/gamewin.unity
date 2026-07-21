@@ -439,6 +439,7 @@ GameObject:
   - component: {fileID: 292745438}
   - component: {fileID: 292745437}
   - component: {fileID: 292745436}
+  - component: {fileID: 900000011}
   m_Layer: 0
   m_Name: RetryButton
   m_TagString: Untagged
@@ -572,6 +573,7 @@ GameObject:
   - component: {fileID: 687170258}
   - component: {fileID: 687170257}
   - component: {fileID: 687170256}
+  - component: {fileID: 900000012}
   m_Layer: 0
   m_Name: BackToTitleButton
   m_TagString: Untagged
@@ -1270,6 +1272,70 @@ RectTransform:
   m_CorrespondingSourceObject: {fileID: 2443191454390348473, guid: 8510f126b3c9b6a4cbca208eed5127e2, type: 3}
   m_PrefabInstance: {fileID: 3929947781358564391}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &900000011
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 292745434}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.95686275, b: 0.78039217, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!114 &900000012
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 687170254}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.95686275, b: 0.78039217, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

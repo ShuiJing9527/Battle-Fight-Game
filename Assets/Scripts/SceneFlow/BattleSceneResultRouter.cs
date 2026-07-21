@@ -24,23 +24,52 @@ public class BattleSceneResultRouter : MonoBehaviour
     private bool subscribedPlayer02;
     private bool subscribedVictory;
     private float nextBindingRetryTime;
+    private static bool sceneLoadedHookRegistered;
 
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
-    private static void AutoCreateForBattleScene()
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    private static void ResetRuntimeState()
     {
-        Scene activeScene = SceneManager.GetActiveScene();
-        if (!string.Equals(activeScene.name, BattleSceneName, StringComparison.Ordinal))
+        SceneManager.sceneLoaded -= HandleSceneLoaded;
+        sceneLoadedHookRegistered = false;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void RegisterSceneLoadedHook()
+    {
+        if (sceneLoadedHookRegistered)
         {
             return;
         }
 
-        if (FindObjectOfType<BattleSceneResultRouter>() != null)
+        SceneManager.sceneLoaded += HandleSceneLoaded;
+        sceneLoadedHookRegistered = true;
+    }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+    private static void AutoCreateForActiveBattleScene()
+    {
+        EnsureRouterForScene(SceneManager.GetActiveScene());
+    }
+
+    private static void HandleSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        EnsureRouterForScene(scene);
+    }
+
+    private static void EnsureRouterForScene(Scene scene)
+    {
+        if (!scene.IsValid() || !scene.isLoaded || !string.Equals(scene.name, BattleSceneName, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (FindSceneComponent<BattleSceneResultRouter>(scene) != null)
         {
             return;
         }
 
         GameObject routerObject = new GameObject(nameof(BattleSceneResultRouter));
-        SceneManager.MoveGameObjectToScene(routerObject, activeScene);
+        SceneManager.MoveGameObjectToScene(routerObject, scene);
         routerObject.AddComponent<BattleSceneResultRouter>();
     }
 
