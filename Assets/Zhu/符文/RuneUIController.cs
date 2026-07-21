@@ -215,6 +215,7 @@ public class RuneUIController : MonoBehaviour
     [SerializeField] private Vector2 runeBagItemSize = new Vector2(0f, 40f);
     [SerializeField] private float runeBagContentTopPadding = 0f;
     [SerializeField] private float runeBagContentBottomPadding = 0f;
+    [SerializeField, Min(1f)] private float runeBagMouseWheelPixels = 72f;
     [SerializeField] private bool hideLegacyRuneDetailPanel = true;
     [SerializeField] private bool buildUiAtRuntime = false;
     [SerializeField] private bool applyInventoryLayoutAtRuntime = false;
@@ -291,6 +292,7 @@ public class RuneUIController : MonoBehaviour
             TogglePanel();
         }
 
+        HandleRuneBagMouseWheel();
     }
 
     private void OnDisable()
@@ -835,7 +837,7 @@ public class RuneUIController : MonoBehaviour
 
     private void UpdateRuneListContentHeight(int runeCount)
     {
-        if (runeBagContentRoot == null || !applyInventoryLayoutAtRuntime)
+        if (runeBagContentRoot == null)
         {
             return;
         }
@@ -850,6 +852,51 @@ public class RuneUIController : MonoBehaviour
             + Mathf.Max(0, rows - 1) * Mathf.Max(0f, runeBagItemSpacing.y)
             + runeBagContentBottomPadding;
         runeBagContentRoot.sizeDelta = new Vector2(runeBagContentRoot.sizeDelta.x, contentHeight);
+    }
+
+    private void HandleRuneBagMouseWheel()
+    {
+        if (!IsMainPanelVisible() || runeInventoryScrollRect == null || runeInventoryViewport == null || runeInventoryContent == null)
+        {
+            return;
+        }
+
+        float wheelDelta = Input.mouseScrollDelta.y;
+        if (Mathf.Approximately(wheelDelta, 0f))
+        {
+            return;
+        }
+
+        Canvas.ForceUpdateCanvases();
+        RectTransform wheelHitArea = runeInventoryViewport.rect.width > 1f && runeInventoryViewport.rect.height > 1f
+            ? runeInventoryViewport
+            : runeInventoryPanel;
+        if (wheelHitArea == null)
+        {
+            return;
+        }
+
+        Canvas canvas = wheelHitArea.GetComponentInParent<Canvas>();
+        Camera eventCamera = canvas != null && canvas.renderMode != RenderMode.ScreenSpaceOverlay
+            ? canvas.worldCamera
+            : null;
+        if (!RectTransformUtility.RectangleContainsScreenPoint(wheelHitArea, Input.mousePosition, eventCamera))
+        {
+            return;
+        }
+
+        float viewportHeight = wheelHitArea.rect.height;
+        float contentHeight = runeInventoryContent.rect.height;
+        float scrollableHeight = Mathf.Max(0f, contentHeight - viewportHeight);
+        if (scrollableHeight <= 0.01f)
+        {
+            return;
+        }
+
+        runeInventoryScrollRect.StopMovement();
+        float normalizedDelta = wheelDelta * runeBagMouseWheelPixels / scrollableHeight;
+        runeInventoryScrollRect.verticalNormalizedPosition = Mathf.Clamp01(
+            runeInventoryScrollRect.verticalNormalizedPosition + normalizedDelta);
     }
 
     private void ApplyInventoryLayoutIfEnabled()
