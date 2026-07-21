@@ -7,6 +7,7 @@ using UnityEditor;
 public class RuntimeLootDropOnDeath : MonoBehaviour
 {
     private const float LuckRuneDropChancePerPoint = 0.03f;
+    private const float RuneDropChanceDecayPerEquippedRune = 0.05f;
 
     [Header("Soul Drop")]
     [SerializeField] private SoulPickup soulPrefab;
@@ -157,10 +158,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         float? eliteRuneRoll;
         int ownedRuneCount = ResolveOwnedRuneCount(killer);
         int runeCount = ResolveRuneDropCount(rank, killerLuck, ownedRuneCount, out eliteRuneRoll);
-        if (rank != MonsterRank.Normal)
-        {
-            runeCount = Mathf.Clamp(runeCount, 1, 3);
-        }
+        runeCount = rank == MonsterRank.Normal ? 0 : Mathf.Clamp(runeCount, 0, 3);
         if (cleanupBossPhaseSplit != null)
         {
             runeCount = Mathf.Max(0, Mathf.RoundToInt(runeCount * cleanupBossRewardMultiplier));
@@ -569,9 +567,16 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             return manager.RollRuneDropCount(rank, luck, ownedRuneCount);
         }
 
+        float dropGateRoll = Random.value;
+        eliteRoll = dropGateRoll;
+        if (dropGateRoll >= ApplyOwnedRuneDropDecay(1f, ownedRuneCount))
+        {
+            return 0;
+        }
+
         if (rank == MonsterRank.Elite)
         {
-            return RollEliteRuneDropCount(ownedRuneCount, out eliteRoll);
+            return RollEliteRuneDropCount(ownedRuneCount);
         }
 
         int baseCount = GetBaseRuneDropCount(rank);
@@ -597,10 +602,9 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return ClampRuneDropCountByRank(rank, count);
     }
 
-    private static int RollEliteRuneDropCount(int ownedRuneCount, out float? eliteRoll)
+    private static int RollEliteRuneDropCount(int ownedRuneCount)
     {
         float roll = Random.value;
-        eliteRoll = roll;
         float thirdRuneChance = ApplyOwnedRuneDropDecay(0.05f, ownedRuneCount);
         if (roll < thirdRuneChance)
         {
@@ -647,8 +651,8 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     {
         return rank switch
         {
-            MonsterRank.Boss => Mathf.Clamp(count, 2, 6),
-            MonsterRank.Elite => Mathf.Clamp(count, 1, 3),
+            MonsterRank.Boss => Mathf.Clamp(count, 0, 6),
+            MonsterRank.Elite => Mathf.Clamp(count, 0, 3),
             _ => 0
         };
     }
@@ -669,86 +673,116 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     private int ResolveOwnedRuneCount(GameObject killer)
     {
-        RuneInventory inventory = ResolveOwnedRuneInventory(killer);
-        return inventory != null ? Mathf.Max(0, inventory.Count) : 0;
+        if (TryResolveEquippedRuneCount(killer, out int equippedRuneCount))
+        {
+            return Mathf.Max(0, equippedRuneCount);
+        }
+
+        return Mathf.Max(0, ResolveAnyPlayerEquippedRuneCount());
     }
 
-    private RuneInventory ResolveOwnedRuneInventory(GameObject killer)
+    private bool TryResolveEquippedRuneCount(GameObject owner, out int equippedRuneCount)
     {
-        RuneInventory sharedInventory = ResolveSharedRuneInventory();
-        if (sharedInventory != null)
+        equippedRuneCount = 0;
+
+        CombatSkillCaster caster = owner != null
+            ? owner.GetComponentInChildren<CombatSkillCaster>(true) ?? owner.GetComponentInParent<CombatSkillCaster>()
+            : null;
+        if (caster != null)
         {
-            return sharedInventory;
+            equippedRuneCount = CountEquippedRunes(caster);
+            return true;
         }
 
-        if (killer == null)
+        Player2Bootstrap bootstrap = FindObjectOfType<Player2Bootstrap>();
+        if (bootstrap != null && bootstrap.CurrentPlayer != null)
         {
-            return null;
-        }
-
-        RuneInventory inventory = killer.GetComponentInChildren<RuneInventory>(true) ?? killer.GetComponent<RuneInventory>();
-        if (inventory != null)
-        {
-            return inventory;
-        }
-
-        Transform root = killer.transform.root;
-        if (root == null)
-        {
-            return null;
-        }
-
-        return root.GetComponentInChildren<RuneInventory>(true) ?? root.GetComponent<RuneInventory>();
-    }
-
-    private RuneInventory ResolveSharedRuneInventory()
-    {
-        RuneDropManager manager = ResolveRuneDropManager();
-        if (manager != null)
-        {
-            RuneInventory inventory = manager.GetComponent<RuneInventory>();
-            if (inventory != null)
+            caster = bootstrap.CurrentPlayer.GetComponentInChildren<CombatSkillCaster>(true)
+                ?? bootstrap.CurrentPlayer.GetComponentInParent<CombatSkillCaster>();
+            if (caster != null)
             {
-                return inventory;
-            }
-
-            inventory = manager.GetComponentInChildren<RuneInventory>(true);
-            if (inventory != null)
-            {
-                return inventory;
+                equippedRuneCount = CountEquippedRunes(caster);
+                return true;
             }
         }
 
-        RuneLibrary[] libraries = Object.FindObjectsOfType<RuneLibrary>(true);
-        for (int i = 0; i < libraries.Length; i++)
+        GameObject taggedPlayer = GameObject.FindWithTag("Player");
+        if (taggedPlayer != null)
         {
-            RuneLibrary library = libraries[i];
-            if (library == null)
+            caster = taggedPlayer.GetComponentInChildren<CombatSkillCaster>(true)
+                ?? taggedPlayer.GetComponentInParent<CombatSkillCaster>();
+            if (caster != null)
+            {
+                equippedRuneCount = CountEquippedRunes(caster);
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static int ResolveAnyPlayerEquippedRuneCount()
+    {
+        CombatSkillCaster[] casters = Object.FindObjectsOfType<CombatSkillCaster>(true);
+        for (int i = 0; i < casters.Length; i++)
+        {
+            CombatSkillCaster caster = casters[i];
+            if (caster == null || caster.gameObject == null || !caster.gameObject.scene.IsValid() || !caster.gameObject.scene.isLoaded)
             {
                 continue;
             }
 
-            RuneInventory inventory = library.GetComponent<RuneInventory>();
-            if (inventory != null)
+            if (caster.GetComponent<Player01SkillController>() != null || caster.GetComponent<Player2PrototypeController>() != null)
             {
-                return inventory;
-            }
-
-            inventory = library.GetComponentInChildren<RuneInventory>(true);
-            if (inventory != null)
-            {
-                return inventory;
+                return CountEquippedRunes(caster);
             }
         }
 
-        return null;
+        return 0;
+    }
+
+    private static int CountEquippedRunes(CombatSkillCaster caster)
+    {
+        if (caster == null)
+        {
+            return 0;
+        }
+
+        RuneRuntimeState runtimeState = caster.GetComponent<RuneRuntimeState>()
+            ?? caster.GetComponentInParent<RuneRuntimeState>()
+            ?? caster.GetComponentInChildren<RuneRuntimeState>(true);
+        if (runtimeState != null)
+        {
+            return runtimeState.GetTotalEquippedRuneCount();
+        }
+
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < 4; skillIndex++)
+        {
+            BattleSkill skill = caster.TryGetSkillRaw(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            int slotLimit = Mathf.Min(Mathf.Max(0, skill.runeSlotCount), skill.equippedRunes.Length);
+            for (int slotIndex = 0; slotIndex < slotLimit; slotIndex++)
+            {
+                RuneDefinition rune = skill.equippedRunes[slotIndex];
+                if (rune != null && rune.IsConfigured() && rune.runeType != RuneType.None)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)
     {
-        float minimumChance = Mathf.Min(baseRuneDropChance, 0.05f);
-        float reducedChance = baseRuneDropChance - Mathf.Max(0, ownedRuneCount) * 0.05f;
-        return Mathf.Clamp(reducedChance, minimumChance, baseRuneDropChance);
+        float reducedChance = Mathf.Clamp01(baseRuneDropChance) - Mathf.Max(0, ownedRuneCount) * RuneDropChanceDecayPerEquippedRune;
+        return Mathf.Clamp01(reducedChance);
     }
 
     private void WarnMissingSoulPrefabOnce()

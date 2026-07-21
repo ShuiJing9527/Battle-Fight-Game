@@ -5,6 +5,7 @@ public class RuneDropManager : MonoBehaviour
     private const float DefaultDropYOffset = 0.3f;
     private const float DefaultMinRuneScatterRadius = 1.25f;
     private const float DefaultMaxRuneScatterRadius = 2.25f;
+    private const float RuneDropChanceDecayPerEquippedRune = 0.05f;
 
     public static RuneDropManager Instance { get; private set; }
 
@@ -151,6 +152,15 @@ public class RuneDropManager : MonoBehaviour
             return 0;
         }
 
+        float dropGateRoll = Random.value;
+        float dropGateChance = ApplyOwnedRuneDropDecay(1f, ownedRuneCount);
+        if (dropGateRoll >= dropGateChance)
+        {
+            LogRuneDropDiagnostic(
+                $"rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 dropGateRoll={dropGateRoll:F4} dropGateChance={dropGateChance:F4} settings=null highRuneDropTestMode=true");
+            return 0;
+        }
+
         if (rank == MonsterRank.Elite)
         {
             float eliteRoll = Random.value;
@@ -195,24 +205,23 @@ public class RuneDropManager : MonoBehaviour
             return 0;
         }
 
-        return Mathf.Clamp(count, 1, 3);
+        return Mathf.Clamp(count, 0, 3);
     }
 
     private static int ClampRuneDropCountByRank(MonsterRank rank, int count)
     {
         return rank switch
         {
-            MonsterRank.Boss => Mathf.Clamp(count, 2, 6),
-            MonsterRank.Elite => Mathf.Clamp(count, 1, 3),
+            MonsterRank.Boss => Mathf.Clamp(count, 0, 6),
+            MonsterRank.Elite => Mathf.Clamp(count, 0, 3),
             _ => 0
         };
     }
 
     private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)
     {
-        float minimumChance = Mathf.Min(baseRuneDropChance, 0.05f);
-        float reducedChance = baseRuneDropChance - Mathf.Max(0, ownedRuneCount) * 0.05f;
-        return Mathf.Clamp(reducedChance, minimumChance, baseRuneDropChance);
+        float reducedChance = Mathf.Clamp01(baseRuneDropChance) - Mathf.Max(0, ownedRuneCount) * RuneDropChanceDecayPerEquippedRune;
+        return Mathf.Clamp01(reducedChance);
     }
 
     private GameObject GetDropPrefabObjectForRune(RuneDefinition rune)

@@ -171,10 +171,11 @@ public static class RebuildRuneUIPanelLayoutSafely
         GameObject bodyViewport = FindOrCreateChild(panel, "BodyViewport", changes);
         RectTransform bodyViewportRect = bodyViewport.GetComponent<RectTransform>();
         bodyViewportRect.anchorMin = new Vector2(0f, 0f);
-        bodyViewportRect.anchorMax = new Vector2(0.94f, 1f);
+        bodyViewportRect.anchorMax = new Vector2(0.91f, 1f);
         bodyViewportRect.pivot = new Vector2(0.5f, 0.5f);
-        bodyViewportRect.offsetMin = new Vector2(0f, 18f);
-        bodyViewportRect.offsetMax = new Vector2(-16f, -46f);
+        bodyViewportRect.offsetMin = new Vector2(0f, 20f);
+        bodyViewportRect.offsetMax = new Vector2(-10f, 40f);
+        bodyViewportRect.localScale = new Vector3(1.2f, 1f, 1f);
         EnsureImage(bodyViewport, new Color(0f, 0f, 0f, 0.001f));
         EnsureRectMask2D(bodyViewport);
 
@@ -193,7 +194,10 @@ public static class RebuildRuneUIPanelLayoutSafely
 
         GameObject scrollbarObject = FindOrCreateChild(panel, "DescriptionScrollbar", changes);
         RectTransform scrollbarRect = scrollbarObject.GetComponent<RectTransform>();
-        ConfigureRectStretchArea(scrollbarRect, new Vector2(0.95f, 0.08f), new Vector2(0.99f, 0.90f));
+        ConfigureRectStretchArea(scrollbarRect, new Vector2(0.965f, 0.08f), new Vector2(0.995f, 0.90f));
+        scrollbarRect.offsetMin = new Vector2(50f, -10f);
+        scrollbarRect.offsetMax = new Vector2(50f, 50f);
+        scrollbarRect.localScale = Vector3.one;
         Scrollbar scrollbar = EnsureScrollbar(scrollbarObject, changes);
 
         ScrollRect descriptionScrollRect = EnsureComponent<ScrollRect>(panel);
@@ -204,7 +208,7 @@ public static class RebuildRuneUIPanelLayoutSafely
         descriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
         descriptionScrollRect.scrollSensitivity = 24f;
         descriptionScrollRect.verticalScrollbar = scrollbar;
-        descriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+        descriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
         changes.Add("Configured SkillDescriptionPanel as the shared rune/skill description area");
 
         return panel;

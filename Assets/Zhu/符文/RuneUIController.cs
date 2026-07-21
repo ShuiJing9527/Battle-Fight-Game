@@ -91,6 +91,21 @@ public class RuneUIController : MonoBehaviour
     private const string RunePanelHoverTracePrefix = "[RunePanelHoverTrace] ";
     private const string TooltipPositionTracePrefix = "[TooltipPositionTrace] ";
     private const string TooltipRuntimeTracePrefix = "[TooltipRuntimeTrace] ";
+    private const float SharedDescriptionScrollSensitivity = 24f;
+    private const float SharedDescriptionContentPaddingY = 12f;
+    private const float SharedDescriptionScrollbarLeftAnchor = 0.965f;
+    private const float SharedDescriptionScrollbarRightAnchor = 0.995f;
+    private const float SharedDescriptionViewportRightAnchor = 0.91f;
+    private const float SharedDescriptionViewportTop = 40f;
+    private const float SharedDescriptionViewportBottom = 20f;
+    private const float SharedDescriptionViewportRightOffset = -10f;
+    private const float SharedDescriptionViewportScaleX = 1.2f;
+    private const float SharedDescriptionScrollbarLeftOffset = 50f;
+    private const float SharedDescriptionScrollbarRightOffset = 50f;
+    private const float SharedDescriptionScrollbarTopOffset = 50f;
+    private const float SharedDescriptionScrollbarBottomOffset = -10f;
+    private const float SharedDescriptionScrollbarTopWithTitle = 0.90f;
+    private const float SharedDescriptionScrollbarTopWithoutTitle = 0.94f;
 
     [System.Serializable]
     public class RuneSlotView
@@ -1412,9 +1427,11 @@ public class RuneUIController : MonoBehaviour
         currentDescriptionSource = source;
         skillDescriptionTitleText.text = title ?? string.Empty;
         skillDescriptionBodyText.text = body ?? string.Empty;
+        skillDescriptionTitleText.gameObject.SetActive(!string.IsNullOrWhiteSpace(title));
         skillDescriptionPanel.SetActive(true);
         Canvas.ForceUpdateCanvases();
         RefreshSkillDescriptionPanelHeight();
+        RefreshSharedDescriptionScrollContent(true);
         Canvas.ForceUpdateCanvases();
         LayoutRebuilder.ForceRebuildLayoutImmediate(skillDescriptionPanel.transform as RectTransform);
         if (sharedDescriptionScrollRect != null)
@@ -2109,6 +2126,10 @@ public class RuneUIController : MonoBehaviour
         if (sharedDescriptionScrollRect == null)
         {
             sharedDescriptionScrollRect = skillDescriptionPanel.GetComponent<ScrollRect>();
+            if (sharedDescriptionScrollRect == null && Application.isPlaying)
+            {
+                sharedDescriptionScrollRect = skillDescriptionPanel.AddComponent<ScrollRect>();
+            }
         }
 
         Transform viewportTransform = skillDescriptionPanel.transform.Find("BodyViewport");
@@ -2118,6 +2139,7 @@ public class RuneUIController : MonoBehaviour
         }
 
         skillDescriptionBodyViewportRect = viewportTransform as RectTransform;
+        EnsureDescriptionViewportReceivesScroll(skillDescriptionBodyViewportRect);
         if (runeDescriptionViewport == null)
         {
             runeDescriptionViewport = skillDescriptionBodyViewportRect;
@@ -2136,21 +2158,137 @@ public class RuneUIController : MonoBehaviour
         {
             sharedDescriptionScrollRect.viewport = skillDescriptionBodyViewportRect;
             sharedDescriptionScrollRect.content = skillDescriptionBodyText.rectTransform;
-            if (applyDescriptionLayoutAtRuntime)
-            {
-                sharedDescriptionScrollRect.horizontal = false;
-                sharedDescriptionScrollRect.vertical = true;
-                sharedDescriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
-                sharedDescriptionScrollRect.scrollSensitivity = 24f;
+            sharedDescriptionScrollRect.horizontal = false;
+            sharedDescriptionScrollRect.vertical = true;
+            sharedDescriptionScrollRect.movementType = ScrollRect.MovementType.Clamped;
+            sharedDescriptionScrollRect.scrollSensitivity = SharedDescriptionScrollSensitivity;
 
-                Scrollbar existingScrollbar = skillDescriptionPanel.GetComponentInChildren<Scrollbar>(true);
-                if (existingScrollbar != null)
-                {
-                    sharedDescriptionScrollRect.verticalScrollbar = existingScrollbar;
-                    sharedDescriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
-                    existingScrollbar.direction = Scrollbar.Direction.BottomToTop;
-                }
+            Scrollbar existingScrollbar = skillDescriptionPanel.GetComponentInChildren<Scrollbar>(true);
+            if (existingScrollbar != null)
+            {
+                sharedDescriptionScrollRect.verticalScrollbar = existingScrollbar;
+                sharedDescriptionScrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;
+                existingScrollbar.direction = Scrollbar.Direction.BottomToTop;
+                ApplySharedDescriptionScrollbarLayout(existingScrollbar);
             }
+        }
+    }
+
+    private void ApplySharedDescriptionScrollbarLayout(Scrollbar scrollbar)
+    {
+        bool hasTitle = skillDescriptionTitleText != null
+            && skillDescriptionTitleText.gameObject.activeSelf
+            && !string.IsNullOrWhiteSpace(skillDescriptionTitleText.text);
+
+        if (skillDescriptionBodyViewportRect != null)
+        {
+            skillDescriptionBodyViewportRect.anchorMin = new Vector2(0f, 0f);
+            skillDescriptionBodyViewportRect.anchorMax = new Vector2(SharedDescriptionViewportRightAnchor, 1f);
+            skillDescriptionBodyViewportRect.offsetMin = new Vector2(0f, SharedDescriptionViewportBottom);
+            skillDescriptionBodyViewportRect.offsetMax = new Vector2(
+                SharedDescriptionViewportRightOffset,
+                SharedDescriptionViewportTop);
+            skillDescriptionBodyViewportRect.localScale = new Vector3(
+                SharedDescriptionViewportScaleX,
+                1f,
+                1f);
+        }
+
+        if (scrollbar == null)
+        {
+            return;
+        }
+
+        RectTransform scrollbarRect = scrollbar.transform as RectTransform;
+        if (scrollbarRect == null)
+        {
+            return;
+        }
+
+        scrollbarRect.anchorMin = new Vector2(SharedDescriptionScrollbarLeftAnchor, 0.08f);
+        scrollbarRect.anchorMax = new Vector2(
+            SharedDescriptionScrollbarRightAnchor,
+            hasTitle ? SharedDescriptionScrollbarTopWithTitle : SharedDescriptionScrollbarTopWithoutTitle);
+        scrollbarRect.offsetMin = new Vector2(
+            SharedDescriptionScrollbarLeftOffset,
+            SharedDescriptionScrollbarBottomOffset);
+        scrollbarRect.offsetMax = new Vector2(
+            SharedDescriptionScrollbarRightOffset,
+            SharedDescriptionScrollbarTopOffset);
+        scrollbarRect.localScale = Vector3.one;
+    }
+
+    private void EnsureDescriptionViewportReceivesScroll(RectTransform viewport)
+    {
+        if (viewport == null)
+        {
+            return;
+        }
+
+        Image viewportImage = viewport.GetComponent<Image>();
+        if (viewportImage == null)
+        {
+            viewportImage = viewport.gameObject.AddComponent<Image>();
+            viewportImage.color = Color.clear;
+        }
+        viewportImage.raycastTarget = true;
+
+        if (viewport.GetComponent<RectMask2D>() == null)
+        {
+            viewport.gameObject.AddComponent<RectMask2D>();
+        }
+    }
+
+    private void RefreshSharedDescriptionScrollContent(bool resetToTop)
+    {
+        EnsureSkillDescriptionScrollSetup();
+
+        if (sharedDescriptionScrollRect == null || skillDescriptionBodyText == null)
+        {
+            return;
+        }
+
+        RectTransform contentRect = sharedDescriptionScrollRect.content != null
+            ? sharedDescriptionScrollRect.content
+            : skillDescriptionBodyText.rectTransform;
+        RectTransform viewportRect = sharedDescriptionScrollRect.viewport != null
+            ? sharedDescriptionScrollRect.viewport
+            : skillDescriptionBodyViewportRect;
+        if (contentRect == null || viewportRect == null)
+        {
+            return;
+        }
+
+        contentRect.anchorMin = new Vector2(0f, 1f);
+        contentRect.anchorMax = new Vector2(1f, 1f);
+        contentRect.pivot = new Vector2(0.5f, 1f);
+        contentRect.offsetMin = new Vector2(18f, contentRect.offsetMin.y);
+        contentRect.offsetMax = new Vector2(-18f, contentRect.offsetMax.y);
+        contentRect.anchoredPosition = Vector2.zero;
+
+        skillDescriptionBodyText.enableWordWrapping = true;
+        skillDescriptionBodyText.overflowMode = TextOverflowModes.Overflow;
+
+        Canvas.ForceUpdateCanvases();
+        float contentWidth = contentRect.rect.width > 0f ? contentRect.rect.width : viewportRect.rect.width;
+        contentWidth = Mathf.Max(40f, contentWidth);
+        skillDescriptionBodyText.ForceMeshUpdate();
+        float preferredHeight = skillDescriptionBodyText.GetPreferredValues(
+            skillDescriptionBodyText.text,
+            contentWidth,
+            Mathf.Infinity).y + SharedDescriptionContentPaddingY;
+        float viewportHeight = Mathf.Max(1f, viewportRect.rect.height);
+        Vector2 sizeDelta = contentRect.sizeDelta;
+        sizeDelta.y = Mathf.Max(viewportHeight, preferredHeight);
+        contentRect.sizeDelta = sizeDelta;
+
+        LayoutRebuilder.ForceRebuildLayoutImmediate(contentRect);
+        Canvas.ForceUpdateCanvases();
+
+        if (resetToTop)
+        {
+            sharedDescriptionScrollRect.StopMovement();
+            sharedDescriptionScrollRect.verticalNormalizedPosition = 1f;
         }
     }
 
