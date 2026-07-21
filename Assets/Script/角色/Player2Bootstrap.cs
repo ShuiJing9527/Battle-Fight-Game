@@ -1395,7 +1395,7 @@ public sealed class TwinTransitionBlessingStatus : MonoBehaviour
         }
         else if (activeBlessing == BlessingKind.NightfallFavor)
         {
-            ResolveNightfallShieldStatus()?.ClearShield();
+            ResolveNightfallShieldStatus(createIfMissing: false)?.ClearShield();
         }
 
         RevertAllAppliedBonuses();
@@ -1537,14 +1537,16 @@ public sealed class TwinTransitionBlessingStatus : MonoBehaviour
         ClearBlessing("Death");
     }
 
-    private PlayerTimedShieldStatus ResolveNightfallShieldStatus()
+    private PlayerTimedShieldStatus ResolveNightfallShieldStatus(bool createIfMissing = true)
     {
         if (nightfallShieldStatus != null)
         {
             return nightfallShieldStatus;
         }
 
-        nightfallShieldStatus = PlayerTimedShieldStatus.GetOrAdd(gameObject, NightfallFavorShieldSourceId);
+        nightfallShieldStatus = createIfMissing
+            ? PlayerTimedShieldStatus.GetOrAdd(gameObject, NightfallFavorShieldSourceId)
+            : PlayerTimedShieldStatus.Find(gameObject, NightfallFavorShieldSourceId);
         return nightfallShieldStatus;
     }
 

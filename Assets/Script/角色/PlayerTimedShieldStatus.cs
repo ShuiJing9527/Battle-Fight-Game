@@ -1,6 +1,5 @@
 using UnityEngine;
 
-[DisallowMultipleComponent]
 public class PlayerTimedShieldStatus : MonoBehaviour
 {
     [SerializeField] private bool debugLog;
@@ -37,12 +36,36 @@ public class PlayerTimedShieldStatus : MonoBehaviour
 
     public static PlayerTimedShieldStatus GetOrAdd(GameObject owner, string sourceId)
     {
+        string resolvedSourceId = NormalizeSourceId(sourceId);
+        PlayerTimedShieldStatus existing = Find(owner, resolvedSourceId);
+        if (existing != null)
+        {
+            return existing;
+        }
+
         if (owner == null)
         {
             return null;
         }
 
-        string resolvedSourceId = string.IsNullOrWhiteSpace(sourceId) ? string.Empty : sourceId.Trim();
+        PlayerTimedShieldStatus created = owner.AddComponent<PlayerTimedShieldStatus>();
+        if (created == null)
+        {
+            return null;
+        }
+
+        created.ConfigureSource(resolvedSourceId);
+        return created;
+    }
+
+    public static PlayerTimedShieldStatus Find(GameObject owner, string sourceId)
+    {
+        if (owner == null)
+        {
+            return null;
+        }
+
+        string resolvedSourceId = NormalizeSourceId(sourceId);
         PlayerTimedShieldStatus[] statuses = owner.GetComponents<PlayerTimedShieldStatus>();
         for (int i = 0; i < statuses.Length; i++)
         {
@@ -53,9 +76,12 @@ public class PlayerTimedShieldStatus : MonoBehaviour
             }
         }
 
-        PlayerTimedShieldStatus created = owner.AddComponent<PlayerTimedShieldStatus>();
-        created.ConfigureSource(resolvedSourceId);
-        return created;
+        return null;
+    }
+
+    private static string NormalizeSourceId(string sourceId)
+    {
+        return string.IsNullOrWhiteSpace(sourceId) ? string.Empty : sourceId.Trim();
     }
 
     public void ApplyShield(float amount, float duration)
