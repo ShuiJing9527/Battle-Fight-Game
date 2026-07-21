@@ -246,7 +246,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: f4688fdb7df04437aeb418b961361dc5, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Unity.TextMeshPro::TMPro.TextMeshProUGUI
   m_Material: {fileID: 0}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
@@ -376,7 +376,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9085046f02f69544eb97fd06b6048fe2, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Toggle
   m_Navigation:
     m_Mode: 3
@@ -989,6 +989,7 @@ RectTransform:
   - {fileID: 1904299813}
   - {fileID: 400451123}
   - {fileID: 1156618046}
+  - {fileID: 901234561}
   - {fileID: 2036436337}
   - {fileID: 1814582571}
   - {fileID: 717417297}
@@ -1042,7 +1043,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9f3c4e2a1b6d47a58c0e3d79f4a2b851, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::MenuLanguageController
   cjkFont: {fileID: 11400000, guid: 6235999b7260f1b45855e09e28884a47, type: 2}
   japaneseFont: {fileID: 11400000, guid: da47f109c18cc4b4db894d698b64d241, type: 2}
@@ -1063,7 +1064,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &400451123
 RectTransform:
   m_ObjectHideFlags: 0
@@ -1627,6 +1628,217 @@ MonoBehaviour:
           m_StringArgument: 
           m_BoolArgument: 0
         m_CallState: 2
+--- !u!114 &900000001
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2036436336}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!114 &900000002
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1814582570}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!114 &900000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 717417296}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  normalScale: 1
+  hoverScale: 1.06
+  pressedScale: 0.94
+  clickOvershootScale: 1.1
+  hoverDuration: 0.15
+  exitDuration: 0.15
+  pressDuration: 0.06
+  releaseDuration: 0.16
+  clickActionDelay: 0.18
+  hoverTiltAngle: 1.5
+  clickShakeAngle: 2
+  hoverTiltDuration: 0.14
+  clickShakeDuration: 0.16
+  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
+  hoverTintStrength: 0.28
+  hoverGraphicColorMultiplier: 1.1
+  pressedGraphicColorMultiplier: 0.88
+  additionalGraphics: []
+  delayButtonOnClick: 1
+  disableButtonDuringDelayedClick: 1
+--- !u!1 &901234560
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 901234561}
+  - component: {fileID: 901234562}
+  - component: {fileID: 901234563}
+  - component: {fileID: 901234564}
+  m_Layer: 5
+  m_Name: LocalizedTitleImage
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!224 &901234561
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901234560}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 367950579}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0, y: 345}
+  m_SizeDelta: {x: 1100, y: 280}
+  m_Pivot: {x: 0.5, y: 0.5}
+--- !u!222 &901234562
+CanvasRenderer:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901234560}
+  m_CullTransparentMesh: 1
+--- !u!114 &901234563
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901234560}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe87c0e1cc204ed48ad3b37840f39efc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: UnityEngine.UI::UnityEngine.UI.Image
+  m_Material: {fileID: 2100000, guid: f7384872a3fc484e8e52ad8476fcacca, type: 2}
+  m_Color: {r: 1, g: 1, b: 1, a: 1}
+  m_RaycastTarget: 0
+  m_RaycastPadding: {x: 0, y: 0, z: 0, w: 0}
+  m_Maskable: 1
+  m_OnCullStateChanged:
+    m_PersistentCalls:
+      m_Calls: []
+  m_Sprite: {fileID: 21300000, guid: 13e20f8a46e101b49b4f999a6786fa14, type: 3}
+  m_Type: 0
+  m_PreserveAspect: 1
+  m_FillCenter: 1
+  m_FillMethod: 4
+  m_FillAmount: 1
+  m_FillClockwise: 1
+  m_FillOrigin: 0
+  m_UseSpriteMesh: 0
+  m_PixelsPerUnitMultiplier: 1
+--- !u!114 &901234564
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 901234560}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 076acf151e044076a716bdc6e58ebaf1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  targetImage: {fileID: 901234563}
+  chineseSprite: {fileID: 21300000, guid: 13e20f8a46e101b49b4f999a6786fa14, type: 3}
+  japaneseSprite: {fileID: 21300000, guid: 94e79b44253bc5145a276deb77177698, type: 3}
+  englishSprite: {fileID: 21300000, guid: 1f7b5418c8a5c6942b3a42081daa4cc7, type: 3}
+  chineseLayout:
+    anchoredPosition: {x: 0, y: 345}
+    sizeDelta: {x: 1100, y: 280}
+    localScale: {x: 1, y: 1, z: 1}
+    rotationZ: 0
+    color: {r: 1, g: 1, b: 1, a: 1}
+  japaneseLayout:
+    anchoredPosition: {x: 0, y: 345}
+    sizeDelta: {x: 1200, y: 300}
+    localScale: {x: 1, y: 1, z: 1}
+    rotationZ: 0
+    color: {r: 1, g: 1, b: 1, a: 1}
+  englishLayout:
+    anchoredPosition: {x: 0, y: 345}
+    sizeDelta: {x: 1500, y: 320}
+    localScale: {x: 1, y: 1, z: 1}
+    rotationZ: 0
+    color: {r: 1, g: 1, b: 1, a: 1}
+  titleMaterial: {fileID: 2100000, guid: f7384872a3fc484e8e52ad8476fcacca, type: 2}
+  preserveAspect: 1
+  setNativeSizeOnRefresh: 0
+  raycastTarget: 0
+  debugLog: 0
 --- !u!1 &1015980953
 GameObject:
   m_ObjectHideFlags: 0
@@ -2144,7 +2356,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &1156618046
 RectTransform:
   m_ObjectHideFlags: 0
@@ -2719,7 +2931,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 71e4c2f9b86d4f0fa3c1d7e95b2a6408, type: 3}
-  m_Name:
+  m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameLocalization
   cjkFont: {fileID: 11400000, guid: 6235999b7260f1b45855e09e28884a47, type: 2}
   japaneseFont: {fileID: 11400000, guid: da47f109c18cc4b4db894d698b64d241, type: 2}
@@ -4067,102 +4279,6 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
---- !u!114 &900000001
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 2036436336}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  normalScale: 1
-  hoverScale: 1.06
-  pressedScale: 0.94
-  clickOvershootScale: 1.1
-  hoverDuration: 0.15
-  exitDuration: 0.15
-  pressDuration: 0.06
-  releaseDuration: 0.16
-  clickActionDelay: 0.18
-  hoverTiltAngle: 1.5
-  clickShakeAngle: 2
-  hoverTiltDuration: 0.14
-  clickShakeDuration: 0.16
-  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
-  hoverTintStrength: 0.28
-  hoverGraphicColorMultiplier: 1.1
-  pressedGraphicColorMultiplier: 0.88
-  additionalGraphics: []
-  delayButtonOnClick: 1
-  disableButtonDuringDelayedClick: 1
---- !u!114 &900000002
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1814582570}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  normalScale: 1
-  hoverScale: 1.06
-  pressedScale: 0.94
-  clickOvershootScale: 1.1
-  hoverDuration: 0.15
-  exitDuration: 0.15
-  pressDuration: 0.06
-  releaseDuration: 0.16
-  clickActionDelay: 0.18
-  hoverTiltAngle: 1.5
-  clickShakeAngle: 2
-  hoverTiltDuration: 0.14
-  clickShakeDuration: 0.16
-  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
-  hoverTintStrength: 0.28
-  hoverGraphicColorMultiplier: 1.1
-  pressedGraphicColorMultiplier: 0.88
-  additionalGraphics: []
-  delayButtonOnClick: 1
-  disableButtonDuringDelayedClick: 1
---- !u!114 &900000003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 717417296}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 9c017adf380d4c89b7ca63895353ca2e, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  normalScale: 1
-  hoverScale: 1.06
-  pressedScale: 0.94
-  clickOvershootScale: 1.1
-  hoverDuration: 0.15
-  exitDuration: 0.15
-  pressDuration: 0.06
-  releaseDuration: 0.16
-  clickActionDelay: 0.18
-  hoverTiltAngle: 1.5
-  clickShakeAngle: 2
-  hoverTiltDuration: 0.14
-  clickShakeDuration: 0.16
-  hoverTintColor: {r: 1, g: 0.9490196, b: 0.72156864, a: 1}
-  hoverTintStrength: 0.28
-  hoverGraphicColorMultiplier: 1.1
-  pressedGraphicColorMultiplier: 0.88
-  additionalGraphics: []
-  delayButtonOnClick: 1
-  disableButtonDuringDelayedClick: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
