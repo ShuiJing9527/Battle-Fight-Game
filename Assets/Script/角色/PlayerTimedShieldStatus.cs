@@ -1,6 +1,5 @@
 using UnityEngine;
 
-[DisallowMultipleComponent]
 public class PlayerTimedShieldStatus : MonoBehaviour
 {
     [SerializeField] private bool debugLog;
@@ -54,6 +53,19 @@ public class PlayerTimedShieldStatus : MonoBehaviour
         }
 
         PlayerTimedShieldStatus created = owner.AddComponent<PlayerTimedShieldStatus>();
+        if (created == null)
+        {
+            PlayerTimedShieldStatus fallback = owner.GetComponent<PlayerTimedShieldStatus>();
+            if (fallback != null)
+            {
+                Debug.LogWarning(
+                    $"[TimedShield] Failed to add shield source '{resolvedSourceId}' on {owner.name}; reusing existing source '{fallback.ShieldSourceId}'.",
+                    owner);
+            }
+
+            return fallback;
+        }
+
         created.ConfigureSource(resolvedSourceId);
         return created;
     }

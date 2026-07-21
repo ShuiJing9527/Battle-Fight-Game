@@ -24,6 +24,13 @@ public class GameLocalization : MonoBehaviour
     private const string RuntimeObjectName = "Game Localization";
     private const GameLanguage DefaultLanguage = GameLanguage.SimplifiedChinese;
     private const string DirectEditorBattleSceneName = "草原";
+    private const string GameSceneTitleKey = "game_scene.title";
+    private const string GameSceneTitleEnglish = "Radiant Dusk Twins";
+    private const string GameSceneTitleChinese = "辉暮双生";
+    private const string GameSceneTitleJapanese = "輝暮双生";
+    private const float GameSceneTitleChineseFontSize = 180f;
+    private const float GameSceneTitleJapaneseFontSize = 170f;
+    private const float GameSceneTitleEnglishFontSize = 120f;
 
     public static GameLocalization Instance { get; private set; }
     public static event Action<GameLanguage> LanguageChanged;
@@ -37,6 +44,7 @@ public class GameLocalization : MonoBehaviour
         { "Start", new[] { "Start", "\u5f00\u59cb\u6e38\u620f", "\u30b2\u30fc\u30e0\u958b\u59cb" } },
         { "Setting", new[] { "Settings", "\u8bbe\u7f6e", "\u8a2d\u5b9a" } },
         { "Exit", new[] { "Exit", "\u9000\u51fa\u6e38\u620f", "\u7d42\u4e86" } },
+        { GameSceneTitleKey, new[] { GameSceneTitleEnglish, GameSceneTitleChinese, GameSceneTitleJapanese } },
         { "Music", new[] { "Music", "\u97f3\u4e50", "\u97f3\u697d" } },
         { "SFX", new[] { "Sound Effects", "\u97f3\u6548", "\u52b9\u679c\u97f3" } },
         { "FullScreen", new[] { "Full Screen", "\u5168\u5c4f", "\u30d5\u30eb\u30b9\u30af\u30ea\u30fc\u30f3" } },
@@ -352,13 +360,20 @@ public class GameLocalization : MonoBehaviour
         if (text == null)
             return;
 
-        string source = string.IsNullOrEmpty(key) ? text.text : key;
+        bool isGameSceneTitle = string.IsNullOrEmpty(key) && IsGameSceneTitleObject(text);
+        string source = isGameSceneTitle
+            ? GameSceneTitleKey
+            : string.IsNullOrEmpty(key) ? text.text : key;
+        isGameSceneTitle = isGameSceneTitle || IsGameSceneTitleText(source);
         string translated = Translate(source);
-        if (translated == source)
+        if (translated == source && !isGameSceneTitle)
             return;
 
         text.text = translated;
         ApplyFontForLanguage(text);
+
+        if (isGameSceneTitle || IsGameSceneTitleText(translated))
+            ApplyGameSceneTitleLayout(text);
     }
 
     public void ApplyFontForLanguage(TextMeshProUGUI text)
@@ -418,6 +433,40 @@ public class GameLocalization : MonoBehaviour
 
         if (!primary.fallbackFontAssetTable.Contains(fallback))
             primary.fallbackFontAssetTable.Add(fallback);
+    }
+
+    private static bool IsGameSceneTitleText(string text)
+    {
+        return text == GameSceneTitleKey
+            || text == GameSceneTitleEnglish
+            || text == GameSceneTitleChinese
+            || text == GameSceneTitleJapanese;
+    }
+
+    private static bool IsGameSceneTitleObject(TextMeshProUGUI text)
+    {
+        if (text == null)
+            return false;
+
+        string objectName = text.gameObject.name;
+        if (objectName != "Title" && objectName != "Title (1)")
+            return false;
+
+        Transform parent = text.transform.parent;
+        return parent != null && parent.name == "Canvas";
+    }
+
+    private void ApplyGameSceneTitleLayout(TextMeshProUGUI text)
+    {
+        text.enableWordWrapping = false;
+        text.overflowMode = TextOverflowModes.Overflow;
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = CurrentLanguage switch
+        {
+            GameLanguage.English => GameSceneTitleEnglishFontSize,
+            GameLanguage.Japanese => GameSceneTitleJapaneseFontSize,
+            _ => GameSceneTitleChineseFontSize
+        };
     }
 
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
