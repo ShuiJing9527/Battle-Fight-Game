@@ -1340,6 +1340,7 @@ MonoBehaviour:
     keyText: {fileID: 3492076617958015448}
     disabledOverlay: {fileID: 0}
     hoverHighlight: {fileID: 7784197908471773814}
+    selectionHighlight: {fileID: 0}
     hoverTrigger: {fileID: 3237559818588093063}
   wSlot:
     root: {fileID: 5778240438172889258}
@@ -1349,6 +1350,7 @@ MonoBehaviour:
     keyText: {fileID: 2967593547680575279}
     disabledOverlay: {fileID: 0}
     hoverHighlight: {fileID: 6988937716719050619}
+    selectionHighlight: {fileID: 0}
     hoverTrigger: {fileID: 1906219234024586408}
   eSlot:
     root: {fileID: 3462657361721745531}
@@ -1358,6 +1360,7 @@ MonoBehaviour:
     keyText: {fileID: 2469874655057786669}
     disabledOverlay: {fileID: 0}
     hoverHighlight: {fileID: 4840628105807574125}
+    selectionHighlight: {fileID: 0}
     hoverTrigger: {fileID: 7375614306299628210}
   rSlot:
     root: {fileID: 2911150962197297373}
@@ -1367,6 +1370,7 @@ MonoBehaviour:
     keyText: {fileID: 2837102801235586281}
     disabledOverlay: {fileID: 0}
     hoverHighlight: {fileID: 2257334161354989454}
+    selectionHighlight: {fileID: 0}
     hoverTrigger: {fileID: 2700547326854188282}
   skillSlotPrefab: {fileID: 3344534873852857039, guid: 5c372e52c0ad64442bd89f6e771cd7c6, type: 3}
   externalTooltipRoot: {fileID: 4976434924857502066}
@@ -1411,12 +1415,20 @@ MonoBehaviour:
   enableCooldownDebugKeys: 0
   hoverHighlightColor: {r: 1, g: 0.9, b: 0.35, a: 0.5}
   hoverHighlightScale: 1.18
+  selectionHighlightColor: {r: 1, g: 0.88, b: 0.28, a: 0.95}
+  selectionHighlightScale: 1.2
+  useGeneratedHighlightRingSprite: 1
   tooltipBackgroundColor: {r: 0.08, g: 0.1, b: 0.14, a: 0.96}
   tooltipTextColor: {r: 1, g: 1, b: 1, a: 1}
   tooltipFontSize: 15
   tooltipWidth: 360
   tooltipPadding: {x: 12, y: 10}
   tooltipOffset: {x: 0, y: 25}
+  tooltipScreenMargin: 16
+  tooltipPreferredRightOffset: {x: 18, y: 18}
+  tooltipPreferredLeftOffset: {x: -18, y: 18}
+  rTooltipManualOffset: {x: -12, y: 0}
+  debugTooltipPositioning: 1
 --- !u!1 &3821786947658303259
 GameObject:
   m_ObjectHideFlags: 0
