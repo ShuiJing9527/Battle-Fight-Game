@@ -1,4 +1,3 @@
-using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -27,10 +26,6 @@ public class PlayerStatusHUD : MonoBehaviour
     private CombatHealth cachedCombatHealth;
     private CombatStats cachedCombatStats;
     private float nextBootstrapLookupTime;
-    private Coroutine temporarySwitchHintRoutine;
-    private bool hasTemporarySwitchHint;
-    private string temporarySwitchHintKey;
-    private string temporarySwitchHintFallback;
 
     public void SetDisplayVisible(bool visible)
     {
@@ -65,14 +60,7 @@ public class PlayerStatusHUD : MonoBehaviour
     {
         if (switchHintText != null)
         {
-            if (hasTemporarySwitchHint)
-            {
-                SetStaticText(switchHintText, temporarySwitchHintKey, temporarySwitchHintFallback);
-            }
-            else
-            {
-                SetStaticText(switchHintText, "T: Switch Player");
-            }
+            SetStaticText(switchHintText, "T: Switch Player");
         }
 
         if (runeHintText != null)
@@ -89,12 +77,6 @@ public class PlayerStatusHUD : MonoBehaviour
     private void OnDisable()
     {
         GameLocalization.LanguageChanged -= OnLanguageChanged;
-        if (temporarySwitchHintRoutine != null)
-        {
-            StopCoroutine(temporarySwitchHintRoutine);
-            temporarySwitchHintRoutine = null;
-        }
-        hasTemporarySwitchHint = false;
     }
 
     private void OnLanguageChanged(GameLanguage language)
@@ -102,50 +84,15 @@ public class PlayerStatusHUD : MonoBehaviour
         ApplyStaticTexts();
     }
 
-    public void ShowTemporarySwitchHint(string key, string fallback, float duration)
-    {
-        if (switchHintText == null)
-        {
-            return;
-        }
-
-        if (temporarySwitchHintRoutine != null)
-        {
-            StopCoroutine(temporarySwitchHintRoutine);
-        }
-
-        hasTemporarySwitchHint = true;
-        temporarySwitchHintKey = key;
-        temporarySwitchHintFallback = fallback;
-        SetStaticText(switchHintText, key, fallback);
-        temporarySwitchHintRoutine = StartCoroutine(RestoreSwitchHintAfterDelay(Mathf.Max(0.1f, duration)));
-    }
-
-    private IEnumerator RestoreSwitchHintAfterDelay(float duration)
-    {
-        yield return new WaitForSecondsRealtime(duration);
-        hasTemporarySwitchHint = false;
-        temporarySwitchHintRoutine = null;
-        if (switchHintText != null)
-        {
-            SetStaticText(switchHintText, "T: Switch Player");
-        }
-    }
-
     private static void SetStaticText(TextMeshProUGUI text, string key)
-    {
-        SetStaticText(text, key, key);
-    }
-
-    private static void SetStaticText(TextMeshProUGUI text, string key, string fallback)
     {
         if (GameLocalization.Instance == null)
         {
-            text.text = fallback;
+            text.text = key;
             return;
         }
 
-        text.text = GameLocalization.Instance.TranslateOrFallback(key, fallback);
+        text.text = GameLocalization.Instance.Translate(key);
         GameLocalization.Instance.ApplyToText(text, key);
     }
 
