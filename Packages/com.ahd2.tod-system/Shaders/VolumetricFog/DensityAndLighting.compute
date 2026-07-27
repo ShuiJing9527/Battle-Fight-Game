@@ -7,7 +7,9 @@
 #define INV_4PI  0.07957747154594767f
 
 //接收投影变体
-#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE _MAIN_LIGHT_SHADOWS_SCREEN
+// Screen-space main light shadows use regular texture Sample calls inside URP
+// Shadows.hlsl, which are not valid for this compute shader on D3D11 cs_5_0.
+#pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 #pragma multi_compile _ _FORWARD_PLUS//必须有这个变体声明不然USE_FORWARD_PLUS无效
 
 RWTexture3D<float4> _DensityBuffer;

@@ -84,12 +84,20 @@ public class SceneButtonLoader : MonoBehaviour
             return;
         }
 
+        bool loadingTitleScene = sceneName == BattleSceneResultRouter.TitleSceneName;
         LogRestartTrace($"Restart requested targetScene={sceneName} loader={name}#{GetInstanceID()} timeScaleBefore={Time.timeScale:F2}");
         Time.timeScale = 1f;
         AudioListener.pause = false;
         LogRestartTrace($"Time.timeScale restored to {Time.timeScale:F2} before loading {sceneName}");
-        GameLocalization.MarkFormalGameStart();
-        LogRestartTrace($"Loading battle scene={sceneName}");
+        if (loadingTitleScene)
+        {
+            GameManager.RequestMainMenuResetOnNextLoad();
+        }
+        else
+        {
+            GameLocalization.MarkFormalGameStart();
+        }
+        LogRestartTrace($"Loading scene={sceneName}");
         SceneManager.LoadScene(sceneName);
     }
 

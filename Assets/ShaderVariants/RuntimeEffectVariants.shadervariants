@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!200 &20000000
+ShaderVariantCollection:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: RuntimeEffectVariants
+  m_Shaders:
+  - first: {fileID: 4800000, guid: 0f159e2f67c7a3e4498cb70905d10b2d, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: -6465566751694194690, guid: eee38aa0a48fe4b43a740cdceb66f809, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: -6465566751694194690, guid: 1e95477c5da04f440805ef49fca0b246, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: 4800000, guid: 7f8bc3d44bbd4f3fae0c0f1de7b0f3a1, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0
+  - first: {fileID: -6465566751694194690, guid: 3266dc85b24046749b5aed044b8bb8be, type: 3}
+    second:
+      variants:
+      - keywords: 
+        passType: 0

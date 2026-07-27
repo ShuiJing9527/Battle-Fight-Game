@@ -1,0 +1,1637 @@
+﻿Shader Build Collector Report
+Generated At: 2026-07-27 14:44:24
+Mode: Collect / Apply
+GraphicsSettings valid: True
+
+Summary
+Enabled Build Settings scenes scanned: 4
+Prefab/material references scanned: 251
+High confidence effect shaders: 20
+Medium confidence suggested shaders: 31
+Non-effect shaders excluded from auto add: 13
+Dynamic Shader.Find constants: 24
+Existing Always Included Shaders: 7
+New A-class shaders added: 19
+Excluded test/recovery/editor/temp resources: 119
+Excluded path hit Assets/_Recovery: False
+Excluded path hit Packages/*/Tests or Test: False
+Materials missing shader: 0
+
+A. High Confidence Effect Shaders - Auto Added By Collect
+- Shader: AHD2TODSystem/S_E_StarTrail_Additive
+  Already Included: False
+  Added/Will Add: True
+  Material: M_SoulParticle
+  Material Path: Assets/Materials/Effects/M_SoulParticle.mat
+  Prefab/Source: Assets/Prefabs/Drop/SoulOrb.prefab
+  Renderer Type: ParticleSystemRenderer:SoulOrb/SoulCoreParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_SoulParticle
+  Material Path: Assets/Materials/Effects/M_SoulParticle.mat
+  Prefab/Source: Assets/Prefabs/Drop/SoulOrb.prefab
+  Renderer Type: ParticleSystemRenderer:SoulOrb/SoulTrailParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 坠击
+  Material Path: Assets/Material/特效/坠击.mat
+  Prefab/Source: Assets/Prefabs/Enemy/VFX/BossSlime_LandingImpact.prefab
+  Renderer Type: ParticleSystemRenderer:BossSlime_LandingImpact
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 坠击
+  Material Path: Assets/Material/特效/坠击.mat
+  Prefab/Source: Assets/Prefabs/Enemy/VFX/BossSlime_LandingImpact.prefab
+  Renderer Type: ParticleSystemRenderer:BossSlime_LandingImpact/GroundShockwave
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/Player/光迹拖尾.prefab
+  Renderer Type: ParticleSystemRenderer:光迹拖尾/main
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/Player/光迹拖尾.prefab
+  Renderer Type: ParticleSystemRenderer:光迹拖尾/main/Lizi
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/Player/光迹拖尾.prefab
+  Renderer Type: ParticleSystemRenderer:光迹拖尾/main/Lizi 附件
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 坠击
+  Material Path: Assets/Material/特效/坠击.mat
+  Prefab/Source: Assets/Prefabs/Player/坠击.prefab
+  Renderer Type: ParticleSystemRenderer:坠击
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 气焰
+  Material Path: Assets/Material/特效/气焰.mat
+  Prefab/Source: Assets/Prefabs/Player/气焰.prefab
+  Renderer Type: ParticleSystemRenderer:气焰
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 气焰
+  Material Path: Assets/Material/特效/气焰.mat
+  Prefab/Source: Assets/Prefabs/Player/气焰.prefab
+  Renderer Type: ParticleSystemRenderer:气焰/气焰 复制
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/Player/气焰.prefab
+  Renderer Type: ParticleSystemRenderer:气焰/粒子
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Q_Impact_ConeSpark_Additive
+  Material Path: Assets/Material/特效/M_Q_Impact_ConeSpark_Additive.mat
+  Prefab/Source: Assets/Prefabs/Player/烟尘.prefab
+  Renderer Type: ParticleSystemRenderer:烟尘
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/DeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:DeathDissolveVFX/OrangeSparkBurst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/DeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:DeathDissolveVFX/RisingAshParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/DeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:DeathDissolveVFX/EdgeGlowParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/PlayerDeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:PlayerDeathDissolveVFX/OrangeSparkBurst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/PlayerDeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:PlayerDeathDissolveVFX/RisingAshParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Prefabs/VFX/PlayerDeathDissolveVFX.prefab
+  Renderer Type: ParticleSystemRenderer:PlayerDeathDissolveVFX/EdgeGlowParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Shader.Find("AHD2TODSystem/S_E_StarTrail_Additive")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Script/角色/Player2PrototypeController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: BattleFight/DeathDissolveURP
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("BattleFight/DeathDissolveURP")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/shukaisho/DissolveOnDeath.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: BattleFight/Player01EGhostParticle
+  Already Included: False
+  Added/Will Add: True
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/E_Player01_GhostParticles.prefab
+  Renderer Type: ParticleSystemRenderer:E_Player01_GhostParticles/E_GhostSparkle
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/E_Player01_GhostParticles.prefab
+  Renderer Type: ParticleSystemRenderer:E_Player01_GhostParticles/E_GhostMist
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/E_Player01_GhostParticles.prefab
+  Renderer Type: ParticleSystemRenderer:E_Player01_GhostParticles/E_GhostTrail
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: ParticleSystemRenderer:Player01/E_GhostParticles/E_GhostSparkle
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: ParticleSystemRenderer:Player01/E_GhostParticles/E_GhostMist
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: ParticleSystemRenderer:Player01/E_GhostParticles/E_GhostTrail
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+- Shader: Legacy Shaders/Particles/Alpha Blended Premultiply
+  Already Included: False
+  Added/Will Add: True
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinShift_RadianceToTwilight.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinShift_RadianceToTwilight/Radiance_Gold_Burst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinShift_RadianceToTwilight.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinShift_RadianceToTwilight/Twilight_Blue_Gather
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinShift_TwilightToRadiance.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinShift_TwilightToRadiance/Twilight_Blue_Burst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinShift_TwilightToRadiance.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinShift_TwilightToRadiance/Radiance_Gold_Burst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinShift_TwilightToRadiance.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinShift_TwilightToRadiance/Radiance_Shield_Ring
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Default-Particle
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/VFX/TwinShift/VFX_TwinSwitch_Basic.prefab
+  Renderer Type: ParticleSystemRenderer:VFX_TwinSwitch_Basic/Basic_WhiteBlue_Burst
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+- Shader: Particles/Standard Unlit
+  Already Included: False
+  Added/Will Add: True
+  Material: Default-ParticleSystem
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: ParticleSystemRenderer:Player01R_EnergyNeedle/TailParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Shader.Find("Particles/Standard Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Script/角色/Player01EGhostParticleController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+  Material: Shader.Find("Particles/Standard Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Shader Graphs/SG_AirWallRefraction
+  Already Included: False
+  Added/Will Add: True
+  Material: M_AirWallRipple
+  Material Path: Assets/Material/交互/M_AirWallRipple.mat
+  Prefab/Source: Assets/Prefabs/Effects/AirWallHitEffect.prefab
+  Renderer Type: MeshRenderer:AirWallHitEffect/RippleQuad
+  Reason: Prefab path/name matches runtime effect keywords.
+- Shader: Shader Graphs/TrailShader
+  Already Included: False
+  Added/Will Add: True
+  Material: 彗星特效
+  Material Path: Assets/Material/特效/彗星特效.mat
+  Prefab/Source: Assets/Prefabs/Effects/Trail.prefab
+  Renderer Type: TrailRenderer:Trail
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 彗星特效2
+  Material Path: Assets/Material/特效/彗星特效2.mat
+  Prefab/Source: Assets/Prefabs/Effects/Trail.prefab
+  Renderer Type: TrailRenderer:Trail/Trail (1)
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 彗星特效
+  Material Path: Assets/Material/特效/彗星特效.mat
+  Prefab/Source: Assets/Prefabs/Effects/流星.prefab
+  Renderer Type: MeshRenderer:流星
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: 彗星特效
+  Material Path: Assets/Material/特效/彗星特效.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: TrailRenderer:星刃 拖尾 R/星刃外发光/Trail
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 彗星特效2
+  Material Path: Assets/Material/特效/彗星特效2.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: TrailRenderer:星刃 拖尾 R/星刃外发光/Trail/Trail (1)
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 彗星特效 Q
+  Material Path: Assets/Material/特效/彗星特效 Q.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: TrailRenderer:星刃 拖尾/星刃外发光/Trail
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 彗星特效2
+  Material Path: Assets/Material/特效/彗星特效2.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: TrailRenderer:星刃 拖尾/星刃外发光/Trail/Trail (1)
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+- Shader: Shader Graphs/护盾特效
+  Already Included: False
+  Added/Will Add: True
+  Material: 护盾特效
+  Material Path: Assets/Material/特效/护盾特效.mat
+  Prefab/Source: Assets/Resources/Prefabs/Enemy/BossProjectile.prefab
+  Renderer Type: MeshRenderer:BossProjectile
+  Reason: Prefab path/name matches runtime effect keywords.
+- Shader: Shader Graphs/火焰弹
+  Already Included: False
+  Added/Will Add: True
+  Material: 火焰
+  Material Path: Assets/Material/特效/火焰.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: TrailRenderer:Player01/火焰特效/火焰特效CP
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 火焰 外层
+  Material Path: Assets/Material/特效/火焰 外层.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: TrailRenderer:Player01/火焰特效
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 火焰
+  Material Path: Assets/Material/特效/火焰.mat
+  Prefab/Source: Assets/Prefabs/Player/火焰特效.prefab
+  Renderer Type: TrailRenderer:火焰特效/火焰特效CP
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+  Material: 火焰 外层
+  Material Path: Assets/Material/特效/火焰 外层.mat
+  Prefab/Source: Assets/Prefabs/Player/火焰特效.prefab
+  Renderer Type: TrailRenderer:火焰特效
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+- Shader: Spine/Skeleton
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Spine/Skeleton")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Spine/Runtime/spine-unity/Asset Types/SpineAtlasAsset.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+  Material: Shader.Find("Spine/Skeleton")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Spine/Runtime/spine-unity/Utility/AtlasUtilities.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Spine/SkeletonGraphic
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Spine/SkeletonGraphic")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Spine/Runtime/spine-unity/Components/SkeletonGraphic.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Spine/Special/HiddenPass
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Spine/Special/HiddenPass")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Spine/Runtime/spine-unity/Asset Types/RegionlessAttachmentLoader.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Sprites/Default
+  Already Included: True
+  Added/Will Add: False
+  Material: Sprites-Default
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_ThrustVfx.prefab
+  Renderer Type: SpriteRenderer:Player01R_ThrustVfx/ThrustSpriteAnimation
+  Reason: Prefab path/name matches runtime effect keywords.
+- Shader: Standard
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Standard")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Universal Render Pipeline/2D/Sprite-Unlit-Default
+  Already Included: False
+  Added/Will Add: True
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Player01/01.prefab
+  Renderer Type: SpriteRenderer:01
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Player01/06.prefab
+  Renderer Type: SpriteRenderer:06
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Player01/Player01ScissorCutEffect.prefab
+  Renderer Type: SpriteRenderer:Player01ScissorCutEffect
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Player01/Player01ScissorEndBurstEffect.prefab
+  Renderer Type: SpriteRenderer:Player01ScissorEndBurstEffect
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Player01/Player01ScissorSlashWaveEffect.prefab
+  Renderer Type: SpriteRenderer:Player01ScissorSlashWaveEffect
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Runes/RuneThornCounterBurst.prefab
+  Renderer Type: SpriteRenderer:RuneThornCounterBurst/Ring
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Runes/RuneThornCounterBurst.prefab
+  Renderer Type: SpriteRenderer:RuneThornCounterBurst/OuterGlow
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Resources/Prefabs/Effects/Runes/RuneThornCounterBurst.prefab
+  Renderer Type: SpriteRenderer:RuneThornCounterBurst/InnerBurst
+  Reason: Prefab path/name matches runtime effect keywords.
+- Shader: Universal Render Pipeline/Lit
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Universal Render Pipeline/Lit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Universal Render Pipeline/Particles/Unlit
+  Already Included: False
+  Added/Will Add: True
+  Material: ParticlesUnlit
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/ParticlesUnlit.mat
+  Prefab/Source: Assets/Prefabs/Player/光迹拖尾.prefab
+  Renderer Type: ParticleSystemRenderer:光迹拖尾
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Shader.Find("Universal Render Pipeline/Particles/Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Script/角色/Player01EGhostParticleController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+  Material: Shader.Find("Universal Render Pipeline/Particles/Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Universal Render Pipeline/Unlit
+  Already Included: False
+  Added/Will Add: True
+  Material: Shader.Find("Universal Render Pipeline/Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: YY/Player01/R/EnergyNeedleURP
+  Already Included: False
+  Added/Will Add: True
+  Material: Player01R_NeedleCore
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleCore.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: MeshRenderer:Player01R_EnergyNeedle/Core
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Player01R_NeedleOuterGlow
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleOuterGlow.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: MeshRenderer:Player01R_EnergyNeedle/OuterGlow
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Player01R_NeedleTipGlow
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleTipGlow.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: MeshRenderer:Player01R_EnergyNeedle/ForwardSpikeGlow
+  Reason: Prefab path/name matches runtime effect keywords.
+  Material: Player01R_NeedleTrail
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleTrail.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: ParticleSystemRenderer:Player01R_EnergyNeedle/TailParticles
+  Reason: Renderer type ParticleSystemRenderer is a runtime effect renderer.
+  Material: Player01R_NeedleTrail
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleTrail.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: TrailRenderer:Player01R_EnergyNeedle
+  Reason: Renderer type TrailRenderer is a runtime effect renderer.
+- Shader: YY/Player01/R/NeedleDistortionURP
+  Already Included: False
+  Added/Will Add: True
+  Material: Player01R_NeedleDistortion
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleDistortion.mat
+  Prefab/Source: Assets/Effects/Player01R/Prefabs/Player01R_EnergyNeedle.prefab
+  Renderer Type: MeshRenderer:Player01R_EnergyNeedle/DistortionMesh
+  Reason: Prefab path/name matches runtime effect keywords.
+
+B. Medium Confidence Shaders - Suggestions Only
+- Shader: AHD2TODSystem/S_E_StarTrail_Additive
+  Already Included: False
+  Auto Add: False
+  Material: M_SoulParticle
+  Material Path: Assets/Materials/Effects/M_SoulParticle.mat
+  Prefab/Source: Assets/Prefabs/Drop/SoulOrb.prefab
+  Renderer Type: SpriteRenderer:SoulOrb/SoulHaloRing
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: M_Q_Impact_ConeSpark_Additive
+  Material Path: Assets/Material/特效/M_Q_Impact_ConeSpark_Additive.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: M_SoulParticle
+  Material Path: Assets/Materials/Effects/M_SoulParticle.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 坠击
+  Material Path: Assets/Material/特效/坠击.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 气焰
+  Material Path: Assets/Material/特效/气焰.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 粒子
+  Material Path: Assets/Material/特效/粒子.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: BattleFight/Player01EGhostParticle
+  Already Included: False
+  Auto Add: False
+  Material: M_Player01_EGhostParticle
+  Material Path: Assets/Materials/Effects/M_Player01_EGhostParticle.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Effects/Parallax/ParallaxOffset_URP
+  Already Included: False
+  Auto Add: False
+  Material: M_ParallaxOffset_URP_Clean
+  Material Path: Assets/Materials/Effects/M_ParallaxOffset_URP_Clean.mat
+  Prefab/Source: Assets/Prefabs/Player/领域.prefab
+  Renderer Type: MeshRenderer:领域
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: M_ParallaxOffset_URP_Clean
+  Material Path: Assets/Materials/Effects/M_ParallaxOffset_URP_Clean.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Effects/Player01/WVeilBarrierDissolve
+  Already Included: False
+  Auto Add: False
+  Material: M_Player01_W_VeilBarrier
+  Material Path: Assets/Materials/Effects/M_Player01_W_VeilBarrier.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Player02/HaloRainbowFlow
+  Already Included: False
+  Auto Add: False
+  Material: M_Player02_HaloRainbowFlow
+  Material Path: Assets/Material/特效/M_Player02_HaloRainbowFlow.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Cloud Shader
+  Already Included: False
+  Auto Add: False
+  Material: Cloud Sky
+  Material Path: Assets/Material/场景/贴图氛围/Cloud Sky.mat
+  Prefab/Source: Assets/Prefabs/Map/云朵流动.prefab
+  Renderer Type: MeshRenderer:云朵流动
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Cloud Sky
+  Material Path: Assets/Material/场景/贴图氛围/Cloud Sky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Cloud Ⅱ
+  Already Included: False
+  Auto Add: False
+  Material: Cloud Ⅱ
+  Material Path: Assets/Material/场景/贴图氛围/Cloud Ⅱ.mat
+  Prefab/Source: Assets/Prefabs/Map/云海.prefab
+  Renderer Type: MeshRenderer:云海
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Cloud Ⅱ
+  Material Path: Assets/Material/场景/贴图氛围/Cloud Ⅱ.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Grass
+  Already Included: False
+  Auto Add: False
+  Material: Grass
+  Material Path: Assets/Material/场景/场景物体/Grass.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/草.prefab
+  Renderer Type: MeshRenderer:草
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Grass
+  Material Path: Assets/Material/场景/场景物体/Grass.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Player
+  Already Included: False
+  Auto Add: False
+  Material: 岩石
+  Material Path: Assets/Material/场景/场景物体/岩石.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/中石块.prefab
+  Renderer Type: SpriteRenderer:中石块
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 岩石
+  Material Path: Assets/Material/场景/场景物体/岩石.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/大石块.prefab
+  Renderer Type: SpriteRenderer:大石块
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 岩石
+  Material Path: Assets/Material/场景/场景物体/岩石.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小石块.prefab
+  Renderer Type: SpriteRenderer:小石块
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 角色光照
+  Material Path: Assets/Material/交互/角色光照.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: SpriteRenderer:Player02/神眷之子 残影
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 岩石
+  Material Path: Assets/Material/场景/场景物体/岩石.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 角色光照
+  Material Path: Assets/Material/交互/角色光照.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/SG_AirWallRefraction
+  Already Included: False
+  Auto Add: False
+  Material: M_AirWallRipple
+  Material Path: Assets/Material/交互/M_AirWallRipple.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Skill Effect Sprite
+  Already Included: False
+  Auto Add: False
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾 R
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾 R/星刃外发光/星刃2
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾/星刃外发光/星刃2
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃.prefab
+  Renderer Type: MeshRenderer:星刃
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃.prefab
+  Renderer Type: MeshRenderer:星刃/星刃外发光/星刃2
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Skill Effect Sprite
+  Material Path: Assets/Material/特效/Skill Effect Sprite.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/TrailShader
+  Already Included: False
+  Auto Add: False
+  Material: 彗星特效
+  Material Path: Assets/Material/特效/彗星特效.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 彗星特效 Q
+  Material Path: Assets/Material/特效/彗星特效 Q.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 彗星特效2
+  Material Path: Assets/Material/特效/彗星特效2.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Trees YZS
+  Already Included: False
+  Auto Add: False
+  Material: 杉树
+  Material Path: Assets/Material/场景/场景物体/杉树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/杉树.prefab
+  Renderer Type: SpriteRenderer:杉树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 椰子树
+  Material Path: Assets/Material/场景/场景物体/椰子树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/椰子树.prefab
+  Renderer Type: SpriteRenderer:椰子树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 观赏树
+  Material Path: Assets/Material/场景/场景物体/观赏树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/观赏树.prefab
+  Renderer Type: SpriteRenderer:观赏树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 杉树
+  Material Path: Assets/Material/场景/场景物体/杉树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 椰子树
+  Material Path: Assets/Material/场景/场景物体/椰子树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 观赏树
+  Material Path: Assets/Material/场景/场景物体/观赏树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/Water
+  Already Included: False
+  Auto Add: False
+  Material: Water
+  Material Path: Assets/Material/场景/贴图氛围/Water.mat
+  Prefab/Source: Assets/Prefabs/Map/海洋.prefab
+  Renderer Type: MeshRenderer:海洋
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: Water
+  Material Path: Assets/Material/场景/贴图氛围/Water.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/外描边
+  Already Included: False
+  Auto Add: False
+  Material: 外描边
+  Material Path: Assets/Material/特效/外描边.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾 R/星刃外发光
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 外描边
+  Material Path: Assets/Material/特效/外描边.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: MeshRenderer:星刃 拖尾/星刃外发光
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 外描边
+  Material Path: Assets/Material/特效/外描边.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃.prefab
+  Renderer Type: MeshRenderer:星刃/星刃外发光
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 外描边
+  Material Path: Assets/Material/特效/外描边.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/护盾特效
+  Already Included: False
+  Auto Add: False
+  Material: 护盾特效
+  Material Path: Assets/Material/特效/护盾特效.mat
+  Prefab/Source: Assets/Prefabs/Player/护盾球体.prefab
+  Renderer Type: MeshRenderer:护盾球体
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 护盾特效
+  Material Path: Assets/Material/特效/护盾特效.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/火焰弹
+  Already Included: False
+  Auto Add: False
+  Material: 火焰
+  Material Path: Assets/Material/特效/火焰.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: MeshRenderer:Player01/火焰Anchor/EyeFireROffsetRoot/火焰
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 火焰
+  Material Path: Assets/Material/特效/火焰.mat
+  Prefab/Source: Assets/Prefabs/Player/火焰.prefab
+  Renderer Type: MeshRenderer:火焰
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 火焰
+  Material Path: Assets/Material/特效/火焰.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 火焰 外层
+  Material Path: Assets/Material/特效/火焰 外层.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/花朵
+  Already Included: False
+  Auto Add: False
+  Material: 小灯花
+  Material Path: Assets/Material/场景/场景物体/小灯花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小灯花.prefab
+  Renderer Type: MeshRenderer:小灯花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 小白花
+  Material Path: Assets/Material/场景/场景物体/小白花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小白花.prefab
+  Renderer Type: MeshRenderer:小白花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 小粉花
+  Material Path: Assets/Material/场景/场景物体/小粉花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小粉花.prefab
+  Renderer Type: MeshRenderer:小粉花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 小红花
+  Material Path: Assets/Material/场景/场景物体/小红花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小红花.prefab
+  Renderer Type: MeshRenderer:小红花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 小黄花
+  Material Path: Assets/Material/场景/场景物体/小黄花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小黄花.prefab
+  Renderer Type: MeshRenderer:小黄花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 百合花
+  Material Path: Assets/Material/场景/场景物体/百合花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/百合花.prefab
+  Renderer Type: MeshRenderer:百合花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 薰衣草
+  Material Path: Assets/Material/场景/场景物体/薰衣草.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/薰衣草.prefab
+  Renderer Type: MeshRenderer:薰衣草
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 野花
+  Material Path: Assets/Material/场景/场景物体/野花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/野花.prefab
+  Renderer Type: MeshRenderer:野花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 风铃花
+  Material Path: Assets/Material/场景/场景物体/风铃花.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/风铃花.prefab
+  Renderer Type: MeshRenderer:风铃花
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 小灯花
+  Material Path: Assets/Material/场景/场景物体/小灯花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 小白花
+  Material Path: Assets/Material/场景/场景物体/小白花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 小粉花
+  Material Path: Assets/Material/场景/场景物体/小粉花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 小红花
+  Material Path: Assets/Material/场景/场景物体/小红花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 小黄花
+  Material Path: Assets/Material/场景/场景物体/小黄花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 百合花
+  Material Path: Assets/Material/场景/场景物体/百合花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 薰衣草
+  Material Path: Assets/Material/场景/场景物体/薰衣草.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 野花
+  Material Path: Assets/Material/场景/场景物体/野花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 风铃花
+  Material Path: Assets/Material/场景/场景物体/风铃花.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/草丛
+  Already Included: False
+  Auto Add: False
+  Material: 像素草
+  Material Path: Assets/Material/场景/场景物体/像素草.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/中型草丛.prefab
+  Renderer Type: SpriteRenderer:中型草丛
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 像素草
+  Material Path: Assets/Material/场景/场景物体/像素草.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/小草丛.prefab
+  Renderer Type: SpriteRenderer:小草丛
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 像素草
+  Material Path: Assets/Material/场景/场景物体/像素草.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/长草丛.prefab
+  Renderer Type: SpriteRenderer:长草丛
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 像素草
+  Material Path: Assets/Material/场景/场景物体/像素草.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Shader Graphs/风吹树
+  Already Included: False
+  Auto Add: False
+  Material: 一般树
+  Material Path: Assets/Material/场景/场景物体/一般树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/一般树.prefab
+  Renderer Type: SpriteRenderer:一般树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 柏树
+  Material Path: Assets/Material/场景/场景物体/柏树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/普通树木.prefab
+  Renderer Type: SpriteRenderer:普通树木
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 未知树
+  Material Path: Assets/Material/场景/场景物体/未知树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/未知树.prefab
+  Renderer Type: SpriteRenderer:未知树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 柏树
+  Material Path: Assets/Material/场景/场景物体/柏树.mat
+  Prefab/Source: Assets/Prefabs/Map/物体/柏树.prefab
+  Renderer Type: SpriteRenderer:柏树
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: 一般树
+  Material Path: Assets/Material/场景/场景物体/一般树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 未知树
+  Material Path: Assets/Material/场景/场景物体/未知树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: 柏树
+  Material Path: Assets/Material/场景/场景物体/柏树.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Spine/PlayerLit
+  Already Included: False
+  Auto Add: False
+  Material: skeleton_Material
+  Material Path: Assets/Spine/Player01Spine/skeleton_Material.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: MeshRenderer:Player01/Spine GameObject (skeleton)
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_Material
+  Material Path: Assets/Spine/Player01Spine/skeleton_Material.mat
+  Prefab/Source: Assets/Prefabs/Player/Player01.prefab
+  Renderer Type: MeshRenderer:Player01/Player01_EGhostShadow/Spine GameObject影子
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: MeshRenderer:Player02/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton2
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton2.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: MeshRenderer:Player02/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton3
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton3.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: MeshRenderer:Player02/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton4
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton4.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: MeshRenderer:Player02/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_Material
+  Material Path: Assets/Spine/Player01Spine/skeleton_Material.mat
+  Prefab/Source: Assets/Resources/Prefabs/UI/Preview/Player01AttributeWorldPreview.prefab
+  Renderer Type: MeshRenderer:Player01AttributeWorldPreview/Spine GameObject (skeleton)
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton.mat
+  Prefab/Source: Assets/Resources/Prefabs/UI/Preview/Player02AttributeWorldPreview.prefab
+  Renderer Type: MeshRenderer:Player02AttributeWorldPreview/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton2
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton2.mat
+  Prefab/Source: Assets/Resources/Prefabs/UI/Preview/Player02AttributeWorldPreview.prefab
+  Renderer Type: MeshRenderer:Player02AttributeWorldPreview/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton3
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton3.mat
+  Prefab/Source: Assets/Resources/Prefabs/UI/Preview/Player02AttributeWorldPreview.prefab
+  Renderer Type: MeshRenderer:Player02AttributeWorldPreview/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_skeleton4
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton4.mat
+  Prefab/Source: Assets/Resources/Prefabs/UI/Preview/Player02AttributeWorldPreview.prefab
+  Renderer Type: MeshRenderer:Player02AttributeWorldPreview/神眷之子Spine
+  Reason: Shader name matches effect keywords, but renderer/prefab is not clearly an effect.
+  Material: skeleton_Material
+  Material Path: Assets/Spine/Player01Spine/skeleton_Material.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: skeleton_skeleton
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: skeleton_skeleton2
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton2.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: skeleton_skeleton3
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton3.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: skeleton_skeleton4
+  Material Path: Assets/Spine/Player02Spine/skeleton_skeleton4.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Sprites/Default
+  Already Included: True
+  Auto Add: False
+  Material: Shader.Find("Sprites/Default")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Script/角色/Player2PrototypeController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Standard
+  Already Included: False
+  Auto Add: False
+  Material: Shader.Find("Standard")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Behavior/EnemyController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+  Material: Shader.Find("Standard")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Drops/RuntimeLootDropOnDeath.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: TextMeshPro/Distance Field
+  Already Included: False
+  Auto Add: False
+  Material: Shader.Find("TextMeshPro/Distance Field")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark03.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: TextMeshPro/Mobile/Distance Field SSD
+  Already Included: False
+  Auto Add: False
+  Material: Shader.Find("TextMeshPro/Mobile/Distance Field SSD")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark03.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: UI/TitleAdditive
+  Already Included: False
+  Auto Add: False
+  Material: TitleAdditive
+  Material Path: Assets/Zhu/UI/Materials/TitleAdditive.mat
+  Prefab/Source: Assets/Zhu/GameScene.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Universal Render Pipeline/Lit
+  Already Included: False
+  Auto Add: False
+  Material: Shader.Find("Universal Render Pipeline/Lit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Behavior/EnemyController.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: Universal Render Pipeline/Particles/Unlit
+  Already Included: False
+  Auto Add: False
+  Material: ParticlesUnlit
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/ParticlesUnlit.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: Universal Render Pipeline/Unlit
+  Already Included: False
+  Auto Add: False
+  Material: Shader.Find("Universal Render Pipeline/Unlit")
+  Material Path: (dynamic)
+  Prefab/Source: Assets/Scripts/Enemies/Drops/RuntimeLootDropOnDeath.cs
+  Renderer Type: Code
+  Reason: Runtime code uses constant Shader.Find.
+- Shader: YY/Player01/R/EnergyNeedleURP
+  Already Included: False
+  Auto Add: False
+  Material: Player01R_NeedleCore
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleCore.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: Player01R_NeedleOuterGlow
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleOuterGlow.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: Player01R_NeedleTipGlow
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleTipGlow.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+  Material: Player01R_NeedleTrail
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleTrail.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+- Shader: YY/Player01/R/NeedleDistortionURP
+  Already Included: False
+  Auto Add: False
+  Material: Player01R_NeedleDistortion
+  Material Path: Assets/Effects/Player01R/Materials/Player01R_NeedleDistortion.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency has effect-like path or shader name.
+
+C. Non-Effect Shaders - Not Added
+- Shader: AHD2TODSystem/BaseSky
+  Already Included: False
+  Auto Add: False
+  Material: AfterDawn_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/AfterDawn_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: AfterDusk_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/AfterDusk_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Dawn_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Dawn_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Dusk_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Dusk_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Dusk_HDRSkyBox_BaseSky
+  Material Path: Assets/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Dusk_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: HDRSkyBox_BaseSky
+  Material Path: Assets/TODSystem/Material/HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Night1_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Night1_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Night2_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Night2_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Noon1_HDRSkyBox_BaseSky
+  Material Path: Assets/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Noon1_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Noon1_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Noon1_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Noon2_HDRSkyBox_BaseSky
+  Material Path: Assets/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Noon2_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: Noon2_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/Noon2_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: PreDawn_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/PreDawn_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: PreDusk_HDRSkyBox_BaseSky
+  Material Path: Packages/com.ahd2.tod-system/TODSystem/Material/HDRSkyBox_BaseSky_TOD/PreDusk_HDRSkyBox_BaseSky.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: Custom/Player01_Ghost2D
+  Already Included: False
+  Auto Add: False
+  Material: M_Player01_Ghost2D
+  Material Path: Assets/Materials/Enemies/M_Player01_Ghost2D.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_Player01_GhostShadow2D
+  Material Path: Assets/Materials/Enemies/M_Player01_GhostShadow2D.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: Custom/StarBlade_FlowLight
+  Already Included: False
+  Auto Add: False
+  Material: M_StarBlade_FlowLight
+  Material Path: Assets/Materials/Enemies/M_StarBlade_FlowLight.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾 R.prefab
+  Renderer Type: SpriteRenderer:星刃 拖尾 R/星刃
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_StarBlade_FlowLight
+  Material Path: Assets/Materials/Enemies/M_StarBlade_FlowLight.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃 拖尾.prefab
+  Renderer Type: SpriteRenderer:星刃 拖尾/星刃
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_StarBlade_FlowLight
+  Material Path: Assets/Materials/Enemies/M_StarBlade_FlowLight.mat
+  Prefab/Source: Assets/Prefabs/Player/星刃.prefab
+  Renderer Type: SpriteRenderer:星刃/星刃
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_StarBlade_FlowLight
+  Material Path: Assets/Materials/Enemies/M_StarBlade_FlowLight.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: Player02/HaloRainbowFlow
+  Already Included: False
+  Auto Add: False
+  Material: M_Player02_HaloRainbowFlow
+  Material Path: Assets/Material/特效/M_Player02_HaloRainbowFlow.mat
+  Prefab/Source: Assets/Prefabs/Player/Player02.prefab
+  Renderer Type: SpriteRenderer:Player02/光轮
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_Player02_HaloRainbowFlow
+  Material Path: Assets/Material/特效/M_Player02_HaloRainbowFlow.mat
+  Prefab/Source: Assets/Prefabs/Player/光轮.prefab
+  Renderer Type: SpriteRenderer:光轮
+  Reason: Ordinary renderer/material; not collected automatically.
+- Shader: ShoreWave/Overlay URP
+  Already Included: False
+  Auto Add: False
+  Material: ShoreWave_OceanInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_OceanInnerCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreWave_OceanOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_OceanOuterCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreWave_Overlay_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_Overlay_Test.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreWave_OceanInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_OceanInnerCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanInnerCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanInnerCorner/ShoreWave_OceanInnerCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreWave_OceanOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_OceanOuterCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanOuterCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanOuterCorner/ShoreWave_OceanOuterCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreWave_Overlay_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreWave_Overlay_Test.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanTransition.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanTransition/ShoreWave_Test
+  Reason: Ordinary renderer/material; not collected automatically.
+- Shader: ShoreWave/Sand Fade URP
+  Already Included: False
+  Auto Add: False
+  Material: ShoreSandFade_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreSandFade_Test.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_GrassInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_GrassInnerCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_GrassOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_GrassOuterCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_Normal_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_Normal_Test.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_OceanInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_OceanInnerCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_OceanOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_OceanOuterCorner.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: ShoreSand_GrassInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_GrassInnerCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_GrassInnerCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_GrassInnerCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSand_GrassOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_GrassOuterCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_GrassOuterCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_GrassOuterCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSandFade_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreSandFade_Test.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_GrassTransition.prefab
+  Renderer Type: MeshRenderer:ShoreSand_GrassTransition
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSand_Normal_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_Normal_Test.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_Normal.prefab
+  Renderer Type: MeshRenderer:ShoreSand_Normal
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSand_OceanInnerCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_OceanInnerCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanInnerCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanInnerCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSand_OceanOuterCorner
+  Material Path: Assets/ShoreWave/Materials/ShoreSand_OceanOuterCorner.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanOuterCorner.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanOuterCorner
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: ShoreSandFade_Test
+  Material Path: Assets/ShoreWave/Materials/ShoreSandFade_Test.mat
+  Prefab/Source: Assets/ShoreWave/Prefabs/ShoreSand_OceanTransition.prefab
+  Renderer Type: MeshRenderer:ShoreSand_OceanTransition
+  Reason: Ordinary renderer/material; not collected automatically.
+- Shader: Sprites/Default
+  Already Included: True
+  Auto Add: False
+  Material: Sprites-Default
+  Material Path: Resources/unity_builtin_extra
+  Prefab/Source: Assets/Prefabs/UI/StatusMarks/RadianceMarkIcon.prefab
+  Renderer Type: SpriteRenderer:RadianceMarkIcon
+  Reason: Ordinary renderer/material; not collected automatically.
+- Shader: TextMeshPro/Mobile/Distance Field
+  Already Included: False
+  Auto Add: False
+  Material: LiberationSans SDF Material
+  Material Path: Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset
+  Prefab/Source: Assets/Resources/Prefabs/UI/DamagePopupFloatingText.prefab
+  Renderer Type: MeshRenderer:DamagePopupFloatingText
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: LiberationSans SDF Material
+  Material Path: Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset
+  Prefab/Source: Assets/Resources/Prefabs/UI/SoulPickupFloatingText.prefab
+  Renderer Type: MeshRenderer:SoulPickupFloatingText
+  Reason: Ordinary renderer/material; not collected automatically.
+- Shader: UI/DayNightGaugeFlow
+  Already Included: False
+  Auto Add: False
+  Material: M_RadianceGaugeAccent
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_RadianceGaugeAccent.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_RadianceGaugeFlow
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_RadianceGaugeFlow.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_RadianceGaugeSolid
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_RadianceGaugeSolid.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_TwilightGaugeAccent
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_TwilightGaugeAccent.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_TwilightGaugeFlow
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_TwilightGaugeFlow.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+  Material: M_TwilightGaugeSolid
+  Material Path: Assets/Prefabs/UI/DayNightAffinity/M_TwilightGaugeSolid.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: UnderTheStars/Enemies/SlimeJelly_URP
+  Already Included: False
+  Auto Add: False
+  Material: M_Slime_Jelly
+  Material Path: Assets/Materials/Enemies/M_Slime_Jelly.mat
+  Prefab/Source: Assets/Prefabs/Enemy/Enemy_Slime.prefab
+  Renderer Type: SpriteRenderer:Enemy_Slime/Visual_Slime
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_Slime_Jelly
+  Material Path: Assets/Materials/Enemies/M_Slime_Jelly.mat
+  Prefab/Source: Assets/Prefabs/Enemy/Enemy_Slime_Lava.prefab
+  Renderer Type: SpriteRenderer:Enemy_Slime_Lava/Visual_Slime
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_Slime_Jelly
+  Material Path: Assets/Materials/Enemies/M_Slime_Jelly.mat
+  Prefab/Source: Assets/Prefabs/Enemy/Enemy_Slime_Poison.prefab
+  Renderer Type: SpriteRenderer:Enemy_Slime_Poison/Visual_Slime
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_Slime_Jelly
+  Material Path: Assets/Materials/Enemies/M_Slime_Jelly.mat
+  Prefab/Source: Assets/Prefabs/Enemy/Enemy_Slime_Rainbow.prefab
+  Renderer Type: SpriteRenderer:Enemy_Slime_Rainbow/Visual_Slime
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: M_Slime_Jelly
+  Material Path: Assets/Materials/Enemies/M_Slime_Jelly.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: UnderTheStars/Tilemap/Ground Wet Light URP
+  Already Included: False
+  Auto Add: False
+  Material: M_Ground_WetLight_URPLit
+  Material Path: Assets/Materials/场景/M_Ground_WetLight_URPLit.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: Universal Render Pipeline/2D/Sprite-Unlit-Default
+  Already Included: False
+  Auto Add: False
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Prefabs/RuneDrops/5.prefab
+  Renderer Type: SpriteRenderer:5
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Prefabs/UI/Rune/WorldHealthBarPrefab.prefab
+  Renderer Type: SpriteRenderer:WorldHealthBarPrefab/Background
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Prefabs/UI/Rune/WorldHealthBarPrefab.prefab
+  Renderer Type: SpriteRenderer:WorldHealthBarPrefab/Fill
+  Reason: Ordinary renderer/material; not collected automatically.
+  Material: Sprite-Unlit-Default
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+- Shader: Universal Render Pipeline/Lit
+  Already Included: False
+  Auto Add: False
+  Material: Lit
+  Material Path: Packages/com.unity.render-pipelines.universal/Runtime/Materials/Lit.mat
+  Prefab/Source: Assets/Scenes/草原.unity
+  Renderer Type: SceneDependency
+  Reason: Enabled Build Settings scene dependency material is not effect-like.
+
+D. Shader.Find Dynamic Loaded Shaders
+- AHD2TODSystem/S_E_StarTrail_Additive [resolved, runtime]
+  Source: Assets/Script/角色/Player2PrototypeController.cs
+- AHD2TODSystem/S_E_StarTrail_Additive [resolved, runtime]
+  Source: Assets/Script/角色/Player2PrototypeController.cs
+- BattleFight/DeathDissolveURP [resolved, runtime]
+  Source: Assets/shukaisho/DissolveOnDeath.cs
+- Particles/Standard Unlit [resolved, runtime]
+  Source: Assets/Script/角色/Player01EGhostParticleController.cs
+- Particles/Standard Unlit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Spine/Skeleton [resolved, runtime]
+  Source: Assets/Spine/Runtime/spine-unity/Asset Types/SpineAtlasAsset.cs
+- Spine/Skeleton [resolved, runtime]
+  Source: Assets/Spine/Runtime/spine-unity/Utility/AtlasUtilities.cs
+- Spine/SkeletonGraphic [resolved, runtime]
+  Source: Assets/Spine/Runtime/spine-unity/Components/SkeletonGraphic.cs
+- Spine/Special/HiddenPass [resolved, runtime]
+  Source: Assets/Spine/Runtime/spine-unity/Asset Types/RegionlessAttachmentLoader.cs
+- Sprites/Default [resolved, runtime]
+  Source: Assets/Script/角色/Player2PrototypeController.cs
+- Sprites/Default [resolved, runtime]
+  Source: Assets/Script/角色/Player2PrototypeController.cs
+- Sprites/Default [resolved, runtime]
+  Source: Assets/Script/角色/Player2PrototypeController.cs
+- Standard [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Behavior/EnemyController.cs
+- Standard [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Standard [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Standard [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Drops/RuntimeLootDropOnDeath.cs
+- TextMeshPro/Distance Field [resolved, runtime]
+  Source: Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark03.cs
+- TextMeshPro/Mobile/Distance Field SSD [resolved, runtime]
+  Source: Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark03.cs
+- Universal Render Pipeline/Lit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Behavior/EnemyController.cs
+- Universal Render Pipeline/Lit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Universal Render Pipeline/Particles/Unlit [resolved, runtime]
+  Source: Assets/Script/角色/Player01EGhostParticleController.cs
+- Universal Render Pipeline/Particles/Unlit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Universal Render Pipeline/Unlit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Universal Render Pipeline/Unlit [resolved, runtime]
+  Source: Assets/Scripts/Enemies/Drops/RuntimeLootDropOnDeath.cs
+
+Missing Shader Materials
+
+Excluded Path Samples
+- Assets/Editor/CreateTwinShiftVfxPrefabs.cs
+- Assets/Editor/Player2EditorSetup.cs
+- Assets/Editor/Player2PrototypeControllerEditor.cs
+- Assets/Editor/PropSpawnRuleDrawer.cs
+- Assets/Editor/RandomMapGenerationEditor.cs
+- Assets/Editor/ShaderBuildCollector.cs
+- Assets/Editor/Tools/YY/Battle/CreateBattleTimerAndDifficultyDirectorTool.cs
+- Assets/Editor/Tools/YY/Battle/WriteBattleSceneLoadingGateTool.cs
+- Assets/Editor/Tools/YY/Battle/WriteResultSceneButtonsTool.cs
+- Assets/Editor/Tools/YY/Effects/CreatePlayer01ScissorEffectPrefabs.cs
+- Assets/Editor/Tools/YY/Enemy/BuildWorldHealthBarPrefabUnderSelected.cs
+- Assets/Editor/Tools/YY/Enemy/SetupSelectedEnemyPrefabIdentityAndVisual.cs
+- Assets/Editor/Tools/YY/HUD/AddOrRepairCharacterSwitchWarningPopup.cs
+- Assets/Editor/Tools/YY/HUD/BuildPlayerStatusHUDUnderSelected.cs
+- Assets/Editor/Tools/YY/Rune/BuildRuneUITestUnderSelected.cs
+- Assets/Editor/Tools/YY/Rune/CreateOrRefreshRuneDropSettings.cs
+- Assets/Editor/Tools/YY/Rune/CreateRuneUIPrefab.cs
+- Assets/Editor/Tools/YY/Rune/RebuildRuneUIPanelLayoutSafely.cs
+- Assets/Editor/Tools/YY/UI/CreatePlayerAttributePanelPrefab.cs
+- Assets/Editor/Tools/YY/UI/CreatePlayerAttributePreviewPrefabs.cs
+- Assets/Editor/Tools/YY/UI/CreatePlayerAttributeWorldPreviewPrefabs.cs
+- Assets/Effects/Player01R/Scripts/Editor/Player01REnergyNeedleAssetBuilderWindow.cs
+- Assets/Plugins/UniTask/Editor/SplitterGUILayout.cs
+- Assets/Plugins/UniTask/Editor/UniTaskTrackerTreeView.cs
+- Assets/Plugins/UniTask/Editor/UniTaskTrackerWindow.cs
+- Assets/Spine Examples/Scripts/Sample Components/SkeletonUtility Modules/Editor/SkeletonRagdoll2DInspector.cs
+- Assets/Spine Examples/Scripts/Sample Components/SkeletonUtility Modules/Editor/SkeletonRagdollInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Asset Types/AnimationReferenceAssetEditor.cs
+- Assets/Spine/Editor/spine-unity/Editor/Asset Types/SkeletonDataAssetInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Asset Types/SpineAtlasAssetInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Asset Types/SpineSpriteAtlasAssetInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/BoneFollowerGraphicInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/BoneFollowerInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/BoundingBoxFollowerGraphicInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/BoundingBoxFollowerInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/PointFollowerInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonAnimationInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonGraphicCustomMaterialsInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonGraphicInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonMecanimInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonMecanimRootMotionInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonRendererCustomMaterialsInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonRendererInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonRootMotionBaseInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonRootMotionInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonUtilityBoneInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Components/SkeletonUtilityInspector.cs
+- Assets/Spine/Editor/spine-unity/Editor/GUI/AtlasAsset Icon.png
+- Assets/Spine/Editor/spine-unity/Editor/GUI/SkeletonDataAsset Icon.png
+- Assets/Spine/Editor/spine-unity/Editor/Menus.cs
+- Assets/Spine/Editor/spine-unity/Editor/Shaders/SpineShaderWithOutlineGUI.cs
+- Assets/Spine/Editor/spine-unity/Editor/Shaders/SpineSpriteShaderGUI.cs
+- Assets/Spine/Editor/spine-unity/Editor/SpineAttributeDrawers.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/AssetDatabaseAvailabilityDetector.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/AssetUtility.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/BlendModeMaterialsUtility.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/BuildSettings.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/DataReloadHandler.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/Icons.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/Instantiation.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/Preferences.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/SpineEditorUtilities.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/SpineHandles.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/SpineInspectorUtility.cs
+- Assets/Spine/Editor/spine-unity/Editor/Utility/SpineMaskUtilities.cs
+- Assets/Spine/Editor/spine-unity/Editor/Windows/SkeletonBaker.cs
+- Assets/Spine/Editor/spine-unity/Editor/Windows/SkeletonBakingWindow.cs
+- Assets/Spine/Editor/spine-unity/Editor/Windows/SkeletonDebugWindow.cs
+- Assets/Spine/Editor/spine-unity/Editor/Windows/SpinePreferences.cs
+- Assets/Spine/Editor/spine-unity/Editor/Windows/SpriteAtlasImportWindow.cs
+- Assets/Spine/Editor/spine-unity/Modules/SkeletonRenderSeparator/Editor/SkeletonPartsRendererInspector.cs
+- Assets/Spine/Editor/spine-unity/Modules/SkeletonRenderSeparator/Editor/SkeletonRenderSeparatorInspector.cs
+- Assets/Spine/Editor/spine-unity/Modules/SlotBlendModes/Editor/SlotBlendModesEditor.cs
+- Assets/Tests/AsyncOperationTest.cs
+- Assets/Tests/AsyncTest.cs
+- Assets/Tests/CachelikeTest.cs
+- Assets/Tests/CoroutineToUniTaskTest.cs
+- Assets/Tests/DelayTest.cs
+- Assets/Tests/Editor/AsyncTestEditor.cs
+- Assets/Tests/Editor/RunTestEditor.cs
+- Assets/Tests/Editor/WhenAnyTestEditor.cs
+- Assets/Tests/GenericsWhenAllAny.cs
+- Assets/Tests/PlayerLoopTimerTest.cs
+- Assets/Tests/Preserve.cs
+- Assets/Tests/RunTest.cs
+- Assets/Tests/Shims.cs
+- Assets/Tests/WhenAnyTest.cs
+- Assets/Zhu/UI/Editor/SkillHUDPrefabBuilder.cs
+- Packages/com.ahd2.tod-system/Editor/MeterialTODViewer/MeterialTODViewer.cs
+- Packages/com.ahd2.tod-system/Editor/ReflectionProbe/Baker.cs
+- Packages/com.ahd2.tod-system/Editor/ReflectionProbe/NewRelecttionProbe.cs
+- Packages/com.ahd2.tod-system/Editor/ReflectionProbe/ReflectorProbeEditor.cs
+- Packages/com.ahd2.tod-system/Editor/ShaderGUI/AHD2PBRGUI.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysController/NewTimeOfDaysController.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysGenerator.Checker.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysGenerator.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysGenerator.Window1.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysGenerator.Window2.cs
+- Packages/com.ahd2.tod-system/Editor/TimeOfDaysGenerator.Window3.cs
+- Packages/com.ahd2.tod-system/Editor/TODControllerGUI/TODControllerGUI.cs
+- Packages/com.ahd2.tod-system/Editor/Utility/TimeOfDaysEditorUtility.cs
+- Packages/com.ahd2.tod-system/Runtime/ReflectionProbe/ReflectorProbe.Editor.cs
+- Packages/com.unity.inputsystem/InputSystem/Editor/AssetImporter/InputActionImporter.cs
+- Packages/com.unity.inputsystem/InputSystem/Editor/Icons/InputSystemUIInputModule@64.png
+- Packages/com.unity.render-pipelines.universal/Editor/AssetVersion.cs
+- Packages/com.unity.render-pipelines.universal/Editor/ShaderGraph/UniversalMetadata.cs
+- Packages/com.unity.shadergraph/Editor/Data/SubGraph/SubGraphAsset.cs
+- Packages/com.unity.shadergraph/Editor/Generation/ShaderGraphVfxAsset.cs
+- Packages/com.unity.shadergraph/Editor/Importers/ShaderGraphImporter.cs
+- Packages/com.unity.shadergraph/Editor/Importers/ShaderGraphMetadata.cs
+- Packages/com.unity.shadergraph/Editor/Importers/ShaderSubGraphImporter.cs
+- Packages/com.unity.shadergraph/Editor/Importers/ShaderSubGraphMetadata.cs
+- Packages/com.unity.shadergraph/Editor/Resources/Icons/sg_graph_icon.png
+
+Code Paths With Runtime Shader/Keyword/Resource References
+- Assets/Script/角色/Player01GhostStateVisual.cs
+- Assets/Scripts/Enemies/Combat/MonsterProjectile.cs
+- Assets/Spine/Runtime/spine-unity/Utility/MaterialChecks.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark01.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark01_UGUI.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark03.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/Benchmark04.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/SimpleScript.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/TextMeshProFloatingText.cs
+- Assets/TextMesh Pro/Examples & Extras/Scripts/TextMeshSpawner.cs
+- Packages/com.ahd2.tod-system/Runtime/PlaneReflection/PlanarReflections.cs
+- Packages/com.ahd2.tod-system/Runtime/ReflectionProbe/ReflectorProbe.cs
+- Packages/com.ahd2.tod-system/Runtime/VolumetricFog/DensityAndLightingPass.cs
+
+Variant Collection
+Path: Assets/ShaderVariants/RuntimeEffectVariants.shadervariants
+Collect mode generates variants only for A-class high-confidence effect materials and their currently enabled keywords.
+- Variant warning: M_AirWallRipple / Shader Graphs/SG_AirWallRefraction: shader Shader Graphs/SG_AirWallRefraction does not have pass type 0
+- Variant warning: ParticlesUnlit / Universal Render Pipeline/Particles/Unlit: passed shader keyword variant not found in shader Universal Render Pipeline/Particles/Unlit pass type 0
+- Variant warning: Player01R_NeedleCore / YY/Player01/R/EnergyNeedleURP: shader YY/Player01/R/EnergyNeedleURP does not have pass type 0
+- Variant warning: Player01R_NeedleDistortion / YY/Player01/R/NeedleDistortionURP: shader YY/Player01/R/NeedleDistortionURP does not have pass type 0
+- Variant warning: Player01R_NeedleOuterGlow / YY/Player01/R/EnergyNeedleURP: shader YY/Player01/R/EnergyNeedleURP does not have pass type 0
+- Variant warning: Player01R_NeedleTipGlow / YY/Player01/R/EnergyNeedleURP: shader YY/Player01/R/EnergyNeedleURP does not have pass type 0
+- Variant warning: Player01R_NeedleTrail / YY/Player01/R/EnergyNeedleURP: shader YY/Player01/R/EnergyNeedleURP does not have pass type 0
+- Variant warning: Sprite-Unlit-Default / Universal Render Pipeline/2D/Sprite-Unlit-Default: shader Universal Render Pipeline/2D/Sprite-Unlit-Default does not have pass type 0
+
+Code Scan Warnings

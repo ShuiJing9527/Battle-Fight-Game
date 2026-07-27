@@ -154,6 +154,11 @@ Shader "Spine/PlayerLit"
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
 
+            // URP 17 sets these for the ShadowCaster pass. Directional lights use
+            // _LightDirection; point/spot lights use _LightPosition per vertex.
+            float3 _LightDirection;
+            float3 _LightPosition;
+
             CBUFFER_START(UnityPerMaterial)
                 float4 _MainTex_ST;
                 float4 _Color;
@@ -169,18 +174,11 @@ Shader "Spine/PlayerLit"
                 #if _CASTING_PUNCTUAL_LIGHT_SHADOW
                     float3 lightDirectionWS = normalize(_LightPosition - positionWS);
                 #else
-                    float3 lightDirectionWS = _MainLightPosition.xyz;
+                    float3 lightDirectionWS = _LightDirection;
                 #endif
 
                 float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, lightDirectionWS));
-
-                #if UNITY_REVERSED_Z
-                    positionCS.z = min(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
-                #else
-                    positionCS.z = max(positionCS.z, positionCS.w * UNITY_NEAR_CLIP_VALUE);
-                #endif
-
-                return positionCS;
+                return ApplyShadowClamping(positionCS);
             }
 
             ShadowVaryings ShadowPassVertex(ShadowAttributes IN)

@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -44,6 +43,7 @@ public class GameLocalization : MonoBehaviour
         { "Start", new[] { "Start", "\u5f00\u59cb\u6e38\u620f", "\u30b2\u30fc\u30e0\u958b\u59cb" } },
         { "Setting", new[] { "Settings", "\u8bbe\u7f6e", "\u8a2d\u5b9a" } },
         { "Exit", new[] { "Exit", "\u9000\u51fa\u6e38\u620f", "\u7d42\u4e86" } },
+        { "Settings_Back", new[] { "Back", "\u8fd4\u56de", "\u623b\u308b" } },
         { GameSceneTitleKey, new[] { GameSceneTitleEnglish, GameSceneTitleChinese, GameSceneTitleJapanese } },
         { "Music", new[] { "Music", "\u97f3\u4e50", "\u97f3\u697d" } },
         { "SFX", new[] { "Sound Effects", "\u97f3\u6548", "\u52b9\u679c\u97f3" } },
@@ -209,7 +209,7 @@ public class GameLocalization : MonoBehaviour
             cjkFont = font;
 
         ConfigureFallbackFonts();
-        PreloadTranslationCharacters();
+        ApplyToAllText();
     }
 
     public void SetJapaneseFont(TMP_FontAsset font)
@@ -218,7 +218,7 @@ public class GameLocalization : MonoBehaviour
             japaneseFont = font;
 
         ConfigureFallbackFonts();
-        PreloadTranslationCharacters();
+        ApplyToAllText();
     }
 
     private void Awake()
@@ -233,7 +233,6 @@ public class GameLocalization : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         CurrentLanguage = ResolveInitialLanguage();
         ConfigureFallbackFonts();
-        PreloadTranslationCharacters();
         SceneManager.sceneLoaded += OnSceneLoaded;
     }
 
@@ -387,41 +386,30 @@ public class GameLocalization : MonoBehaviour
 
         if (CurrentLanguage == GameLanguage.English)
         {
-            text.font = originalFonts[text];
+            ApplyFontAsset(text, originalFonts[text]);
         }
         else
         {
             TMP_FontAsset primaryFont = CurrentLanguage == GameLanguage.Japanese ? japaneseFont : cjkFont;
             if (primaryFont != null)
-                text.font = primaryFont;
+                ApplyFontAsset(text, primaryFont);
         }
+    }
+
+    private static void ApplyFontAsset(TextMeshProUGUI text, TMP_FontAsset font)
+    {
+        if (text == null || font == null)
+            return;
+
+        text.font = font;
+        if (font.material != null)
+            text.fontSharedMaterial = font.material;
     }
 
     private void ConfigureFallbackFonts()
     {
         AddFallback(cjkFont, japaneseFont);
         AddFallback(japaneseFont, cjkFont);
-    }
-
-    private void PreloadTranslationCharacters()
-    {
-        if (translations == null || translations.Count == 0)
-            return;
-
-        StringBuilder characters = new StringBuilder();
-        foreach (KeyValuePair<string, string[]> entry in translations)
-        {
-            foreach (string value in entry.Value)
-                characters.Append(value);
-        }
-
-        string characterSet = characters.ToString();
-        string missingCharacters;
-        if (cjkFont != null)
-            cjkFont.TryAddCharacters(characterSet, out missingCharacters);
-
-        if (japaneseFont != null)
-            japaneseFont.TryAddCharacters(characterSet, out missingCharacters);
     }
 
     private static void AddFallback(TMP_FontAsset primary, TMP_FontAsset fallback)
