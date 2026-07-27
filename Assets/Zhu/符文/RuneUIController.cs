@@ -307,6 +307,11 @@ public class RuneUIController : MonoBehaviour
             TogglePanel();
         }
 
+        if (IsMainPanelVisible() && Input.GetKeyDown(KeyCode.Escape))
+        {
+            ClosePanel();
+        }
+
         HandleRuneBagMouseWheel();
     }
 

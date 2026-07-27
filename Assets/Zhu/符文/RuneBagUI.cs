@@ -123,6 +123,14 @@ public class RuneBagUI : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (Application.isPlaying && IsPanelOpen && Input.GetKeyDown(KeyCode.Escape))
+        {
+            ClosePanel();
+        }
+    }
+
     public void OpenPanel()
     {
         ResolveRuntimeReferences();

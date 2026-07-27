@@ -51,6 +51,14 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.F4))
+        {
+            ExitGame();
+        }
+    }
+
     private void OnDestroy()
     {
         if (Instance != this)

@@ -2140,7 +2140,7 @@ PrefabInstance:
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameBgm
       value: 
-      objectReference: {fileID: 8300000, guid: d7ee98b4adc04184fba2de1de7df1dd0, type: 3}
+      objectReference: {fileID: 0}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: menuBgm
       value: 
@@ -2169,6 +2169,10 @@ PrefabInstance:
       propertyPath: menuSceneName
       value: GameScene
       objectReference: {fileID: 0}
+    - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
+      propertyPath: spiritweaveDollBgm
+      value: 
+      objectReference: {fileID: 8300000, guid: d7ee98b4adc04184fba2de1de7df1dd0, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

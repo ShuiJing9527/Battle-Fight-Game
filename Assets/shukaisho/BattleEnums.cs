@@ -69,6 +69,7 @@ public struct BattleDamage
     public bool bypassAttackerMultipliers;
     public bool bypassAmbientAffinity;
     public bool bypassAffinityModifier;
+    public bool bypassEvasion;
     public bool suppressGaugeNotification;
     public string debugTag;
 
@@ -81,6 +82,7 @@ public struct BattleDamage
         bypassAttackerMultipliers = false;
         bypassAmbientAffinity = false;
         bypassAffinityModifier = false;
+        bypassEvasion = false;
         suppressGaugeNotification = false;
         debugTag = string.Empty;
     }

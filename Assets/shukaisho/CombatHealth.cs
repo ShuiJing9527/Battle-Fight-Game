@@ -200,7 +200,7 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        if (TryEvadeDamage(damage.source, out _))
+        if (TryEvadeDamage(damage, out _))
         {
             if (logBossPlayerDamage)
             {
@@ -523,7 +523,7 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        if (TryEvadeDamage(damage.source, out _))
+        if (TryEvadeDamage(damage, out _))
         {
             ShowMissPopup();
             DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=miss source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)}", gameObject);
@@ -975,11 +975,22 @@ public class CombatHealth : MonoBehaviour
         return damageType == BattleDamageType.Special ? DamagePopupType.Special : DamagePopupType.Physical;
     }
 
-    private bool TryEvadeDamage(GameObject source, out float finalEvasionChance)
+    private bool TryEvadeDamage(BattleDamage damage, out float finalEvasionChance)
     {
+        GameObject source = damage.source;
         finalEvasionChance = 0f;
         CombatStats defenderStats = stats;
         CombatStats attackerStats = BattleStatUtility.GetCombatStats(source);
+        if (damage.bypassEvasion)
+        {
+            lastIncomingDamageFinalHitChance = 1f;
+            lastIncomingDamageFinalEvasionChance = 0f;
+            lastIncomingDamageMissRoll = -1f;
+            lastIncomingDamageWasMiss = false;
+            LogPlayerAccuracyAudit(damage, defenderStats, attackerStats, 0f, 0f, 0f, 1f, -1f, false, "BypassEvasion");
+            return false;
+        }
+
         BattleStatUtility.ResolveFinalEvasionAndHitChance(
             gameObject,
             source,
@@ -996,6 +1007,7 @@ public class CombatHealth : MonoBehaviour
         Debug.Log(
             $"[CombatEvasion] attacker={(source != null ? source.name : "null")} attackerRank={BattleStatUtility.GetAttackerRankLabel(source)} defender={name} defenderSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} defenderLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} rawEvasionChance={rawEvasionChance:F4} clampedEvasionChance={clampedEvasionChance:F4} accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F2} finalEvasionChance={finalEvasionChance:F4} finalHitChance={finalHitChance:F4} randomRoll={randomRoll:F4} result={(evaded ? "Miss" : "Hit")}",
             this);
+        LogPlayerAccuracyAudit(damage, defenderStats, attackerStats, rawEvasionChance, clampedEvasionChance, finalEvasionChance, finalHitChance, randomRoll, evaded, "Roll");
 
         if (!evaded)
         {
@@ -1008,6 +1020,44 @@ public class CombatHealth : MonoBehaviour
         }
 
         return true;
+    }
+
+    private void LogPlayerAccuracyAudit(
+        BattleDamage damage,
+        CombatStats defenderStats,
+        CombatStats attackerStats,
+        float rawEvasionChance,
+        float clampedEvasionChance,
+        float finalEvasionChance,
+        float finalHitChance,
+        float randomRoll,
+        bool evaded,
+        string sourceMethod)
+    {
+        if (!BattleTargetUtility.IsPlayer(damage.source) || !BattleTargetUtility.IsMonster(gameObject))
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[PlayerAccuracyAudit] " +
+            $"activeCharacter={(damage.source != null ? damage.source.name : "null")} " +
+            $"skill={(string.IsNullOrWhiteSpace(damage.debugTag) ? "Unknown" : damage.debugTag)} " +
+            "baseAccuracy=1.0000 " +
+            $"accuracyMultiplier={BattleStatUtility.GetAccuracyMultiplier(attackerStats):F4} " +
+            $"attackerSpeed={(attackerStats != null ? attackerStats.speed : 0f):F2} " +
+            $"target={name} " +
+            $"targetSpeed={(defenderStats != null ? defenderStats.speed : 0f):F2} " +
+            $"targetLuck={(defenderStats != null ? defenderStats.luck : 0f):F2} " +
+            $"rawEvasionChance={rawEvasionChance:F4} " +
+            $"clampedEvasionChance={clampedEvasionChance:F4} " +
+            $"targetEvasion={finalEvasionChance:F4} " +
+            $"finalHitChance={finalHitChance:F4} " +
+            $"randomRoll={randomRoll:F4} " +
+            $"bypassEvasion={damage.bypassEvasion} " +
+            $"result={(evaded ? "Miss" : "Hit")} " +
+            $"sourceMethod={sourceMethod}",
+            this);
     }
 
     private float ResolveCurrentHealthForDebug()

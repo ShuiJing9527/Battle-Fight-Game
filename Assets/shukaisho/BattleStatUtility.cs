@@ -9,6 +9,7 @@ public static class BattleStatUtility
     public const float MinEliteMonsterHitChanceAgainstPlayer = 0.75f;
     public const float MinBossMonsterHitChanceAgainstPlayer = 0.85f;
     public const float MinFinalBossHitChanceAgainstPlayer = 0.90f;
+    public const float MinPlayerHitChanceAgainstMonster = 0.90f;
     public const float MaxFinalHitChance = 0.95f;
     private const float BaseEvasionChance = 0.05f;
     private const float SpeedMoveBonusPerPoint = 0.0075f;
@@ -316,6 +317,11 @@ public static class BattleStatUtility
 
     private static float ResolveMinHitChance(GameObject defender, GameObject attacker)
     {
+        if (BattleTargetUtility.IsMonster(defender) && BattleTargetUtility.IsPlayer(attacker))
+        {
+            return MinPlayerHitChanceAgainstMonster;
+        }
+
         if (!BattleTargetUtility.IsPlayer(defender))
         {
             return 0f;

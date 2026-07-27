@@ -90,12 +90,12 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
             float resolvedSpecialDamage = specialDamageAmount * skillDamageTakenMultiplier;
             if (resolvedPhysicalDamage > 0f)
             {
-                combatHealth.TakeDamage(new BattleDamage(resolvedPhysicalDamage, BattleDamageType.Physical, source));
+                combatHealth.TakeDamage(CreateUltimateDamage(resolvedPhysicalDamage, BattleDamageType.Physical));
             }
 
             if (!combatHealth.IsDead && resolvedSpecialDamage > 0f)
             {
-                combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, source));
+                combatHealth.TakeDamage(CreateUltimateDamage(resolvedSpecialDamage, BattleDamageType.Special));
             }
 
             float actualDamage = Mathf.Max(0f, beforeEffectiveHealth - ResolveCurrentEffectiveHealth(combatHealth));
@@ -112,6 +112,15 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
                 HealSource(actualDamage * healPercentOfDamage);
             }
         }
+    }
+
+    private BattleDamage CreateUltimateDamage(float amount, BattleDamageType damageType)
+    {
+        return new BattleDamage(amount, damageType, source)
+        {
+            bypassEvasion = true,
+            debugTag = "Player01 R Needle"
+        };
     }
 
     private float ConsumeRuneFirstHitBonusDamage()

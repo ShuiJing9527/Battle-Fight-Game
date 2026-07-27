@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AudioManager
   menuBgm: {fileID: 8300000, guid: 9ffb50af65bc7c643804330725b4dd2d, type: 3}
   gameBgm: {fileID: 0}
+  spiritweaveDollBgm: {fileID: 0}
   chosenChildBgm: {fileID: 8300000, guid: 001afc1eb40dc1a4dacfa67bd037b60d, type: 3}
   playerAttackSfx: {fileID: 0}
   enemyAttackSfx: {fileID: 0}

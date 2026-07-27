@@ -12,6 +12,9 @@ public class AudioManager : MonoBehaviour
     [Header("游戏场景背景音乐")]
     public AudioClip gameBgm;
 
+    [Header("灵罗娃娃背景音乐")]
+    [SerializeField] private AudioClip spiritweaveDollBgm;
+
     [Header("金色神眷之子背景音乐")]
     public AudioClip chosenChildBgm;
 
@@ -200,6 +203,11 @@ public class AudioManager : MonoBehaviour
         PlayBGM(gameBgm);
     }
 
+    public void PlaySpiritweaveDollBGM()
+    {
+        PlayBGM(spiritweaveDollBgm);
+    }
+
     public void PlayChosenChildBGM()
     {
         PlayBGM(chosenChildBgm);
@@ -213,7 +221,7 @@ public class AudioManager : MonoBehaviour
             return;
         }
 
-        PlayGameBGM();
+        PlaySpiritweaveDollBGM();
     }
 
     private void PlayBGM(AudioClip clip)

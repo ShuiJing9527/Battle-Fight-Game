@@ -346,6 +346,11 @@ public class PlayerAttributePanelUI : MonoBehaviour
             TogglePanel();
         }
 
+        if (isVisible && Input.GetKeyDown(KeyCode.Escape))
+        {
+            ClosePanel();
+        }
+
         if (isVisible && panelRoot != null && panelRoot.gameObject.activeSelf && Time.unscaledTime >= nextRefreshTime)
         {
             RefreshPlayerCache(force: false);

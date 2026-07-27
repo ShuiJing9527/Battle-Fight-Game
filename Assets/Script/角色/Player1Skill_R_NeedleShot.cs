@@ -1014,12 +1014,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
         if (resolvedPhysicalDamage > 0f)
         {
-            combatHealth.TakeDamage(new BattleDamage(resolvedPhysicalDamage, BattleDamageType.Physical, gameObject));
+            combatHealth.TakeDamage(CreateUltimateDamage(resolvedPhysicalDamage, BattleDamageType.Physical, "Player01 R Thrust"));
         }
 
         if (!combatHealth.IsDead && resolvedSpecialDamage > 0f)
         {
-            combatHealth.TakeDamage(new BattleDamage(resolvedSpecialDamage, BattleDamageType.Special, gameObject));
+            combatHealth.TakeDamage(CreateUltimateDamage(resolvedSpecialDamage, BattleDamageType.Special, "Player01 R Thrust"));
         }
 
         TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
@@ -1049,6 +1049,15 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         NotifySkillDamageApplied(actualDamage, combatHealth, "R thrust");
         UpdateMeleeDamageCache(actualDamage, combatHealth, resolvedPhysicalDamage + resolvedSpecialDamage);
         RegisterDamageResult(combatHealth, actualDamage, actualDamage > 0f && combatHealth.IsDead);
+    }
+
+    private BattleDamage CreateUltimateDamage(float amount, BattleDamageType damageType, string debugTag)
+    {
+        return new BattleDamage(amount, damageType, gameObject)
+        {
+            bypassEvasion = true,
+            debugTag = debugTag
+        };
     }
 
     private void RegisterDamageResult(CombatHealth target, float actualDamage, bool killedByThisHit)
