@@ -212,6 +212,7 @@ public class Player2Bootstrap : MonoBehaviour
         }
 
         SafeRefreshSkillHud(CurrentPlayer);
+        SyncCurrentPlayerBgm();
 
         if (disablePlayer2AnimatorIfSharedController)
         {
@@ -407,6 +408,17 @@ public class Player2Bootstrap : MonoBehaviour
         SafeRefreshSkillHud(nextActive);
         ClearTransitionBlessing(previousPlayer, "SwitchOut");
         nextInactive.SetActive(false);
+        SyncCurrentPlayerBgm();
+    }
+
+    private void SyncCurrentPlayerBgm()
+    {
+        if (AudioManager.Instance == null || CurrentPlayer == null)
+        {
+            return;
+        }
+
+        AudioManager.Instance.PlayBGMForCharacter(CurrentPlayer == player02);
     }
 
     private bool CanSwitchTwinPlayer(GameObject previousPlayer, GameObject newPlayer, out string blockedReason)

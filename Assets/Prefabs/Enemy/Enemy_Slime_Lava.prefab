@@ -588,7 +588,7 @@ MonoBehaviour:
   rb: {fileID: 7990415199108324068}
   minMoveSpeed: 0.1
   soundInterval: 0.45
-  volume: 0.7
+  volume: 0.55
 --- !u!114 &-4545700748075916047
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -607,7 +607,7 @@ MonoBehaviour:
   jumpVelocityThreshold: 2
   jumpSfx: {fileID: 0}
   landSfx: {fileID: 8300000, guid: 83a7f97d5fa3fd649bca406e9e6ca9d0, type: 3}
-  volume: 0.8
+  volume: 0.65
   jumpCooldown: 0.8
   groundCheck: {fileID: 0}
   groundCheckRadius: 0.25

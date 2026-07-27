@@ -46,6 +46,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::AudioManager
   menuBgm: {fileID: 8300000, guid: 9ffb50af65bc7c643804330725b4dd2d, type: 3}
   gameBgm: {fileID: 0}
+  chosenChildBgm: {fileID: 8300000, guid: 001afc1eb40dc1a4dacfa67bd037b60d, type: 3}
   playerAttackSfx: {fileID: 0}
   enemyAttackSfx: {fileID: 0}
   playerHitSfx: {fileID: 0}
@@ -57,3 +58,6 @@ MonoBehaviour:
   closePanelSfx: {fileID: 0}
   defaultBgmVolume: 0.5
   defaultSfxVolume: 0.8
+  maxSlimeSfxVoices: 2
+  slimeSfxCooldown: 0.12
+  skillSfxBoost: 1.15

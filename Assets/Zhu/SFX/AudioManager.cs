@@ -12,6 +12,9 @@ public class AudioManager : MonoBehaviour
     [Header("游戏场景背景音乐")]
     public AudioClip gameBgm;
 
+    [Header("金色神眷之子背景音乐")]
+    public AudioClip chosenChildBgm;
+
     [Header("通用音效")]
     public AudioClip playerAttackSfx;
     public AudioClip enemyAttackSfx;
@@ -39,14 +42,25 @@ public class AudioManager : MonoBehaviour
     [Tooltip("同一个音效最短间隔，防止一堆史莱姆同时乱叫")]
     public float sameClipCooldown = 0.08f;
 
+    [Tooltip("全场允许同时播放的史莱姆音效数量")]
+    [Min(1)] public int maxSlimeSfxVoices = 2;
+
+    [Tooltip("任意两个史莱姆音效之间的最短间隔")]
+    [Min(0f)] public float slimeSfxCooldown = 0.12f;
+
     [Tooltip("普通音效整体压低，防止盖住BGM")]
     [Range(0f, 1f)] public float globalSfxLimiter = 0.75f;
+
+    [Tooltip("玩家技能音效额外增益")]
+    [Range(1f, 2f)] public float skillSfxBoost = 1.15f;
 
     private AudioSource bgmSource;
     private List<AudioSource> sfxSources = new List<AudioSource>();
     private Dictionary<AudioClip, float> lastClipPlayTime = new Dictionary<AudioClip, float>();
+    private HashSet<AudioSource> activeSlimeSources = new HashSet<AudioSource>();
 
     private int sfxIndex = 0;
+    private float lastSlimeSfxPlayTime = -999f;
 
     private void Awake()
     {
@@ -103,6 +117,7 @@ public class AudioManager : MonoBehaviour
         bgmSource.loop = true;
 
         sfxSources.Clear();
+        activeSlimeSources.Clear();
 
         for (int i = 1; i < oldSources.Length; i++)
         {
@@ -174,6 +189,22 @@ public class AudioManager : MonoBehaviour
     public void PlayGameBGM()
     {
         PlayBGM(gameBgm);
+    }
+
+    public void PlayChosenChildBGM()
+    {
+        PlayBGM(chosenChildBgm);
+    }
+
+    public void PlayBGMForCharacter(bool isChosenChild)
+    {
+        if (isChosenChild)
+        {
+            PlayChosenChildBGM();
+            return;
+        }
+
+        PlayGameBGM();
     }
 
     private void PlayBGM(AudioClip clip)
@@ -254,7 +285,32 @@ public class AudioManager : MonoBehaviour
 
     public void PlaySFX(AudioClip clip, float volumeMultiplier)
     {
-        if (clip == null) return;
+        PlaySFXInternal(clip, volumeMultiplier, false);
+    }
+
+    public void PlaySlimeSFX(AudioClip clip, float volumeMultiplier = 1f)
+    {
+        activeSlimeSources.RemoveWhere(source => source == null || !source.isPlaying);
+
+        if (activeSlimeSources.Count >= Mathf.Max(1, maxSlimeSfxVoices))
+        {
+            return;
+        }
+
+        if (Time.time - lastSlimeSfxPlayTime < Mathf.Max(0f, slimeSfxCooldown))
+        {
+            return;
+        }
+
+        if (PlaySFXInternal(clip, volumeMultiplier, true))
+        {
+            lastSlimeSfxPlayTime = Time.time;
+        }
+    }
+
+    private bool PlaySFXInternal(AudioClip clip, float volumeMultiplier, bool isSlimeSfx)
+    {
+        if (clip == null) return false;
 
         if (sfxSources == null || sfxSources.Count == 0)
         {
@@ -263,25 +319,36 @@ public class AudioManager : MonoBehaviour
 
         if (IsSameClipTooSoon(clip))
         {
-            return;
+            return false;
         }
 
         AudioSource source = GetAvailableSfxSource();
 
         if (source == null)
         {
-            return;
+            return false;
         }
 
         float finalVolume = sfxVolume * volumeMultiplier * globalSfxLimiter;
         finalVolume = Mathf.Clamp01(finalVolume);
 
         lastClipPlayTime[clip] = Time.time;
+        activeSlimeSources.Remove(source);
+        if (isSlimeSfx)
+        {
+            activeSlimeSources.Add(source);
+        }
 
         source.Stop();
         source.clip = clip;
         source.volume = finalVolume;
         source.Play();
+        return true;
+    }
+
+    public void PlaySkillSFX(AudioClip clip, float volumeMultiplier = 1f)
+    {
+        PlaySFX(clip, volumeMultiplier * skillSfxBoost);
     }
 
     private bool IsSameClipTooSoon(AudioClip clip)

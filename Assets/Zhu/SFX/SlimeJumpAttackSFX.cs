@@ -22,7 +22,7 @@ public class SlimeJumpSFX : MonoBehaviour
 
     [Header("音量")]
     [Range(0f, 1f)]
-    public float volume = 0.35f;
+    public float volume = 0.3f;
 
     [Header("起跳音效冷却")]
     public float jumpCooldown = 1.2f;
@@ -109,7 +109,7 @@ public class SlimeJumpSFX : MonoBehaviour
 
         if (jumpSfx != null)
         {
-            AudioManager.Instance?.PlaySFX(jumpSfx, volume);
+            AudioManager.Instance?.PlaySlimeSFX(jumpSfx, volume);
         }
     }
 
@@ -129,7 +129,7 @@ public class SlimeJumpSFX : MonoBehaviour
 
             if (landSfx != null)
             {
-                AudioManager.Instance?.PlaySFX(landSfx, volume);
+                AudioManager.Instance?.PlaySlimeSFX(landSfx, volume);
             }
         }
 

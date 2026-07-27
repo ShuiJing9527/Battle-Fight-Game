@@ -18,12 +18,12 @@ public class AnimationSFXEvent : MonoBehaviour
 
     public void PlaySkillSFX()
     {
-        AudioManager.Instance?.PlaySFX(skillSfx, volume);
+        AudioManager.Instance?.PlaySkillSFX(skillSfx, volume);
     }
 
     public void PlaySpecialSFX()
     {
-        AudioManager.Instance?.PlaySFX(specialSfx, volume);
+        AudioManager.Instance?.PlaySkillSFX(specialSfx, volume);
     }
 
     public void PlayFootstepSFX()

@@ -15,7 +15,7 @@ public class SlimeMoveSFX : MonoBehaviour
     public float soundInterval = 0.45f;
 
     [Header("音量")]
-    [Range(0f, 1f)] public float volume = 0.7f;
+    [Range(0f, 1f)] public float volume = 0.55f;
 
     private float timer;
 
@@ -56,7 +56,7 @@ public class SlimeMoveSFX : MonoBehaviour
 
         if (clip != null)
         {
-            AudioManager.Instance?.PlaySFX(clip, volume);
+            AudioManager.Instance?.PlaySlimeSFX(clip, volume);
         }
     }
 }

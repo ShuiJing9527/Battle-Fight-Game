@@ -42,7 +42,7 @@ public class SkillSFXByKey : MonoBehaviour
     {
         if (flashSfx != null)
         {
-            AudioManager.Instance?.PlaySFX(flashSfx, volume);
+            AudioManager.Instance?.PlaySkillSFX(flashSfx, volume);
         }
     }
 
@@ -50,7 +50,7 @@ public class SkillSFXByKey : MonoBehaviour
     {
         if (dashSfx != null)
         {
-            AudioManager.Instance?.PlaySFX(dashSfx, volume);
+            AudioManager.Instance?.PlaySkillSFX(dashSfx, volume);
         }
     }
 
@@ -58,7 +58,7 @@ public class SkillSFXByKey : MonoBehaviour
     {
         if (skillSfx != null)
         {
-            AudioManager.Instance?.PlaySFX(skillSfx, volume);
+            AudioManager.Instance?.PlaySkillSFX(skillSfx, volume);
         }
     }
 }
