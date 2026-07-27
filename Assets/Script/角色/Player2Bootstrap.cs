@@ -6,7 +6,7 @@ public class Player2Bootstrap : MonoBehaviour
 {
     private const string TwinShiftRewardShieldSourceId = "TwinShiftReward";
     private const string CharacterSwitchEnergyNotFullKey = "CharacterSwitch_EnergyNotFull";
-    private const string CharacterSwitchEnergyNotFullFallback = "能量槽未满，无法切换角色";
+    private const string CharacterSwitchEnergyNotFullFallback = "能量槽未满，无法切换角色。";
     private const float CharacterSwitchEnergyNotFullHintDuration = 2f;
 
     [Header("Party Members")]
@@ -62,7 +62,6 @@ public class Player2Bootstrap : MonoBehaviour
     private GUIStyle switchHintStyle;
     private GUIStyle healthBarLabelStyle;
     private bool warnedMissingTwinShiftVfxPlayer;
-    private PlayerStatusHUD cachedStatusHud;
 
     private void Start()
     {
@@ -482,18 +481,10 @@ public class Player2Bootstrap : MonoBehaviour
             return;
         }
 
-        if (cachedStatusHud == null)
-        {
-            cachedStatusHud = FindObjectOfType<PlayerStatusHUD>(true);
-        }
-
-        if (cachedStatusHud != null)
-        {
-            cachedStatusHud.ShowTemporarySwitchHint(
-                CharacterSwitchEnergyNotFullKey,
-                CharacterSwitchEnergyNotFullFallback,
-                CharacterSwitchEnergyNotFullHintDuration);
-        }
+        CharacterSwitchWarningPopup.ShowLocalized(
+            CharacterSwitchEnergyNotFullKey,
+            CharacterSwitchEnergyNotFullFallback,
+            CharacterSwitchEnergyNotFullHintDuration);
     }
 
     private bool TryFinalizeTwinShift(GameObject previousPlayer, GameObject newPlayer, Vector3 switchPosition)
