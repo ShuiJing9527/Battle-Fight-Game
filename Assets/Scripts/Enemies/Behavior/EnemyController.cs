@@ -1293,7 +1293,7 @@ public class EnemyController : MonoBehaviour
         ResetBossAirborneLandingState(transform.position.y, true);
         pendingAttackTarget = target;
         lastAttackTime = Time.time;
-        nextBossLeapAttackTime = Time.time + Mathf.Max(0.1f, bossLeapCooldown);
+        nextBossLeapAttackTime = Time.time + ResolveBossCooldownWithDemoRecovery(bossLeapCooldown);
         rb.linearVelocity = Vector3.zero;
         LogBossLeapSlamConfigTraceOnce("BeginBossLeapSlam");
         BeginBossLeapBodyOverride();
@@ -1518,7 +1518,7 @@ public class EnemyController : MonoBehaviour
 
         pendingAttackTarget = playerTarget;
         lastAttackTime = Time.time;
-        nextBossSplitAttackTime = Time.time + Mathf.Max(0.1f, bossSplitCooldown);
+        nextBossSplitAttackTime = Time.time + ResolveBossCooldownWithDemoRecovery(bossSplitCooldown);
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
         CancelInvoke(nameof(FinishAttackRecovery));
@@ -1616,7 +1616,7 @@ public class EnemyController : MonoBehaviour
 
         pendingAttackTarget = target;
         lastAttackTime = Time.time;
-        nextBossDevourAttackTime = Time.time + Mathf.Max(0.1f, bossDevourCooldown);
+        nextBossDevourAttackTime = Time.time + ResolveBossCooldownWithDemoRecovery(bossDevourCooldown);
         activeBossDevourRuntimeConfig = devourSkill != null ? devourSkill.BuildRuntimeConfig() : default;
         if (rb != null)
         {
@@ -2195,7 +2195,8 @@ public class EnemyController : MonoBehaviour
 
             float configuredDamage = Mathf.Max(0f, bossLeapSlamLandingDamage);
             float attackScale = MonsterDayNightAffinity.ResolveAttackScale(gameObject, BattleDamageType.Physical);
-            float damage = configuredDamage * attackScale;
+            float demoDamageMultiplier = EnemyDifficultyDirector.ResolveEnemyOutgoingDamageMultiplier(gameObject);
+            float damage = configuredDamage * attackScale * demoDamageMultiplier;
             Vector3 launchVelocity = horizontalDirection * Mathf.Max(0f, bossLeapSlamKnockbackHorizontal) + Vector3.up * Mathf.Max(0f, bossLeapSlamKnockbackVertical);
             float playerHpBefore = ResolveCombatHealthValue(targetHealth);
             float playerShieldBefore = targetHealth.GetShield();
@@ -2267,6 +2268,7 @@ public class EnemyController : MonoBehaviour
                     " target=" + targetHealth.name +
                     " configuredDamage=" + configuredDamage.ToString("F2") +
                     " attackScale=" + attackScale.ToString("F2") +
+                    " demoDamageMultiplier=" + demoDamageMultiplier.ToString("F2") +
                     " damage=" + damage.ToString("F2"),
                     this);
             }
@@ -4172,7 +4174,7 @@ public class EnemyController : MonoBehaviour
 
         pendingAttackTarget = target;
         lastAttackTime = Time.time;
-        nextBossRangedAttackTime = Time.time + Mathf.Max(0.1f, bossRangedAttackCooldown);
+        nextBossRangedAttackTime = Time.time + ResolveBossCooldownWithDemoRecovery(bossRangedAttackCooldown);
         rb.linearVelocity = Vector3.zero;
         StopMoveAnimation();
         CancelInvoke(nameof(FinishAttackRecovery));
@@ -6256,7 +6258,18 @@ public class EnemyController : MonoBehaviour
         float baseAttackCooldown = Mathf.Max(0.1f, attackCooldown * Mathf.Max(0.1f, attackIntervalMultiplier));
         float attackSpeedMultiplier = BattleStatUtility.GetEnemyAttackSpeedMultiplier(combatStats);
         float externalAttackCooldownMultiplier = Mathf.Max(1f, ResolveAttackMultiplier());
-        return Mathf.Max(0.1f, baseAttackCooldown / Mathf.Max(0.1f, attackSpeedMultiplier) * externalAttackCooldownMultiplier);
+        float cooldown = Mathf.Max(0.1f, baseAttackCooldown / Mathf.Max(0.1f, attackSpeedMultiplier) * externalAttackCooldownMultiplier);
+        if (attackStyle == MonsterAttackStyle.ElementalBoss)
+        {
+            cooldown += EnemyDifficultyDirector.ResolveBossAttackRecoveryBonus(gameObject);
+        }
+
+        return cooldown;
+    }
+
+    private float ResolveBossCooldownWithDemoRecovery(float cooldown)
+    {
+        return Mathf.Max(0.1f, cooldown) + EnemyDifficultyDirector.ResolveBossAttackRecoveryBonus(gameObject);
     }
 
     private void LogAttackDiagnostics(

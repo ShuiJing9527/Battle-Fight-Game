@@ -486,7 +486,9 @@ public class BossSlimeDevourStatus : MonoBehaviour
         out float targetDefense)
     {
         targetDefense = 0f;
-        scaledDamage = Mathf.Max(0f, configuredDamage) * MonsterDayNightAffinity.ResolveAttackScale(damageSource, damageType);
+        scaledDamage = Mathf.Max(0f, configuredDamage)
+            * MonsterDayNightAffinity.ResolveAttackScale(damageSource, damageType)
+            * EnemyDifficultyDirector.ResolveEnemyOutgoingDamageMultiplier(damageSource);
         if (health == null)
         {
             return scaledDamage;

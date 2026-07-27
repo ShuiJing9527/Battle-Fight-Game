@@ -44,6 +44,12 @@ public class CombatHealth : MonoBehaviour
     private bool lastIncomingDamageWasMiss;
     private static DamagePopupFloatingText defaultDamagePopupPrefab;
     private static bool attemptedLoadDefaultDamagePopupPrefab;
+    private float nextPlayerMonsterDamageAllowedTime;
+    private float lastCurrentHealthBeforeDeath = -1f;
+    private float lastMaxHealthBeforeDeath = -1f;
+    private float lastDamageBeforeDeath;
+    private string lastDamageSourceMethod = "None";
+    private GameObject lastDamageSourceObject;
 
     private float MaxHealth => stats != null ? stats.maxHealth : (resourceBank != null ? resourceBank.maxHealth : currentHealth);
     public float MaxHealthValue => MaxHealth;
@@ -239,6 +245,30 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
+        if (ShouldBlockPlayerMonsterDamageByInvincibility(resolvedMonsterSource, out float invincibilityRemaining))
+        {
+            if (logBossPlayerDamage)
+            {
+                Debug.Log(
+                    "[BossMeleeDamageFlow] enemy=" + GetDebugObjectName(damage.source) +
+                    " target=" + name +
+                    " source=BossMelee damageBeforeModifiers=" + damage.amount.ToString("F2") +
+                    " damageAfterModifiers=0.00" +
+                    " hitChance=" + lastIncomingDamageFinalHitChance.ToString("F4") +
+                    " missRoll=" + lastIncomingDamageMissRoll.ToString("F4") +
+                    " isMiss=false targetInvincible=true targetShield=" + playerShieldBefore.ToString("F2") +
+                    " targetCombatHealthFound=true TakeDamageCalled=true result=invincible" +
+                    " invincibilityRemaining=" + invincibilityRemaining.ToString("F2") +
+                    " playerHpBefore=" + playerHpBefore.ToString("F2") +
+                    " playerHpAfter=" + playerHpBefore.ToString("F2"),
+                    gameObject);
+            }
+
+            DayNightGaugeHitFlowLog($"TakeDamage(BattleDamage) skipped reason=player-monster-hit-invincible source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} remaining={invincibilityRemaining:F2}", gameObject);
+            return;
+        }
+
         float outgoingDamage = damage.bypassAttackerMultipliers
             ? Mathf.Max(0f, damage.amount)
             : BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
@@ -256,7 +286,6 @@ public class CombatHealth : MonoBehaviour
             finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _, includeAmbientAffinity);
         }
         float afterAffinityDamage = finalDamage;
-        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
         finalDamage = TwinStateCombatBonus.ApplyNightChildIncomingDamageReduction(gameObject, resolvedMonsterSource, finalDamage, this, damage.debugTag);
         float afterTwinReductionDamage = finalDamage;
         runeRuntimeState = ResolveRuneRuntimeState();
@@ -290,6 +319,10 @@ public class CombatHealth : MonoBehaviour
         float combatHealthCurrentAfter = currentHealth;
         float resourceBankCurrentAfter = resourceBank != null ? resourceBank.currentHealth : -1f;
         bool damageApplied = combatHealthCurrentAfter < combatHealthCurrentBefore || (resourceBank != null && resourceBankCurrentAfter < resourceBankCurrentBefore);
+        if (resolvedDamageBeforeShieldAndGuard > 0f)
+        {
+            ArmPlayerMonsterDamageInvincibility(resolvedMonsterSource);
+        }
 
         if (finalDamage <= 0f)
         {
@@ -443,6 +476,11 @@ public class CombatHealth : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
+            lastCurrentHealthBeforeDeath = resourceBank != null ? resourceBankCurrentBefore : combatHealthCurrentBefore;
+            lastMaxHealthBeforeDeath = resourceBank != null ? resourceBank.maxHealth : MaxHealthValue;
+            lastDamageBeforeDeath = finalDamage;
+            lastDamageSourceMethod = "TakeDamage";
+            lastDamageSourceObject = damage.source;
             Die(damage.source);
         }
     }
@@ -470,6 +508,9 @@ public class CombatHealth : MonoBehaviour
 
     public void ApplyDirectDamage(BattleDamage damage, DamagePopupType popupType)
     {
+        float currentHealthBefore = resourceBank != null ? resourceBank.currentHealth : currentHealth;
+        float maxHealthBefore = resourceBank != null ? resourceBank.maxHealth : MaxHealthValue;
+
         if (dead)
         {
             DayNightGaugeHitFlowLog("ApplyDirectDamage skipped reason=target-dead", gameObject);
@@ -489,6 +530,13 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
+        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
+        if (ShouldBlockPlayerMonsterDamageByInvincibility(resolvedMonsterSource, out float invincibilityRemaining))
+        {
+            DayNightGaugeHitFlowLog($"ApplyDirectDamage skipped reason=player-monster-hit-invincible source={GetDebugObjectName(damage.source)} target={GetDebugObjectName(gameObject)} remaining={invincibilityRemaining:F2}", gameObject);
+            return;
+        }
+
         float finalDamage = damage.bypassAttackerMultipliers
             ? Mathf.Max(0f, damage.amount)
             : BattleStatUtility.ApplyPlayerMoveSpeedDamageBonus(damage.source, damage.amount);
@@ -497,7 +545,6 @@ public class CombatHealth : MonoBehaviour
             bool includeAmbientAffinity = !damage.bypassAttackerMultipliers && !damage.bypassAmbientAffinity;
             finalDamage = DayNightAffinityDamageModifier.ApplyModifier(damage.source, gameObject, finalDamage, out _, includeAmbientAffinity);
         }
-        GameObject resolvedMonsterSource = ResolveIncomingMonsterSource(damage.source);
         finalDamage = TwinStateCombatBonus.ApplyNightChildIncomingDamageReduction(gameObject, resolvedMonsterSource, finalDamage, this, damage.debugTag);
         runeRuntimeState = ResolveRuneRuntimeState();
         if (resolvedMonsterSource != null && runeRuntimeState != null)
@@ -507,6 +554,10 @@ public class CombatHealth : MonoBehaviour
         finalDamage *= GetIncomingDamageMultiplier();
         float resolvedDamageBeforeShield = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
+        if (resolvedDamageBeforeShield > 0f)
+        {
+            ArmPlayerMonsterDamageInvincibility(resolvedMonsterSource);
+        }
 
         if (resourceBank != null)
         {
@@ -571,6 +622,11 @@ public class CombatHealth : MonoBehaviour
 
         if (currentHealth <= 0f)
         {
+            lastCurrentHealthBeforeDeath = currentHealthBefore;
+            lastMaxHealthBeforeDeath = maxHealthBefore;
+            lastDamageBeforeDeath = finalDamage;
+            lastDamageSourceMethod = "ApplyDirectDamage";
+            lastDamageSourceObject = damage.source;
             Die(damage.source);
         }
     }
@@ -598,6 +654,40 @@ public class CombatHealth : MonoBehaviour
         }
 
         return false;
+    }
+
+    private bool ShouldBlockPlayerMonsterDamageByInvincibility(GameObject resolvedMonsterSource, out float remainingSeconds)
+    {
+        remainingSeconds = 0f;
+        if (resolvedMonsterSource == null || !BattleTargetUtility.IsPlayer(gameObject))
+        {
+            return false;
+        }
+
+        float duration = EnemyDifficultyDirector.ResolvePlayerHitInvincibleDuration();
+        if (duration <= 0f)
+        {
+            return false;
+        }
+
+        remainingSeconds = nextPlayerMonsterDamageAllowedTime - Time.time;
+        return remainingSeconds > 0f;
+    }
+
+    private void ArmPlayerMonsterDamageInvincibility(GameObject resolvedMonsterSource)
+    {
+        if (resolvedMonsterSource == null || !BattleTargetUtility.IsPlayer(gameObject))
+        {
+            return;
+        }
+
+        float duration = EnemyDifficultyDirector.ResolvePlayerHitInvincibleDuration();
+        if (duration <= 0f)
+        {
+            return;
+        }
+
+        nextPlayerMonsterDamageAllowedTime = Mathf.Max(nextPlayerMonsterDamageAllowedTime, Time.time + duration);
     }
 
     public void Heal(float amount)
@@ -1020,6 +1110,7 @@ public class CombatHealth : MonoBehaviour
         if (BattleTargetUtility.IsPlayer(gameObject))
         {
             LogPlayerDeathTrace($"HP reached zero on {name}");
+            LogPlayerDeathAudit(killer);
         }
 
         dead = true;
@@ -1130,5 +1221,36 @@ public class CombatHealth : MonoBehaviour
         }
 
         Debug.Log("[PlayerDeathTrace] " + message, this);
+    }
+
+    private void LogPlayerDeathAudit(GameObject killer)
+    {
+        RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
+        string equippedRunes = runtimeState != null
+            ? "total=" + runtimeState.GetTotalEquippedRuneCount()
+                + " life=" + runtimeState.GetGlobalRuneCount(RuneType.Life)
+                + " shield=" + runtimeState.GetGlobalRuneCount(RuneType.Shield)
+                + " mana=" + runtimeState.GetGlobalRuneCount(RuneType.Mana)
+                + " thorn=" + runtimeState.GetGlobalRuneCount(RuneType.Thorn)
+                + " luck=" + runtimeState.GetGlobalRuneCount(RuneType.Luck)
+            : "none";
+        float currentHp = resourceBank != null ? resourceBank.currentHealth : currentHealth;
+        float maxHp = resourceBank != null ? resourceBank.maxHealth : MaxHealthValue;
+
+        Debug.Log(
+            "[PlayerDeathAudit] " +
+            "currentHPBefore=" + lastCurrentHealthBeforeDeath.ToString("F2") +
+            " currentHPAfter=" + currentHp.ToString("F2") +
+            " maxHPBefore=" + lastMaxHealthBeforeDeath.ToString("F2") +
+            " maxHP=" + maxHp.ToString("F2") +
+            " lastDamage=" + lastDamageBeforeDeath.ToString("F2") +
+            " deathReason=HealthReachedZero" +
+            " sourceMethod=" + lastDamageSourceMethod +
+            " sourceObject=" + GetDebugObjectName(lastDamageSourceObject) +
+            " killer=" + GetDebugObjectName(killer) +
+            " activeCharacter=" + name +
+            " equippedRunes=" + equippedRunes +
+            " stackTrace=" + Environment.StackTrace,
+            this);
     }
 }

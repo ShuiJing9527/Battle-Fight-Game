@@ -2352,7 +2352,8 @@ public class EnemySpawner : MonoBehaviour
         BattleDamageType damageType = identity.attackStyle == MonsterAttackStyle.Melee ? BattleDamageType.Physical : BattleDamageType.Special;
         float attackPower = damageType == BattleDamageType.Physical ? stats.physicalAttack : stats.specialAttack;
         float attackIntervalMultiplier = ResolveRankAttackIntervalMultiplier(identity.rank);
-        float outgoingDamageMultiplier = ResolveRankOutgoingDamageMultiplier(identity.rank);
+        float outgoingDamageMultiplier = ResolveRankOutgoingDamageMultiplier(identity.rank)
+            * EnemyDifficultyDirector.ResolveEnemyOutgoingDamageMultiplier(enemy);
         if (enemy == cleanupBossInstance)
         {
             attackIntervalMultiplier *= Mathf.Max(0.01f, cleanupBossAttackIntervalMultiplier);

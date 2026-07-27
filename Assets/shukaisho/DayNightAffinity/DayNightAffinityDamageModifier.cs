@@ -80,7 +80,8 @@ public static class DayNightAffinityDamageModifier
             {
                 if (defenderHasNightChildState)
                 {
-                    multiplier *= defenderNightChildFavorable ? 0.5f : 2f;
+                    // Exhibition balance: wrong day/night character now takes +50% instead of +100%.
+                    multiplier *= defenderNightChildFavorable ? 0.5f : EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
                     reason = AppendReason(
                         reason,
                         defenderNightChildFavorable
@@ -96,7 +97,8 @@ public static class DayNightAffinityDamageModifier
             {
                 if (defenderHasDayChildState)
                 {
-                    multiplier *= defenderDayChildFavorable ? 0.5f : 2f;
+                    // Exhibition balance: wrong day/night character now takes +50% instead of +100%.
+                    multiplier *= defenderDayChildFavorable ? 0.5f : EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
                     reason = AppendReason(
                         reason,
                         defenderDayChildFavorable

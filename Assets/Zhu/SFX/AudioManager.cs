@@ -15,6 +15,10 @@ public class AudioManager : MonoBehaviour
     [Header("金色神眷之子背景音乐")]
     public AudioClip chosenChildBgm;
 
+    [Header("Result BGM")]
+    [SerializeField] private AudioClip gameOverBgm;
+    [SerializeField] private AudioClip victoryBgm;
+
     [Header("通用音效")]
     public AudioClip playerAttackSfx;
     public AudioClip enemyAttackSfx;
@@ -61,6 +65,9 @@ public class AudioManager : MonoBehaviour
 
     private int sfxIndex = 0;
     private float lastSlimeSfxPlayTime = -999f;
+    private bool isPlayingResultBgm;
+    private bool warnedMissingGameOverBgm;
+    private bool warnedMissingVictoryBgm;
 
     private void Awake()
     {
@@ -173,10 +180,12 @@ public class AudioManager : MonoBehaviour
     {
         if (sceneName == menuSceneName)
         {
+            ClearResultBgmState();
             PlayMenuBGM();
         }
         else if (sceneName == gameSceneName)
         {
+            ClearResultBgmState();
             PlayGameBGM();
         }
     }
@@ -209,6 +218,11 @@ public class AudioManager : MonoBehaviour
 
     private void PlayBGM(AudioClip clip)
     {
+        if (isPlayingResultBgm)
+        {
+            return;
+        }
+
         if (clip == null)
         {
             Debug.LogWarning("BGM 没有拖进去");
@@ -229,11 +243,68 @@ public class AudioManager : MonoBehaviour
         bgmSource.clip = clip;
         bgmSource.volume = bgmVolume;
         bgmSource.loop = true;
+        bgmSource.ignoreListenerPause = false;
         bgmSource.Play();
+    }
+
+    public void PlayGameOverBgm()
+    {
+        PlayResultBgm(gameOverBgm, "GameOver", ref warnedMissingGameOverBgm);
+    }
+
+    public void PlayVictoryBgm()
+    {
+        PlayResultBgm(victoryBgm, "Victory", ref warnedMissingVictoryBgm);
+    }
+
+    private void PlayResultBgm(AudioClip clip, string resultName, ref bool warnedMissingClip)
+    {
+        if (clip == null)
+        {
+            if (!warnedMissingClip)
+            {
+                warnedMissingClip = true;
+                Debug.LogWarning($"[AudioManager] {resultName} BGM is not assigned.", this);
+            }
+
+            return;
+        }
+
+        if (bgmSource == null)
+        {
+            InitAudioSources();
+        }
+
+        if (bgmSource.clip == clip && bgmSource.isPlaying)
+        {
+            bgmSource.volume = bgmVolume;
+            bgmSource.loop = false;
+            bgmSource.ignoreListenerPause = true;
+            isPlayingResultBgm = true;
+            return;
+        }
+
+        bgmSource.Stop();
+        bgmSource.clip = clip;
+        bgmSource.volume = bgmVolume;
+        bgmSource.loop = false;
+        bgmSource.ignoreListenerPause = true;
+        isPlayingResultBgm = true;
+        bgmSource.Play();
+    }
+
+    private void ClearResultBgmState()
+    {
+        isPlayingResultBgm = false;
+        if (bgmSource != null)
+        {
+            bgmSource.ignoreListenerPause = false;
+        }
     }
 
     public void StopAllBGM()
     {
+        ClearResultBgmState();
         if (bgmSource != null)
         {
             bgmSource.Stop();

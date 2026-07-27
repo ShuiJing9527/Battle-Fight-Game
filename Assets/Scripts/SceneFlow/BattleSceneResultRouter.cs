@@ -253,6 +253,7 @@ public class BattleSceneResultRouter : MonoBehaviour
 
         resultTriggered = true;
         FreezeBattleBeforeResultScene();
+        AudioManager.Instance?.PlayGameOverBgm();
         LogPlayerDeathTrace("GameOver entered");
         SceneManager.LoadScene(GameOverSceneName);
     }
@@ -266,6 +267,7 @@ public class BattleSceneResultRouter : MonoBehaviour
 
         resultTriggered = true;
         FreezeBattleBeforeResultScene();
+        AudioManager.Instance?.PlayVictoryBgm();
         SceneManager.LoadScene(GameWinSceneName);
     }
 

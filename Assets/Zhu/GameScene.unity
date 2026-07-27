@@ -1444,6 +1444,7 @@ MonoBehaviour:
   languagePanel: {fileID: 0}
   creditsPanel: {fileID: 0}
   defaultSelectedObject: {fileID: 0}
+  quitButton: {fileID: 0}
   settings:
     musicVolume: 1
     sfxVolume: 1
@@ -2139,11 +2140,11 @@ PrefabInstance:
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameBgm
       value: 
-      objectReference: {fileID: 8300000, guid: d3085f3c1e0ac5148aa5ac613b74d31f, type: 3}
+      objectReference: {fileID: 8300000, guid: d7ee98b4adc04184fba2de1de7df1dd0, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: menuBgm
       value: 
-      objectReference: {fileID: 8300000, guid: 9ffb50af65bc7c643804330725b4dd2d, type: 3}
+      objectReference: {fileID: 8300000, guid: eaf8a17b30308be40876d68c73b21b8a, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: bgmVolume
       value: 0.819
@@ -2152,6 +2153,14 @@ PrefabInstance:
       propertyPath: sfxVolume
       value: 0.612
       objectReference: {fileID: 0}
+    - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
+      propertyPath: victoryBgm
+      value: 
+      objectReference: {fileID: 8300000, guid: d3085f3c1e0ac5148aa5ac613b74d31f, type: 3}
+    - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
+      propertyPath: gameOverBgm
+      value: 
+      objectReference: {fileID: 8300000, guid: 9ffb50af65bc7c643804330725b4dd2d, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameSceneName
       value: "\u8349\u539F"
@@ -2365,6 +2374,6 @@ SceneRoots:
   - {fileID: 2074656671}
   - {fileID: 2081226046}
   - {fileID: 367950579}
-  - {fileID: 356478430}
   - {fileID: 1570221544}
   - {fileID: 2500671608206394949}
+  - {fileID: 356478430}

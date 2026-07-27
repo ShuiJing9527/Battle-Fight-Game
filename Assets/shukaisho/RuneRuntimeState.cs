@@ -67,6 +67,7 @@ public class RuneRuntimeState : MonoBehaviour
     [SerializeField] private bool runeDebugLog = false;
     [SerializeField] private bool debugRuneThornCounter = false;
     [SerializeField] private bool debugRuneSetBonuses = false;
+    [SerializeField] private bool debugHealthRuneAudit = false;
 
     private CombatSkillCaster skillCaster;
     private BattleResourceBank resourceBank;
@@ -1845,6 +1846,11 @@ public class RuneRuntimeState : MonoBehaviour
 
     private void ApplyGlobalPassiveBonuses()
     {
+        float oldCurrentHealth = ResolveCurrentHealthSnapshot();
+        float oldMaxHealth = ResolveMaxHealthSnapshot();
+        bool wasAlive = oldCurrentHealth > 0f && (combatHealth == null || !combatHealth.IsDead);
+        float removedHealthBonus = appliedHealthBonus;
+
         RemoveAppliedStatBonuses();
 
         if (combatStats == null)
@@ -1928,15 +1934,150 @@ public class RuneRuntimeState : MonoBehaviour
 
         ClampCurrentShieldToRuneCap();
 
-        if (resourceBank != null)
+        bool healthRuneMaxChanged = removedHealthBonus > 0f || appliedHealthBonus > 0f || GetGlobalRuneCount(RuneType.Life) > 0;
+        if (healthRuneMaxChanged)
+        {
+            SyncHealthAfterLifeRuneMaxHealthChange(oldCurrentHealth, oldMaxHealth, wasAlive, removedHealthBonus);
+        }
+        else if (resourceBank != null)
         {
             resourceBank.SyncHealthFromCombatStats(refillCurrentHealth: false);
+            if (combatHealth != null)
+            {
+                combatHealth.SyncHealthFromStats(refillCurrentHealth: false);
+            }
+        }
+        else if (combatHealth != null)
+        {
+            combatHealth.SyncHealthFromStats(refillCurrentHealth: false);
+        }
+    }
+
+    private void SyncHealthAfterLifeRuneMaxHealthChange(float oldCurrentHealth, float oldMaxHealth, bool wasAlive, float removedHealthBonus)
+    {
+        float newMaxHealth = ResolveMaxHealthSnapshot();
+        if (!IsFiniteHealthValue(oldCurrentHealth) || !IsFiniteHealthValue(oldMaxHealth) || !IsFiniteHealthValue(newMaxHealth))
+        {
+            Debug.LogError(
+                $"[HealthRuneAudit] invalid-health-value activeCharacter={name} switchInProgress=unknown oldCurrentHP={oldCurrentHealth} oldMaxHP={oldMaxHealth} runeHealthBonus={appliedHealthBonus} newMaxHP={newMaxHealth} equipOrUnequip=Rebuild sourceMethod=ApplyGlobalPassiveBonuses",
+                this);
+            oldCurrentHealth = Mathf.Max(0f, ResolveCurrentHealthSnapshot());
+            oldMaxHealth = Mathf.Max(1f, ResolveMaxHealthSnapshot());
+            newMaxHealth = Mathf.Max(1f, newMaxHealth);
+        }
+
+        if (wasAlive && newMaxHealth <= 0f)
+        {
+            Debug.LogError(
+                $"[HealthRuneAudit] prevented-alive-player-zero-max activeCharacter={name} switchInProgress=unknown oldCurrentHP={oldCurrentHealth:F2} oldMaxHP={oldMaxHealth:F2} runeHealthBonus={appliedHealthBonus:F2} newMaxHP={newMaxHealth:F2} equipOrUnequip=Rebuild sourceMethod=ApplyGlobalPassiveBonuses",
+                this);
+            newMaxHealth = Mathf.Max(1f, oldMaxHealth);
+            if (combatStats != null)
+            {
+                combatStats.maxHealth = newMaxHealth;
+            }
+        }
+
+        float ratio = oldMaxHealth > 0f ? Mathf.Clamp01(oldCurrentHealth / oldMaxHealth) : 1f;
+        float newCurrentHealth = wasAlive
+            ? Mathf.Clamp(Mathf.Round(newMaxHealth * ratio), 1f, Mathf.Max(1f, newMaxHealth))
+            : 0f;
+
+        if (resourceBank != null)
+        {
+            resourceBank.maxHealth = Mathf.Max(0f, newMaxHealth);
+            resourceBank.currentHealth = Mathf.Clamp(newCurrentHealth, 0f, resourceBank.maxHealth);
         }
 
         if (combatHealth != null)
         {
-            combatHealth.SyncHealthFromStats(refillCurrentHealth: false);
+            combatHealth.currentHealth = resourceBank != null
+                ? resourceBank.currentHealth
+                : Mathf.Clamp(newCurrentHealth, 0f, Mathf.Max(0f, newMaxHealth));
         }
+
+        HealthRuneAuditLog(
+            "activeCharacter=" + name +
+            " switchInProgress=unknown" +
+            " oldCurrentHP=" + oldCurrentHealth.ToString("F2") +
+            " oldMaxHP=" + oldMaxHealth.ToString("F2") +
+            " removedRuneHealthBonus=" + removedHealthBonus.ToString("F2") +
+            " runeHealthBonus=" + appliedHealthBonus.ToString("F2") +
+            " newMaxHP=" + newMaxHealth.ToString("F2") +
+            " calculatedRatio=" + ratio.ToString("F4") +
+            " newCurrentHP=" + newCurrentHealth.ToString("F2") +
+            " wasAlive=" + wasAlive +
+            " equipOrUnequip=Rebuild" +
+            " sourceMethod=ApplyGlobalPassiveBonuses");
+        PlayerHealthMutationLog(
+            "reason=LifeRuneMaxHealthRebuild" +
+            " oldCurrentHP=" + oldCurrentHealth.ToString("F2") +
+            " newCurrentHP=" + newCurrentHealth.ToString("F2") +
+            " oldMaxHP=" + oldMaxHealth.ToString("F2") +
+            " newMaxHP=" + newMaxHealth.ToString("F2") +
+            " activeCharacter=" + name +
+            " switchInProgress=unknown" +
+            " sourceMethod=SyncHealthAfterLifeRuneMaxHealthChange");
+    }
+
+    private float ResolveCurrentHealthSnapshot()
+    {
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (resourceBank != null)
+        {
+            return Mathf.Max(0f, resourceBank.currentHealth);
+        }
+
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        return combatHealth != null ? Mathf.Max(0f, combatHealth.currentHealth) : 0f;
+    }
+
+    private float ResolveMaxHealthSnapshot()
+    {
+        if (combatStats == null)
+        {
+            combatStats = GetComponent<CombatStats>();
+        }
+
+        if (combatStats != null && combatStats.maxHealth > 0f)
+        {
+            return Mathf.Max(0f, combatStats.maxHealth);
+        }
+
+        if (resourceBank == null)
+        {
+            resourceBank = GetComponent<BattleResourceBank>();
+        }
+
+        if (resourceBank != null && resourceBank.maxHealth > 0f)
+        {
+            return Mathf.Max(0f, resourceBank.maxHealth);
+        }
+
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        if (combatHealth != null && combatHealth.MaxHealthValue > 0f)
+        {
+            return Mathf.Max(0f, combatHealth.MaxHealthValue);
+        }
+
+        return 0f;
+    }
+
+    private static bool IsFiniteHealthValue(float value)
+    {
+        return !float.IsNaN(value) && !float.IsInfinity(value);
     }
 
     private void ApplyFlatCombatStatBonuses(
@@ -2214,6 +2355,30 @@ public class RuneRuntimeState : MonoBehaviour
         }
 
         Debug.Log($"[RuneSetBonusTrace] {message}", this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void HealthRuneAuditLog(string message)
+    {
+        if (!debugHealthRuneAudit)
+        {
+            return;
+        }
+
+        Debug.Log($"[HealthRuneAudit] {message}", this);
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void PlayerHealthMutationLog(string message)
+    {
+        if (!debugHealthRuneAudit)
+        {
+            return;
+        }
+
+        Debug.Log($"[PlayerHealthMutation] {message}", this);
     }
 
 }

@@ -81,6 +81,20 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [Tooltip("Extra alive-enemy cap granted while FinalRush is active.")]
     [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 40;
 
+    [Header("Demo Balance")]
+    [Tooltip("Exhibition balance: final outgoing damage multiplier for all non-Boss monsters.")]
+    [SerializeField, Range(0.01f, 1f)] private float normalEnemyDamageMultiplier = 0.8f;
+    [Tooltip("Exhibition balance: final outgoing damage multiplier for Boss attacks.")]
+    [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 0.85f;
+    [Tooltip("Exhibition balance: wrong day/night character incoming damage multiplier. 1.5 means +50% damage.")]
+    [SerializeField, Min(1f)] private float wrongTimeDamageMultiplier = 1.5f;
+    [Tooltip("Exhibition balance: player monster-hit invincibility duration in seconds.")]
+    [SerializeField, Min(0f)] private float playerHitInvincibleDuration = 0.8f;
+    [Tooltip("Exhibition balance: extra cooldown after Boss main attacks.")]
+    [SerializeField, Min(0f)] private float bossAttackRecoveryBonus = 0.7f;
+    [Tooltip("Exhibition balance: early-game spawn pressure multiplier. 0.8 means spawn intervals are 25% longer during initial grace.")]
+    [SerializeField, Range(0.1f, 1f)] private float earlyGameSpawnMultiplier = 0.8f;
+
     [Header("Boss Spawn By Kills")]
     [SerializeField, Min(1)] private int killsPerBossSpawn = 100;
 
@@ -181,6 +195,53 @@ public class EnemyDifficultyDirector : MonoBehaviour
     public float CurrentSpawnIntervalMultiplier => ResolveSpawnIntervalMultiplier();
     public int CurrentExtraMaxAlive => ResolveExtraMaxAlive();
     public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
+    public float NormalEnemyDamageMultiplier => Mathf.Clamp(normalEnemyDamageMultiplier, 0.01f, 1f);
+    public float BossDamageMultiplier => Mathf.Clamp(bossDamageMultiplier, 0.01f, 1f);
+    public float WrongTimeDamageMultiplier => Mathf.Max(1f, wrongTimeDamageMultiplier);
+    public float PlayerHitInvincibleDuration => Mathf.Max(0f, playerHitInvincibleDuration);
+    public float BossAttackRecoveryBonus => Mathf.Max(0f, bossAttackRecoveryBonus);
+    public float EarlyGameSpawnMultiplier => Mathf.Clamp(earlyGameSpawnMultiplier, 0.1f, 1f);
+
+    public static float ResolveEnemyOutgoingDamageMultiplier(GameObject enemy)
+    {
+        MonsterIdentity identity = enemy != null ? enemy.GetComponentInParent<MonsterIdentity>() : null;
+        if (identity == null)
+        {
+            return 1f;
+        }
+
+        EnemyDifficultyDirector director = Instance;
+        if (identity.rank == MonsterRank.Boss)
+        {
+            return director != null ? director.BossDamageMultiplier : 0.85f;
+        }
+
+        return director != null ? director.NormalEnemyDamageMultiplier : 0.8f;
+    }
+
+    public static float ResolveWrongTimeDamageMultiplier()
+    {
+        EnemyDifficultyDirector director = Instance;
+        return director != null ? director.WrongTimeDamageMultiplier : 1.5f;
+    }
+
+    public static float ResolvePlayerHitInvincibleDuration()
+    {
+        EnemyDifficultyDirector director = Instance;
+        return director != null ? director.PlayerHitInvincibleDuration : 0.8f;
+    }
+
+    public static float ResolveBossAttackRecoveryBonus(GameObject enemy)
+    {
+        MonsterIdentity identity = enemy != null ? enemy.GetComponentInParent<MonsterIdentity>() : null;
+        if (identity == null || identity.rank != MonsterRank.Boss)
+        {
+            return 0f;
+        }
+
+        EnemyDifficultyDirector director = Instance;
+        return director != null ? director.BossAttackRecoveryBonus : 0.7f;
+    }
 
     private void Awake()
     {
@@ -545,6 +606,11 @@ public class EnemyDifficultyDirector : MonoBehaviour
     private float ResolveSpawnIntervalMultiplier()
     {
         float multiplier = 1f / (1f + CurrentDifficultyLevel * Mathf.Max(0f, spawnRateGrowthPerLevel));
+        if (IsInitialGraceActive)
+        {
+            multiplier /= EarlyGameSpawnMultiplier;
+        }
+
         if (currentPhase == DifficultyPhase.FinalRush)
         {
             multiplier *= Mathf.Max(0.01f, finalRushSpawnIntervalMultiplier);
