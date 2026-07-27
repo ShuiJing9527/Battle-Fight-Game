@@ -69,7 +69,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: b40028e7a67109447a173990dafd0a1e, type: 2}
+  - {fileID: 2100000, guid: 6c9a8ebc4e9d4cb888604895471af5f3, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0
@@ -162,9 +162,9 @@ MonoBehaviour:
   destroyOnHit: 1
   hitSplashPrefab: {fileID: 1000000000000000000, guid: 5b2c0bc346624d8ab8ac2780cf98eab2, type: 3}
   visualRoot: {fileID: 0}
-  bodyMaterial: {fileID: 0}
-  trailMaterial: {fileID: 0}
-  splashMaterial: {fileID: 0}
+  bodyMaterial: {fileID: 2100000, guid: 6c9a8ebc4e9d4cb888604895471af5f3, type: 2}
+  trailMaterial: {fileID: 2100000, guid: d6db166043654d778a3e5f0f3e6f2fa6, type: 2}
+  splashMaterial: {fileID: 2100000, guid: 50f6bb0f1a3b48bf81f3bf78be16f838, type: 2}
   bodySurfaceTexture: {fileID: 0}
   dropletTexture: {fileID: 0}
   trailTexture: {fileID: 0}

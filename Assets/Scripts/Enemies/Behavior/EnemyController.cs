@@ -4291,7 +4291,23 @@ public class EnemyController : MonoBehaviour
             }
 
             PlayBossRangedMuzzleParticle();
-            ExecuteProjectileAttack(target, i, shotCount);
+            try
+            {
+                ExecuteProjectileAttack(target, i, shotCount);
+            }
+            catch (System.Exception exception)
+            {
+                Debug.LogError(
+                    "[BossRangedCast] projectile fire failed. Releasing boss action lock to avoid permanent AttackInProgress. " +
+                    "boss=" + name +
+                    " sequenceId=" + sequenceId +
+                    " error=" + exception,
+                    this);
+
+                RestoreBossRangedVisual(visual, baseScale, basePosition, visualInitialLocalRotation, rootInitialRotation);
+                CompleteBossRangedAttack(sequenceId);
+                yield break;
+            }
 
             if (i < shotCount - 1)
             {
@@ -4341,6 +4357,19 @@ public class EnemyController : MonoBehaviour
 
         CompleteBossRangedAttack(sequenceId);
         yield break;
+    }
+
+    private void RestoreBossRangedVisual(Transform visual, Vector3 baseScale, Vector3 basePosition, Quaternion visualLocalRotation, Quaternion rootRotation)
+    {
+        transform.rotation = rootRotation;
+        if (visual == null)
+        {
+            return;
+        }
+
+        visual.localScale = baseScale;
+        visual.localPosition = basePosition;
+        visual.localRotation = visualLocalRotation;
     }
 
     private void CompleteBossRangedAttack(int sequenceId)

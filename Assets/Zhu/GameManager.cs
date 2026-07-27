@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     [SerializeField] private GameObject languagePanel;
     [SerializeField] private GameObject creditsPanel;
     [SerializeField] private GameObject defaultSelectedObject;
+    [SerializeField] private Button quitButton;
     public SettingsData settings = new SettingsData();
 
     private static bool resetMainMenuOnNextLoad;
@@ -89,9 +90,11 @@ public class GameManager : MonoBehaviour
 
     public void ExitGame()
     {
+        Debug.Log("[GameManager] ExitGame requested.");
 #if UNITY_EDITOR
         UnityEditor.EditorApplication.isPlaying = false;
 #else
+        Debug.Log("[GameManager] Calling Application.Quit.");
         Application.Quit();
 #endif
     }
@@ -121,11 +124,26 @@ public class GameManager : MonoBehaviour
         mainMenuPanel = FindSceneObjectByName(scene, "MainMenuPanel", "Main Menu Panel", "MenuPanel") ?? mainMenuPanel;
         languagePanel = FindSceneObjectByName(scene, "LanguagePanel", "Language Panel") ?? languagePanel;
         creditsPanel = FindSceneObjectByName(scene, "CreditsPanel", "Credits Panel") ?? creditsPanel;
+        BindQuitButton(scene);
 
         if (defaultSelectedObject == null || defaultSelectedObject.scene != scene)
         {
             defaultSelectedObject = FindSceneObjectByName(scene, "Start", "StartButton");
         }
+    }
+
+    private void BindQuitButton(Scene scene)
+    {
+        GameObject quitButtonObject = FindSceneObjectByName(scene, "Over", "Exit", "ExitButton", "Quit", "QuitButton");
+        Button sceneQuitButton = quitButtonObject != null ? quitButtonObject.GetComponent<Button>() : null;
+        if (sceneQuitButton == null)
+        {
+            return;
+        }
+
+        quitButton = sceneQuitButton;
+        quitButton.onClick.RemoveListener(ExitGame);
+        quitButton.onClick.AddListener(ExitGame);
     }
 
     private static void SetPanelActive(GameObject panel, bool active)

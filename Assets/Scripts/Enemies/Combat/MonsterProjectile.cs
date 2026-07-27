@@ -326,7 +326,9 @@ public class MonsterProjectile : MonoBehaviour
         }
         bodyMeshRenderer.shadowCastingMode = ShadowCastingMode.Off;
         bodyMeshRenderer.receiveShadows = false;
-        bodyMeshRenderer.sharedMaterial = ResolveBodyMaterial();
+        Material resolvedBodyMaterial = ResolveBodyMaterial();
+        bodyMeshRenderer.sharedMaterial = resolvedBodyMaterial;
+        bodyMeshRenderer.enabled = resolvedBodyMaterial != null;
 
         cachedTrailRenderer = GetComponent<TrailRenderer>();
         if (cachedTrailRenderer == null)
@@ -450,7 +452,14 @@ public class MonsterProjectile : MonoBehaviour
         trail.textureMode = LineTextureMode.Stretch;
         trail.numCornerVertices = Mathf.Clamp(trailCornerVertices, 0, 12);
         trail.numCapVertices = Mathf.Clamp(trailCapVertices, 0, 8);
-        trail.sharedMaterial = ResolveTrailMaterial();
+        Material resolvedTrailMaterial = ResolveTrailMaterial();
+        trail.sharedMaterial = resolvedTrailMaterial;
+        if (resolvedTrailMaterial == null)
+        {
+            trail.emitting = false;
+            return;
+        }
+
         trail.colorGradient = CreateTrailGradient();
         trail.emitting = true;
     }
@@ -505,7 +514,14 @@ public class MonsterProjectile : MonoBehaviour
 
         ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.renderMode = ParticleSystemRenderMode.Billboard;
-        renderer.sharedMaterial = ResolveSplashMaterial();
+        Material resolvedSplashMaterial = ResolveSplashMaterial();
+        renderer.sharedMaterial = resolvedSplashMaterial;
+        renderer.enabled = resolvedSplashMaterial != null;
+        if (resolvedSplashMaterial == null)
+        {
+            return;
+        }
+
         particleSystem.Play(true);
     }
 
@@ -591,7 +607,14 @@ public class MonsterProjectile : MonoBehaviour
 
         ParticleSystemRenderer renderer = particleSystem.GetComponent<ParticleSystemRenderer>();
         renderer.renderMode = ParticleSystemRenderMode.Billboard;
-        renderer.sharedMaterial = ResolveSplashMaterial();
+        Material resolvedSplashMaterial = ResolveSplashMaterial();
+        renderer.sharedMaterial = resolvedSplashMaterial;
+        renderer.enabled = resolvedSplashMaterial != null;
+        if (resolvedSplashMaterial == null)
+        {
+            return;
+        }
+
         particleSystem.Play(true);
     }
 
@@ -653,7 +676,18 @@ public class MonsterProjectile : MonoBehaviour
 
     private Material CreateLitTransparentMaterial(Color color)
     {
-        Shader shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+        Shader shader = ResolveRuntimeShader(
+            "BattleFight/BossProjectileSlime",
+            "Universal Render Pipeline/Lit",
+            "Universal Render Pipeline/Unlit",
+            "Sprites/Default",
+            "Standard");
+        if (shader == null)
+        {
+            Debug.LogWarning("[MonsterProjectile] Could not resolve a runtime body shader. Assign bodyMaterial on the projectile prefab for player builds.", this);
+            return null;
+        }
+
         Material material = new Material(shader);
         ApplyMaterialColor(material, "_BaseColor", color);
         ApplyMaterialColor(material, "_Color", color);
@@ -670,11 +704,19 @@ public class MonsterProjectile : MonoBehaviour
 
     private Material CreateParticleTransparentMaterial(Color color)
     {
-        Shader shader =
-            Shader.Find("Universal Render Pipeline/Particles/Unlit")
-            ?? Shader.Find("Particles/Standard Unlit")
-            ?? Shader.Find("Universal Render Pipeline/Unlit")
-            ?? Shader.Find("Standard");
+        Shader shader = ResolveRuntimeShader(
+            "BattleFight/BossProjectileSlime",
+            "Universal Render Pipeline/Particles/Unlit",
+            "Particles/Standard Unlit",
+            "Universal Render Pipeline/Unlit",
+            "Sprites/Default",
+            "Standard");
+        if (shader == null)
+        {
+            Debug.LogWarning("[MonsterProjectile] Could not resolve a runtime particle shader. Assign trailMaterial/splashMaterial on the projectile prefab for player builds.", this);
+            return null;
+        }
+
         Material material = new Material(shader);
         ApplyMaterialColor(material, "_BaseColor", color);
         ApplyMaterialColor(material, "_Color", color);
@@ -687,6 +729,20 @@ public class MonsterProjectile : MonoBehaviour
         material.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
         material.renderQueue = (int)RenderQueue.Transparent;
         return material;
+    }
+
+    private static Shader ResolveRuntimeShader(params string[] shaderNames)
+    {
+        for (int i = 0; i < shaderNames.Length; i++)
+        {
+            Shader shader = Shader.Find(shaderNames[i]);
+            if (shader != null)
+            {
+                return shader;
+            }
+        }
+
+        return null;
     }
 
     private static void ApplyMaterialTexture(Material material, Texture texture)
