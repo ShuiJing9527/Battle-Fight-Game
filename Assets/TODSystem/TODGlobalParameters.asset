@@ -12,10 +12,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f00ec0cbd352f5b47818976299a9e2b6, type: 3}
   m_Name: TODGlobalParameters
   m_EditorClassIdentifier: 
-  timeFlowSpeed: 1
-  timeFlowScale: 2
-  _currentTime: 18.516962
-  isTimeFlow: 0
+  timeFlowSpeed: 2
+  timeFlowScale: 4
+  _currentTime: 10.779074
+  isTimeFlow: 1
   timeOfDays:
   - {fileID: 11400000, guid: efc6fcc2cfc53e74b8da9bed3815def3, type: 2}
   - {fileID: 11400000, guid: 88803c82defc4c64db357631b362ccf5, type: 2}
@@ -27,10 +27,10 @@ MonoBehaviour:
   - {fileID: 11400000, guid: c24d0cc689f8be646b9f94824ad540ac, type: 2}
   - {fileID: 11400000, guid: ab66e95161309d84c956c8863a30f2c6, type: 2}
   - {fileID: 11400000, guid: d1dc95f67b33e9e41afb64a1d5c2fb63, type: 2}
-  currentTimeOfDay: {fileID: 11400000, guid: 1d2287fa8d47caa4b95ad4a7a26c6b7c, type: 2}
-  _dayOrNight: 1
-  todElapsedTimeRatio: 0.51696205
-  todElapsedTime: 0.51696205
+  currentTimeOfDay: {fileID: 11400000, guid: 83c9f54e598a5774ea89d8d4f8ec6321, type: 2}
+  _dayOrNight: 0
+  todElapsedTimeRatio: 0.34738356
+  todElapsedTime: 2.7790685
   todFrameList:
   - name: Night2
     _time: 4
@@ -52,13 +52,13 @@ MonoBehaviour:
     _time: 19
   - name: Night1
     _time: 20
-  MainlightColor: {r: 0.37775496, g: 0.07183597, b: 0.13167901, a: 0}
-  MainlightIntensity: 0
-  MainlightDirection: {x: 0.95125127, y: 0.254887, z: 0.044943437, w: 0.16773118}
+  MainlightColor: {r: 0.9868912, g: 0.72740126, b: 0.3308363, a: 1}
+  MainlightIntensity: 8
+  MainlightDirection: {x: 0.56561375, y: 0.15155575, z: 0.20980504, w: 0.7830031}
   MainlightTiltAngle: {x: 0, y: 0, z: 30}
-  FogLightColor: {r: 0.36962026, g: 0.045563657, b: 0.4064433, a: 0}
-  FogLightIntensity: 4.224557
-  HGCoefficient: 0.1
+  FogLightColor: {r: 0.07458457, g: 0.7374312, b: 0.8420749, a: 0}
+  FogLightIntensity: 7
+  HGCoefficient: 0
   IblBrdfLut: {fileID: 2800000, guid: 373b983f45125c042a202367c7f36bf4, type: 3}
   TimeOfDayData: {fileID: 11400000, guid: 31c67636ff6455949a6f1bde7f0025a3, type: 2}
   materials:
