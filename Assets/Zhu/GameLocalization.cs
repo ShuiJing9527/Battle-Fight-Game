@@ -50,6 +50,7 @@ public class GameLocalization : MonoBehaviour
         { "FullScreen", new[] { "Full Screen", "\u5168\u5c4f", "\u30d5\u30eb\u30b9\u30af\u30ea\u30fc\u30f3" } },
         { "Save", new[] { "Save", "\u4fdd\u5b58", "\u4fdd\u5b58" } },
         { "T: Switch Player", new[] { "T: Switch Player", "T: \u5207\u6362\u89d2\u8272", "T: \u30ad\u30e3\u30e9\u30af\u30bf\u30fc\u5207\u66ff" } },
+        { "CharacterSwitch_EnergyNotFull", new[] { "The energy gauge is not full. Unable to switch characters.", "能量槽未满，无法切换角色", "エネルギーゲージが満タンではないため、キャラクターを切り替えられません" } },
         { "K: Rune Panel", new[] { "K: Rune Panel", "K: \u7b26\u6587\u9762\u677f", "K: \u30eb\u30fc\u30f3\u30d1\u30cd\u30eb" } },
         { "I: Character Panel", new[] { "I: Character Panel", "I: \u89d2\u8272\u9762\u677f", "I: \u30ad\u30e3\u30e9\u30af\u30bf\u30fc\u30d1\u30cd\u30eb" } },
         { "Rune Panel", new[] { "Rune Panel", "\u7b26\u6587\u9762\u677f", "\u30eb\u30fc\u30f3\u30d1\u30cd\u30eb" } },
