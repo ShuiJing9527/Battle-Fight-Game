@@ -17,11 +17,11 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     [Header("Timeline")]
     [Tooltip("Seconds required to gain one normal difficulty level before FinalRush starts.")]
-    [SerializeField, Min(1f)] private float normalLevelInterval = 10f;
+    [SerializeField, Min(1f)] private float normalLevelInterval = 15f;
     [Tooltip("Elapsed battle time in seconds when FinalRush begins.")]
-    [SerializeField, Min(0f)] private float finalRushStartTime = 600f;
+    [SerializeField, Min(0f)] private float finalRushStartTime = 120f;
     [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
-    [SerializeField, Min(0f)] private float finalRushDuration = 180f;
+    [SerializeField, Min(0f)] private float finalRushDuration = 60f;
 
     [Header("Initial Grace")]
     [Tooltip("How long monster combat stat growth stays buffered at the start of the run.")]
@@ -73,13 +73,13 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     [Header("Spawn Pressure")]
     [Tooltip("Additive spawn-rate growth per difficulty level. Higher values make spawn intervals shorter.")]
-    [SerializeField, Min(0f)] private float spawnRateGrowthPerLevel = 0.08f;
+    [SerializeField, Min(0f)] private float spawnRateGrowthPerLevel = 0.12f;
     [Tooltip("Extra alive-enemy cap granted per difficulty level.")]
     [SerializeField, Min(0)] private int extraMaxAlivePerLevel = 2;
     [Tooltip("FinalRush multiplier applied to the resolved spawn interval. Values below 1 spawn faster.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpawnIntervalMultiplier = 0.25f;
+    [SerializeField, Min(0.01f)] private float finalRushSpawnIntervalMultiplier = 0.35f;
     [Tooltip("Extra alive-enemy cap granted while FinalRush is active.")]
-    [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 40;
+    [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 30;
 
     [Header("Demo Balance")]
     [Tooltip("Exhibition balance: final outgoing damage multiplier for all non-Boss monsters.")]
@@ -418,7 +418,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
         switch (currentPhase)
         {
             case DifficultyPhase.Normal:
-                return FormatSeconds(Mathf.Max(0f, finalRushStartTime - elapsedTime));
+                return FormatSeconds(Mathf.Max(0f, FinalRushEndTime - elapsedTime));
             case DifficultyPhase.FinalRush:
                 return "FINAL RUSH " + FormatSeconds(Mathf.Max(0f, FinalRushEndTime - elapsedTime));
             case DifficultyPhase.SpawnStopped:
@@ -426,7 +426,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
             case DifficultyPhase.Victory:
                 return "VICTORY";
             default:
-                return FormatSeconds(Mathf.Max(0f, finalRushStartTime - elapsedTime));
+                return FormatSeconds(Mathf.Max(0f, FinalRushEndTime - elapsedTime));
         }
     }
 

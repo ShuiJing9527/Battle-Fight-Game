@@ -33,7 +33,12 @@ public class PlayerCameraRig : MonoBehaviour
     public Vector3 targetCenterOffset = new Vector3(0f, 0f, 0f);
     public bool lockEveryFrame = true;
 
+    [Header("Foreground Occlusion")]
+    [Tooltip("Fade large generated props when they block the camera's view of the player.")]
+    public bool enableForegroundOcclusionFade = true;
+
     private Player2Bootstrap cachedBootstrap;
+    private CameraOcclusionFader cachedOcclusionFader;
     private bool loggedMissingTarget;
 
     private void Start()
@@ -49,6 +54,8 @@ public class PlayerCameraRig : MonoBehaviour
             ResolvePlayerSlotIfNeeded();
             ApplyCameraLock();
         }
+
+        UpdateForegroundOcclusionFade();
     }
 
     private void ApplyCameraLock()
@@ -146,6 +153,43 @@ public class PlayerCameraRig : MonoBehaviour
         autoResolvePlayerSlot = true;
         fallbackPlayerTag = "Player";
         fallbackPlayerNames = new[] { "Player01", "Player02", "Player" };
+        enableForegroundOcclusionFade = true;
+    }
+
+    private void UpdateForegroundOcclusionFade()
+    {
+        if (!enableForegroundOcclusionFade || playerSlot == null)
+        {
+            if (cachedOcclusionFader != null)
+            {
+                cachedOcclusionFader.enabled = false;
+            }
+
+            return;
+        }
+
+        Camera targetCamera = GetComponent<Camera>();
+        if (targetCamera == null)
+        {
+            targetCamera = GetComponentInChildren<Camera>(true);
+        }
+
+        if (targetCamera == null)
+        {
+            return;
+        }
+
+        if (cachedOcclusionFader == null || cachedOcclusionFader.gameObject != targetCamera.gameObject)
+        {
+            cachedOcclusionFader = targetCamera.GetComponent<CameraOcclusionFader>();
+            if (cachedOcclusionFader == null)
+            {
+                cachedOcclusionFader = targetCamera.gameObject.AddComponent<CameraOcclusionFader>();
+            }
+        }
+
+        cachedOcclusionFader.enabled = true;
+        cachedOcclusionFader.SetTarget(playerSlot);
     }
 
     private static GameObject FindSceneObjectByNameIncludingInactive(string targetName)

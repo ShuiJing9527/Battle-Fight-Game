@@ -166,9 +166,9 @@ MonoBehaviour:
   loadDemoBattleOnStart: 1
   demoBattleSceneName: "\u8349\u539F"
   demoDifficultyLevelInterval: 15
-  demoFinalRushStartTime: 20
-  demoFinalRushDuration: 10
-  demoPlayerDamageMultiplier: 50
+  demoFinalRushStartTime: 120
+  demoFinalRushDuration: 60
+  demoPlayerDamageMultiplier: 1.25
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

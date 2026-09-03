@@ -1,10 +1,27 @@
-using System.Collections.Generic;
 using System.Reflection;
 using AHD2TimeOfDay;
 using UnityEngine;
 
+public enum DayNightPhase
+{
+    Dawn,
+    Day,
+    Dusk,
+    Night
+}
+
 public static class TODDayNightAdapter
 {
+    public const float DefaultDawnStartHour = 5f;
+    public const float DefaultDayStartHour = 7f;
+    public const float DefaultDuskStartHour = 17f;
+    public const float DefaultNightStartHour = 19f;
+
+    public static float DawnStartHour => ResolvePhaseBoundary(gauge => gauge.DawnStartHour, DefaultDawnStartHour);
+    public static float DayStartHour => ResolvePhaseBoundary(gauge => gauge.DayStartHour, DefaultDayStartHour);
+    public static float DuskStartHour => ResolvePhaseBoundary(gauge => gauge.DuskStartHour, DefaultDuskStartHour);
+    public static float NightStartHour => ResolvePhaseBoundary(gauge => gauge.NightStartHour, DefaultNightStartHour);
+
     private static TODController cachedController;
     private static object cachedParameters;
     private static bool warnedMissingController;
@@ -12,29 +29,34 @@ public static class TODDayNightAdapter
     public static bool TryGetIsDay(out bool isDay)
     {
         isDay = false;
-        if (!TryReadDayNightValue(out float dayNightValue))
+        if (!TryGetCurrentPhase(out DayNightPhase phase))
         {
             return false;
         }
 
-        isDay = dayNightValue < 0.5f;
+        isDay = phase == DayNightPhase.Dawn || phase == DayNightPhase.Day;
         return true;
     }
 
     public static bool TryGetIsNight(out bool isNight)
     {
         isNight = false;
-        if (!TryReadDayNightValue(out float dayNightValue))
+        if (!TryGetCurrentPhase(out DayNightPhase phase))
         {
             return false;
         }
 
-        isNight = dayNightValue >= 0.5f;
+        isNight = phase == DayNightPhase.Dusk || phase == DayNightPhase.Night;
         return true;
     }
 
     public static string GetDebugPhaseName()
     {
+        if (TryGetCurrentPhase(out DayNightPhase phase))
+        {
+            return phase.ToString();
+        }
+
         object parameters = ResolveParameters();
         if (parameters != null && TryReadMember(parameters, "currentTimeOfDay", out object currentTimeOfDay) && currentTimeOfDay != null)
         {
@@ -68,85 +90,92 @@ public static class TODDayNightAdapter
         return false;
     }
 
-    public static bool TryGetSunriseSunsetHours(out float sunriseHour, out float sunsetHour)
+    public static bool TryGetCurrentPhase(out DayNightPhase phase)
     {
-        sunriseHour = 0f;
-        sunsetHour = 0f;
-
-        object parameters = ResolveParameters();
-        if (parameters == null)
+        phase = DayNightPhase.Night;
+        if (!TryGetCurrentTimeHours(out float currentTimeHours))
         {
             return false;
         }
 
-        if (!TryReadMember(parameters, "timeOfDays", out object timeOfDaysRaw) || !(timeOfDaysRaw is TimeOfDay[] timeOfDays) || timeOfDays.Length == 0)
-        {
-            return false;
-        }
-
-        TimeOfDay[] ordered = new TimeOfDay[timeOfDays.Length];
-        int orderedCount = 0;
-        for (int i = 0; i < timeOfDays.Length; i++)
-        {
-            if (timeOfDays[i] == null)
-            {
-                continue;
-            }
-
-            ordered[orderedCount++] = timeOfDays[i];
-        }
-
-        if (orderedCount < 2)
-        {
-            return false;
-        }
-
-        System.Array.Sort(ordered, 0, orderedCount, Comparer<TimeOfDay>.Create((a, b) => a.CurrentTODTime.CompareTo(b.CurrentTODTime)));
-
-        bool sunriseFound = false;
-        bool sunsetFound = false;
-        for (int i = 0; i < orderedCount; i++)
-        {
-            TimeOfDay current = ordered[i];
-            TimeOfDay previous = ordered[(i - 1 + orderedCount) % orderedCount];
-            if (current == null || previous == null)
-            {
-                continue;
-            }
-
-            bool currentIsNight = current.dayOrNight;
-            bool previousIsNight = previous.dayOrNight;
-            if (previousIsNight && !currentIsNight)
-            {
-                sunriseHour = NormalizeHour(current.CurrentTODTime);
-                sunriseFound = true;
-            }
-            else if (!previousIsNight && currentIsNight)
-            {
-                sunsetHour = NormalizeHour(current.CurrentTODTime);
-                sunsetFound = true;
-            }
-        }
-
-        return sunriseFound && sunsetFound;
+        phase = GetPhaseForHour(currentTimeHours);
+        return true;
     }
 
-    private static bool TryReadDayNightValue(out float value)
+    public static DayNightPhase GetPhaseForHour(float currentTimeHours)
     {
-        value = 0f;
-        object parameters = ResolveParameters();
-        if (parameters == null)
+        float normalizedHour = NormalizeHour(currentTimeHours);
+        float dawnStart = DawnStartHour;
+        float dayStart = DayStartHour;
+        float duskStart = DuskStartHour;
+        float nightStart = NightStartHour;
+
+        if (IsHourInRange(normalizedHour, dawnStart, dayStart))
+        {
+            return DayNightPhase.Dawn;
+        }
+
+        if (IsHourInRange(normalizedHour, dayStart, duskStart))
+        {
+            return DayNightPhase.Day;
+        }
+
+        if (IsHourInRange(normalizedHour, duskStart, nightStart))
+        {
+            return DayNightPhase.Dusk;
+        }
+
+        return DayNightPhase.Night;
+    }
+
+    public static void GetPhaseBoundaries(out float dawnStartHour, out float dayStartHour, out float duskStartHour, out float nightStartHour)
+    {
+        dawnStartHour = DawnStartHour;
+        dayStartHour = DayStartHour;
+        duskStartHour = DuskStartHour;
+        nightStartHour = NightStartHour;
+    }
+
+    public static bool TryGetSunriseSunsetHours(out float sunriseHour, out float sunsetHour)
+    {
+        sunriseHour = DawnStartHour;
+        sunsetHour = DuskStartHour;
+        return true;
+    }
+
+    private static bool IsDayHour(float currentTimeHours)
+    {
+        DayNightPhase phase = GetPhaseForHour(currentTimeHours);
+        return phase == DayNightPhase.Dawn || phase == DayNightPhase.Day;
+    }
+
+    private static bool IsHourInRange(float hour, float startHour, float endHour)
+    {
+        float normalizedHour = NormalizeHour(hour);
+        float normalizedStart = NormalizeHour(startHour);
+        float normalizedEnd = NormalizeHour(endHour);
+
+        if (Mathf.Approximately(normalizedStart, normalizedEnd))
         {
             return false;
         }
 
-        if (TryReadFloat(parameters, out value, "DayOrNight", "dayOrNight", "_dayOrNight"))
+        if (normalizedStart < normalizedEnd)
         {
-            value = Mathf.Clamp01(value);
-            return true;
+            return normalizedHour >= normalizedStart && normalizedHour < normalizedEnd;
         }
 
-        return false;
+        return normalizedHour >= normalizedStart || normalizedHour < normalizedEnd;
+    }
+
+    private static float ResolvePhaseBoundary(System.Func<DayNightGaugeRuntimeState, float> selector, float fallback)
+    {
+        if (selector != null && DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge) && gauge != null)
+        {
+            return NormalizeHour(selector(gauge));
+        }
+
+        return NormalizeHour(fallback);
     }
 
     private static object ResolveParameters()

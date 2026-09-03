@@ -5,7 +5,11 @@ public class RuneDropManager : MonoBehaviour
     private const float DefaultDropYOffset = 0.3f;
     private const float DefaultMinRuneScatterRadius = 1.25f;
     private const float DefaultMaxRuneScatterRadius = 2.25f;
-    private const float RuneDropChanceDecayPerEquippedRune = 0.05f;
+    private const float RuneDropChanceDecayPerEquippedRune = 0.02f;
+    private const float DemoNormalRuneDropChance = 0.12f;
+    private const float DemoEliteRuneDropChance = 0.65f;
+    private const float DemoBossRuneDropChance = 1f;
+    private const float DemoFinalRushRuneDropChanceMultiplier = 1.75f;
 
     public static RuneDropManager Instance { get; private set; }
 
@@ -146,19 +150,19 @@ public class RuneDropManager : MonoBehaviour
             return settingsCount;
         }
 
-        if (rank == MonsterRank.Normal)
-        {
-            LogRuneDropDiagnostic($"rank=Normal luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 eliteRoll=n/a settings=null highRuneDropTestMode=true");
-            return 0;
-        }
-
         float dropGateRoll = Random.value;
-        float dropGateChance = ApplyOwnedRuneDropDecay(1f, ownedRuneCount);
+        float dropGateChance = ResolveDemoRankDropChance(rank, ownedRuneCount);
         if (dropGateRoll >= dropGateChance)
         {
             LogRuneDropDiagnostic(
                 $"rank={rank} luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=0 dropGateRoll={dropGateRoll:F4} dropGateChance={dropGateChance:F4} settings=null highRuneDropTestMode=true");
             return 0;
+        }
+
+        if (rank == MonsterRank.Normal)
+        {
+            LogRuneDropDiagnostic($"rank=Normal luck={luck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount=1 dropGateRoll={dropGateRoll:F4} dropGateChance={dropGateChance:F4} settings=null highRuneDropTestMode=true");
+            return 1;
         }
 
         if (rank == MonsterRank.Elite)
@@ -202,7 +206,7 @@ public class RuneDropManager : MonoBehaviour
     {
         if (rank == MonsterRank.Normal)
         {
-            return 0;
+            return Mathf.Clamp(count, 0, 1);
         }
 
         return Mathf.Clamp(count, 0, 3);
@@ -214,8 +218,30 @@ public class RuneDropManager : MonoBehaviour
         {
             MonsterRank.Boss => Mathf.Clamp(count, 0, 6),
             MonsterRank.Elite => Mathf.Clamp(count, 0, 3),
-            _ => 0
+            _ => Mathf.Clamp(count, 0, 1)
         };
+    }
+
+    private static float ResolveDemoRankDropChance(MonsterRank rank, int ownedRuneCount)
+    {
+        float chance = rank switch
+        {
+            MonsterRank.Boss => DemoBossRuneDropChance,
+            MonsterRank.Elite => DemoEliteRuneDropChance,
+            _ => DemoNormalRuneDropChance
+        };
+
+        if (EnemyDifficultyDirector.Instance != null && EnemyDifficultyDirector.Instance.IsFinalRushActive)
+        {
+            chance *= DemoFinalRushRuneDropChanceMultiplier;
+        }
+
+        if (rank == MonsterRank.Boss)
+        {
+            return Mathf.Clamp01(chance);
+        }
+
+        return ApplyOwnedRuneDropDecay(chance, ownedRuneCount);
     }
 
     private static float ApplyOwnedRuneDropDecay(float baseRuneDropChance, int ownedRuneCount)

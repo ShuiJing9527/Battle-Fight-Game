@@ -129,9 +129,14 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
 
         Vector3 moveDirection = new Vector3(input.x, 0f, input.y);
         float statsSpeed = combatStats != null ? Mathf.Max(0f, combatStats.speed) : 0f;
-        float evasionMultiplier = BattleStatUtility.GetEvasionMultiplier(combatStats);
-        float finalEvasionChance = BattleStatUtility.GetEvasionChance(combatStats);
-        float externalMoveMultiplier = 1f;
+        bool isInDayChildState = DayNightAffinityDamageModifier.HasDayChildState(gameObject);
+        bool isInNightChildState = DayNightAffinityDamageModifier.HasNightChildState(gameObject);
+        bool isCorrectDayNightState = DayNightAffinityDamageModifier.IsCorrectDayNightState(gameObject);
+        bool isWrongDayNightState = DayNightAffinityDamageModifier.IsWrongDayNightState(gameObject);
+        float wrongTimeEvasionMultiplier = DayNightAffinityDamageModifier.GetWrongTimeEvasionMultiplier(gameObject);
+        float evasionMultiplier = BattleStatUtility.GetEvasionMultiplier(combatStats) * wrongTimeEvasionMultiplier;
+        float finalEvasionChance = BattleStatUtility.GetEvasionChance(combatStats) * wrongTimeEvasionMultiplier;
+        float externalMoveMultiplier = DayNightAffinityDamageModifier.GetWrongTimeMoveSpeedMultiplier(gameObject);
         float scaledBaseMoveSpeed = moveSpeed * Mathf.Max(0f, playerBaseMoveSpeedScale);
         float moveMultiplierFromSpeed = 1f + Mathf.Max(0f, statsSpeed - 1f) * Mathf.Max(0f, speedStatMoveRatio);
         float speedStatBonus = Mathf.Max(0f, statsSpeed - 1f) * scaledBaseMoveSpeed * Mathf.Max(0f, speedStatMoveRatio);
@@ -165,8 +170,22 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
         if (debugSpeedDiagnostics && Time.time >= nextSpeedDiagnosticTime)
         {
             nextSpeedDiagnosticTime = Time.time + Mathf.Max(0.1f, debugSpeedLogInterval);
+            bool hasCurrentTime = TODDayNightAdapter.TryGetCurrentTimeHours(out float currentTimeHours);
+            bool hasCurrentPhase = DayNightAffinityDamageModifier.TryGetCurrentPhase(out DayNightPhase currentPhase);
+            bool isTwinChildPositivePhase = DayNightAffinityDamageModifier.IsTwinChildPositivePhase(gameObject);
+            bool isTwinChildNeutralPhase = DayNightAffinityDamageModifier.IsTwinChildNeutralPhase(gameObject);
+            bool isTwinChildNegativePhase = DayNightAffinityDamageModifier.IsTwinChildNegativePhase(gameObject);
+            bool isNightChildPositivePhase = DayNightAffinityDamageModifier.IsNightChildPositivePhase(gameObject);
+            bool isNightChildNeutralPhase = DayNightAffinityDamageModifier.IsNightChildNeutralPhase(gameObject);
+            bool isNightChildNegativePhase = DayNightAffinityDamageModifier.IsNightChildNegativePhase(gameObject);
+            bool isDayChildPositivePhase = DayNightAffinityDamageModifier.IsDayChildPositivePhase(gameObject);
+            bool isDayChildNeutralPhase = DayNightAffinityDamageModifier.IsDayChildNeutralPhase(gameObject);
+            bool isDayChildNegativePhase = DayNightAffinityDamageModifier.IsDayChildNegativePhase(gameObject);
+            bool hasGauge = DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge);
+            float radiance = hasGauge && gauge != null ? gauge.RadianceValue : -1f;
+            float twilight = hasGauge && gauge != null ? gauge.TwilightValue : -1f;
             Debug.Log(
-                $"[SpeedDiag] name={name} stats.speed={statsSpeed:F2} stats.luck={(combatStats != null ? Mathf.Max(0f, combatStats.luck) : 0f):F2} baseMoveSpeed={moveSpeed:F2} playerBaseMoveSpeedScale={playerBaseMoveSpeedScale:F2} scaledBaseMoveSpeed={scaledBaseMoveSpeed:F2} speedStatMoveRatio={speedStatMoveRatio:F4} moveMultiplierFromSpeed={moveMultiplierFromSpeed:F2} externalMoveMultiplier={externalMoveMultiplier:F2} moveSpeedCap={resolvedMoveSpeedCap:F2} rawMoveSpeed={RawResolvedMoveSpeed:F2} actualMoveSpeed={ActualMoveSpeed:F2} excessMoveSpeed={ExcessMoveSpeed:F2} excessDamageBonus={ExcessMoveSpeedDamageBonus:P2} evasionMultiplier={evasionMultiplier:F2} finalEvasionChance={finalEvasionChance:P2}",
+                $"[SpeedDiag] currentCharacter={name} currentTime={(hasCurrentTime ? currentTimeHours.ToString("F2") : "Unavailable")} currentPhase={(hasCurrentPhase ? currentPhase.ToString() : "Unavailable")} radiance={radiance:F2} twilight={twilight:F2} hasTwilightState={(hasGauge && gauge != null && gauge.HasTwilightState())} hasRadianceState={(hasGauge && gauge != null && gauge.HasRadianceState())} isInDayChildState={isInDayChildState} isInNightChildState={isInNightChildState} isCorrectDayNightState={isCorrectDayNightState} isNeutralDayNightState={isTwinChildNeutralPhase} isWrongDayNightState={isWrongDayNightState} isTwinChildPositivePhase={isTwinChildPositivePhase} isTwinChildNegativePhase={isTwinChildNegativePhase} isNightChildPositivePhase={isNightChildPositivePhase} isNightChildNeutralPhase={isNightChildNeutralPhase} isNightChildNegativePhase={isNightChildNegativePhase} isDayChildPositivePhase={isDayChildPositivePhase} isDayChildNeutralPhase={isDayChildNeutralPhase} isDayChildNegativePhase={isDayChildNegativePhase} stats.speed={statsSpeed:F2} stats.luck={(combatStats != null ? Mathf.Max(0f, combatStats.luck) : 0f):F2} baseMoveSpeed={moveSpeed:F2} playerBaseMoveSpeedScale={playerBaseMoveSpeedScale:F2} scaledBaseMoveSpeed={scaledBaseMoveSpeed:F2} speedStatMoveRatio={speedStatMoveRatio:F4} moveMultiplierFromSpeed={moveMultiplierFromSpeed:F2} moveSpeedMultiplier={externalMoveMultiplier:F2} moveSpeedCap={resolvedMoveSpeedCap:F2} rawMoveSpeed={RawResolvedMoveSpeed:F2} finalMoveSpeed={ActualMoveSpeed:F2} excessMoveSpeed={ExcessMoveSpeed:F2} excessDamageBonus={ExcessMoveSpeedDamageBonus:P2} evasionMultiplier={evasionMultiplier:F2} finalEvasionChance={finalEvasionChance:P2}",
                 this);
         }
     }

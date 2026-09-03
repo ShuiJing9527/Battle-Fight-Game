@@ -1,7 +1,55 @@
 using UnityEngine;
 
+public enum TwinStateRuntimeType
+{
+    Normal,
+    Buff,
+    Neutral,
+    Debuff
+}
+
+public enum TwinChildRuntimeType
+{
+    None,
+    DayChild,
+    NightChild
+}
+
+[System.Serializable]
+public struct TwinStateRuntimeBonus
+{
+    public TwinStateRuntimeType statusType;
+    public TwinChildRuntimeType childType;
+    public bool hasCurrentPhase;
+    public DayNightPhase currentPhase;
+    public bool isInDayChildState;
+    public bool isInNightChildState;
+    public float radiance;
+    public float twilight;
+    public float attackStatMultiplier;
+    public float magicStatMultiplier;
+    public float defenseStatMultiplier;
+    public float resistanceStatMultiplier;
+    public float outgoingDamageMultiplier;
+    public float incomingDamageMultiplier;
+    public float evasionMultiplier;
+    public float moveSpeedMultiplier;
+}
+
 public static class DayNightAffinityDamageModifier
 {
+    private const float TwinChildOutgoingMultiplier = 2f;
+    private const float TwinChildIncomingMultiplier = 0.5f;
+    private const float NightChildAttackStatMultiplier = 1.5f;
+    private const float NightChildMagicStatMultiplier = 1.5f;
+    private const float NightChildDefenseStatMultiplier = 2f;
+    private const float NightChildResistanceStatMultiplier = 2f;
+    private const float DayChildAttackStatMultiplier = 2f;
+    private const float DayChildMagicStatMultiplier = 2f;
+    private const float DayChildDefenseStatMultiplier = 1.5f;
+    private const float DayChildResistanceStatMultiplier = 1.5f;
+    private const float WrongTimeEvasionMultiplier = 0.5f;
+    private const float WrongTimeMoveSpeedMultiplier = 0.5f;
     private const float SkillGaugeGainManaWeight = 0.5f;
     private const float SkillGaugeGainCooldownWeight = 0.5f;
     private const float SkillGaugeGainMin = 5f;
@@ -20,21 +68,22 @@ public static class DayNightAffinityDamageModifier
         bool attackerIsMonster = BattleTargetUtility.IsMonster(attacker);
         bool defenderIsMonster = BattleTargetUtility.IsMonster(defender);
 
-        if (!TryResolveDayState(out bool isDay, out bool isNight))
-        {
-            return damage;
-        }
+        bool hasCurrentPhase = TryResolveCurrentPhase(out DayNightPhase currentPhase);
 
         bool hasGauge = DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge);
         bool attackerHasDayChildState = HasDayChildState(attacker);
         bool attackerHasNightChildState = HasNightChildState(attacker);
         bool defenderHasDayChildState = HasDayChildState(defender);
         bool defenderHasNightChildState = HasNightChildState(defender);
-        bool attackerDayChildFavorable = attackerHasDayChildState && isDay;
-        bool attackerNightChildFavorable = attackerHasNightChildState && isNight;
-        bool defenderDayChildFavorable = defenderHasDayChildState && isDay;
-        bool defenderNightChildFavorable = defenderHasNightChildState && isNight;
-        bool debugEnabled = hasGauge && gauge.DebugAffinityDamageEnabled;
+        TwinStateRuntimeBonus attackerTwinBonus = GetTwinStateRuntimeBonus(attacker);
+        TwinStateRuntimeBonus defenderTwinBonus = GetTwinStateRuntimeBonus(defender);
+        bool attackerDayChildBuffActive = attackerTwinBonus.isInDayChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Buff;
+        bool attackerNightChildBuffActive = attackerTwinBonus.isInNightChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Buff;
+        bool defenderDayChildBuffActive = defenderTwinBonus.isInDayChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Buff;
+        bool defenderNightChildBuffActive = defenderTwinBonus.isInNightChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Buff;
+        bool defenderDayChildDebuffActive = defenderTwinBonus.isInDayChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Debuff;
+        bool defenderNightChildDebuffActive = defenderTwinBonus.isInNightChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Debuff;
+        bool debugEnabled = hasGauge && (gauge.DebugAffinityDamageEnabled || gauge.DebugDayNightPhaseDiagnosticsEnabled);
 
         PlayerDayNightAffinity attackerAffinity = ResolveAffinity(attacker);
         PlayerDayNightAffinity defenderAffinity = ResolveAffinity(defender);
@@ -42,68 +91,56 @@ public static class DayNightAffinityDamageModifier
 
         if (attackerIsPlayer && defenderIsMonster && attackerAffinity != null)
         {
-            if (includeAmbientAffinity && attackerAffinity.IsDayChild && AmbientDayNightAffinityBonus.IsDaytime())
+            if (attackerAffinity.IsNightChild && attackerNightChildBuffActive)
             {
-                multiplier *= AmbientDayNightAffinityBonus.GetDayChildAmbientOutgoingMultiplier(attacker, defender, "PlayerVsMonster");
-                reason = "day-child-ambient-player-vs-monster";
-            }
-
-            if (attackerAffinity.IsNightChild && attackerNightChildFavorable)
-            {
-                multiplier *= 1.5f;
+                multiplier *= attackerTwinBonus.outgoingDamageMultiplier;
                 reason = AppendReason(reason, "night-child-favorable-player-vs-monster");
             }
-            else if (attackerAffinity.IsDayChild && attackerDayChildFavorable)
+            else if (attackerAffinity.IsDayChild && attackerDayChildBuffActive)
             {
-                multiplier *= 1.5f;
+                multiplier *= attackerTwinBonus.outgoingDamageMultiplier;
                 reason = AppendReason(reason, "day-child-favorable-player-vs-monster");
             }
-            else if (reason == "no-applicable-rule" || reason == "day-child-ambient-player-vs-monster")
+            else if (reason == "no-applicable-rule")
             {
                 reason = ResolvePlayerAttackMissReason(
                     attackerAffinity,
-                    isDay,
-                    isNight,
+                    hasCurrentPhase,
+                    currentPhase,
                     attackerHasDayChildState,
                     attackerHasNightChildState);
             }
         }
         else if (attackerIsMonster && defenderIsPlayer && defenderAffinity != null)
         {
-            if (includeAmbientAffinity && defenderAffinity.IsNightChild && AmbientDayNightAffinityBonus.IsNighttime())
-            {
-                multiplier *= AmbientDayNightAffinityBonus.GetNightChildAmbientIncomingMultiplier(defender, defender, "MonsterVsPlayer");
-                reason = "night-child-ambient-monster-vs-player";
-            }
-
             if (defenderAffinity.IsNightChild)
             {
-                if (defenderHasNightChildState)
+                if (defenderNightChildBuffActive)
                 {
-                    // Exhibition balance: wrong day/night character now takes +50% instead of +100%.
-                    multiplier *= defenderNightChildFavorable ? 0.5f : EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
-                    reason = AppendReason(
-                        reason,
-                        defenderNightChildFavorable
-                        ? "night-child-favorable-monster-vs-player-resist"
-                        : "night-child-unfavorable-monster-vs-player-penalty");
+                    multiplier *= defenderTwinBonus.incomingDamageMultiplier;
+                    reason = AppendReason(reason, "night-child-favorable-monster-vs-player-resist");
                 }
-                else if (reason == "no-applicable-rule" || reason == "night-child-ambient-monster-vs-player")
+                else if (defenderNightChildDebuffActive)
+                {
+                    multiplier *= defenderTwinBonus.incomingDamageMultiplier;
+                    reason = AppendReason(reason, "night-child-unfavorable-monster-vs-player-penalty");
+                }
+                else if (reason == "no-applicable-rule")
                 {
                     reason = "night-child-state-inactive";
                 }
             }
             else if (defenderAffinity.IsDayChild)
             {
-                if (defenderHasDayChildState)
+                if (defenderDayChildBuffActive)
                 {
-                    // Exhibition balance: wrong day/night character now takes +50% instead of +100%.
-                    multiplier *= defenderDayChildFavorable ? 0.5f : EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
-                    reason = AppendReason(
-                        reason,
-                        defenderDayChildFavorable
-                        ? "day-child-favorable-monster-vs-player-resist"
-                        : "day-child-unfavorable-monster-vs-player-penalty");
+                    multiplier *= defenderTwinBonus.incomingDamageMultiplier;
+                    reason = AppendReason(reason, "day-child-favorable-monster-vs-player-resist");
+                }
+                else if (defenderDayChildDebuffActive)
+                {
+                    multiplier *= defenderTwinBonus.incomingDamageMultiplier;
+                    reason = AppendReason(reason, "day-child-unfavorable-monster-vs-player-penalty");
                 }
                 else if (reason == "no-applicable-rule")
                 {
@@ -118,12 +155,12 @@ public static class DayNightAffinityDamageModifier
         else
         {
             reason = ResolveUnhandledReason(attackerIsPlayer, defenderIsMonster, attackerIsMonster, defenderIsPlayer);
-            LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, isDay, isNight, attackerHasDayChildState, attackerHasNightChildState, defenderHasDayChildState, defenderHasNightChildState, damage, multiplier, reason);
+            LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, hasCurrentPhase, currentPhase, attackerHasDayChildState, attackerHasNightChildState, defenderHasDayChildState, defenderHasNightChildState, damage, multiplier, reason);
             return damage;
         }
 
         float finalDamage = damage * multiplier;
-        LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, isDay, isNight, attackerHasDayChildState, attackerHasNightChildState, defenderHasDayChildState, defenderHasNightChildState, damage, multiplier, reason);
+        LogAffinityDecision(debugEnabled, attacker, defender, attackerAffinity, defenderAffinity, gauge, hasCurrentPhase, currentPhase, attackerHasDayChildState, attackerHasNightChildState, defenderHasDayChildState, defenderHasNightChildState, damage, multiplier, reason);
 
         return finalDamage;
     }
@@ -182,11 +219,33 @@ public static class DayNightAffinityDamageModifier
             return false;
         }
 
+        if (gauge == null)
+        {
+            LogHitFlow(debugHitFlow, $"skipped reason=gauge-null originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} target={GetObjectName(resolvedDefender)}", resolvedDefender);
+            return false;
+        }
+
+        float gain = Mathf.Max(0f, gauge.GaugeGainPerHit);
+        float previousRadiance = gauge.RadianceValue;
+        float previousTwilight = gauge.TwilightValue;
+        string action;
+
+        if (affinity.IsDayChild)
+        {
+            gauge.AddRadiance(gain);
+            action = "AddRadiance";
+        }
+        else
+        {
+            gauge.AddTwilight(gain);
+            action = "AddTwilight";
+        }
+
         LogHitFlow(
             debugHitFlow,
-            $"skipped reason=hit-gain-disabled target={GetObjectName(resolvedDefender)} originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} affinity={GetAffinityName(affinity)} attackerIsPlayer={BattleTargetUtility.IsPlayer(resolvedAttacker)} targetIsMonster={BattleTargetUtility.IsMonster(resolvedDefender)} balanceUnchanged={gauge.BalanceValue:F2}",
+            $"success target={GetObjectName(resolvedDefender)} originalAttacker={GetObjectName(attacker)} resolvedAttacker={GetObjectName(resolvedAttacker)} affinity={GetAffinityName(affinity)} gain={gain:F2} action={action} oldRadiance={previousRadiance:F2} oldTwilight={previousTwilight:F2} newRadiance={gauge.RadianceValue:F2} newTwilight={gauge.TwilightValue:F2}",
             resolvedDefender);
-        return false;
+        return true;
     }
 
     public static bool NotifySuccessfulSkillCast(GameObject caster, float manaCost, float cooldownSeconds, string skillLabel = null)
@@ -269,32 +328,286 @@ public static class DayNightAffinityDamageModifier
 
     public static bool IsNightChildFavorableTime(GameObject target)
     {
-        return HasNightChildState(target) && TryResolveDayState(out _, out bool isNight) && isNight;
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildPositiveState(target, phase);
     }
 
     public static bool IsDayChildFavorableTime(GameObject target)
     {
-        return HasDayChildState(target) && TryResolveDayState(out bool isDay, out _) && isDay;
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildPositiveState(target, phase);
     }
 
     public static bool IsNightChildUnfavorableTime(GameObject target)
     {
-        return HasNightChildState(target) && TryResolveDayState(out bool isDay, out _) && isDay;
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildNegativeState(target, phase);
     }
 
     public static bool IsDayChildUnfavorableTime(GameObject target)
     {
-        return HasDayChildState(target) && TryResolveDayState(out _, out bool isNight) && isNight;
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildNegativeState(target, phase);
     }
 
     public static bool IsNightChildBuffActive(GameObject target)
     {
-        return HasNightChildState(target);
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildPositiveState(target, phase);
     }
 
     public static bool IsDayChildBuffActive(GameObject target)
     {
-        return HasDayChildState(target);
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildPositiveState(target, phase);
+    }
+
+    public static bool IsWrongTimeDebuffActive(GameObject target)
+    {
+        return GetTwinStateRuntimeBonus(target).statusType == TwinStateRuntimeType.Debuff;
+    }
+
+    public static float GetWrongTimeEvasionMultiplier(GameObject target)
+    {
+        return GetTwinStateRuntimeBonus(target).evasionMultiplier;
+    }
+
+    public static float GetWrongTimeMoveSpeedMultiplier(GameObject target)
+    {
+        return GetTwinStateRuntimeBonus(target).moveSpeedMultiplier;
+    }
+
+    public static bool IsCorrectDayNightState(GameObject target)
+    {
+        return IsTwinChildPositivePhase(target);
+    }
+
+    public static bool IsWrongDayNightState(GameObject target)
+    {
+        return IsTwinChildNegativePhase(target);
+    }
+
+    public static float GetTwinOutgoingDamageMultiplier(GameObject target)
+    {
+        return GetTwinStateRuntimeBonus(target).outgoingDamageMultiplier;
+    }
+
+    public static float GetTwinIncomingDamageMultiplier(GameObject target)
+    {
+        return GetTwinStateRuntimeBonus(target).incomingDamageMultiplier;
+    }
+
+    public static TwinStateRuntimeBonus GetTwinStateRuntimeBonus(GameObject target)
+    {
+        bool hasCurrentPhase = TryResolveCurrentPhase(out DayNightPhase currentPhase);
+        TwinStateRuntimeBonus bonus = new TwinStateRuntimeBonus
+        {
+            statusType = TwinStateRuntimeType.Normal,
+            childType = TwinChildRuntimeType.None,
+            hasCurrentPhase = hasCurrentPhase,
+            currentPhase = currentPhase,
+            radiance = -1f,
+            twilight = -1f,
+            attackStatMultiplier = 1f,
+            magicStatMultiplier = 1f,
+            defenseStatMultiplier = 1f,
+            resistanceStatMultiplier = 1f,
+            outgoingDamageMultiplier = 1f,
+            incomingDamageMultiplier = 1f,
+            evasionMultiplier = 1f,
+            moveSpeedMultiplier = 1f
+        };
+
+        if (DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge) && gauge != null)
+        {
+            bonus.radiance = gauge.RadianceValue;
+            bonus.twilight = gauge.TwilightValue;
+        }
+
+        GameObject resolvedTarget = ResolvePlayerSource(target) ?? target;
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedTarget);
+        if (affinity == null)
+        {
+            return bonus;
+        }
+
+        if (affinity.IsDayChild)
+        {
+            bonus.childType = TwinChildRuntimeType.DayChild;
+        }
+        else if (affinity.IsNightChild)
+        {
+            bonus.childType = TwinChildRuntimeType.NightChild;
+        }
+
+        bonus.isInDayChildState = affinity.IsDayChild && HasDayChildState(resolvedTarget);
+        bonus.isInNightChildState = affinity.IsNightChild && HasNightChildState(resolvedTarget);
+        if (!bonus.isInDayChildState && !bonus.isInNightChildState)
+        {
+            return bonus;
+        }
+
+        if (!bonus.hasCurrentPhase)
+        {
+            bonus.statusType = TwinStateRuntimeType.Neutral;
+            return bonus;
+        }
+
+        bool positive = bonus.isInDayChildState
+            ? IsDayChildPositivePhase(bonus.currentPhase)
+            : IsNightChildPositivePhase(bonus.currentPhase);
+        bool negative = bonus.isInDayChildState
+            ? bonus.currentPhase == DayNightPhase.Night
+            : bonus.currentPhase == DayNightPhase.Day;
+
+        if (positive)
+        {
+            bonus.statusType = TwinStateRuntimeType.Buff;
+            bonus.outgoingDamageMultiplier = TwinChildOutgoingMultiplier;
+            bonus.incomingDamageMultiplier = TwinChildIncomingMultiplier;
+
+            if (bonus.isInDayChildState)
+            {
+                bonus.attackStatMultiplier = DayChildAttackStatMultiplier;
+                bonus.magicStatMultiplier = DayChildMagicStatMultiplier;
+                bonus.defenseStatMultiplier = DayChildDefenseStatMultiplier;
+                bonus.resistanceStatMultiplier = DayChildResistanceStatMultiplier;
+            }
+            else
+            {
+                bonus.attackStatMultiplier = NightChildAttackStatMultiplier;
+                bonus.magicStatMultiplier = NightChildMagicStatMultiplier;
+                bonus.defenseStatMultiplier = NightChildDefenseStatMultiplier;
+                bonus.resistanceStatMultiplier = NightChildResistanceStatMultiplier;
+            }
+
+            return bonus;
+        }
+
+        if (negative)
+        {
+            bonus.statusType = TwinStateRuntimeType.Debuff;
+            bonus.incomingDamageMultiplier = EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
+            bonus.evasionMultiplier = WrongTimeEvasionMultiplier;
+            bonus.moveSpeedMultiplier = WrongTimeMoveSpeedMultiplier;
+            return bonus;
+        }
+
+        bonus.statusType = TwinStateRuntimeType.Neutral;
+        return bonus;
+    }
+
+    public static bool IsTwinChildPositivePhase(GameObject target)
+    {
+        if (!TryResolveCurrentPhase(out DayNightPhase phase))
+        {
+            return false;
+        }
+
+        return IsDayChildPositiveState(target, phase) || IsNightChildPositiveState(target, phase);
+    }
+
+    public static bool IsNightChildPositivePhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildPositiveState(target, phase);
+    }
+
+    public static bool IsNightChildNeutralPhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildNeutralState(target, phase);
+    }
+
+    public static bool IsNightChildNegativePhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsNightChildNegativeState(target, phase);
+    }
+
+    public static bool IsDayChildPositivePhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildPositiveState(target, phase);
+    }
+
+    public static bool IsDayChildNeutralPhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildNeutralState(target, phase);
+    }
+
+    public static bool IsDayChildNegativePhase(GameObject target)
+    {
+        return TryResolveCurrentPhase(out DayNightPhase phase) && IsDayChildNegativeState(target, phase);
+    }
+
+    public static bool IsTwinChildNeutralPhase(GameObject target)
+    {
+        if (!TryResolveCurrentPhase(out DayNightPhase phase))
+        {
+            return false;
+        }
+
+        return IsDayChildNeutralState(target, phase) || IsNightChildNeutralState(target, phase);
+    }
+
+    public static bool IsTwinChildNegativePhase(GameObject target)
+    {
+        if (!TryResolveCurrentPhase(out DayNightPhase phase))
+        {
+            return false;
+        }
+
+        return IsDayChildNegativeState(target, phase) || IsNightChildNegativeState(target, phase);
+    }
+
+    public static bool TryGetCurrentPhase(out DayNightPhase phase)
+    {
+        return TryResolveCurrentPhase(out phase);
+    }
+
+    private static bool IsNightChildPositiveState(GameObject target, DayNightPhase phase)
+    {
+        return HasNightChildState(target) && IsNightChildPositivePhase(phase);
+    }
+
+    private static bool IsDayChildPositiveState(GameObject target, DayNightPhase phase)
+    {
+        return HasDayChildState(target) && IsDayChildPositivePhase(phase);
+    }
+
+    private static bool IsNightChildNeutralState(GameObject target, DayNightPhase phase)
+    {
+        return HasNightChildState(target) && phase == DayNightPhase.Dawn;
+    }
+
+    private static bool IsDayChildNeutralState(GameObject target, DayNightPhase phase)
+    {
+        return HasDayChildState(target) && phase == DayNightPhase.Dusk;
+    }
+
+    private static bool IsNightChildNegativeState(GameObject target, DayNightPhase phase)
+    {
+        return HasNightChildState(target) && phase == DayNightPhase.Day;
+    }
+
+    private static bool IsDayChildNegativeState(GameObject target, DayNightPhase phase)
+    {
+        return HasDayChildState(target) && phase == DayNightPhase.Night;
+    }
+
+    private static bool IsNightChildPositivePhase(DayNightPhase phase)
+    {
+        return phase == DayNightPhase.Dusk || phase == DayNightPhase.Night;
+    }
+
+    private static bool IsDayChildPositivePhase(DayNightPhase phase)
+    {
+        return phase == DayNightPhase.Dawn || phase == DayNightPhase.Day;
+    }
+
+    private static bool IsNightChild(GameObject target)
+    {
+        GameObject resolvedTarget = ResolvePlayerSource(target) ?? target;
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedTarget);
+        return affinity != null && affinity.IsNightChild;
+    }
+
+    private static bool IsDayChild(GameObject target)
+    {
+        GameObject resolvedTarget = ResolvePlayerSource(target) ?? target;
+        PlayerDayNightAffinity affinity = ResolveAffinity(resolvedTarget);
+        return affinity != null && affinity.IsDayChild;
     }
 
     private static bool TryResolveDayState(out bool isDay, out bool isNight)
@@ -302,12 +615,19 @@ public static class DayNightAffinityDamageModifier
         isDay = false;
         isNight = false;
 
-        if (TODDayNightAdapter.TryGetIsDay(out isDay) && TODDayNightAdapter.TryGetIsNight(out isNight))
+        if (TryResolveCurrentPhase(out DayNightPhase phase))
         {
+            isDay = phase == DayNightPhase.Dawn || phase == DayNightPhase.Day;
+            isNight = phase == DayNightPhase.Dusk || phase == DayNightPhase.Night;
             return true;
         }
 
         return false;
+    }
+
+    private static bool TryResolveCurrentPhase(out DayNightPhase phase)
+    {
+        return TODDayNightAdapter.TryGetCurrentPhase(out phase);
     }
 
     private static PlayerDayNightAffinity ResolveAffinity(GameObject target)
@@ -408,8 +728,8 @@ public static class DayNightAffinityDamageModifier
 
     private static string ResolvePlayerAttackMissReason(
         PlayerDayNightAffinity attackerAffinity,
-        bool isDay,
-        bool isNight,
+        bool hasCurrentPhase,
+        DayNightPhase currentPhase,
         bool hasDayChildState,
         bool hasNightChildState)
     {
@@ -425,7 +745,12 @@ public static class DayNightAffinityDamageModifier
                 return "day-child-state-inactive";
             }
 
-            return !isDay ? "phase-mismatch-not-day" : "no-applicable-rule";
+            if (!hasCurrentPhase)
+            {
+                return "phase-unavailable";
+            }
+
+            return !IsDayChildPositivePhase(currentPhase) ? $"day-child-not-positive-phase-{(hasCurrentPhase ? currentPhase.ToString() : "Unavailable")}" : "no-applicable-rule";
         }
 
         if (attackerAffinity.IsNightChild)
@@ -435,7 +760,12 @@ public static class DayNightAffinityDamageModifier
                 return "night-child-state-inactive";
             }
 
-            return !isNight ? "phase-mismatch-not-night" : "no-applicable-rule";
+            if (!hasCurrentPhase)
+            {
+                return "phase-unavailable";
+            }
+
+            return !IsNightChildPositivePhase(currentPhase) ? $"night-child-not-positive-phase-{(hasCurrentPhase ? currentPhase.ToString() : "Unavailable")}" : "no-applicable-rule";
         }
 
         return "attacker-affinity-none";
@@ -473,8 +803,8 @@ public static class DayNightAffinityDamageModifier
         PlayerDayNightAffinity attackerAffinity,
         PlayerDayNightAffinity defenderAffinity,
         DayNightGaugeRuntimeState gauge,
-        bool isDay,
-        bool isNight,
+        bool hasCurrentPhase,
+        DayNightPhase currentPhase,
         bool attackerHasDayChildState,
         bool attackerHasNightChildState,
         bool defenderHasDayChildState,
@@ -491,13 +821,48 @@ public static class DayNightAffinityDamageModifier
         float balance = gauge != null ? gauge.BalanceValue : -1f;
         float radiance = gauge != null ? gauge.RadianceValue : -1f;
         float twilight = gauge != null ? gauge.TwilightValue : -1f;
-        string phase = isDay ? "Day" : isNight ? "Night" : "Unknown";
+        bool isDay = hasCurrentPhase && (currentPhase == DayNightPhase.Dawn || currentPhase == DayNightPhase.Day);
+        bool isNight = hasCurrentPhase && (currentPhase == DayNightPhase.Dusk || currentPhase == DayNightPhase.Night);
+        string phase = hasCurrentPhase ? currentPhase.ToString() : "Unknown";
+        bool hasCurrentTime = TODDayNightAdapter.TryGetCurrentTimeHours(out float currentTimeHours);
+        bool attackerCorrectDayNightState = IsCorrectDayNightState(attacker);
+        bool attackerWrongDayNightState = IsWrongDayNightState(attacker);
+        bool attackerNeutralDayNightState = IsTwinChildNeutralPhase(attacker);
+        bool attackerNightChildPositivePhase = hasCurrentPhase && IsNightChildPositiveState(attacker, currentPhase);
+        bool attackerNightChildNeutralPhase = hasCurrentPhase && IsNightChildNeutralState(attacker, currentPhase);
+        bool attackerNightChildNegativePhase = hasCurrentPhase && IsNightChildNegativeState(attacker, currentPhase);
+        bool attackerDayChildPositivePhase = hasCurrentPhase && IsDayChildPositiveState(attacker, currentPhase);
+        bool attackerDayChildNeutralPhase = hasCurrentPhase && IsDayChildNeutralState(attacker, currentPhase);
+        bool attackerDayChildNegativePhase = hasCurrentPhase && IsDayChildNegativeState(attacker, currentPhase);
+        bool defenderCorrectDayNightState = IsCorrectDayNightState(defender);
+        bool defenderWrongDayNightState = IsWrongDayNightState(defender);
+        bool defenderNeutralDayNightState = IsTwinChildNeutralPhase(defender);
+        bool defenderNightChildPositivePhase = hasCurrentPhase && IsNightChildPositiveState(defender, currentPhase);
+        bool defenderNightChildNeutralPhase = hasCurrentPhase && IsNightChildNeutralState(defender, currentPhase);
+        bool defenderNightChildNegativePhase = hasCurrentPhase && IsNightChildNegativeState(defender, currentPhase);
+        bool defenderDayChildPositivePhase = hasCurrentPhase && IsDayChildPositiveState(defender, currentPhase);
+        bool defenderDayChildNeutralPhase = hasCurrentPhase && IsDayChildNeutralState(defender, currentPhase);
+        bool defenderDayChildNegativePhase = hasCurrentPhase && IsDayChildNegativeState(defender, currentPhase);
+        float attackerOutgoingMultiplier = GetTwinOutgoingDamageMultiplier(attacker);
+        float defenderIncomingMultiplier = GetTwinIncomingDamageMultiplier(defender);
+        float defenderEvasionMultiplier = GetWrongTimeEvasionMultiplier(defender);
+        float defenderMoveSpeedMultiplier = GetWrongTimeMoveSpeedMultiplier(defender);
+        TwinStateRuntimeBonus attackerRuntimeBonus = GetTwinStateRuntimeBonus(attacker);
+        TwinStateRuntimeBonus defenderRuntimeBonus = GetTwinStateRuntimeBonus(defender);
+        TODDayNightAdapter.GetPhaseBoundaries(out float dawnStart, out float dayStart, out float duskStart, out float nightStart);
 
         Debug.Log(
             $"[DayNightAffinity] phase={phase} attackerIsPlayer={BattleTargetUtility.IsPlayer(attacker)} defenderIsPlayer={BattleTargetUtility.IsPlayer(defender)} " +
             $"attackerIsMonster={BattleTargetUtility.IsMonster(attacker)} defenderIsMonster={BattleTargetUtility.IsMonster(defender)} " +
             $"attacker={GetObjectName(attacker)} defender={GetObjectName(defender)} attackerAffinity={GetAffinityName(attackerAffinity)} defenderAffinity={GetAffinityName(defenderAffinity)} " +
+            $"currentTime={(hasCurrentTime ? currentTimeHours.ToString("F2") : "Unavailable")} dawnStart={dawnStart:F2} dayStart={dayStart:F2} duskStart={duskStart:F2} nightStart={nightStart:F2} isDayTime={isDay} isNightTime={isNight} " +
             $"balance={balance:F2} radiance={radiance:F2} twilight={twilight:F2} attackerHasDayChildState={attackerHasDayChildState} attackerHasNightChildState={attackerHasNightChildState} defenderHasDayChildState={defenderHasDayChildState} defenderHasNightChildState={defenderHasNightChildState} " +
+            $"attackerCorrectDayNightState={attackerCorrectDayNightState} attackerNeutralDayNightState={attackerNeutralDayNightState} attackerWrongDayNightState={attackerWrongDayNightState} defenderCorrectDayNightState={defenderCorrectDayNightState} defenderNeutralDayNightState={defenderNeutralDayNightState} defenderWrongDayNightState={defenderWrongDayNightState} " +
+            $"attackerNightChildPositivePhase={attackerNightChildPositivePhase} attackerNightChildNeutralPhase={attackerNightChildNeutralPhase} attackerNightChildNegativePhase={attackerNightChildNegativePhase} attackerDayChildPositivePhase={attackerDayChildPositivePhase} attackerDayChildNeutralPhase={attackerDayChildNeutralPhase} attackerDayChildNegativePhase={attackerDayChildNegativePhase} " +
+            $"defenderNightChildPositivePhase={defenderNightChildPositivePhase} defenderNightChildNeutralPhase={defenderNightChildNeutralPhase} defenderNightChildNegativePhase={defenderNightChildNegativePhase} defenderDayChildPositivePhase={defenderDayChildPositivePhase} defenderDayChildNeutralPhase={defenderDayChildNeutralPhase} defenderDayChildNegativePhase={defenderDayChildNegativePhase} " +
+            $"attackerStatusType={attackerRuntimeBonus.statusType} attackerAttackStatMultiplier={attackerRuntimeBonus.attackStatMultiplier:F2} attackerMagicStatMultiplier={attackerRuntimeBonus.magicStatMultiplier:F2} attackerDefenseStatMultiplier={attackerRuntimeBonus.defenseStatMultiplier:F2} attackerResistanceStatMultiplier={attackerRuntimeBonus.resistanceStatMultiplier:F2} " +
+            $"defenderStatusType={defenderRuntimeBonus.statusType} defenderAttackStatMultiplier={defenderRuntimeBonus.attackStatMultiplier:F2} defenderMagicStatMultiplier={defenderRuntimeBonus.magicStatMultiplier:F2} defenderDefenseStatMultiplier={defenderRuntimeBonus.defenseStatMultiplier:F2} defenderResistanceStatMultiplier={defenderRuntimeBonus.resistanceStatMultiplier:F2} " +
+            $"attackerOutgoingDamageMultiplier={attackerOutgoingMultiplier:F2} defenderIncomingDamageMultiplier={defenderIncomingMultiplier:F2} defenderEvasionMultiplier={defenderEvasionMultiplier:F2} defenderMoveSpeedMultiplier={defenderMoveSpeedMultiplier:F2} " +
             $"originalDamage={originalDamage:F2} multiplier={multiplier:F2} finalDamage={originalDamage * multiplier:F2} reason={reason}",
             defender != null ? defender : attacker);
     }

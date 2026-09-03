@@ -1265,12 +1265,6 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
             multiplier *= Mathf.Max(0f, attackerStats.outgoingDamageMultiplier);
         }
 
-        if (DayNightAffinityDamageModifier.IsNightChildFavorableTime(attacker)
-            || DayNightAffinityDamageModifier.IsDayChildFavorableTime(attacker))
-        {
-            multiplier *= 1.5f;
-        }
-
         return Mathf.Max(1f, multiplier);
     }
 

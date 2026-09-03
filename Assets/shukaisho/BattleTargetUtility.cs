@@ -2,6 +2,40 @@ using UnityEngine;
 
 public static class BattleTargetUtility
 {
+    public static GameObject ResolvePlayerSource(GameObject source)
+    {
+        if (source == null)
+        {
+            return null;
+        }
+
+        PlayerMovement movement = source.GetComponentInParent<PlayerMovement>(true);
+        if (movement != null)
+        {
+            return movement.gameObject;
+        }
+
+        Player01SkillController player01 = source.GetComponentInParent<Player01SkillController>(true);
+        if (player01 != null)
+        {
+            return player01.gameObject;
+        }
+
+        Player2PrototypeController player02 = source.GetComponentInParent<Player2PrototypeController>(true);
+        if (player02 != null)
+        {
+            return player02.gameObject;
+        }
+
+        CombatSkillCaster caster = source.GetComponentInParent<CombatSkillCaster>(true);
+        if (caster != null && IsPlayer(caster.gameObject))
+        {
+            return caster.gameObject;
+        }
+
+        return source.CompareTag("Player") ? source : null;
+    }
+
     public static bool IsPlayer(GameObject target)
     {
         if (target == null)

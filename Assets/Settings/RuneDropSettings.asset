@@ -12,9 +12,13 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a62c34e8345f4b7caee6f598c8d61e31, type: 3}
   m_Name: RuneDropSettings
   m_EditorClassIdentifier: 
-  normalRuneDrops: 0
+  normalRuneDrops: 1
   eliteRuneDrops: 1
   bossRuneDrops: 2
+  normalRuneDropChance: 0.12
+  eliteRuneDropChance: 0.65
+  bossRuneDropChance: 1
+  finalRushRuneDropChanceMultiplier: 1.75
   normalExtraRuneChance: 0
   eliteExtraRuneChance: 0
   bossExtraRuneChance: 0

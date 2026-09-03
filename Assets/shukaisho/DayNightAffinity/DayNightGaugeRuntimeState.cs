@@ -9,10 +9,19 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
 
     private static DayNightGaugeRuntimeState instance;
 
-    [SerializeField, Range(0f, 100f)] private float initialActiveGaugeAmount = 15f;
+    [SerializeField, Range(0f, 100f)] private float initialRadianceAmount = 50f;
+    [SerializeField, Range(0f, 100f)] private float initialTwilightAmount = 50f;
     [SerializeField, Min(0f)] private float gaugeGainPerHit = 3f;
     [SerializeField, Range(0f, 100f)] private float buffActivationThreshold = 100f;
     [SerializeField, Min(0f)] private float activationEpsilon = 0.001f;
+
+    [Header("Day Night Phase")]
+    [SerializeField, Range(0f, 24f)] private float dawnStartHour = 5f;
+    [SerializeField, Range(0f, 24f)] private float dayStartHour = 7f;
+    [SerializeField, Range(0f, 24f)] private float duskStartHour = 17f;
+    [SerializeField, Range(0f, 24f)] private float nightStartHour = 19f;
+    [SerializeField] private bool debugDayNightPhaseDiagnostics = false;
+
     [SerializeField] private bool debugLog = false;
     [SerializeField] private bool debugHitFlow = false;
     [SerializeField] private bool debugAffinityDamage = false;
@@ -28,6 +37,11 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     public float GaugeGainPerHit => gaugeGainPerHit;
     public float BuffActivationThreshold => buffActivationThreshold;
     public float ActivationEpsilon => activationEpsilon;
+    public float DawnStartHour => NormalizeHour(dawnStartHour);
+    public float DayStartHour => NormalizeHour(dayStartHour);
+    public float DuskStartHour => NormalizeHour(duskStartHour);
+    public float NightStartHour => NormalizeHour(nightStartHour);
+    public bool DebugDayNightPhaseDiagnosticsEnabled => debugDayNightPhaseDiagnostics;
     public bool DebugLogEnabled => debugLog;
     public bool DebugHitFlowEnabled => debugHitFlow;
     public bool DebugAffinityDamageEnabled => debugAffinityDamage;
@@ -224,14 +238,12 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
 
     private void InitializeGaugeValues()
     {
-        PlayerDayNightAffinityType activeAffinity = ResolveInitialActiveAffinity();
-        float seedAmount = Mathf.Clamp(initialActiveGaugeAmount, 0f, MaxGaugeValue);
-        float initialRadiance = activeAffinity == PlayerDayNightAffinityType.DayChild ? seedAmount : 0f;
-        float initialTwilight = activeAffinity == PlayerDayNightAffinityType.NightChild ? seedAmount : 0f;
+        float initialRadiance = Mathf.Clamp(initialRadianceAmount, 0f, MaxGaugeValue);
+        float initialTwilight = Mathf.Clamp(initialTwilightAmount, 0f, MaxGaugeValue);
         SetGaugeValuesWithoutLogging(initialRadiance, initialTwilight);
 
         Debug.Log(
-            $"[DayNightGauge] initialized active={activeAffinity} twilight={FormatGaugeValue(twilight)} radiance={FormatGaugeValue(radiance)} empty={FormatGaugeValue(EmptyValue)}",
+            $"[DayNightGauge] initialized twilight={FormatGaugeValue(twilight)} radiance={FormatGaugeValue(radiance)} empty={FormatGaugeValue(EmptyValue)}",
             this);
     }
 
@@ -285,6 +297,16 @@ public class DayNightGaugeRuntimeState : MonoBehaviour
     private static string FormatGaugeValue(float value)
     {
         return Mathf.Clamp(value, 0f, MaxGaugeValue).ToString("0.##");
+    }
+
+    private static float NormalizeHour(float hour)
+    {
+        if (float.IsNaN(hour) || float.IsInfinity(hour))
+        {
+            return 0f;
+        }
+
+        return Mathf.Repeat(hour, 24f);
     }
 
     private void ApplyRadianceGain(float amount, string source)

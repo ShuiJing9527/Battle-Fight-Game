@@ -115,8 +115,7 @@ public class DayNightAffinityUI : MonoBehaviour
             return;
         }
 
-        bool hasDay = TODDayNightAdapter.TryGetIsDay(out bool isDay);
-        bool hasNight = TODDayNightAdapter.TryGetIsNight(out bool isNight);
+        bool hasPhase = TODDayNightAdapter.TryGetCurrentPhase(out DayNightPhase currentPhase);
 
         float twilightValue;
         float radianceValue;
@@ -156,7 +155,7 @@ public class DayNightAffinityUI : MonoBehaviour
         UpdateCover(radianceCoverRoot, radianceCoverSolid, radianceCoverFade, true, radianceValue / 100f);
         UpdateFlowMaterials();
         UpdateValueTexts(twilightValue, radianceValue);
-        UpdateIconState(hasDay, hasNight, isDay, isNight);
+        UpdateIconState(hasPhase, currentPhase);
         UpdateGlowState(gaugeState, twilightValue, radianceValue);
     }
 
@@ -205,16 +204,19 @@ public class DayNightAffinityUI : MonoBehaviour
         }
     }
 
-    private void UpdateIconState(bool hasDay, bool hasNight, bool isDay, bool isNight)
+    private void UpdateIconState(bool hasPhase, DayNightPhase currentPhase)
     {
+        bool isSunPhase = hasPhase && (currentPhase == DayNightPhase.Dawn || currentPhase == DayNightPhase.Day);
+        bool isMoonPhase = hasPhase && (currentPhase == DayNightPhase.Dusk || currentPhase == DayNightPhase.Night);
+
         if (moonIcon != null)
         {
-            moonIcon.color = ApplyAlpha(moonIcon.color, hasNight && isNight ? activeIconAlpha : inactiveIconAlpha);
+            moonIcon.color = ApplyAlpha(moonIcon.color, isMoonPhase ? activeIconAlpha : inactiveIconAlpha);
         }
 
         if (sunIcon != null)
         {
-            sunIcon.color = ApplyAlpha(sunIcon.color, hasDay && isDay ? activeIconAlpha : inactiveIconAlpha);
+            sunIcon.color = ApplyAlpha(sunIcon.color, isSunPhase ? activeIconAlpha : inactiveIconAlpha);
         }
     }
 
