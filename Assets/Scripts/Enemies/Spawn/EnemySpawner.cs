@@ -107,18 +107,18 @@ public class EnemySpawner : MonoBehaviour
 
     [Header("Legacy Spawn")]
     [Tooltip("Base refill check interval used when alive normal monsters fall below the base amount.")]
-    public float spawnInterval = 3f;
+    public float spawnInterval = 2f;
     public float startDelay = 2f;
     [Tooltip("Legacy field kept for compatibility. Elite now uses the random interval range below.")]
     [HideInInspector] public float eliteSpawnInterval = 30f;
 
     [Header("Normal Monsters")]
-    public int baseNormalMonsterCount = 5;
-    public int maxNormalMonsterCount = 50;
-    public float normalReinforceIntervalMin = 5f;
-    public float normalReinforceIntervalMax = 10f;
-    public int normalReinforceCountMin = 1;
-    public int normalReinforceCountMax = 5;
+    public int baseNormalMonsterCount = 4;
+    public int maxNormalMonsterCount = 70;
+    public float normalReinforceIntervalMin = 3f;
+    public float normalReinforceIntervalMax = 6f;
+    public int normalReinforceCountMin = 2;
+    public int normalReinforceCountMax = 6;
 
     [Header("Monster Stat Growth")]
     [Tooltip("Base HP multiplier applied before time growth, rank multipliers, and special boss phase multipliers.")]
@@ -194,14 +194,14 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField, Min(0.05f)] private float bossHurtboxRuntimeRefreshInterval = 0.25f;
 
     [Header("Elite")]
-    public float eliteSpawnIntervalMin = 10f;
+    public float eliteSpawnIntervalMin = 18f;
     public float eliteSpawnIntervalMax = 30f;
-    [SerializeField, Min(0f)] private float eliteGuaranteedSpawnTime = 30f;
-    public int maxAliveEliteCount = 1;
+    [SerializeField, Min(0f)] private float eliteGuaranteedSpawnTime = 24f;
+    public int maxAliveEliteCount = 3;
 
     [Header("Boss")]
-    public float bossCheckIntervalGameHours = 6f;
-    [Range(0f, 1f)] public float bossSpawnChancePerCheck = 0.25f;
+    public float bossCheckIntervalGameHours = 3f;
+    [Range(0f, 1f)] public float bossSpawnChancePerCheck = 0.5f;
     public int maxAliveBossCount = 1;
 
     [Header("Final Moment Boss")]

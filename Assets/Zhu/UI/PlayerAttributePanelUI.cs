@@ -1,5 +1,6 @@
 using TMPro;
 using System.Collections.Generic;
+using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
 using Spine.Unity;
@@ -84,6 +85,16 @@ public class PlayerAttributePanelUI : MonoBehaviour
         public float speed;
     }
 
+    private struct AttributeBonusBreakdown
+    {
+        public float baseValue;
+        public float nonTwinBonus;
+        public float preTwinValue;
+        public float twinBonus;
+        public float totalBonus;
+        public float finalValue;
+    }
+
     [Header("Root")]
     [SerializeField] private Canvas targetCanvas;
     [SerializeField] private RectTransform panelRoot;
@@ -151,6 +162,16 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private float footerHeight = 110f;
     [SerializeField] private float attributeLabelWidth = 48f;
     [SerializeField] private float attributeValueWidth = 88f;
+
+    [Header("Twin State Summary Layout")]
+    [SerializeField, Min(40f)] private float twinSummaryAreaHeight = 56f;
+    [SerializeField, Min(8f)] private float twinSummaryFontSize = 10f;
+    [SerializeField, Min(8f)] private float twinSummaryMinFontSize = 9f;
+    [SerializeField, Min(0f)] private float twinSummaryLineSpacing = 1f;
+    [SerializeField, Min(8f)] private float secondaryStatsFontSize = 13f;
+    [SerializeField, Min(8f)] private float secondaryStatsMinFontSize = 12f;
+    [SerializeField, Min(14f)] private float secondaryStatsLineHeight = 16f;
+    [SerializeField, Min(0f)] private float secondaryStatsLineGap = 2f;
 
     [Header("Fallback Colors")]
     [SerializeField] private Color panelColor = new Color(0.08f, 0.1f, 0.14f, 0.96f);
@@ -235,6 +256,7 @@ public class PlayerAttributePanelUI : MonoBehaviour
     private Transform previewExtraVisualRoot;
     private readonly List<PreviewExtraVisualRuntime> previewExtraVisuals = new List<PreviewExtraVisualRuntime>();
     private readonly Dictionary<int, AttributeBaseSnapshot> attributeBaseSnapshots = new Dictionary<int, AttributeBaseSnapshot>();
+    private string lastTwinPanelDebugSignature;
 
     public bool IsPanelOpen => isVisible;
 
@@ -1192,20 +1214,32 @@ public class PlayerAttributePanelUI : MonoBehaviour
         float hpCurrent = ResolveCurrentHealth();
         float hpTotal = ResolveMaxHealth();
         AttributeBaseSnapshot baseSnapshot = ResolveAttributeBaseSnapshot();
+        TwinFormalStateStatus twinStatus = TwinStateCombatBonus.EnsureFormalStateStatus(cachedPlayer);
+        twinStatus?.RefreshNow();
+        TwinStateRuntimeBonus twinBonus = DayNightAffinityDamageModifier.GetTwinStateRuntimeBonus(cachedPlayer);
+        int equippedRuneCount = BattleStatUtility.GetEquippedRuneCount(cachedPlayer, out string runeCountSource);
         float hpBase = Mathf.Max(0f, baseSnapshot.maxHealth);
         float hpBonus = Mathf.Max(0f, hpTotal - hpBase);
-        float atkTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalAttack) : 0f;
-        float atkBase = Mathf.Max(0f, baseSnapshot.physicalAttack);
-        float atkBonus = Mathf.Max(0f, atkTotal - atkBase);
-        float defTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.physicalDefense) : 0f;
-        float defBase = Mathf.Max(0f, baseSnapshot.physicalDefense);
-        float defBonus = Mathf.Max(0f, defTotal - defBase);
-        float magTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.specialAttack) : 0f;
-        float magBase = Mathf.Max(0f, baseSnapshot.specialAttack);
-        float magBonus = Mathf.Max(0f, magTotal - magBase);
-        float resTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.specialDefense) : 0f;
-        float resBase = Mathf.Max(0f, baseSnapshot.specialDefense);
-        float resBonus = Mathf.Max(0f, resTotal - resBase);
+        AttributeBonusBreakdown atkBreakdown = ResolveAttributeBonusBreakdown(
+            baseSnapshot.physicalAttack,
+            cachedStats != null ? cachedStats.physicalAttack : 0f,
+            twinStatus != null ? twinStatus.AppliedPhysicalAttackBonus : 0f,
+            twinBonus.attackStatMultiplier);
+        AttributeBonusBreakdown defBreakdown = ResolveAttributeBonusBreakdown(
+            baseSnapshot.physicalDefense,
+            cachedStats != null ? cachedStats.physicalDefense : 0f,
+            twinStatus != null ? twinStatus.AppliedPhysicalDefenseBonus : 0f,
+            twinBonus.defenseStatMultiplier);
+        AttributeBonusBreakdown magBreakdown = ResolveAttributeBonusBreakdown(
+            baseSnapshot.specialAttack,
+            cachedStats != null ? cachedStats.specialAttack : 0f,
+            twinStatus != null ? twinStatus.AppliedSpecialAttackBonus : 0f,
+            twinBonus.magicStatMultiplier);
+        AttributeBonusBreakdown resBreakdown = ResolveAttributeBonusBreakdown(
+            baseSnapshot.specialDefense,
+            cachedStats != null ? cachedStats.specialDefense : 0f,
+            twinStatus != null ? twinStatus.AppliedSpecialDefenseBonus : 0f,
+            twinBonus.resistanceStatMultiplier);
         float speedTotal = cachedStats != null ? Mathf.Max(0f, cachedStats.speed) : 0f;
         float speedBase = Mathf.Max(0f, baseSnapshot.speed);
         float speedBonus = Mathf.Max(0f, speedTotal - speedBase);
@@ -1247,10 +1281,10 @@ public class PlayerAttributePanelUI : MonoBehaviour
         RefreshPreview(force: false);
 
         SetHealthDisplay(hpCurrent, hpBase, hpTotal, hpBonus);
-        SetAttributeDisplay(1, atkBase, atkTotal, atkBonus, atkDisplayMax);
-        SetAttributeDisplay(2, defBase, defTotal, defBonus, defDisplayMax);
-        SetAttributeDisplay(3, magBase, magTotal, magBonus, magDisplayMax);
-        SetAttributeDisplay(4, resBase, resTotal, resBonus, resDisplayMax);
+        SetAttributeDisplay(1, atkBreakdown.baseValue, atkBreakdown.finalValue, atkBreakdown.totalBonus, atkDisplayMax);
+        SetAttributeDisplay(2, defBreakdown.baseValue, defBreakdown.finalValue, defBreakdown.totalBonus, defDisplayMax);
+        SetAttributeDisplay(3, magBreakdown.baseValue, magBreakdown.finalValue, magBreakdown.totalBonus, magDisplayMax);
+        SetAttributeDisplay(4, resBreakdown.baseValue, resBreakdown.finalValue, resBreakdown.totalBonus, resDisplayMax);
         SetAttributeDisplay(5, speedBase, speedTotal, speedBonus, spdDisplayMax);
 
         if (spdText != null)
@@ -1280,7 +1314,14 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         if (reserveText != null)
         {
-            reserveText.text = Localize("Buff / Rune / Skill Info Reserved");
+            ConfigureTwinSummaryLayout();
+            reserveText.text = BuildTwinStateSummary(
+                twinBonus,
+                atkBreakdown,
+                magBreakdown,
+                defBreakdown,
+                resBreakdown);
+            reserveText.ForceMeshUpdate();
         }
 
         if (footerText != null && spdText == null && luckText == null && critRateText == null && extraSoulDropText == null && extraRuneDropText == null)
@@ -1289,11 +1330,283 @@ public class PlayerAttributePanelUI : MonoBehaviour
                 Localize("LUCK") + " " + luck.ToString("0") + "\n" +
                 Localize("Crit Rate") + " " + critRate.ToString("0.#") + "%\n" +
                 Localize("Extra Soul Drop") + " " + extraSoulDrop.ToString("0.#") + "%\n" +
-                Localize("Extra Rune Drop") + " " + extraRuneDrop.ToString("0.#") + "%\n" +
-                Localize("Buff / Rune / Skill Info Reserved");
+                Localize("Extra Rune Drop") + " " + extraRuneDrop.ToString("0.#") + "%";
         }
 
+        LogTwinPanelDebugIfNeeded(
+            twinBonus,
+            twinStatus,
+            equippedRuneCount,
+            runeCountSource,
+            atkBreakdown,
+            magBreakdown,
+            defBreakdown,
+            resBreakdown);
+
         ApplyLanguageFontToPanel();
+    }
+
+    private string BuildTwinStateSummary(
+        TwinStateRuntimeBonus bonus,
+        AttributeBonusBreakdown atk,
+        AttributeBonusBreakdown mag,
+        AttributeBonusBreakdown def,
+        AttributeBonusBreakdown res)
+    {
+        string statusName = ResolveTwinStatusName(bonus);
+        string phaseName = bonus.hasCurrentPhase ? bonus.currentPhase.ToString() : "--";
+        string separator = LocalizedTwinText(" | ", "｜", "｜");
+        StringBuilder builder = new StringBuilder(384);
+
+        builder.Append(LocalizedTwinText("Status", "状态", "状態"))
+            .Append(": ").Append(statusName)
+            .Append(separator).Append(LocalizedTwinText("Phase", "阶段", "段階"))
+            .Append(": ").AppendLine(phaseName);
+
+        builder.Append(LocalizedTwinText("State Bonus", "状态加成", "状態補正"))
+            .Append(": ")
+            .AppendLine(BuildAttributeBonusList(atk.twinBonus, mag.twinBonus, def.twinBonus, res.twinBonus, separator));
+        builder.Append(LocalizedTwinText("Passive Bonus", "常驻加成", "常時補正"))
+            .Append(": ")
+            .AppendLine(BuildAttributeBonusList(atk.nonTwinBonus, mag.nonTwinBonus, def.nonTwinBonus, res.nonTwinBonus, separator));
+        builder.Append(LocalizedTwinText("Battle Mult.", "战斗倍率", "戦闘倍率"))
+            .Append(": ")
+            .Append(LocalizedTwinText("Damage", "造成", "与ダメ"))
+            .Append(" ×").Append(bonus.outgoingDamageMultiplier.ToString("0.0"))
+            .Append(separator)
+            .Append(LocalizedTwinText("Taken", "受伤", "被ダメ"))
+            .Append(" ×").Append(bonus.incomingDamageMultiplier.ToString("0.0"));
+
+        if (bonus.statusType == TwinStateRuntimeType.Debuff)
+        {
+            builder.AppendLine();
+            builder.Append(LocalizedTwinText("Weakened", "弱化", "弱体化"))
+                .Append(": ")
+                .Append(LocalizedTwinText("Evasion", "闪避", "回避"))
+                .Append(" ×").Append(bonus.evasionMultiplier.ToString("0.0"))
+                .Append(separator)
+                .Append(LocalizedTwinText("Move speed", "移速", "移動速度"))
+                .Append(" ×").Append(bonus.moveSpeedMultiplier.ToString("0.0"));
+        }
+
+        return builder.ToString();
+    }
+
+    private static AttributeBonusBreakdown ResolveAttributeBonusBreakdown(
+        float baseValue,
+        float runtimeFinalValue,
+        float appliedTwinBonus,
+        float twinMultiplier)
+    {
+        float safeBaseValue = Mathf.Max(0f, baseValue);
+        float safeRuntimeFinalValue = Mathf.Max(0f, runtimeFinalValue);
+        float safeAppliedTwinBonus = Mathf.Max(0f, appliedTwinBonus);
+        float preTwinValue = Mathf.Max(safeBaseValue, safeRuntimeFinalValue - safeAppliedTwinBonus);
+        float nonTwinBonus = Mathf.Max(0f, preTwinValue - safeBaseValue);
+        float twinRate = Mathf.Max(0f, twinMultiplier - 1f);
+        float roundedTwinBonus = Mathf.RoundToInt(preTwinValue * twinRate);
+        float roundedNonTwinBonus = Mathf.RoundToInt(nonTwinBonus);
+        float totalBonus = roundedNonTwinBonus + roundedTwinBonus;
+
+        return new AttributeBonusBreakdown
+        {
+            baseValue = Mathf.RoundToInt(safeBaseValue),
+            nonTwinBonus = roundedNonTwinBonus,
+            preTwinValue = preTwinValue,
+            twinBonus = roundedTwinBonus,
+            totalBonus = totalBonus,
+            finalValue = Mathf.RoundToInt(safeBaseValue) + totalBonus
+        };
+    }
+
+    private string BuildAttributeBonusList(
+        float atkBonus,
+        float magBonus,
+        float defBonus,
+        float resBonus,
+        string separator)
+    {
+        int atk = Mathf.RoundToInt(Mathf.Max(0f, atkBonus));
+        int mag = Mathf.RoundToInt(Mathf.Max(0f, magBonus));
+        int def = Mathf.RoundToInt(Mathf.Max(0f, defBonus));
+        int res = Mathf.RoundToInt(Mathf.Max(0f, resBonus));
+        if (atk <= 0 && mag <= 0 && def <= 0 && res <= 0)
+        {
+            return LocalizedTwinText("None", "无", "なし");
+        }
+
+        StringBuilder builder = new StringBuilder(96);
+        AppendAttributeBonus(builder, "ATK", atk, separator);
+        AppendAttributeBonus(builder, "MAG", mag, separator);
+        AppendAttributeBonus(builder, "DEF", def, separator);
+        AppendAttributeBonus(builder, "RES", res, separator);
+        return builder.ToString();
+    }
+
+    private static void AppendAttributeBonus(StringBuilder builder, string label, int value, string separator)
+    {
+        if (value <= 0)
+        {
+            return;
+        }
+
+        if (builder.Length > 0)
+        {
+            builder.Append(separator);
+        }
+
+        builder.Append(label).Append(" +").Append(value);
+    }
+
+    private void ConfigureTwinSummaryLayout()
+    {
+        const float stateAreaBottom = 8f;
+
+        if (reserveRect != null)
+        {
+            reserveRect.anchorMin = new Vector2(0f, 0f);
+            reserveRect.anchorMax = new Vector2(1f, 0f);
+            reserveRect.pivot = new Vector2(0.5f, 0.5f);
+            reserveRect.anchoredPosition = new Vector2(
+                reserveRect.anchoredPosition.x,
+                stateAreaBottom + twinSummaryAreaHeight * 0.5f);
+            reserveRect.sizeDelta = new Vector2(reserveRect.sizeDelta.x, twinSummaryAreaHeight);
+        }
+
+        if (subInfoRect != null)
+        {
+            ConfigureSecondaryStatsTextLayout();
+        }
+
+        if (reserveText == null)
+        {
+            return;
+        }
+
+        reserveText.enableWordWrapping = true;
+        reserveText.enableAutoSizing = true;
+        reserveText.fontSizeMin = Mathf.Min(twinSummaryMinFontSize, twinSummaryFontSize);
+        reserveText.fontSizeMax = Mathf.Max(twinSummaryMinFontSize, twinSummaryFontSize);
+        reserveText.fontSize = twinSummaryFontSize;
+        reserveText.lineSpacing = twinSummaryLineSpacing;
+        reserveText.alignment = TextAlignmentOptions.TopLeft;
+        reserveText.overflowMode = TextOverflowModes.Truncate;
+    }
+
+    private void ConfigureSecondaryStatsTextLayout()
+    {
+        TextMeshProUGUI[] secondaryTexts =
+        {
+            luckText,
+            critRateText,
+            extraSoulDropText,
+            extraRuneDropText
+        };
+        float lineStep = secondaryStatsLineHeight + secondaryStatsLineGap;
+
+        for (int i = 0; i < secondaryTexts.Length; i++)
+        {
+            TextMeshProUGUI text = secondaryTexts[i];
+            if (text == null)
+            {
+                continue;
+            }
+
+            RectTransform rect = text.rectTransform;
+            rect.anchorMin = new Vector2(0f, 1f);
+            rect.anchorMax = new Vector2(1f, 1f);
+            rect.pivot = new Vector2(0.5f, 0.5f);
+            rect.anchoredPosition = new Vector2(0f, -(secondaryStatsLineHeight * 0.5f + i * lineStep));
+            rect.sizeDelta = new Vector2(0f, secondaryStatsLineHeight);
+
+            text.enableWordWrapping = false;
+            text.enableAutoSizing = true;
+            text.fontSizeMin = Mathf.Min(secondaryStatsMinFontSize, secondaryStatsFontSize);
+            text.fontSizeMax = Mathf.Max(secondaryStatsMinFontSize, secondaryStatsFontSize);
+            text.fontSize = secondaryStatsFontSize;
+            text.alignment = TextAlignmentOptions.MidlineLeft;
+            text.overflowMode = TextOverflowModes.Truncate;
+        }
+    }
+
+    private string ResolveTwinStatusName(TwinStateRuntimeBonus bonus)
+    {
+        if (bonus.statusType == TwinStateRuntimeType.Normal || bonus.childType == TwinChildRuntimeType.None)
+        {
+            return LocalizedTwinText("Normal", "常态", "通常");
+        }
+
+        string childName = bonus.childType == TwinChildRuntimeType.DayChild
+            ? LocalizedTwinText("Day Child", "日之子", "日の子")
+            : LocalizedTwinText("Night Child", "夜之子", "夜の子");
+        return childName + " " + bonus.statusType;
+    }
+
+    private static string LocalizedTwinText(string english, string simplifiedChinese, string japanese)
+    {
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        if (localization == null)
+        {
+            return simplifiedChinese;
+        }
+
+        switch (localization.CurrentLanguage)
+        {
+            case GameLanguage.English:
+                return english;
+            case GameLanguage.Japanese:
+                return japanese;
+            default:
+                return simplifiedChinese;
+        }
+    }
+
+    private void LogTwinPanelDebugIfNeeded(
+        TwinStateRuntimeBonus bonus,
+        TwinFormalStateStatus status,
+        int equippedRuneCount,
+        string runeCountSource,
+        AttributeBonusBreakdown atk,
+        AttributeBonusBreakdown mag,
+        AttributeBonusBreakdown def,
+        AttributeBonusBreakdown res)
+    {
+        bool debugEnabled = status != null && status.DebugTwinStateBonuses;
+        if (!debugEnabled)
+        {
+            return;
+        }
+
+        GameLocalization localization = GameLocalization.EnsureInstance();
+        string currentLanguage = localization != null ? localization.CurrentLanguage.ToString() : "Unavailable";
+        float reserveTextPreferredHeight = reserveText != null ? reserveText.preferredHeight : 0f;
+        float reserveTextRectHeight = reserveText != null ? reserveText.rectTransform.rect.height : 0f;
+        string signature =
+            $"{cachedPlayer?.GetInstanceID()}:{bonus.statusType}:{bonus.currentPhase}:{bonus.radiance:F2}:{bonus.twilight:F2}:" +
+            $"{equippedRuneCount}:{atk.totalBonus:F2}:{mag.totalBonus:F2}:{def.totalBonus:F2}:{res.totalBonus:F2}:" +
+            $"{currentLanguage}:{reserveTextPreferredHeight:F2}:{reserveTextRectHeight:F2}";
+        if (signature == lastTwinPanelDebugSignature)
+        {
+            return;
+        }
+
+        lastTwinPanelDebugSignature = signature;
+        RuneRuntimeState runeRuntimeState = BattleStatUtility.ResolveRuneRuntimeState(cachedPlayer);
+        float damageBonusPerRune = runeRuntimeState != null
+            ? runeRuntimeState.GetDemoBaseDamageBonusPerEquippedRune()
+            : 5f;
+        Debug.Log(
+            $"[TwinStatePanel] currentCharacter={bonus.childType} CurrentPhase={(bonus.hasCurrentPhase ? bonus.currentPhase.ToString() : "Unavailable")} " +
+            $"Radiance={bonus.radiance:F2} Twilight={bonus.twilight:F2} IsInDayChildState={bonus.isInDayChildState} IsInNightChildState={bonus.isInNightChildState} statusType={bonus.statusType} " +
+            $"attackStatMultiplier={bonus.attackStatMultiplier:F2} magicStatMultiplier={bonus.magicStatMultiplier:F2} defenseStatMultiplier={bonus.defenseStatMultiplier:F2} resistanceStatMultiplier={bonus.resistanceStatMultiplier:F2} " +
+            $"outgoingDamageMultiplier={bonus.outgoingDamageMultiplier:F2} incomingDamageMultiplier={bonus.incomingDamageMultiplier:F2} evasionMultiplier={bonus.evasionMultiplier:F2} moveSpeedMultiplier={bonus.moveSpeedMultiplier:F2} " +
+            $"baseATK={atk.baseValue:F2} nonTwinBonusATK={atk.nonTwinBonus:F2} preTwinATK={atk.preTwinValue:F2} twinBonusATK={atk.twinBonus:F2} totalBonusATK={atk.totalBonus:F2} " +
+            $"baseMAG={mag.baseValue:F2} nonTwinBonusMAG={mag.nonTwinBonus:F2} preTwinMAG={mag.preTwinValue:F2} twinBonusMAG={mag.twinBonus:F2} totalBonusMAG={mag.totalBonus:F2} " +
+            $"baseDEF={def.baseValue:F2} nonTwinBonusDEF={def.nonTwinBonus:F2} preTwinDEF={def.preTwinValue:F2} twinBonusDEF={def.twinBonus:F2} totalBonusDEF={def.totalBonus:F2} " +
+            $"baseRES={res.baseValue:F2} nonTwinBonusRES={res.nonTwinBonus:F2} preTwinRES={res.preTwinValue:F2} twinBonusRES={res.twinBonus:F2} totalBonusRES={res.totalBonus:F2} " +
+            $"equippedRuneCount={equippedRuneCount} damageBonusPerRune={damageBonusPerRune:F2} runeBaseDamageBonus={equippedRuneCount * damageBonusPerRune:F2} runeCountSource={runeCountSource} " +
+            $"currentLanguage={currentLanguage} reserveTextPreferredHeight={reserveTextPreferredHeight:F2} reserveTextRectHeight={reserveTextRectHeight:F2}",
+            cachedPlayer != null ? (Object)cachedPlayer : this);
     }
 
     private static string Localize(string key)
@@ -1519,14 +1832,19 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return;
         }
 
+        TwinFormalStateStatus twinStatus = player.GetComponent<TwinFormalStateStatus>();
+        float twinAttackBonus = twinStatus != null ? twinStatus.AppliedPhysicalAttackBonus : 0f;
+        float twinDefenseBonus = twinStatus != null ? twinStatus.AppliedPhysicalDefenseBonus : 0f;
+        float twinMagicBonus = twinStatus != null ? twinStatus.AppliedSpecialAttackBonus : 0f;
+        float twinResistanceBonus = twinStatus != null ? twinStatus.AppliedSpecialDefenseBonus : 0f;
         AttributeBaseSnapshot snapshot = new AttributeBaseSnapshot
         {
             initialized = true,
             maxHealth = Mathf.Max(0f, stats.maxHealth),
-            physicalAttack = Mathf.Max(0f, stats.physicalAttack),
-            physicalDefense = Mathf.Max(0f, stats.physicalDefense),
-            specialAttack = Mathf.Max(0f, stats.specialAttack),
-            specialDefense = Mathf.Max(0f, stats.specialDefense),
+            physicalAttack = Mathf.Max(0f, stats.physicalAttack - twinAttackBonus),
+            physicalDefense = Mathf.Max(0f, stats.physicalDefense - twinDefenseBonus),
+            specialAttack = Mathf.Max(0f, stats.specialAttack - twinMagicBonus),
+            specialDefense = Mathf.Max(0f, stats.specialDefense - twinResistanceBonus),
             speed = Mathf.Max(0f, stats.speed)
         };
 
@@ -1607,14 +1925,19 @@ public class PlayerAttributePanelUI : MonoBehaviour
             return default;
         }
 
+        TwinFormalStateStatus twinStatus = cachedPlayer.GetComponent<TwinFormalStateStatus>();
+        float twinAttackBonus = twinStatus != null ? twinStatus.AppliedPhysicalAttackBonus : 0f;
+        float twinDefenseBonus = twinStatus != null ? twinStatus.AppliedPhysicalDefenseBonus : 0f;
+        float twinMagicBonus = twinStatus != null ? twinStatus.AppliedSpecialAttackBonus : 0f;
+        float twinResistanceBonus = twinStatus != null ? twinStatus.AppliedSpecialDefenseBonus : 0f;
         snapshot = new AttributeBaseSnapshot
         {
             initialized = true,
             maxHealth = Mathf.Max(0f, cachedStats.maxHealth),
-            physicalAttack = Mathf.Max(0f, cachedStats.physicalAttack),
-            physicalDefense = Mathf.Max(0f, cachedStats.physicalDefense),
-            specialAttack = Mathf.Max(0f, cachedStats.specialAttack),
-            specialDefense = Mathf.Max(0f, cachedStats.specialDefense),
+            physicalAttack = Mathf.Max(0f, cachedStats.physicalAttack - twinAttackBonus),
+            physicalDefense = Mathf.Max(0f, cachedStats.physicalDefense - twinDefenseBonus),
+            specialAttack = Mathf.Max(0f, cachedStats.specialAttack - twinMagicBonus),
+            specialDefense = Mathf.Max(0f, cachedStats.specialDefense - twinResistanceBonus),
             speed = Mathf.Max(0f, cachedStats.speed)
         };
 

@@ -4,7 +4,7 @@ using UnityEngine;
 public class RuneDropSettings : ScriptableObject
 {
     private const float LuckRuneDropChancePerPoint = 0.03f;
-    private const float RuneDropChanceDecayPerEquippedRune = 0.05f;
+    private const float RuneDropChanceDecayPerEquippedRune = 0.02f;
 
     [System.Serializable]
     public struct RuneWeight
@@ -14,9 +14,15 @@ public class RuneDropSettings : ScriptableObject
     }
 
     [Header("Base Drop Count")]
-    [SerializeField, Min(0)] private int normalRuneDrops = 0;
+    [SerializeField, Min(0)] private int normalRuneDrops = 1;
     [SerializeField, Min(0)] private int eliteRuneDrops = 1;
     [SerializeField, Min(0)] private int bossRuneDrops = 2;
+
+    [Header("Base Drop Chance")]
+    [SerializeField, Range(0f, 1f)] private float normalRuneDropChance = 0.12f;
+    [SerializeField, Range(0f, 1f)] private float eliteRuneDropChance = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float bossRuneDropChance = 1f;
+    [SerializeField, Min(0f)] private float finalRushRuneDropChanceMultiplier = 1.75f;
 
     [Header("Extra Drop Chance")]
     [SerializeField, Range(0f, 1f)] private float normalExtraRuneChance = 0f;
@@ -59,16 +65,17 @@ public class RuneDropSettings : ScriptableObject
     public int RollRuneDropCount(MonsterRank rank, float luck, int ownedRuneCount, out float? eliteRoll)
     {
         eliteRoll = null;
-        if (rank == MonsterRank.Normal)
+        float dropGateRoll = Random.value;
+        float dropGateChance = ResolveRankDropChance(rank, ownedRuneCount);
+        eliteRoll = dropGateRoll;
+        if (dropGateRoll >= dropGateChance)
         {
             return 0;
         }
 
-        float dropGateRoll = Random.value;
-        eliteRoll = dropGateRoll;
-        if (dropGateRoll >= ApplyOwnedRuneDropDecay(1f, ownedRuneCount))
+        if (rank == MonsterRank.Normal)
         {
-            return 0;
+            return Mathf.Clamp(Mathf.Max(1, normalRuneDrops), 0, GetMaxRuneDropCount(rank));
         }
 
         if (rank == MonsterRank.Elite)
@@ -178,7 +185,7 @@ public class RuneDropSettings : ScriptableObject
         {
             MonsterRank.Boss => 6,
             MonsterRank.Elite => 3,
-            _ => 0
+            _ => 1
         };
     }
 
@@ -198,8 +205,30 @@ public class RuneDropSettings : ScriptableObject
         {
             MonsterRank.Boss => Mathf.Clamp(count, 0, 6),
             MonsterRank.Elite => Mathf.Clamp(count, 0, 3),
-            _ => 0
+            _ => Mathf.Clamp(count, 0, 1)
         };
+    }
+
+    private float ResolveRankDropChance(MonsterRank rank, int ownedRuneCount)
+    {
+        float chance = rank switch
+        {
+            MonsterRank.Boss => bossRuneDropChance,
+            MonsterRank.Elite => eliteRuneDropChance,
+            _ => normalRuneDropChance
+        };
+
+        if (EnemyDifficultyDirector.Instance != null && EnemyDifficultyDirector.Instance.IsFinalRushActive)
+        {
+            chance *= Mathf.Max(0f, finalRushRuneDropChanceMultiplier);
+        }
+
+        if (rank == MonsterRank.Boss)
+        {
+            return Mathf.Clamp01(chance);
+        }
+
+        return ApplyOwnedRuneDropDecay(chance, ownedRuneCount);
     }
 
     private float GetRankExtraChance(MonsterRank rank)

@@ -44,6 +44,140 @@ public static class BattleStatUtility
         return stats;
     }
 
+    public static float ApplyEquippedRuneBaseDamageBonus(GameObject owner, float baseDamage)
+    {
+        return ApplyEquippedRuneBaseDamageBonus(owner, baseDamage, out _, out _, out _, out _);
+    }
+
+    public static float ApplyEquippedRuneBaseDamageBonus(
+        GameObject owner,
+        float baseDamage,
+        out int equippedRuneCount,
+        out float damageBonusPerRune,
+        out float runeBaseDamageBonus,
+        out string runeCountSource)
+    {
+        float damage = Mathf.Max(0f, baseDamage);
+        equippedRuneCount = 0;
+        damageBonusPerRune = 0f;
+        runeBaseDamageBonus = 0f;
+        runeCountSource = "NoPlayerSource";
+
+        GameObject playerSource = BattleTargetUtility.ResolvePlayerSource(owner);
+        if (playerSource == null)
+        {
+            return damage;
+        }
+
+        RuneRuntimeState runeRuntimeState = ResolveRuneRuntimeState(playerSource);
+
+        if (runeRuntimeState != null)
+        {
+            runeRuntimeState.RebuildFromEquippedRunes();
+            equippedRuneCount = Mathf.Max(0, runeRuntimeState.GetTotalEquippedRuneCount());
+            damageBonusPerRune = runeRuntimeState.GetDemoBaseDamageBonusPerEquippedRune();
+            runeCountSource = "RuneRuntimeState.GetTotalEquippedRuneCount";
+        }
+        else
+        {
+            equippedRuneCount = CountEquippedRunesFromSkillCaster(playerSource);
+            damageBonusPerRune = 5f;
+            runeCountSource = "CombatSkillCaster.equippedRunes";
+        }
+
+        if (equippedRuneCount <= 0)
+        {
+            return damage;
+        }
+
+        runeBaseDamageBonus = equippedRuneCount * Mathf.Max(0f, damageBonusPerRune);
+        return damage + runeBaseDamageBonus;
+    }
+
+    public static RuneRuntimeState ResolveRuneRuntimeState(GameObject owner)
+    {
+        GameObject playerSource = BattleTargetUtility.ResolvePlayerSource(owner) ?? owner;
+        if (playerSource == null)
+        {
+            return null;
+        }
+
+        RuneRuntimeState runeRuntimeState = playerSource.GetComponent<RuneRuntimeState>();
+        if (runeRuntimeState != null)
+        {
+            return runeRuntimeState;
+        }
+
+        runeRuntimeState = playerSource.GetComponentInParent<RuneRuntimeState>();
+        if (runeRuntimeState != null)
+        {
+            return runeRuntimeState;
+        }
+
+        return playerSource.GetComponentInChildren<RuneRuntimeState>(true);
+    }
+
+    public static int GetEquippedRuneCount(GameObject owner, out string runeCountSource)
+    {
+        GameObject playerSource = BattleTargetUtility.ResolvePlayerSource(owner) ?? owner;
+        if (playerSource == null)
+        {
+            runeCountSource = "NoPlayerSource";
+            return 0;
+        }
+
+        RuneRuntimeState runeRuntimeState = ResolveRuneRuntimeState(playerSource);
+        if (runeRuntimeState != null)
+        {
+            runeCountSource = "RuneRuntimeState.GetTotalEquippedRuneCount";
+            return Mathf.Max(0, runeRuntimeState.GetTotalEquippedRuneCount());
+        }
+
+        runeCountSource = "CombatSkillCaster.equippedRunes";
+        return CountEquippedRunesFromSkillCaster(playerSource);
+    }
+
+    private static int CountEquippedRunesFromSkillCaster(GameObject owner)
+    {
+        CombatSkillCaster caster = owner != null ? owner.GetComponent<CombatSkillCaster>() : null;
+        if (caster == null && owner != null)
+        {
+            caster = owner.GetComponentInParent<CombatSkillCaster>();
+        }
+
+        if (caster == null && owner != null)
+        {
+            caster = owner.GetComponentInChildren<CombatSkillCaster>(true);
+        }
+
+        if (caster == null)
+        {
+            return 0;
+        }
+
+        int count = 0;
+        for (int skillIndex = 0; skillIndex < 4; skillIndex++)
+        {
+            BattleSkill skill = caster.TryGetSkillRaw(skillIndex);
+            if (skill == null || skill.equippedRunes == null)
+            {
+                continue;
+            }
+
+            int slotLimit = Mathf.Min(Mathf.Max(0, skill.runeSlotCount), skill.equippedRunes.Length);
+            for (int slotIndex = 0; slotIndex < slotLimit; slotIndex++)
+            {
+                RuneDefinition rune = skill.equippedRunes[slotIndex];
+                if (rune != null && rune.IsConfigured() && rune.runeType != RuneType.None)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
+    }
+
     public static float ResolveBaseMoveSpeed(CombatStats stats, float fallbackBaseMoveSpeed)
     {
         if (stats == null)
@@ -205,6 +339,7 @@ public static class BattleStatUtility
         rawEvasionChance = GetRawEvasionChance(defenderStats);
         clampedEvasionChance = GetEvasionChance(defenderStats);
         float accuracyAdjustedEvasion = GetFinalEvasionChance(defenderStats, attackerStats);
+        accuracyAdjustedEvasion *= DayNightAffinityDamageModifier.GetWrongTimeEvasionMultiplier(defender);
         float minHitChance = ResolveMinHitChance(defender, attacker);
         finalHitChance = Mathf.Clamp(1f - accuracyAdjustedEvasion, minHitChance, MaxFinalHitChance);
         finalEvasionChance = Mathf.Clamp01(1f - finalHitChance);
@@ -213,7 +348,7 @@ public static class BattleStatUtility
     public static bool TryRollEvasion(GameObject target, out float evasionChance)
     {
         CombatStats stats = GetCombatStats(target);
-        evasionChance = GetEvasionChance(stats);
+        evasionChance = GetEvasionChance(stats) * DayNightAffinityDamageModifier.GetWrongTimeEvasionMultiplier(target);
         if (evasionChance <= 0f)
         {
             return false;

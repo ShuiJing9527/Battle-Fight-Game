@@ -11,23 +11,55 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
     private PlayerDayNightAffinity affinity;
     private float appliedPhysicalAttackBonus;
     private float appliedSpecialAttackBonus;
+    private float appliedPhysicalDefenseBonus;
+    private float appliedSpecialDefenseBonus;
     private bool deathSubscribed;
+    private bool hasLoggedRuntimeState;
+    private TwinStateRuntimeType lastLoggedStatusType;
+    private DayNightPhase lastLoggedPhase;
+    private TwinStateRuntimeBonus currentRuntimeBonus;
 
-    public bool DebugTwinStateBonuses => debugTwinStateBonuses;
+    public bool DebugTwinStateBonuses
+    {
+        get
+        {
+            if (debugTwinStateBonuses)
+            {
+                return true;
+            }
+
+            return DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge)
+                   && gauge != null
+                   && (gauge.DebugAffinityDamageEnabled || gauge.DebugDayNightPhaseDiagnosticsEnabled);
+        }
+    }
+
+    public TwinStateRuntimeBonus CurrentRuntimeBonus => currentRuntimeBonus;
+    public float AppliedPhysicalAttackBonus => appliedPhysicalAttackBonus;
+    public float AppliedSpecialAttackBonus => appliedSpecialAttackBonus;
+    public float AppliedPhysicalDefenseBonus => appliedPhysicalDefenseBonus;
+    public float AppliedSpecialDefenseBonus => appliedSpecialDefenseBonus;
 
     private void Awake()
     {
         ResolveReferences();
         SubscribeDeathEventIfNeeded();
+        RefreshState();
     }
 
     private void OnEnable()
     {
         ResolveReferences();
         SubscribeDeathEventIfNeeded();
+        RefreshState();
     }
 
     private void Update()
+    {
+        RefreshState();
+    }
+
+    public void RefreshNow()
     {
         RefreshState();
     }
@@ -46,7 +78,7 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
 
     public void DebugLog(string message, Object context = null)
     {
-        if (!debugTwinStateBonuses)
+        if (!DebugTwinStateBonuses)
         {
             return;
         }
@@ -68,19 +100,48 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
             return;
         }
 
-        bool shouldApplyNightChildAttackBonus =
-            affinity != null
-            && affinity.IsNightChild
-            && DayNightAffinityDamageModifier.HasNightChildState(gameObject);
+        currentRuntimeBonus = DayNightAffinityDamageModifier.GetTwinStateRuntimeBonus(gameObject);
+        bool changed = false;
+        changed |= SyncStatMultiplier(
+            ref combatStats.physicalAttack,
+            ref appliedPhysicalAttackBonus,
+            currentRuntimeBonus.attackStatMultiplier,
+            "physicalAttack");
+        changed |= SyncStatMultiplier(
+            ref combatStats.specialAttack,
+            ref appliedSpecialAttackBonus,
+            currentRuntimeBonus.magicStatMultiplier,
+            "specialAttack");
+        changed |= SyncStatMultiplier(
+            ref combatStats.physicalDefense,
+            ref appliedPhysicalDefenseBonus,
+            currentRuntimeBonus.defenseStatMultiplier,
+            "physicalDefense");
+        changed |= SyncStatMultiplier(
+            ref combatStats.specialDefense,
+            ref appliedSpecialDefenseBonus,
+            currentRuntimeBonus.resistanceStatMultiplier,
+            "specialDefense");
 
-        if (shouldApplyNightChildAttackBonus)
+        bool stateChanged = !hasLoggedRuntimeState
+                            || lastLoggedStatusType != currentRuntimeBonus.statusType
+                            || lastLoggedPhase != currentRuntimeBonus.currentPhase;
+        if (changed || stateChanged)
         {
-            SyncStatMultiplier(ref combatStats.physicalAttack, ref appliedPhysicalAttackBonus, 1.5f, "physicalAttack");
-            SyncStatMultiplier(ref combatStats.specialAttack, ref appliedSpecialAttackBonus, 1.5f, "specialAttack");
-            return;
+            hasLoggedRuntimeState = true;
+            lastLoggedStatusType = currentRuntimeBonus.statusType;
+            lastLoggedPhase = currentRuntimeBonus.currentPhase;
+            DebugLog(
+                $"currentCharacter={currentRuntimeBonus.childType} CurrentPhase={(currentRuntimeBonus.hasCurrentPhase ? currentRuntimeBonus.currentPhase.ToString() : "Unavailable")} " +
+                $"Radiance={currentRuntimeBonus.radiance:F2} Twilight={currentRuntimeBonus.twilight:F2} " +
+                $"IsInDayChildState={currentRuntimeBonus.isInDayChildState} IsInNightChildState={currentRuntimeBonus.isInNightChildState} statusType={currentRuntimeBonus.statusType} " +
+                $"attackStatMultiplier={currentRuntimeBonus.attackStatMultiplier:F2} magicStatMultiplier={currentRuntimeBonus.magicStatMultiplier:F2} " +
+                $"defenseStatMultiplier={currentRuntimeBonus.defenseStatMultiplier:F2} resistanceStatMultiplier={currentRuntimeBonus.resistanceStatMultiplier:F2} " +
+                $"outgoingDamageMultiplier={currentRuntimeBonus.outgoingDamageMultiplier:F2} incomingDamageMultiplier={currentRuntimeBonus.incomingDamageMultiplier:F2} " +
+                $"evasionMultiplier={currentRuntimeBonus.evasionMultiplier:F2} moveSpeedMultiplier={currentRuntimeBonus.moveSpeedMultiplier:F2} " +
+                $"panelBonusATK={appliedPhysicalAttackBonus:F2} panelBonusMAG={appliedSpecialAttackBonus:F2} " +
+                $"panelBonusDEF={appliedPhysicalDefenseBonus:F2} panelBonusRES={appliedSpecialDefenseBonus:F2}");
         }
-
-        ClearAppliedBonuses("StateInactive");
     }
 
     private void ResolveReferences()
@@ -132,7 +193,7 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
         ClearAppliedBonuses("CombatHealth.Died");
     }
 
-    private void SyncStatMultiplier(ref float statValue, ref float appliedBonus, float multiplier, string statLabel)
+    private bool SyncStatMultiplier(ref float statValue, ref float appliedBonus, float multiplier, string statLabel)
     {
         float rawWithoutBonus = Mathf.Max(0f, statValue - appliedBonus);
         float desiredBonus = Mathf.Max(0f, rawWithoutBonus * Mathf.Max(0f, multiplier - 1f));
@@ -142,8 +203,10 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
 
         if (changed)
         {
-            DebugLog($"NightChildAttackBonus stat={statLabel} raw={rawWithoutBonus:F2} appliedBonus={desiredBonus:F2} final={statValue:F2}");
+            DebugLog($"RuntimeStatBonus stat={statLabel} raw={rawWithoutBonus:F2} multiplier={multiplier:F2} appliedBonus={desiredBonus:F2} final={statValue:F2}");
         }
+
+        return changed;
     }
 
     private void ClearAppliedBonuses(string reason)
@@ -152,16 +215,20 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
         {
             appliedPhysicalAttackBonus = 0f;
             appliedSpecialAttackBonus = 0f;
+            appliedPhysicalDefenseBonus = 0f;
+            appliedSpecialDefenseBonus = 0f;
             return;
         }
 
         bool removedAny = false;
         removedAny |= RemoveAppliedBonus(ref combatStats.physicalAttack, ref appliedPhysicalAttackBonus);
         removedAny |= RemoveAppliedBonus(ref combatStats.specialAttack, ref appliedSpecialAttackBonus);
+        removedAny |= RemoveAppliedBonus(ref combatStats.physicalDefense, ref appliedPhysicalDefenseBonus);
+        removedAny |= RemoveAppliedBonus(ref combatStats.specialDefense, ref appliedSpecialDefenseBonus);
 
         if (removedAny)
         {
-            DebugLog($"NightChildAttackBonus removed reason={reason}");
+            DebugLog($"RuntimeStatBonus removed reason={reason}");
         }
     }
 
@@ -180,20 +247,20 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
 
 public static class TwinStateCombatBonus
 {
-    private const float NightChildAttackMultiplier = 1.5f;
-    private const int NightChildFixedDamageBase = 100;
-    private const int NightChildFixedDamagePerRune = 30;
-    private const int NightChildFixedDamageCap = 250;
+    private const float NightChildAttackMultiplier = 2f;
+    private const int NightChildFixedDamageBase = 0;
+    private const int NightChildFixedDamagePerRune = 0;
+    private const int NightChildFixedDamageCap = 0;
     private const float NightChildLowHealthStep = 0.10f;
     private const float NightChildLowHealthReductionPerStep = 0.03f;
     private const float NightChildCriticalHealthThreshold = 0.10f;
     private const float NightChildCriticalHealthReduction = 0.30f;
     private const float NightChildFavorableTimeReduction = 0.50f;
     private const float NightChildTotalReductionCap = 0.80f;
-    private const float DayChildQDamageMultiplier = 1.30f;
-    private const float DayChildRBaseDamageBonus = 0.20f;
-    private const float DayChildRMarkDamageBonusPerEnemy = 0.05f;
-    private const float DayChildRMarkDamageBonusCap = 0.20f;
+    private const float DayChildQDamageMultiplier = 1f;
+    private const float DayChildRBaseDamageBonus = 0f;
+    private const float DayChildRMarkDamageBonusPerEnemy = 0f;
+    private const float DayChildRMarkDamageBonusCap = 0f;
     private const string NightChildFixedDamageTag = "NightChildFixedBonus";
 
     private static readonly Dictionary<string, HashSet<int>> NightChildHitTargetsByCast = new Dictionary<string, HashSet<int>>();
@@ -338,31 +405,15 @@ public static class TwinStateCombatBonus
             return clampedDamage;
         }
 
-        bool isNight = DayNightAffinityDamageModifier.IsNightChildFavorableTime(target);
-        float lowHealthReduction = GetNightChildLowHealthReduction(target);
-        float totalReduction = Mathf.Clamp(
-            (isNight ? NightChildFavorableTimeReduction : 0f) + lowHealthReduction,
-            0f,
-            NightChildTotalReductionCap);
-        float finalDamage = Mathf.Max(0f, clampedDamage * (1f - totalReduction));
-
         TwinFormalStateStatus status = GetStatus(target);
         if (status != null && status.DebugTwinStateBonuses)
         {
-            CombatHealth combatHealth = ResolveCombatHealth(target);
-            float currentHealth = ResolveCurrentHealth(combatHealth);
-            float maxHealth = ResolveMaxHealth(combatHealth);
-            float currentHealthRatio = maxHealth > 0f ? Mathf.Clamp01(currentHealth / maxHealth) : 0f;
-            int lostTier = maxHealth > 0f
-                ? Mathf.Max(0, Mathf.FloorToInt((1f - currentHealthRatio) / NightChildLowHealthStep))
-                : 0;
-            float nightReduction = isNight ? NightChildFavorableTimeReduction : 0f;
             status.DebugLog(
-                $"NightChildIncomingReduction damageTag={damageTag ?? "<none>"} source={resolvedMonsterSource.name} hpRatio={currentHealthRatio:F2} lostTier={lostTier} lowHealthReduction={lowHealthReduction:F2} isNight={isNight} nightReduction={nightReduction:F2} totalReduction={totalReduction:F2} before={clampedDamage:F2} after={finalDamage:F2}",
+                $"NightChildIncomingReduction skipped damageTag={damageTag ?? "<none>"} source={resolvedMonsterSource.name} reason=handled-by-day-night-affinity-damage-modifier damage={clampedDamage:F2}",
                 context);
         }
 
-        return finalDamage;
+        return clampedDamage;
     }
 
     public static float GetDayChildQDamageMultiplier(GameObject owner, Object context = null)

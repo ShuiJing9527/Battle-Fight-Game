@@ -63,6 +63,9 @@ public class RuneRuntimeState : MonoBehaviour
     [Range(0f, 1f)]
     [SerializeField] private float manaRuneExtraCostMaxManaPercent = 0.20f;
 
+    [Header("Demo Skill Damage")]
+    [SerializeField, Min(0f)] private float demoBaseDamageBonusPerEquippedRune = 5f;
+
     [Header("Debug")]
     [SerializeField] private bool runeDebugLog = false;
     [SerializeField] private bool debugRuneThornCounter = false;
@@ -283,6 +286,11 @@ public class RuneRuntimeState : MonoBehaviour
             GetGlobalRuneCount(RuneType.Mana) +
             GetGlobalRuneCount(RuneType.Thorn) +
             GetGlobalRuneCount(RuneType.Luck);
+    }
+
+    public float GetDemoBaseDamageBonusPerEquippedRune()
+    {
+        return Mathf.Max(0f, demoBaseDamageBonusPerEquippedRune);
     }
 
     public int NotifySkillCastStarted(int skillIndex)

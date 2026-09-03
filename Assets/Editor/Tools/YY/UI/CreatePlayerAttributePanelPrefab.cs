@@ -102,10 +102,15 @@ public static class CreatePlayerAttributePanelPrefab
         CreateSubInfoText(subInfoArea.transform, "ExtraRuneDropText", "Extra Rune Drop 0%", fontAsset, 3);
 
         GameObject reserveArea = CreateUIObject("ReserveArea", root.transform);
-        Stretch(reserveArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 14f), new Vector2(-20f, 42f));
+        Stretch(reserveArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 8f), new Vector2(-20f, 64f));
 
-        TextMeshProUGUI reserveText = CreateText(reserveArea.transform, "ReserveText", "Buff / Rune / Skill Info Reserved", fontAsset, 13f, TextAlignmentOptions.MidlineLeft);
+        TextMeshProUGUI reserveText = CreateText(reserveArea.transform, "ReserveText", "Twin state data loading...", fontAsset, 10f, TextAlignmentOptions.TopLeft);
         reserveText.enableWordWrapping = true;
+        reserveText.enableAutoSizing = true;
+        reserveText.fontSizeMin = 9f;
+        reserveText.fontSizeMax = 10f;
+        reserveText.lineSpacing = 1f;
+        reserveText.overflowMode = TextOverflowModes.Truncate;
         Stretch(reserveText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
 
         SetLayerRecursively(root, 5);
@@ -158,8 +163,12 @@ public static class CreatePlayerAttributePanelPrefab
     private static void CreateSubInfoText(Transform parent, string name, string value, TMP_FontAsset fontAsset, int lineIndex)
     {
         TextMeshProUGUI text = CreateText(parent, name, value, fontAsset, 13f, TextAlignmentOptions.MidlineLeft);
-        float top = 18f + 22f * lineIndex;
-        Stretch(text.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -top - 18f), new Vector2(0f, -top));
+        float top = 18f * lineIndex;
+        text.enableAutoSizing = true;
+        text.fontSizeMin = 12f;
+        text.fontSizeMax = 13f;
+        text.overflowMode = TextOverflowModes.Truncate;
+        Stretch(text.rectTransform, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(0f, -top - 16f), new Vector2(0f, -top));
     }
 
     private static GameObject CreatePanel(Transform parent, string name, Color color)
