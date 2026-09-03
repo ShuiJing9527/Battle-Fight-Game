@@ -164,10 +164,10 @@ public class PlayerAttributePanelUI : MonoBehaviour
     [SerializeField] private float attributeValueWidth = 88f;
 
     [Header("Twin State Summary Layout")]
-    [SerializeField, Min(40f)] private float twinSummaryAreaHeight = 56f;
-    [SerializeField, Min(8f)] private float twinSummaryFontSize = 10f;
-    [SerializeField, Min(8f)] private float twinSummaryMinFontSize = 9f;
-    [SerializeField, Min(0f)] private float twinSummaryLineSpacing = 1f;
+    [SerializeField, Min(8f)] private float twinSummaryFontSize = 12f;
+    [SerializeField, Min(8f)] private float twinSummaryMinFontSize = 11.5f;
+    [SerializeField, Min(8f)] private float twinSummaryMaxFontSize = 12.5f;
+    [SerializeField] private float twinSummaryLineSpacing;
     [SerializeField, Min(8f)] private float secondaryStatsFontSize = 13f;
     [SerializeField, Min(8f)] private float secondaryStatsMinFontSize = 12f;
     [SerializeField, Min(14f)] private float secondaryStatsLineHeight = 16f;
@@ -1460,19 +1460,6 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
     private void ConfigureTwinSummaryLayout()
     {
-        const float stateAreaBottom = 8f;
-
-        if (reserveRect != null)
-        {
-            reserveRect.anchorMin = new Vector2(0f, 0f);
-            reserveRect.anchorMax = new Vector2(1f, 0f);
-            reserveRect.pivot = new Vector2(0.5f, 0.5f);
-            reserveRect.anchoredPosition = new Vector2(
-                reserveRect.anchoredPosition.x,
-                stateAreaBottom + twinSummaryAreaHeight * 0.5f);
-            reserveRect.sizeDelta = new Vector2(reserveRect.sizeDelta.x, twinSummaryAreaHeight);
-        }
-
         if (subInfoRect != null)
         {
             ConfigureSecondaryStatsTextLayout();
@@ -1485,8 +1472,8 @@ public class PlayerAttributePanelUI : MonoBehaviour
 
         reserveText.enableWordWrapping = true;
         reserveText.enableAutoSizing = true;
-        reserveText.fontSizeMin = Mathf.Min(twinSummaryMinFontSize, twinSummaryFontSize);
-        reserveText.fontSizeMax = Mathf.Max(twinSummaryMinFontSize, twinSummaryFontSize);
+        reserveText.fontSizeMin = Mathf.Min(twinSummaryMinFontSize, twinSummaryMaxFontSize);
+        reserveText.fontSizeMax = Mathf.Max(twinSummaryMinFontSize, twinSummaryMaxFontSize);
         reserveText.fontSize = twinSummaryFontSize;
         reserveText.lineSpacing = twinSummaryLineSpacing;
         reserveText.alignment = TextAlignmentOptions.TopLeft;

@@ -104,12 +104,12 @@ public static class CreatePlayerAttributePanelPrefab
         GameObject reserveArea = CreateUIObject("ReserveArea", root.transform);
         Stretch(reserveArea.GetComponent<RectTransform>(), new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(220f, 8f), new Vector2(-20f, 64f));
 
-        TextMeshProUGUI reserveText = CreateText(reserveArea.transform, "ReserveText", "Twin state data loading...", fontAsset, 10f, TextAlignmentOptions.TopLeft);
+        TextMeshProUGUI reserveText = CreateText(reserveArea.transform, "ReserveText", "Twin state data loading...", fontAsset, 12f, TextAlignmentOptions.TopLeft);
         reserveText.enableWordWrapping = true;
         reserveText.enableAutoSizing = true;
-        reserveText.fontSizeMin = 9f;
-        reserveText.fontSizeMax = 10f;
-        reserveText.lineSpacing = 1f;
+        reserveText.fontSizeMin = 11.5f;
+        reserveText.fontSizeMax = 12.5f;
+        reserveText.lineSpacing = 0f;
         reserveText.overflowMode = TextOverflowModes.Truncate;
         Stretch(reserveText.rectTransform, new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
 
