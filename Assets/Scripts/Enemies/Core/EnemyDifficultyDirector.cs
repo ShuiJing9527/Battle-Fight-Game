@@ -19,9 +19,9 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [Tooltip("Seconds required to gain one normal difficulty level before FinalRush starts.")]
     [SerializeField, Min(1f)] private float normalLevelInterval = 15f;
     [Tooltip("Elapsed battle time in seconds when FinalRush begins.")]
-    [SerializeField, Min(0f)] private float finalRushStartTime = 120f;
+    [SerializeField, Min(0f)] private float finalRushStartTime = 90f;
     [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
-    [SerializeField, Min(0f)] private float finalRushDuration = 60f;
+    [SerializeField, Min(0f)] private float finalRushDuration = 30f;
 
     [Header("Initial Grace")]
     [Tooltip("How long monster combat stat growth stays buffered at the start of the run.")]
@@ -636,6 +636,9 @@ public class EnemyDifficultyDirector : MonoBehaviour
         if (currentPhase == DifficultyPhase.FinalRush)
         {
             batchCount += 5;
+            // Final Rush is deliberately intense, but each wave keeps only two thirds
+            // of its former size so the final 30 seconds stay manageable.
+            batchCount = Mathf.Max(2, Mathf.RoundToInt(batchCount * (2f / 3f)));
         }
 
         int maxBatchCount = currentPhase == DifficultyPhase.FinalRush ? 20 : 12;

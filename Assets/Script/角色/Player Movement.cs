@@ -17,6 +17,14 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
     [Tooltip("Upper limit for the final movement speed after all scaling is applied.")]
     [SerializeField, Min(0f)] private float maxActualMoveSpeed = 30f;
 
+    [Header("Sprint - Double Tap Direction")]
+    [Tooltip("Press the same arrow key twice quickly, then keep holding it to sprint.")]
+    [SerializeField] private bool enableDoubleTapSprint = true;
+    [Tooltip("Maximum time in seconds allowed between the two presses of one direction key.")]
+    [SerializeField, Min(0.05f)] private float doubleTapSprintWindow = 0.3f;
+    [Tooltip("Movement-speed multiplier while double-tap sprinting.")]
+    [SerializeField, Min(1f)] private float doubleTapSprintMultiplier = 1.5f;
+
     public Rigidbody rb;
 
     [Header("Debug")]
@@ -67,6 +75,20 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
     private Vector3 lastValidGroundedPosition;
     private bool hasLastValidGroundedPosition;
     private ExternalLaunchPhase externalLaunchPhase = ExternalLaunchPhase.None;
+    private SprintDirection activeSprintDirection;
+    private float lastLeftArrowPressTime = -999f;
+    private float lastRightArrowPressTime = -999f;
+    private float lastDownArrowPressTime = -999f;
+    private float lastUpArrowPressTime = -999f;
+
+    private enum SprintDirection
+    {
+        None,
+        Left,
+        Right,
+        Down,
+        Up
+    }
 
     public float RawResolvedMoveSpeed { get; private set; }
     public float ActualMoveSpeed { get; private set; }
@@ -88,6 +110,11 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
 
         combatStats = GetComponent<CombatStats>();
         player01SkillController = GetComponent<Player01SkillController>();
+    }
+
+    private void Update()
+    {
+        UpdateDoubleTapSprintInput();
     }
 
     private void FixedUpdate()
@@ -141,7 +168,8 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
         float moveMultiplierFromSpeed = 1f + Mathf.Max(0f, statsSpeed - 1f) * Mathf.Max(0f, speedStatMoveRatio);
         float speedStatBonus = Mathf.Max(0f, statsSpeed - 1f) * scaledBaseMoveSpeed * Mathf.Max(0f, speedStatMoveRatio);
 
-        RawResolvedMoveSpeed = (scaledBaseMoveSpeed + speedStatBonus) * Mathf.Max(0f, externalMoveMultiplier);
+        float sprintMultiplier = IsDoubleTapSprintActive() ? Mathf.Max(1f, doubleTapSprintMultiplier) : 1f;
+        RawResolvedMoveSpeed = (scaledBaseMoveSpeed + speedStatBonus) * Mathf.Max(0f, externalMoveMultiplier) * sprintMultiplier;
         float resolvedMoveSpeedCap = Mathf.Max(0f, maxActualMoveSpeed);
         ExcessMoveSpeed = Mathf.Max(0f, RawResolvedMoveSpeed - resolvedMoveSpeedCap);
         ActualMoveSpeed = Mathf.Min(Mathf.Max(0f, RawResolvedMoveSpeed), resolvedMoveSpeedCap);
@@ -202,6 +230,78 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
     public bool IsMovementInputLocked()
     {
         return movementInputLocked;
+    }
+
+    private void UpdateDoubleTapSprintInput()
+    {
+        if (!enableDoubleTapSprint || Keyboard.current == null)
+        {
+            activeSprintDirection = SprintDirection.None;
+            return;
+        }
+
+        if (Keyboard.current.leftArrowKey.wasPressedThisFrame)
+        {
+            RegisterDirectionPress(SprintDirection.Left, ref lastLeftArrowPressTime);
+        }
+
+        if (Keyboard.current.rightArrowKey.wasPressedThisFrame)
+        {
+            RegisterDirectionPress(SprintDirection.Right, ref lastRightArrowPressTime);
+        }
+
+        if (Keyboard.current.downArrowKey.wasPressedThisFrame)
+        {
+            RegisterDirectionPress(SprintDirection.Down, ref lastDownArrowPressTime);
+        }
+
+        if (Keyboard.current.upArrowKey.wasPressedThisFrame)
+        {
+            RegisterDirectionPress(SprintDirection.Up, ref lastUpArrowPressTime);
+        }
+
+        if (!IsActiveSprintDirectionHeld())
+        {
+            activeSprintDirection = SprintDirection.None;
+        }
+    }
+
+    private void RegisterDirectionPress(SprintDirection direction, ref float lastPressTime)
+    {
+        float now = Time.unscaledTime;
+        if (now - lastPressTime <= Mathf.Max(0.05f, doubleTapSprintWindow))
+        {
+            activeSprintDirection = direction;
+        }
+
+        lastPressTime = now;
+    }
+
+    private bool IsDoubleTapSprintActive()
+    {
+        return enableDoubleTapSprint && IsActiveSprintDirectionHeld();
+    }
+
+    private bool IsActiveSprintDirectionHeld()
+    {
+        if (Keyboard.current == null)
+        {
+            return false;
+        }
+
+        switch (activeSprintDirection)
+        {
+            case SprintDirection.Left:
+                return Keyboard.current.leftArrowKey.isPressed;
+            case SprintDirection.Right:
+                return Keyboard.current.rightArrowKey.isPressed;
+            case SprintDirection.Down:
+                return Keyboard.current.downArrowKey.isPressed;
+            case SprintDirection.Up:
+                return Keyboard.current.upArrowKey.isPressed;
+            default:
+                return false;
+        }
     }
 
     public void ApplyExternalLaunch(Vector3 launchVelocity, float lockDuration, Vector3 separationOffset, int launchSequenceId = 0)

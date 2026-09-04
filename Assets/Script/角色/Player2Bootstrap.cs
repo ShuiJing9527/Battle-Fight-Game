@@ -92,7 +92,62 @@ public class Player2Bootstrap : MonoBehaviour
                 ToggleRunePanel();
             }
         }
+
+#if UNITY_EDITOR
+        if (Keyboard.current != null && Keyboard.current.f8Key.wasPressedThisFrame)
+        {
+            ClearAllEnemiesForEditorPlayMode();
+        }
+#endif
     }
+
+#if UNITY_EDITOR
+    /// <summary>
+    /// Editor Play Mode only: kills every active monster through its normal health
+    /// component so death events, drops, and battle tracking can still run.
+    /// This method is excluded from player builds by UNITY_EDITOR.
+    /// </summary>
+    private void ClearAllEnemiesForEditorPlayMode()
+    {
+        MonsterIdentity[] monsters = FindObjectsByType<MonsterIdentity>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        int clearedCount = 0;
+        int fallbackDestroyedCount = 0;
+
+        for (int i = 0; i < monsters.Length; i++)
+        {
+            MonsterIdentity monster = monsters[i];
+            if (monster == null || !monster.gameObject.activeInHierarchy || BattleTargetUtility.IsPlayer(monster.gameObject))
+            {
+                continue;
+            }
+
+            CombatHealth health = monster.GetComponent<CombatHealth>();
+            if (health != null && !health.IsDead)
+            {
+                BattleDamage clearDamage = new BattleDamage(1000000f, BattleDamageType.Physical, null)
+                {
+                    bypassAttackerMultipliers = true,
+                    bypassAmbientAffinity = true,
+                    bypassAffinityModifier = true,
+                    bypassEvasion = true,
+                    suppressGaugeNotification = true,
+                    debugTag = "EditorFullscreenClear"
+                };
+                health.ApplyDirectDamage(clearDamage, DamagePopupType.Normal);
+                clearedCount++;
+                continue;
+            }
+
+            if (health == null)
+            {
+                Destroy(monster.gameObject);
+                fallbackDestroyedCount++;
+            }
+        }
+
+        Debug.Log($"[EditorFullscreenClear] F8 cleared={clearedCount}, fallbackDestroyed={fallbackDestroyedCount}", this);
+    }
+#endif
 
     private void OnGUI()
     {

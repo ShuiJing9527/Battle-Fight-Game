@@ -3,9 +3,9 @@
   <Project Path="spine-unity-examples.csproj" />
   <Project Path="UniTask.csproj" />
   <Project Path="AHD2.TODSystem.Runtime.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="UniTask.Linq.csproj" />
   <Project Path="spine-unity-editor.csproj" />
-  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="spine-unity.csproj" />
   <Project Path="Assembly-CSharp-Editor.csproj" />
   <Project Path="UniTask.Addressables.csproj" />

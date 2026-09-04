@@ -494,8 +494,8 @@ MonoBehaviour:
   loadDemoBattleOnStart: 0
   demoBattleSceneName: "\u8349\u539F"
   demoDifficultyLevelInterval: 15
-  demoFinalRushStartTime: 120
-  demoFinalRushDuration: 60
+  demoFinalRushStartTime: 90
+  demoFinalRushDuration: 30
   demoPlayerDamageMultiplier: 1.25
   debugRestartTrace: 0
 --- !u!4 &2135320836

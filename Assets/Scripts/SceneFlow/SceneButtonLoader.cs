@@ -7,8 +7,8 @@ public class SceneButtonLoader : MonoBehaviour
     [SerializeField] private bool loadDemoBattleOnStart;
     [SerializeField] private string demoBattleSceneName = BattleSceneResultRouter.BattleSceneName;
     [SerializeField, Min(1f)] private float demoDifficultyLevelInterval = 15f;
-    [SerializeField, Min(0f)] private float demoFinalRushStartTime = 120f;
-    [SerializeField, Min(0f)] private float demoFinalRushDuration = 60f;
+    [SerializeField, Min(0f)] private float demoFinalRushStartTime = 90f;
+    [SerializeField, Min(0f)] private float demoFinalRushDuration = 30f;
     [SerializeField, Min(0f)] private float demoPlayerDamageMultiplier = 1.25f;
     [Header("Debug")]
     [SerializeField] private bool debugRestartTrace;
