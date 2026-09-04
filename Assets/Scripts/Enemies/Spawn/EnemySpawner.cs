@@ -190,7 +190,7 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Boss attack interval multiplier passed to EnemyController. Values above 1 make attacks slower in the current formula.")]
     public float bossAttackIntervalMultiplier = 1.8f;
     [Tooltip("Boss outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
-    public float bossOutgoingDamageMultiplier = 1.5f;
+    public float bossOutgoingDamageMultiplier = 1f;
     [SerializeField, Min(0.05f)] private float bossHurtboxRuntimeRefreshInterval = 0.25f;
 
     [Header("Elite")]

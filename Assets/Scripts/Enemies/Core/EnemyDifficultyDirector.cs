@@ -61,11 +61,11 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [Tooltip("Extra HP multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 2.5f;
     [Tooltip("Extra physical attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 2.2f;
+    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 1f;
     [Tooltip("Extra physical defense multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.8f;
     [Tooltip("Extra special attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 2.2f;
+    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 1f;
     [Tooltip("Extra special defense multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.8f;
     [Tooltip("Extra speed multiplier applied when FinalRush is active.")]
@@ -85,7 +85,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [Tooltip("Exhibition balance: final outgoing damage multiplier for all non-Boss monsters.")]
     [SerializeField, Range(0.01f, 1f)] private float normalEnemyDamageMultiplier = 0.8f;
     [Tooltip("Exhibition balance: final outgoing damage multiplier for Boss attacks.")]
-    [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 0.85f;
+    [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 0.7f;
     [Tooltip("Exhibition balance: wrong day/night character incoming damage multiplier. 1.5 means +50% damage.")]
     [SerializeField, Min(1f)] private float wrongTimeDamageMultiplier = 1.5f;
     [Tooltip("Exhibition balance: player monster-hit invincibility duration in seconds.")]
