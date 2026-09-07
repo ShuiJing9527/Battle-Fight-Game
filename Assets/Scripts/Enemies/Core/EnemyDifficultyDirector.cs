@@ -86,6 +86,8 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [SerializeField, Range(0.01f, 1f)] private float normalEnemyDamageMultiplier = 0.8f;
     [Tooltip("Exhibition balance: final outgoing damage multiplier for Boss attacks.")]
     [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 0.7f;
+    [Tooltip("Maximum damage a single Boss hit can deal, expressed as a fraction of the player's maximum HP.")]
+    [SerializeField, Range(0.05f, 1f)] private float bossSingleHitMaxHealthRatio = 0.35f;
     [Tooltip("Exhibition balance: wrong day/night character incoming damage multiplier. 1.5 means +50% damage.")]
     [SerializeField, Min(1f)] private float wrongTimeDamageMultiplier = 1.5f;
     [Tooltip("Exhibition balance: player monster-hit invincibility duration in seconds.")]
@@ -197,6 +199,7 @@ public class EnemyDifficultyDirector : MonoBehaviour
     public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
     public float NormalEnemyDamageMultiplier => Mathf.Clamp(normalEnemyDamageMultiplier, 0.01f, 1f);
     public float BossDamageMultiplier => Mathf.Clamp(bossDamageMultiplier, 0.01f, 1f);
+    public float BossSingleHitMaxHealthRatio => Mathf.Clamp(bossSingleHitMaxHealthRatio, 0.05f, 1f);
     public float WrongTimeDamageMultiplier => Mathf.Max(1f, wrongTimeDamageMultiplier);
     public float PlayerHitInvincibleDuration => Mathf.Max(0f, playerHitInvincibleDuration);
     public float BossAttackRecoveryBonus => Mathf.Max(0f, bossAttackRecoveryBonus);
@@ -217,6 +220,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
 
         return director != null ? director.NormalEnemyDamageMultiplier : 0.8f;
+    }
+
+    public static float ResolveBossSingleHitMaxHealthRatio()
+    {
+        EnemyDifficultyDirector director = Instance;
+        return director != null ? director.BossSingleHitMaxHealthRatio : 0.35f;
     }
 
     public static float ResolveWrongTimeDamageMultiplier()

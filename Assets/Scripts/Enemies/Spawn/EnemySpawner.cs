@@ -176,7 +176,7 @@ public class EnemySpawner : MonoBehaviour
     public float eliteOutgoingDamageMultiplier = 1f;
     [Header("Rank Multipliers - Boss")]
     [Tooltip("Boss HP multiplier after base and time growth. 1 means unchanged.")]
-    public float bossHealthMultiplier = 10f;
+    public float bossHealthMultiplier = 5f;
     [Tooltip("Boss physical attack multiplier after base and time growth. 1 means unchanged.")]
     public float bossAttackMultiplier = 5f;
     [Tooltip("Boss physical defense multiplier after base and time growth. 1 means unchanged.")]

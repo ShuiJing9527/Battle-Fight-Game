@@ -321,6 +321,7 @@ public class CombatHealth : MonoBehaviour
         float afterRuneDamage = finalDamage;
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = ApplyMinimumMonsterHitDamageIfNeeded(baseDamage, resolvedMonsterSource, finalDamage);
+        finalDamage = LimitBossSingleHitDamage(finalDamage, resolvedMonsterSource);
         float afterIncomingMultiplierDamage = finalDamage;
         float resolvedDamageBeforeShieldAndGuard = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
@@ -650,6 +651,7 @@ public class CombatHealth : MonoBehaviour
         }
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = ApplyMinimumMonsterHitDamageIfNeeded(baseDamage, resolvedMonsterSource, finalDamage);
+        finalDamage = LimitBossSingleHitDamage(finalDamage, resolvedMonsterSource);
         float resolvedDamageBeforeShield = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
         if (resolvedDamageBeforeShield > 0f)
@@ -1379,6 +1381,24 @@ public class CombatHealth : MonoBehaviour
                 Destroy(gameObject, destroyDelayAfterDeath);
             }
         }
+    }
+
+    private float LimitBossSingleHitDamage(float damage, GameObject monsterSource)
+    {
+        if (damage <= 0f || !BattleTargetUtility.IsPlayer(gameObject))
+        {
+            return Mathf.Max(0f, damage);
+        }
+
+        MonsterIdentity identity = monsterSource != null ? monsterSource.GetComponentInParent<MonsterIdentity>() : null;
+        if (identity == null || identity.rank != MonsterRank.Boss)
+        {
+            return Mathf.Max(0f, damage);
+        }
+
+        float maxHealth = Mathf.Max(1f, MaxHealthValue);
+        float maxAllowedDamage = maxHealth * EnemyDifficultyDirector.ResolveBossSingleHitMaxHealthRatio();
+        return Mathf.Min(Mathf.Max(0f, damage), maxAllowedDamage);
     }
 
     private void TriggerAnimation(string triggerName)
