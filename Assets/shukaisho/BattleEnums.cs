@@ -72,6 +72,11 @@ public struct BattleDamage
     public bool bypassEvasion;
     public bool suppressGaugeNotification;
     public string debugTag;
+    public string skillName;
+    public string damageSource;
+    public string attackKind;
+    public int packetId;
+    public bool isReflectDamage;
 
     public BattleDamage(float amount, BattleDamageType damageType, GameObject source, bool isCritical = false)
     {
@@ -85,5 +90,10 @@ public struct BattleDamage
         bypassEvasion = false;
         suppressGaugeNotification = false;
         debugTag = string.Empty;
+        skillName = string.Empty;
+        damageSource = string.Empty;
+        attackKind = string.Empty;
+        packetId = 0;
+        isReflectDamage = false;
     }
 }

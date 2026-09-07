@@ -131,6 +131,15 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
             hasLoggedRuntimeState = true;
             lastLoggedStatusType = currentRuntimeBonus.statusType;
             lastLoggedPhase = currentRuntimeBonus.currentPhase;
+            if (DebugTwinStateBonuses)
+            {
+                Debug.Log(
+                    $"[TwinBuff] character={currentRuntimeBonus.childType} phase={(currentRuntimeBonus.hasCurrentPhase ? currentRuntimeBonus.currentPhase.ToString() : "Unavailable")} " +
+                    $"statusType={currentRuntimeBonus.statusType} outgoingDamageMultiplier={currentRuntimeBonus.outgoingDamageMultiplier:F2} " +
+                    $"incomingDamageMultiplier={currentRuntimeBonus.incomingDamageMultiplier:F2} critRateBonus={currentRuntimeBonus.critRateBonus:F2} " +
+                    $"critDamageBonus={currentRuntimeBonus.critDamageBonus:F2} moveSpeedMultiplier={currentRuntimeBonus.moveSpeedMultiplier:F2} lifesteal={currentRuntimeBonus.lifesteal:F2}",
+                    this);
+            }
             DebugLog(
                 $"currentCharacter={currentRuntimeBonus.childType} CurrentPhase={(currentRuntimeBonus.hasCurrentPhase ? currentRuntimeBonus.currentPhase.ToString() : "Unavailable")} " +
                 $"Radiance={currentRuntimeBonus.radiance:F2} Twilight={currentRuntimeBonus.twilight:F2} " +
@@ -139,6 +148,7 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
                 $"defenseStatMultiplier={currentRuntimeBonus.defenseStatMultiplier:F2} resistanceStatMultiplier={currentRuntimeBonus.resistanceStatMultiplier:F2} " +
                 $"outgoingDamageMultiplier={currentRuntimeBonus.outgoingDamageMultiplier:F2} incomingDamageMultiplier={currentRuntimeBonus.incomingDamageMultiplier:F2} " +
                 $"evasionMultiplier={currentRuntimeBonus.evasionMultiplier:F2} moveSpeedMultiplier={currentRuntimeBonus.moveSpeedMultiplier:F2} " +
+                $"critRateBonus={currentRuntimeBonus.critRateBonus:F2} critDamageBonus={currentRuntimeBonus.critDamageBonus:F2} lifesteal={currentRuntimeBonus.lifesteal:F2} " +
                 $"panelBonusATK={appliedPhysicalAttackBonus:F2} panelBonusMAG={appliedSpecialAttackBonus:F2} " +
                 $"panelBonusDEF={appliedPhysicalDefenseBonus:F2} panelBonusRES={appliedSpecialDefenseBonus:F2}");
         }
@@ -247,7 +257,7 @@ public sealed class TwinFormalStateStatus : MonoBehaviour
 
 public static class TwinStateCombatBonus
 {
-    private const float NightChildAttackMultiplier = 2f;
+    private const float NightChildAttackMultiplier = 1f;
     private const int NightChildFixedDamageBase = 0;
     private const int NightChildFixedDamagePerRune = 0;
     private const int NightChildFixedDamageCap = 0;

@@ -95,6 +95,7 @@ public class PlayerTimedShieldStatus : MonoBehaviour
         }
 
         float previousCurrent = CurrentShield;
+        amount = ClampToUnifiedShieldCapacity(amount, previousCurrent);
         persistentShield = false;
         currentShield = Mathf.Max(previousCurrent, amount);
         maxShield = currentShield;
@@ -109,6 +110,13 @@ public class PlayerTimedShieldStatus : MonoBehaviour
         amount = Mathf.Max(0f, amount);
         if (amount <= 0f)
         {
+            return;
+        }
+
+        amount = ClampToUnifiedShieldCapacity(amount, CurrentShield);
+        if (amount <= 0f)
+        {
+            ClearShield();
             return;
         }
 
@@ -143,6 +151,26 @@ public class PlayerTimedShieldStatus : MonoBehaviour
         }
 
         return amount - absorbed;
+    }
+
+    public void ClampCurrentShield(float maximumAllowed)
+    {
+        maximumAllowed = Mathf.Max(0f, maximumAllowed);
+        if (currentShield <= maximumAllowed)
+        {
+            return;
+        }
+
+        currentShield = maximumAllowed;
+        maxShield = Mathf.Min(maxShield, maximumAllowed);
+        if (currentShield <= 0f)
+        {
+            ClearShield(notify: true, reason: "UnifiedCap");
+        }
+        else
+        {
+            NotifyShieldChanged();
+        }
     }
 
     public void ClearShield()
@@ -187,5 +215,20 @@ public class PlayerTimedShieldStatus : MonoBehaviour
         }
 
         Debug.Log($"[TimedShield] owner={name} {message}", this);
+    }
+
+    private float ClampToUnifiedShieldCapacity(float requestedAmount, float replacingCurrentAmount)
+    {
+        if (combatHealth == null)
+        {
+            combatHealth = GetComponent<CombatHealth>();
+        }
+
+        float maxHealth = combatHealth != null ? combatHealth.MaxHealthValue : 0f;
+        float limit = Mathf.Max(0f, maxHealth * BattleResourceBank.ShieldLimitMaxHealthRatio);
+        float totalWithoutThis = combatHealth != null
+            ? Mathf.Max(0f, combatHealth.GetShield() - Mathf.Max(0f, replacingCurrentAmount))
+            : 0f;
+        return Mathf.Clamp(requestedAmount, 0f, Mathf.Max(0f, limit - totalWithoutThis));
     }
 }

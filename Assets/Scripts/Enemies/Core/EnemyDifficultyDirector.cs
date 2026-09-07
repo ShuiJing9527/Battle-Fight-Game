@@ -21,13 +21,13 @@ public class EnemyDifficultyDirector : MonoBehaviour
     [Tooltip("Elapsed battle time in seconds when FinalRush begins.")]
     [SerializeField, Min(0f)] private float finalRushStartTime = 120f;
     [Tooltip("How long FinalRush lasts before the scene enters the cleanup phase.")]
-    [SerializeField, Min(0f)] private float finalRushDuration = 60f;
+    [SerializeField, Min(0f)] private float finalRushDuration = 30f;
 
     [Header("Initial Grace")]
     [Tooltip("How long monster combat stat growth stays buffered at the start of the run.")]
-    [SerializeField, Min(0f)] private float initialGraceDuration = 30f;
+    [SerializeField, Min(0f)] private float initialGraceDuration = 0f;
     [Tooltip("Combat stat multiplier applied to monsters during the initial grace period.")]
-    [SerializeField, Range(0.1f, 1f)] private float initialMonsterStrengthMultiplier = 0.8f;
+    [SerializeField, Range(0.1f, 1f)] private float initialMonsterStrengthMultiplier = 1f;
 
     [Header("Base Multipliers")]
     [Tooltip("Base HP multiplier for the first difficulty layer. 1 means unchanged.")]
@@ -59,35 +59,35 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     [Header("Final Rush Multipliers")]
     [Tooltip("Extra HP multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 2.5f;
+    [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 1.35f;
     [Tooltip("Extra physical attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 2.2f;
+    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 1.35f;
     [Tooltip("Extra physical defense multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.8f;
+    [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.15f;
     [Tooltip("Extra special attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 2.2f;
+    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 1.35f;
     [Tooltip("Extra special defense multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.8f;
+    [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.15f;
     [Tooltip("Extra speed multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.4f;
+    [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.10f;
 
     [Header("Spawn Pressure")]
     [Tooltip("Additive spawn-rate growth per difficulty level. Higher values make spawn intervals shorter.")]
     [SerializeField, Min(0f)] private float spawnRateGrowthPerLevel = 0.12f;
     [Tooltip("Extra alive-enemy cap granted per difficulty level.")]
-    [SerializeField, Min(0)] private int extraMaxAlivePerLevel = 2;
+    [SerializeField, Min(0)] private int extraMaxAlivePerLevel = 0;
     [Tooltip("FinalRush multiplier applied to the resolved spawn interval. Values below 1 spawn faster.")]
     [SerializeField, Min(0.01f)] private float finalRushSpawnIntervalMultiplier = 0.35f;
     [Tooltip("Extra alive-enemy cap granted while FinalRush is active.")]
-    [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 30;
+    [SerializeField, Min(0)] private int finalRushExtraMaxAlive = 0;
 
     [Header("Demo Balance")]
     [Tooltip("Exhibition balance: final outgoing damage multiplier for all non-Boss monsters.")]
-    [SerializeField, Range(0.01f, 1f)] private float normalEnemyDamageMultiplier = 0.8f;
+    [SerializeField, Range(0.01f, 1f)] private float normalEnemyDamageMultiplier = 1f;
     [Tooltip("Exhibition balance: final outgoing damage multiplier for Boss attacks.")]
-    [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 0.85f;
+    [SerializeField, Range(0.01f, 1f)] private float bossDamageMultiplier = 1f;
     [Tooltip("Exhibition balance: wrong day/night character incoming damage multiplier. 1.5 means +50% damage.")]
-    [SerializeField, Min(1f)] private float wrongTimeDamageMultiplier = 1.5f;
+    [SerializeField, Min(1f)] private float wrongTimeDamageMultiplier = 1.25f;
     [Tooltip("Exhibition balance: player monster-hit invincibility duration in seconds.")]
     [SerializeField, Min(0f)] private float playerHitInvincibleDuration = 0.8f;
     [Tooltip("Exhibition balance: extra cooldown after Boss main attacks.")]
@@ -186,12 +186,12 @@ public class EnemyDifficultyDirector : MonoBehaviour
         finalRushDuration = Mathf.Max(0f, finalRushDurationSeconds);
     }
 
-    public float CurrentHpMultiplier => ResolveCombatStatMultiplier(baseHealthMultiplier, hpGrowthPerLevel, finalRushHpMultiplier, applyInitialGraceMultiplier: true);
-    public float CurrentAttackMultiplier => ResolveCombatStatMultiplier(baseAttackMultiplier, attackGrowthPerLevel, finalRushAttackMultiplier, applyInitialGraceMultiplier: true);
-    public float CurrentDefenseMultiplier => ResolveCombatStatMultiplier(baseDefenseMultiplier, defenseGrowthPerLevel, finalRushDefenseMultiplier, applyInitialGraceMultiplier: true);
-    public float CurrentSpecialAttackMultiplier => ResolveCombatStatMultiplier(baseSpecialAttackMultiplier, specialAttackGrowthPerLevel, finalRushSpecialAttackMultiplier, applyInitialGraceMultiplier: true);
-    public float CurrentSpecialDefenseMultiplier => ResolveCombatStatMultiplier(baseSpecialDefenseMultiplier, specialDefenseGrowthPerLevel, finalRushSpecialDefenseMultiplier, applyInitialGraceMultiplier: true);
-    public float CurrentSpeedMultiplier => ResolveCombatStatMultiplier(baseSpeedMultiplier, speedGrowthPerLevel, finalRushSpeedMultiplier, applyInitialGraceMultiplier: false);
+    public float CurrentHpMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Health, baseHealthMultiplier, finalRushHpMultiplier);
+    public float CurrentAttackMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Attack, baseAttackMultiplier, finalRushAttackMultiplier);
+    public float CurrentDefenseMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Defense, baseDefenseMultiplier, finalRushDefenseMultiplier);
+    public float CurrentSpecialAttackMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Attack, baseSpecialAttackMultiplier, finalRushSpecialAttackMultiplier);
+    public float CurrentSpecialDefenseMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Defense, baseSpecialDefenseMultiplier, finalRushSpecialDefenseMultiplier);
+    public float CurrentSpeedMultiplier => ResolveTimelineStatMultiplier(TimelineStat.Speed, baseSpeedMultiplier, finalRushSpeedMultiplier);
     public float CurrentSpawnIntervalMultiplier => ResolveSpawnIntervalMultiplier();
     public int CurrentExtraMaxAlive => ResolveExtraMaxAlive();
     public int CurrentSpawnBatchCount => ResolveSpawnBatchCount();
@@ -601,6 +601,84 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
 
         return Mathf.Max(0.01f, combinedMultiplier);
+    }
+
+    private enum TimelineStat
+    {
+        Health,
+        Attack,
+        Defense,
+        Speed
+    }
+
+    private float ResolveTimelineStatMultiplier(TimelineStat stat, float baseMultiplier, float finalRushMultiplier)
+    {
+        float timelineMultiplier = EvaluateTimelineCurve(stat, Mathf.Clamp(elapsedTime, 0f, 150f));
+        float rushMultiplier = currentPhase == DifficultyPhase.FinalRush ? Mathf.Max(0.01f, finalRushMultiplier) : 1f;
+        return Mathf.Max(0.01f, Mathf.Max(0.01f, baseMultiplier) * timelineMultiplier * rushMultiplier);
+    }
+
+    private static float EvaluateTimelineCurve(TimelineStat stat, float time)
+    {
+        float valueAt40;
+        float valueAt80;
+        float valueAt120;
+        float valueAt150;
+        switch (stat)
+        {
+            case TimelineStat.Health:
+                valueAt40 = 1.15f;
+                valueAt80 = 1.35f;
+                valueAt120 = 1.60f;
+                valueAt150 = 1.95f;
+                break;
+            case TimelineStat.Attack:
+                valueAt40 = 1.10f;
+                valueAt80 = 1.25f;
+                valueAt120 = 1.45f;
+                valueAt150 = 1.70f;
+                break;
+            case TimelineStat.Defense:
+                valueAt40 = 1.05f;
+                valueAt80 = 1.12f;
+                valueAt120 = 1.22f;
+                valueAt150 = 1.35f;
+                break;
+            default:
+                valueAt40 = 1.02f;
+                valueAt80 = 1.05f;
+                valueAt120 = 1.08f;
+                valueAt150 = 1.10f;
+                break;
+        }
+
+        if (time <= 40f)
+        {
+            return Mathf.Lerp(1f, valueAt40, Mathf.InverseLerp(0f, 40f, time));
+        }
+
+        if (time <= 80f)
+        {
+            return Mathf.Lerp(valueAt40, valueAt80, Mathf.InverseLerp(40f, 80f, time));
+        }
+
+        if (time <= 120f)
+        {
+            return Mathf.Lerp(valueAt80, valueAt120, Mathf.InverseLerp(80f, 120f, time));
+        }
+
+        return Mathf.Lerp(valueAt120, valueAt150, Mathf.InverseLerp(120f, 150f, time));
+    }
+
+    public void TriggerFallbackVictory(string reason)
+    {
+        if (currentPhase != DifficultyPhase.SpawnStopped || victoryTriggered)
+        {
+            return;
+        }
+
+        Debug.LogError($"[FinalBossFallback] reason={reason} bossPrefab=null bossSpawned=false fallbackVictoryTriggered=true currentState={currentPhase}", this);
+        SetVictory("FinalBossFallback:" + reason);
     }
 
     private float ResolveSpawnIntervalMultiplier()

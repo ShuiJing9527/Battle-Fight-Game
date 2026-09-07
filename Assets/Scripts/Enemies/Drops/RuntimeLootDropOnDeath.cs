@@ -16,7 +16,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     [SerializeField, Min(0)] private int lifeSoulWeight = 25;
     [SerializeField, Min(0)] private int energySoulWeight = 20;
     [SerializeField, Min(0)] private int functionSoulWeight = 15;
-    [SerializeField, Min(0)] private int growthSoulWeight = 40;
+    [SerializeField, Min(0)] private int growthSoulWeight = 25;
     [SerializeField, Min(0)] private int resourcePoint1Weight = 50;
     [SerializeField, Min(0)] private int resourcePoint2Weight = 25;
     [SerializeField, Min(0)] private int resourcePoint3Weight = 15;
@@ -44,7 +44,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool debugLuckDropLog = false;
-    [SerializeField] private bool debugRuneDropDiagLog = true;
+    [SerializeField] private bool debugRuneDropDiagLog = false;
 
     private CombatHealth combatHealth;
     private RuneDropManager runeDropManager;
@@ -125,7 +125,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         for (int i = 0; i < soulCount; i++)
         {
             SoulType soulType = GetRandomSoulTypeByWeight();
-            int soulPoint = soulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            int soulPoint = soulType == SoulType.Growth ? GetRandomGrowthSoulPoint(rank) : GetRandomResourceSoulPoint();
             if (soulType == SoulType.Growth && runeRuntimeState != null)
             {
                 soulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(soulPoint);
@@ -137,7 +137,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         if (extraSoulDropped)
         {
             SoulType extraSoulType = GetRandomSoulTypeByWeight();
-            int extraSoulPoint = extraSoulType == SoulType.Growth ? GetRandomGrowthSoulPoint() : GetRandomResourceSoulPoint();
+            int extraSoulPoint = extraSoulType == SoulType.Growth ? GetRandomGrowthSoulPoint(rank) : GetRandomResourceSoulPoint();
             if (extraSoulType == SoulType.Growth && runeRuntimeState != null)
             {
                 extraSoulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(extraSoulPoint);
@@ -246,14 +246,14 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             resourcePoint5Weight);
     }
 
-    private int GetRandomGrowthSoulPoint()
+    private int GetRandomGrowthSoulPoint(MonsterRank rank)
     {
-        return GetWeightedPoint(
-            growthPoint1Weight,
-            growthPoint2Weight,
-            growthPoint3Weight,
-            growthPoint4Weight,
-            growthPoint5Weight);
+        return rank switch
+        {
+            MonsterRank.Boss => Random.Range(4, 9),
+            MonsterRank.Elite => Random.Range(2, 5),
+            _ => Random.Range(1, 3)
+        };
     }
 
     private static int GetWeightedPoint(int point1Weight, int point2Weight, int point3Weight, int point4Weight, int point5Weight)

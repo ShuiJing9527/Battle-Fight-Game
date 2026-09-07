@@ -13,7 +13,7 @@ public sealed class SplitBossMinionController : MonoBehaviour
     [SerializeField, Min(0f)] private float summonRadius = 2.5f;
     [SerializeField] private GameObject[] elitePrefabOverrides;
     [SerializeField] private bool suppressRuneDrop = true;
-    [SerializeField] private bool debugSplitBossSummon = true;
+    [SerializeField] private bool debugSplitBossSummon = false;
 
     private BossSlimeFinalSplitController owner;
     private EnemySpawner spawner;
@@ -261,6 +261,11 @@ public sealed class SplitBossMinionController : MonoBehaviour
 
         for (int i = 0; i < summonCount; i++)
         {
+            if (!spawner.CanSpawnWithinBudget(1, "SplitBossEliteSummon"))
+            {
+                break;
+            }
+
             GameObject elitePrefab = ResolveElitePrefab();
             if (elitePrefab == null)
             {

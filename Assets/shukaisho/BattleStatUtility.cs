@@ -386,10 +386,12 @@ public static class BattleStatUtility
         if (BattleTargetUtility.IsPlayer(attacker))
         {
             float finalSpeed = stats != null ? Mathf.Max(0f, stats.speed) : 0f;
-            return Mathf.Clamp(
+            float baseMultiplier = Mathf.Clamp(
                 BaseCritDamageMultiplier + finalSpeed * PlayerCritDamagePerSpeed,
                 BaseCritDamageMultiplier,
                 MaxPlayerCritDamageMultiplier);
+            TwinStateRuntimeBonus twinBonus = DayNightAffinityDamageModifier.GetTwinStateRuntimeBonus(attacker);
+            return Mathf.Min(MaxPlayerCritDamageMultiplier, baseMultiplier + Mathf.Max(0f, twinBonus.critDamageBonus));
         }
 
         return GetCritDamageMultiplier(stats);
@@ -404,7 +406,13 @@ public static class BattleStatUtility
             return false;
         }
 
-        if (Random.value > GetCritRate(stats))
+        float critRate = GetCritRate(stats);
+        if (BattleTargetUtility.IsPlayer(attacker))
+        {
+            critRate = Mathf.Clamp01(critRate + Mathf.Max(0f, DayNightAffinityDamageModifier.GetTwinStateRuntimeBonus(attacker).critRateBonus));
+        }
+
+        if (Random.value > critRate)
         {
             critDamageMultiplier = 1f;
             return false;

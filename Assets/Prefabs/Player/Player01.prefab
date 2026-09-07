@@ -1309,10 +1309,10 @@ MonoBehaviour:
   debugLog: 1
   slashCount: 3
   slashInterval: 0.2
-  physicalBaseDamage: 40
-  specialBaseDamage: 20
-  physicalScaling: 0.5
-  specialScaling: 0.8
+  physicalBaseDamage: 55
+  specialBaseDamage: 30
+  physicalScaling: 0.65
+  specialScaling: 0.9
   quickShearPerSlashDamageMultiplier: 1
   quickShearBonusDamage: 0
   quickShearFinalDamageMultiplier: 1
@@ -1352,9 +1352,9 @@ MonoBehaviour:
   expandHitboxWithEffect: 0
   visualAttackRangeMultiplier: 1
   quickShearExtraCritChance: 0.3
-  quickShearExtraCritMultiplier: 2
+  quickShearExtraCritMultiplier: 2.3
   quickShearSuperCritChance: 0.05
-  quickShearSuperCritMultiplier: 5
+  quickShearSuperCritMultiplier: 6
   debugQuickShearCritLog: 0
   qMovementLockDuration: -1
   qMovementLockFallbackBuffer: 0.05
@@ -1480,9 +1480,9 @@ MonoBehaviour:
   skillEndTime: 1.25
   thrustVfxPrefab: {fileID: 11400000, guid: 6d6b3a1158d84f80848d2c2ba4f39c11, type: 3}
   thrustVfxAnchor: {fileID: 5103700462333239305}
-  thrustPhysicalBaseDamage: 60
+  thrustPhysicalBaseDamage: 78
   thrustSpecialToPhysicalScale: 0.8
-  thrustSpecialBaseDamage: 40
+  thrustSpecialBaseDamage: 52
   thrustPhysicalToSpecialScale: 0.4
   thrustRange: 2.4
   thrustWidth: 1.2

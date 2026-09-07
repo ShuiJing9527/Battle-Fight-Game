@@ -70,6 +70,7 @@ public class EnemyHealth : MonoBehaviour
         CombatHealth resolvedHealth = EnsureCombatHealth();
         if (resolvedHealth == null)
         {
+            Debug.LogWarning($"[DamageEntry] entry=EnemyHealth.TakeDamage attacker={(attacker != null ? attacker.name : "null")} target={name} damageType=Physical rawAmount={damage} defenseHandledBySkill=false usesUnifiedPostProcess=false warning=CombatHealthUnavailable", this);
             return;
         }
 

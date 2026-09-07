@@ -41,7 +41,7 @@ public sealed class BossSlimeFinalSplitController : MonoBehaviour
     [SerializeField] private bool cleanupSummonedElitesOnMerge = true;
 
     [Header("Debug")]
-    [SerializeField] private bool debugFinalBossSplit = true;
+    [SerializeField] private bool debugFinalBossSplit = false;
 
     private EnemySpawner spawner;
     private CombatHealth combatHealth;
@@ -522,6 +522,11 @@ public sealed class BossSlimeFinalSplitController : MonoBehaviour
         MonsterSpecies species = monsterIdentity != null ? monsterIdentity.species : MonsterSpecies.BlueSlime;
         for (int i = 0; i < splitCount; i++)
         {
+            if (spawner == null || !spawner.CanSpawnWithinBudget(1, "FinalBossSplit"))
+            {
+                break;
+            }
+
             Vector3 spawnOffset = ResolveScatterOffset(splitSpawnRadius, i, splitCount);
             Vector3 spawnPosition = splitOrigin + spawnOffset;
             GameObject spawnedBoss = Instantiate(resolvedSplitBossPrefab, spawnPosition, Quaternion.identity);

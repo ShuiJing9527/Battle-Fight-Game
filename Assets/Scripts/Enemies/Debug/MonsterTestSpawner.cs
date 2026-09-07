@@ -56,12 +56,13 @@ public class MonsterTestSpawner : MonoBehaviour
     [SerializeField] private bool isolateTestSpawn = false;
     [SerializeField] private bool disableSharedEnemySpawnerDuringTest = true;
     [SerializeField] private bool resumeSharedEnemySpawnerOnDisable = false;
+    [SerializeField] private bool enableTestSpawnerInProduction = false;
 
     [Header("Runtime")]
     [SerializeField] private List<GameObject> spawnedTestMonsters = new List<GameObject>();
 
     [Header("Fallback Player Rune Monster Scaling")]
-    [SerializeField] private bool enablePlayerRuneStrengthScaling = true;
+    [SerializeField] private bool enablePlayerRuneStrengthScaling = false;
     [SerializeField, Min(0f)] private float strengthIncreasePerEquippedRune = 0.05f;
     [SerializeField, Min(1f)] private float maximumRuneMovementSpeedMultiplier = 1.5f;
     [SerializeField] private bool debugPlayerRuneMonsterScaling = false;
@@ -108,6 +109,7 @@ public class MonsterTestSpawner : MonoBehaviour
     private Coroutine autoSpawnRoutine;
     private float nextBossHurtboxRuntimeRefreshTime;
     private int lastSharedBossHurtboxConfigHash;
+    private bool productionGuardLogged;
 
     private void Awake()
     {
@@ -121,6 +123,11 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void Start()
     {
+        if (IsBlockedByProductionGuard())
+        {
+            LogProductionGuardOnce();
+            return;
+        }
         Debug.Log(
             "[MonsterTestSpawner] " +
             "selected testSpawnType=" + testSpawnType +
@@ -142,12 +149,21 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void Update()
     {
+        if (IsBlockedByProductionGuard())
+        {
+            return;
+        }
         RefreshSpawnedBossHurtboxesIfSharedConfigChanged();
     }
 
     [ContextMenu("TEST/Spawn Selected Monster Type")]
     public void SpawnSelectedMonsterType()
     {
+        if (IsBlockedByProductionGuard())
+        {
+            LogProductionGuardOnce();
+            return;
+        }
         Debug.Log(
             "[MonsterTestSpawner] " +
             "selected testSpawnType=" + testSpawnType +
@@ -347,6 +363,12 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void SpawnMonsterForTest(MonsterRank rank)
     {
+        if (IsBlockedByProductionGuard())
+        {
+            LogProductionGuardOnce();
+            return;
+        }
+
         CleanupTrackedMonsters();
 
         if (clearPreviousSpawnedByThisSpawner)
@@ -627,6 +649,12 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void PrepareSharedEnemySpawnerForTest()
     {
+        if (IsBlockedByProductionGuard())
+        {
+            LogProductionGuardOnce();
+            return;
+        }
+
         ResolveSharedEnemySpawner();
 
         if (!isolateTestSpawn || !disableSharedEnemySpawnerDuringTest)
@@ -647,6 +675,28 @@ public class MonsterTestSpawner : MonoBehaviour
         Debug.Log(
             "[MonsterTestSpawner] Shared EnemySpawner paused for isolated test spawning. " +
             "used PauseSpawningForExternalTest=true enabled=false",
+            this);
+    }
+
+    private bool IsBlockedByProductionGuard()
+    {
+        return !enableTestSpawnerInProduction
+               && string.Equals(gameObject.scene.name, "草原", System.StringComparison.Ordinal);
+    }
+
+    private void LogProductionGuardOnce()
+    {
+        if (productionGuardLogged)
+        {
+            return;
+        }
+
+        productionGuardLogged = true;
+        ResolveSharedEnemySpawner();
+        Debug.Log(
+            $"[SpawnerMode] scene={gameObject.scene.name} monsterTestSpawnerEnabled={enabled} gameObjectActive={gameObject.activeInHierarchy} " +
+            $"enableTestSpawnerInProduction={enableTestSpawnerInProduction} isolateTestSpawn={isolateTestSpawn} " +
+            $"disableSharedEnemySpawnerDuringTest={disableSharedEnemySpawnerDuringTest} enemySpawnerWillBePaused=false blockedByProductionGuard=true",
             this);
     }
 
@@ -1074,76 +1124,9 @@ public class MonsterTestSpawner : MonoBehaviour
 
     private void ApplyFallbackPlayerRuneMonsterScaling(GameObject monster, Transform target)
     {
-        if (!enablePlayerRuneStrengthScaling || monster == null)
-        {
-            return;
-        }
-
-        CombatStats stats = monster.GetComponent<CombatStats>();
-        if (stats == null)
-        {
-            return;
-        }
-
-        int runeCount = EnemySpawner.ResolveEquippedRuneCountForMonsterScaling(target, out string playerName, out string countSource);
-        float strengthMultiplier = EnemySpawner.CalculateRuneStrengthMultiplier(runeCount, strengthIncreasePerEquippedRune);
-        float movementMultiplier = Mathf.Min(strengthMultiplier, Mathf.Max(1f, maximumRuneMovementSpeedMultiplier));
-
-        float baseMaxHealth = stats.maxHealth;
-        float basePhysicalAttack = stats.physicalAttack;
-        float baseSpecialAttack = stats.specialAttack;
-        float basePhysicalDefense = stats.physicalDefense;
-        float baseSpecialDefense = stats.specialDefense;
-        float baseMovementSpeed = stats.speed;
-
-        stats.maxHealth = Mathf.Max(1f, Mathf.Round(baseMaxHealth * strengthMultiplier));
-        stats.physicalAttack = Mathf.Max(0f, Mathf.Round(basePhysicalAttack * strengthMultiplier));
-        stats.specialAttack = Mathf.Max(0f, Mathf.Round(baseSpecialAttack * strengthMultiplier));
-        stats.physicalDefense = Mathf.Max(0f, Mathf.Round(basePhysicalDefense * strengthMultiplier));
-        stats.specialDefense = Mathf.Max(0f, Mathf.Round(baseSpecialDefense * strengthMultiplier));
-        stats.speed = Mathf.Max(0.1f, RoundToDecimals(baseMovementSpeed * movementMultiplier, 2));
-
-        BattleResourceBank resourceBank = monster.GetComponent<BattleResourceBank>();
-        if (resourceBank != null)
-        {
-            resourceBank.maxHealth = stats.maxHealth;
-            resourceBank.currentHealth = stats.maxHealth;
-        }
-
-        CombatHealth combatHealth = monster.GetComponent<CombatHealth>();
-        if (combatHealth != null)
-        {
-            combatHealth.stats = stats;
-            combatHealth.resourceBank = resourceBank;
-            combatHealth.currentHealth = stats.maxHealth;
-        }
-
-        ConfigureFallbackEnemyController(monster, stats);
-
         if (debugPlayerRuneMonsterScaling)
         {
-            Debug.Log(
-                "[MonsterRuneScalingTrace] " +
-                "event=ScalingApplied " +
-                $"enemy={monster.name} " +
-                $"enemyInstanceId={monster.GetInstanceID()} " +
-                $"player={playerName} " +
-                $"countSource={countSource} " +
-                $"equippedRuneCount={runeCount} " +
-                $"strengthPerRune={Mathf.Max(0f, strengthIncreasePerEquippedRune):F2} " +
-                $"strengthMultiplier={strengthMultiplier:F2} " +
-                $"movementMultiplier={movementMultiplier:F2} " +
-                $"baseMaxHealth={baseMaxHealth:F1} " +
-                $"scaledMaxHealth={stats.maxHealth:F1} " +
-                $"baseDamage={Mathf.Max(basePhysicalAttack, baseSpecialAttack):F1} " +
-                $"scaledDamage={Mathf.Max(stats.physicalAttack, stats.specialAttack):F1} " +
-                $"basePhysicalDefense={basePhysicalDefense:F1} " +
-                $"scaledPhysicalDefense={stats.physicalDefense:F1} " +
-                $"baseSpecialDefense={baseSpecialDefense:F1} " +
-                $"scaledSpecialDefense={stats.specialDefense:F1} " +
-                $"baseMovementSpeed={baseMovementSpeed:F2} " +
-                $"scaledMovementSpeed={stats.speed:F2}",
-                monster);
+            Debug.Log("[EnemyGrowth] playerRuneGrowthMultiplier=1.00 hiddenAttackMultiplier=1.00 note=PlayerRunesDoNotScaleMonsters", monster);
         }
     }
 

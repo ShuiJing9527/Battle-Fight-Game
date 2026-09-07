@@ -2140,11 +2140,11 @@ PrefabInstance:
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameBgm
       value: 
-      objectReference: {fileID: 0}
+      objectReference: {fileID: 8300000, guid: 1b2cc9bd81407dd438864f9f8e3dfc18, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: menuBgm
       value: 
-      objectReference: {fileID: 8300000, guid: eaf8a17b30308be40876d68c73b21b8a, type: 3}
+      objectReference: {fileID: 8300000, guid: 1b2cc9bd81407dd438864f9f8e3dfc18, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: bgmVolume
       value: 0.819
@@ -2156,11 +2156,11 @@ PrefabInstance:
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: victoryBgm
       value: 
-      objectReference: {fileID: 8300000, guid: d3085f3c1e0ac5148aa5ac613b74d31f, type: 3}
+      objectReference: {fileID: 8300000, guid: 0b443734adf564049b9d3ca19c9f7003, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameOverBgm
       value: 
-      objectReference: {fileID: 8300000, guid: 9ffb50af65bc7c643804330725b4dd2d, type: 3}
+      objectReference: {fileID: 8300000, guid: 9498659010044a441879b5c2d145badf, type: 3}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: gameSceneName
       value: "\u8349\u539F"
@@ -2170,9 +2170,13 @@ PrefabInstance:
       value: GameScene
       objectReference: {fileID: 0}
     - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
+      propertyPath: chosenChildBgm
+      value: 
+      objectReference: {fileID: 8300000, guid: cd5695f6f5235044aacad3b765bd7af8, type: 3}
+    - target: {fileID: 6285234469643226224, guid: a469b17908bd7c64b85b57cac1330e99, type: 3}
       propertyPath: spiritweaveDollBgm
       value: 
-      objectReference: {fileID: 8300000, guid: d7ee98b4adc04184fba2de1de7df1dd0, type: 3}
+      objectReference: {fileID: 8300000, guid: d4140076ce32dd144acf9403fbf99115, type: 3}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

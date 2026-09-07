@@ -3,6 +3,7 @@ using UnityEngine;
 
 public class BattleResourceBank : MonoBehaviour
 {
+    public const float ShieldLimitMaxHealthRatio = 1.5f;
     private const float SpeedGrowthSoulRedirectChance = 0.5f;
     private const float SpeedGrowthSoulConsumableRedirectChance = 0.5f;
 
@@ -28,6 +29,7 @@ public class BattleResourceBank : MonoBehaviour
 
     [Header("Debug")]
     [SerializeField] private bool debugGrowthSoulRollLog = false;
+    [SerializeField] private bool enableCombatBalanceLogs = false;
 
     public event Action<SoulType, float> SoulApplied;
     public event Action FunctionSoulTriggered;
@@ -127,7 +129,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private string ApplySoulWithFeedbackInternal(SoulType type, int soulPoint, bool allowLuckyCopy)
     {
-        soulPoint = Mathf.Clamp(soulPoint, 1, 5);
+        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, 8) : Mathf.Clamp(soulPoint, 1, 5);
         float resolvedValue = ResolveSoulValue(type, soulPoint);
         string feedback;
 
@@ -185,14 +187,21 @@ public class BattleResourceBank : MonoBehaviour
 
     public void SetShield(float amount)
     {
-        shield = Mathf.Max(0f, amount);
-        maxShield = shield;
+        float before = shield;
+        float limit = ResolveAvailableBaseShieldLimit();
+        shield = Mathf.Clamp(amount, 0f, limit);
+        maxShield = limit;
+        LogShieldGrowth("SetShield", before, amount - before, shield, limit);
         OnShieldChanged?.Invoke(shield, maxShield);
     }
 
     public void SetShieldCurrent(float amount)
     {
-        shield = Mathf.Max(0f, amount);
+        float before = shield;
+        float limit = ResolveAvailableBaseShieldLimit();
+        shield = Mathf.Clamp(amount, 0f, limit);
+        maxShield = limit;
+        LogShieldGrowth("SetShieldCurrent", before, amount - before, shield, limit);
         OnShieldChanged?.Invoke(shield, maxShield);
     }
 
@@ -232,9 +241,42 @@ public class BattleResourceBank : MonoBehaviour
 
         RuneRuntimeState runtimeState = ResolveRuneRuntimeState();
         float multiplier = runtimeState != null ? runtimeState.GetShieldGainMultiplier() : 1f;
-        shield += amount * Mathf.Max(0f, multiplier);
-        maxShield = Mathf.Max(maxShield, shield);
+        float before = shield;
+        float delta = amount * Mathf.Max(0f, multiplier);
+        float limit = ResolveAvailableBaseShieldLimit();
+        shield = Mathf.Clamp(shield + delta, 0f, limit);
+        maxShield = limit;
+        LogShieldGrowth("AddShield", before, delta, shield, limit);
         OnShieldChanged?.Invoke(shield, maxShield);
+    }
+
+    public float GetUnifiedShieldLimit()
+    {
+        return Mathf.Max(0f, ResolveConfiguredMaxHealth() * ShieldLimitMaxHealthRatio);
+    }
+
+    private float ResolveAvailableBaseShieldLimit()
+    {
+        float limit = GetUnifiedShieldLimit();
+        float timedShield = 0f;
+        PlayerTimedShieldStatus[] statuses = GetComponents<PlayerTimedShieldStatus>();
+        for (int i = 0; i < statuses.Length; i++)
+        {
+            if (statuses[i] != null)
+            {
+                timedShield += Mathf.Max(0f, statuses[i].CurrentShield);
+            }
+        }
+
+        return Mathf.Max(0f, limit - timedShield);
+    }
+
+    private void LogShieldGrowth(string reason, float before, float delta, float after, float limit)
+    {
+        if (enableCombatBalanceLogs)
+        {
+            Debug.Log($"[ShieldGrowth] reason={reason} shieldBefore={before:F2} shieldDelta={delta:F2} shieldAfter={after:F2} maxShieldLimit={limit:F2} clamped={after + 0.001f < before + delta}", this);
+        }
     }
 
     private void ApplyLifeSoul(float amount, bool applyRuneHealingMultiplier)
@@ -270,7 +312,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private float ResolveSoulValue(SoulType type, int soulPoint)
     {
-        soulPoint = Mathf.Clamp(soulPoint, 1, 5);
+        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, 8) : Mathf.Clamp(soulPoint, 1, 5);
         return type == SoulType.Growth ? soulPoint : soulPoint * 10f;
     }
 
@@ -288,7 +330,7 @@ public class BattleResourceBank : MonoBehaviour
             redirected = true;
         }
 
-        int growthAmount = Mathf.Clamp(soulPoint, 1, 5);
+        int growthAmount = Mathf.Clamp(soulPoint, 1, 8);
         float healthGrowth = growthAmount * 10f;
 
         if (stats == null)
@@ -325,9 +367,32 @@ public class BattleResourceBank : MonoBehaviour
             return consumableFeedback;
         }
 
+        float growthBefore = ResolveGrowthStatValue(stats, finalChoice);
         string result = ApplyGrowthSoulResult(stats, combatHealth, finalChoice, growthAmount, healthGrowth);
+        if (enableCombatBalanceLogs)
+        {
+            float growthAfter = ResolveGrowthStatValue(stats, finalChoice);
+            Debug.Log(
+                $"[KillGrowth] time={Time.time:F1} enemyName=Unknown enemyRank=Unknown soulType=Growth growthTriggered=true " +
+                $"growthType={GetGrowthSoulLabel(finalChoice)} growthAmount={growthAfter - growthBefore:F2} growthBefore={growthBefore:F2} growthAfter={growthAfter:F2} growthSkippedReason=None",
+                this);
+        }
         LogGrowthSoulRoll(growthChoice, finalChoice, redirected, redirectedToConsumable, null);
         return result;
+    }
+
+    private static float ResolveGrowthStatValue(CombatStats stats, int growthChoice)
+    {
+        if (stats == null) return 0f;
+        return growthChoice switch
+        {
+            0 => stats.maxHealth,
+            1 => stats.physicalAttack,
+            2 => stats.physicalDefense,
+            3 => stats.specialAttack,
+            4 => stats.specialDefense,
+            _ => stats.speed
+        };
     }
 
     private string ApplyGrowthSoulResult(CombatStats stats, CombatHealth combatHealth, int growthChoice, int growthAmount, float healthGrowth)

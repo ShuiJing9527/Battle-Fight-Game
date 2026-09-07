@@ -34,22 +34,25 @@ public struct TwinStateRuntimeBonus
     public float incomingDamageMultiplier;
     public float evasionMultiplier;
     public float moveSpeedMultiplier;
+    public float critRateBonus;
+    public float critDamageBonus;
+    public float lifesteal;
 }
 
 public static class DayNightAffinityDamageModifier
 {
-    private const float TwinChildOutgoingMultiplier = 2f;
-    private const float TwinChildIncomingMultiplier = 0.5f;
-    private const float NightChildAttackStatMultiplier = 1.5f;
-    private const float NightChildMagicStatMultiplier = 1.5f;
-    private const float NightChildDefenseStatMultiplier = 2f;
-    private const float NightChildResistanceStatMultiplier = 2f;
-    private const float DayChildAttackStatMultiplier = 2f;
-    private const float DayChildMagicStatMultiplier = 2f;
-    private const float DayChildDefenseStatMultiplier = 1.5f;
-    private const float DayChildResistanceStatMultiplier = 1.5f;
-    private const float WrongTimeEvasionMultiplier = 0.5f;
-    private const float WrongTimeMoveSpeedMultiplier = 0.5f;
+    private const float DayChildFavorableOutgoingMultiplier = 1.40f;
+    private const float DayChildFavorableIncomingMultiplier = 0.90f;
+    private const float DayChildFavorableCritRateBonus = 0.20f;
+    private const float DayChildFavorableCritDamageBonus = 0.30f;
+    private const float NightChildFavorableOutgoingMultiplier = 1.45f;
+    private const float NightChildFavorableIncomingMultiplier = 0.70f;
+    private const float NightChildFavorableLifesteal = 0.15f;
+    private const float DayChildUnfavorableOutgoingMultiplier = 0.90f;
+    private const float NightChildUnfavorableOutgoingMultiplier = 0.85f;
+    private const float UnfavorableIncomingMultiplier = 1.25f;
+    private const float WrongTimeEvasionMultiplier = 1f;
+    private const float WrongTimeMoveSpeedMultiplier = 0.90f;
     private const float SkillGaugeGainManaWeight = 0.5f;
     private const float SkillGaugeGainCooldownWeight = 0.5f;
     private const float SkillGaugeGainMin = 5f;
@@ -79,6 +82,8 @@ public static class DayNightAffinityDamageModifier
         TwinStateRuntimeBonus defenderTwinBonus = GetTwinStateRuntimeBonus(defender);
         bool attackerDayChildBuffActive = attackerTwinBonus.isInDayChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Buff;
         bool attackerNightChildBuffActive = attackerTwinBonus.isInNightChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Buff;
+        bool attackerDayChildDebuffActive = attackerTwinBonus.isInDayChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Debuff;
+        bool attackerNightChildDebuffActive = attackerTwinBonus.isInNightChildState && attackerTwinBonus.statusType == TwinStateRuntimeType.Debuff;
         bool defenderDayChildBuffActive = defenderTwinBonus.isInDayChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Buff;
         bool defenderNightChildBuffActive = defenderTwinBonus.isInNightChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Buff;
         bool defenderDayChildDebuffActive = defenderTwinBonus.isInDayChildState && defenderTwinBonus.statusType == TwinStateRuntimeType.Debuff;
@@ -100,6 +105,12 @@ public static class DayNightAffinityDamageModifier
             {
                 multiplier *= attackerTwinBonus.outgoingDamageMultiplier;
                 reason = AppendReason(reason, "day-child-favorable-player-vs-monster");
+            }
+            else if ((attackerAffinity.IsDayChild && attackerDayChildDebuffActive)
+                     || (attackerAffinity.IsNightChild && attackerNightChildDebuffActive))
+            {
+                multiplier *= attackerTwinBonus.outgoingDamageMultiplier;
+                reason = AppendReason(reason, "twin-child-unfavorable-player-vs-monster");
             }
             else if (reason == "no-applicable-rule")
             {
@@ -409,7 +420,10 @@ public static class DayNightAffinityDamageModifier
             outgoingDamageMultiplier = 1f,
             incomingDamageMultiplier = 1f,
             evasionMultiplier = 1f,
-            moveSpeedMultiplier = 1f
+            moveSpeedMultiplier = 1f,
+            critRateBonus = 0f,
+            critDamageBonus = 0f,
+            lifesteal = 0f
         };
 
         if (DayNightGaugeRuntimeState.TryGetExistingInstance(out DayNightGaugeRuntimeState gauge) && gauge != null)
@@ -451,28 +465,24 @@ public static class DayNightAffinityDamageModifier
             ? IsDayChildPositivePhase(bonus.currentPhase)
             : IsNightChildPositivePhase(bonus.currentPhase);
         bool negative = bonus.isInDayChildState
-            ? bonus.currentPhase == DayNightPhase.Night
-            : bonus.currentPhase == DayNightPhase.Day;
+            ? bonus.currentPhase == DayNightPhase.Dusk || bonus.currentPhase == DayNightPhase.Night
+            : bonus.currentPhase == DayNightPhase.Dawn || bonus.currentPhase == DayNightPhase.Day;
 
         if (positive)
         {
             bonus.statusType = TwinStateRuntimeType.Buff;
-            bonus.outgoingDamageMultiplier = TwinChildOutgoingMultiplier;
-            bonus.incomingDamageMultiplier = TwinChildIncomingMultiplier;
-
             if (bonus.isInDayChildState)
             {
-                bonus.attackStatMultiplier = DayChildAttackStatMultiplier;
-                bonus.magicStatMultiplier = DayChildMagicStatMultiplier;
-                bonus.defenseStatMultiplier = DayChildDefenseStatMultiplier;
-                bonus.resistanceStatMultiplier = DayChildResistanceStatMultiplier;
+                bonus.outgoingDamageMultiplier = DayChildFavorableOutgoingMultiplier;
+                bonus.incomingDamageMultiplier = DayChildFavorableIncomingMultiplier;
+                bonus.critRateBonus = DayChildFavorableCritRateBonus;
+                bonus.critDamageBonus = DayChildFavorableCritDamageBonus;
             }
             else
             {
-                bonus.attackStatMultiplier = NightChildAttackStatMultiplier;
-                bonus.magicStatMultiplier = NightChildMagicStatMultiplier;
-                bonus.defenseStatMultiplier = NightChildDefenseStatMultiplier;
-                bonus.resistanceStatMultiplier = NightChildResistanceStatMultiplier;
+                bonus.outgoingDamageMultiplier = NightChildFavorableOutgoingMultiplier;
+                bonus.incomingDamageMultiplier = NightChildFavorableIncomingMultiplier;
+                bonus.lifesteal = NightChildFavorableLifesteal;
             }
 
             return bonus;
@@ -481,7 +491,10 @@ public static class DayNightAffinityDamageModifier
         if (negative)
         {
             bonus.statusType = TwinStateRuntimeType.Debuff;
-            bonus.incomingDamageMultiplier = EnemyDifficultyDirector.ResolveWrongTimeDamageMultiplier();
+            bonus.outgoingDamageMultiplier = bonus.isInDayChildState
+                ? DayChildUnfavorableOutgoingMultiplier
+                : NightChildUnfavorableOutgoingMultiplier;
+            bonus.incomingDamageMultiplier = UnfavorableIncomingMultiplier;
             bonus.evasionMultiplier = WrongTimeEvasionMultiplier;
             bonus.moveSpeedMultiplier = WrongTimeMoveSpeedMultiplier;
             return bonus;
@@ -568,22 +581,24 @@ public static class DayNightAffinityDamageModifier
 
     private static bool IsNightChildNeutralState(GameObject target, DayNightPhase phase)
     {
-        return HasNightChildState(target) && phase == DayNightPhase.Dawn;
+        return false;
     }
 
     private static bool IsDayChildNeutralState(GameObject target, DayNightPhase phase)
     {
-        return HasDayChildState(target) && phase == DayNightPhase.Dusk;
+        return false;
     }
 
     private static bool IsNightChildNegativeState(GameObject target, DayNightPhase phase)
     {
-        return HasNightChildState(target) && phase == DayNightPhase.Day;
+        return HasNightChildState(target)
+               && (phase == DayNightPhase.Dawn || phase == DayNightPhase.Day);
     }
 
     private static bool IsDayChildNegativeState(GameObject target, DayNightPhase phase)
     {
-        return HasDayChildState(target) && phase == DayNightPhase.Night;
+        return HasDayChildState(target)
+               && (phase == DayNightPhase.Dusk || phase == DayNightPhase.Night);
     }
 
     private static bool IsNightChildPositivePhase(DayNightPhase phase)

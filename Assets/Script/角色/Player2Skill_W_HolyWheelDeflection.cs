@@ -28,7 +28,9 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
     [Header("W - 星刃护盾 / 接触伤害")]
     [InspectorName("W 星刃伤害占护盾比例")]
-    [SerializeField, Min(0f)] private float wOrbitStarBladeDamageShieldRatio = 0.5f;
+    [SerializeField, Min(0f)] private float wOrbitStarBladeDamageShieldRatio = 0.05f;
+    [InspectorName("W 护盾值追加伤害单次上限")]
+    [SerializeField, Min(0f)] private float wShieldBonusDamageCap = 25f;
     [InspectorName("W 星刃固定追加伤害")]
     [SerializeField, Min(0f)] private float wOrbitStarBladeFlatDamage = 0f;
     [InspectorName("W 星刃物理段占比")]
@@ -51,7 +53,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     [SerializeField] private float wMaxDamageReduction = 0.8f;
     [InspectorName("W 反击伤害比例")]
     [FormerlySerializedAs("wCounterDamageRatio")]
-    [SerializeField, Min(0f)] private float wCounterDamageFromShieldRatio = 0.1f;
+    [SerializeField, Min(0f)] private float wCounterDamageFromShieldRatio = 0.05f;
     [InspectorName("W 被挡伤害转反击比例")]
     [SerializeField, Min(0f)] private float wCounterDamageFromBlockedDamageRatio = 0f;
     [InspectorName("W 反击固定追加伤害")]
@@ -266,8 +268,10 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float blockedDamage = clampedRaw * currentWFinalDamageReduction;
         float damageAfterReduction = clampedRaw - blockedDamage;
         float currentShieldValue = ResolveCurrentShieldValue();
+        float shieldBonusDamageBeforeCap = currentShieldValue * Mathf.Max(0f, wCounterDamageFromShieldRatio);
+        float shieldBonusDamage = Mathf.Min(shieldBonusDamageBeforeCap, Mathf.Max(0f, wShieldBonusDamageCap));
         float counterDamage =
-            currentShieldValue * Mathf.Max(0f, wCounterDamageFromShieldRatio)
+            shieldBonusDamage
             + blockedDamage * Mathf.Max(0f, wCounterDamageFromBlockedDamageRatio)
             + Mathf.Max(0f, wCounterFlatDamage);
         float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
@@ -369,9 +373,15 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         currentWFinalDamageReduction = 0f;
         isWGuardActive = false;
         ApplyWShield(currentWSwordCount);
-        currentWOrbitBladeDamage = Mathf.Max(0f, wAppliedShieldValue * wOrbitStarBladeDamageShieldRatio);
+        float orbitShieldDamageBeforeCap = Mathf.Max(0f, wAppliedShieldValue * wOrbitStarBladeDamageShieldRatio);
+        currentWOrbitBladeDamage = Mathf.Min(orbitShieldDamageBeforeCap, Mathf.Max(0f, wShieldBonusDamageCap));
 
         Debug.Log($"W技能统计：护盾值={wAppliedShieldValue:F2}，神印={sealCount}，星刃数量={currentWSwordCount}，星刃伤害={currentWOrbitBladeDamage:F2}，CD={wCooldown:F2}", this);
+        Debug.Log(
+            $"[SkillBalance] character=Player02 skill=W change=ShieldBonusDamageNerf shieldBefore={wAppliedShieldValue:F2} " +
+            $"shieldBonusRate={wOrbitStarBladeDamageShieldRatio:F2} shieldBonusCap={wShieldBonusDamageCap:F2} " +
+            $"shieldBonusDamageBefore={orbitShieldDamageBeforeCap:F2} shieldBonusDamageAfter={currentWOrbitBladeDamage:F2} finalDamage={currentWOrbitBladeDamage:F2}",
+            this);
         if (activeWSwords.Count > swordCount)
         {
             Debug.LogWarning($"[W Skill] Spawned sword count exceeded expected {swordCount}: {activeWSwords.Count}", this);
@@ -541,7 +551,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             return;
         }
 
-        // W 星刃护盾命中时按“护盾值 50% 混合伤害”拆成物理/法术两段结算。
+        // Shield-derived damage stays a hybrid packet, but is capped before the split.
         float mixedDamage = Mathf.Max(0f, currentWOrbitBladeDamage) + Mathf.Max(0f, wOrbitStarBladeFlatDamage);
         float physicalRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladePhysicalSplitRatio);
         float specialRawDamage = mixedDamage * Mathf.Max(0f, wOrbitStarBladeSpecialSplitRatio);
@@ -550,13 +560,17 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         float specialFinalDamage = Mathf.Max(1f, (specialRawDamage - (targetStats != null ? Mathf.Max(0f, targetStats.specialDefense) : 0f)) * Mathf.Max(0f, wOrbitStarBladeFinalDamageMultiplier) * outgoingDamageMultiplier);
         if (combatHealth != null && combatHealth.gameObject != Owner.gameObject)
         {
-            combatHealth.ApplyDirectDamage(physicalFinalDamage, Owner.gameObject, DamagePopupType.Physical);
-            combatHealth.ApplyDirectDamage(specialFinalDamage, Owner.gameObject, DamagePopupType.Special);
+            combatHealth.ApplyDirectDamage(CreateShieldDamagePacket(physicalFinalDamage, BattleDamageType.Physical), DamagePopupType.Physical);
+            combatHealth.ApplyDirectDamage(CreateShieldDamagePacket(specialFinalDamage, BattleDamageType.Special), DamagePopupType.Special);
         }
         else if (enemyHealth != null && enemyHealth.gameObject != Owner.gameObject)
         {
-            int totalDamage = Mathf.Max(2, Mathf.RoundToInt(physicalFinalDamage) + Mathf.RoundToInt(specialFinalDamage));
-            enemyHealth.TakeDamage(totalDamage, Owner.gameObject);
+            CombatHealth legacyCombatHealth = enemyHealth.EnsureCombatHealth();
+            if (legacyCombatHealth != null)
+            {
+                legacyCombatHealth.ApplyDirectDamage(CreateShieldDamagePacket(physicalFinalDamage, BattleDamageType.Physical), DamagePopupType.Physical);
+                legacyCombatHealth.ApplyDirectDamage(CreateShieldDamagePacket(specialFinalDamage, BattleDamageType.Special), DamagePopupType.Special);
+            }
         }
 
         ApplyOrbitBladeKnockback(target.transform.root != null ? target.transform.root : target.transform);
@@ -599,6 +613,17 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
                 currentVelocity.y,
                 away.z * Mathf.Max(0f, wOrbitStarBladeKnockbackForce));
         }
+    }
+
+    private BattleDamage CreateShieldDamagePacket(float amount, BattleDamageType damageType)
+    {
+        return new BattleDamage(amount, damageType, Owner != null ? Owner.gameObject : gameObject)
+        {
+            skillName = "Player02 W",
+            damageSource = "WShieldBonusDamage",
+            debugTag = "Player02WShieldBonus",
+            isReflectDamage = true
+        };
     }
 
     private GameObject SpawnWShieldBubble(Transform parent)
@@ -1484,7 +1509,11 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         CombatHealth attackerCombatHealth = attacker.GetComponentInParent<CombatHealth>();
         if (attackerCombatHealth != null && attackerCombatHealth.gameObject != gameObject)
         {
-            attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject));
+            attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject)
+            {
+                isReflectDamage = true,
+                debugTag = "Player02WCounter"
+            });
             return;
         }
 

@@ -113,7 +113,10 @@ public class BossSlimeDevourStatus : MonoBehaviour
                     " targetDefense=" + targetDefense.ToString("F2") +
                     " sequenceId=" + ownerSequenceId,
                     this);
-                combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource));
+                combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource)
+                {
+                    attackKind = "BossDevourStrong"
+                });
                 float healthAfter = ResolveCombatHealthValue(combatHealth);
                 float shieldAfter = combatHealth.GetShield();
                 float actualHealthLoss = Mathf.Max(0f, healthBefore - healthAfter);
@@ -233,7 +236,10 @@ public class BossSlimeDevourStatus : MonoBehaviour
 
                     float healthBefore = ResolveCombatHealthValue(combatHealth);
                     float shieldBefore = combatHealth.GetShield();
-                    combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource));
+                    combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource)
+                    {
+                        attackKind = "BossDevourStrong"
+                    });
                     float healthAfter = ResolveCombatHealthValue(combatHealth);
                     float shieldAfter = combatHealth.GetShield();
                     float actualHealthLoss = Mathf.Max(0f, healthBefore - healthAfter);

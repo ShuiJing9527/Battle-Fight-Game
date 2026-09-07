@@ -35,13 +35,13 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField] private float specialScaling = 1.3f;
     [Header("R - 神眷剑涡 / 持续伤害参数")]
     [Tooltip("R 漩涡持续伤害的物理段基础伤害。")]
-    [SerializeField, Min(0f)] private float rSwarmTickPhysicalBaseDamage = 4f;
+    [SerializeField, Min(0f)] private float rSwarmTickPhysicalBaseDamage = 5.2f;
     [Tooltip("R 漩涡持续伤害的物理段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rSwarmTickPhysicalFromPhysicalAttackScaling = 0.45f;
     [Tooltip("R 漩涡持续伤害的物理段从特殊攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rSwarmTickPhysicalFromSpecialAttackScaling = 0f;
     [Tooltip("R 漩涡持续伤害的特殊段基础伤害。")]
-    [SerializeField, Min(0f)] private float rSwarmTickSpecialBaseDamage = 15f;
+    [SerializeField, Min(0f)] private float rSwarmTickSpecialBaseDamage = 19.5f;
     [Tooltip("R 漩涡持续伤害的特殊段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rSwarmTickSpecialFromPhysicalAttackScaling = 0f;
     [Tooltip("R 漩涡持续伤害的特殊段从特殊攻击获得的倍率。")]
@@ -132,13 +132,13 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     [SerializeField, Min(0f)] private float rStarRainImpactDamageMultiplier = 0.6f;
     [Header("R - 神眷剑涡 / 落剑冲击伤害参数")]
     [Tooltip("R 落剑冲击的物理段基础伤害。")]
-    [SerializeField, Min(0f)] private float rStarRainImpactPhysicalBaseDamage = 4f;
+    [SerializeField, Min(0f)] private float rStarRainImpactPhysicalBaseDamage = 5.4f;
     [Tooltip("R 落剑冲击的物理段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rStarRainImpactPhysicalFromPhysicalAttackScaling = 0.45f;
     [Tooltip("R 落剑冲击的物理段从特殊攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rStarRainImpactPhysicalFromSpecialAttackScaling = 0f;
     [Tooltip("R 落剑冲击的特殊段基础伤害。")]
-    [SerializeField, Min(0f)] private float rStarRainImpactSpecialBaseDamage = 15f;
+    [SerializeField, Min(0f)] private float rStarRainImpactSpecialBaseDamage = 20.25f;
     [Tooltip("R 落剑冲击的特殊段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float rStarRainImpactSpecialFromPhysicalAttackScaling = 0f;
     [Tooltip("R 落剑冲击的特殊段从特殊攻击获得的倍率。")]
@@ -375,6 +375,16 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
         {
             Debug.Log(
                 $"[Player02 R Swarm] BaseCount={rBaseSwordCount}, CurrentSwordCount={totalStarBladeCount}, VisibleSwordCount={currentRVisibleStarBladeCount}, OverflowSwordCount={currentROverflowStarBladeCount}, OverflowBonusDamage={currentROverflowBonusDamage}, BaseDuration={rSwarmDuration:F2}, DurationPerSword={rSwarmDurationPerSword:F2}, FinalDuration={finalDuration:F2}, BaseRotationSpeed={rSwarmBaseRotationSpeed:F2}, RotationSpeedPerSword={rSwarmRotationSpeedPerSword:F2}, FinalRotationSpeed={finalRotationSpeed:F2}",
+                this);
+        }
+
+        if (rDamageDebugLog)
+        {
+            Debug.Log(
+                $"[SkillBalance] character=Player02 skill=R change=UltimateDamageBuff " +
+                $"damageNode=SwarmTick baseBefore=20/40 baseAfter={rSwarmTickPhysicalBaseDamage:F2}/{rSwarmTickSpecialBaseDamage:F2} multiplierApplied=1.30 " +
+                $"damageNodeSecondary=StarRain baseBefore=4/15 baseAfter={rStarRainImpactPhysicalBaseDamage:F2}/{rStarRainImpactSpecialBaseDamage:F2} " +
+                "multiplierAppliedSecondary=1.35 runeFlatDamageExtraTrigger=false",
                 this);
         }
 

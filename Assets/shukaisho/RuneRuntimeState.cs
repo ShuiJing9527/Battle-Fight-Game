@@ -4,6 +4,7 @@ using UnityEngine;
 
 public class RuneRuntimeState : MonoBehaviour
 {
+    private const float RuneFlatDamageFallbackWindow = 0.15f;
     public struct SoulDropRequest
     {
         public SoulType soulType;
@@ -302,6 +303,10 @@ public class RuneRuntimeState : MonoBehaviour
 
         int castId = ++nextSkillCastIds[skillIndex];
         pendingSkillFirstHitCastIds[skillIndex].Add(castId);
+        latestSkillCastId = castId;
+        latestSkillIndex = skillIndex;
+        latestSkillCastStartedAt = Time.time;
+        latestSkillCastFlatDamageConsumed = false;
 
         int lifeCount = GetGlobalRuneCount(RuneType.Life);
         if (lifeCount >= 2)
@@ -312,6 +317,92 @@ public class RuneRuntimeState : MonoBehaviour
         TryResolveLuckLottery();
 
         return castId;
+    }
+
+    private int latestSkillCastId = -1;
+    private int latestSkillIndex = -1;
+    private float latestSkillCastStartedAt = -1f;
+    private bool latestSkillCastFlatDamageConsumed;
+    private float nextFallbackFlatDamageTime;
+
+    public bool TryConsumeRuneFlatDamage(
+        BattleDamage damage,
+        out int equippedRuneCount,
+        out float runeFlatDamage,
+        out string skillLabel,
+        out string skipReason)
+    {
+        equippedRuneCount = GetTotalEquippedRuneCount();
+        runeFlatDamage = equippedRuneCount * GetDemoBaseDamageBonusPerEquippedRune();
+        skillLabel = !string.IsNullOrWhiteSpace(damage.skillName)
+            ? damage.skillName
+            : latestSkillIndex >= 0 ? ResolveSkillSlotLabel(latestSkillIndex) : damage.debugTag;
+
+        if (damage.isReflectDamage || IsReflectDamageTag(damage.debugTag))
+        {
+            skipReason = "ReflectDamage";
+            return false;
+        }
+
+        if (equippedRuneCount <= 0 || runeFlatDamage <= 0f)
+        {
+            skipReason = "NoRune";
+            return false;
+        }
+
+        if (latestSkillCastId >= 0)
+        {
+            if (latestSkillCastFlatDamageConsumed)
+            {
+                skipReason = "AlreadyTriggeredThisCast";
+                return false;
+            }
+
+            latestSkillCastFlatDamageConsumed = true;
+            skipReason = string.Empty;
+            return true;
+        }
+
+        if (string.IsNullOrWhiteSpace(damage.skillName) && string.IsNullOrWhiteSpace(damage.damageSource) && string.IsNullOrWhiteSpace(damage.debugTag))
+        {
+            skipReason = "NoSkillSource";
+            return false;
+        }
+
+        if (Time.time < nextFallbackFlatDamageTime)
+        {
+            skipReason = "CooldownWindow";
+            return false;
+        }
+
+        nextFallbackFlatDamageTime = Time.time + RuneFlatDamageFallbackWindow;
+        skipReason = string.Empty;
+        return true;
+    }
+
+    private static bool IsReflectDamageTag(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag))
+        {
+            return false;
+        }
+
+        return tag.IndexOf("Thorn", System.StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Reflect", System.StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Retaliation", System.StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Counter", System.StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static string ResolveSkillSlotLabel(int skillIndex)
+    {
+        return skillIndex switch
+        {
+            0 => "Q",
+            1 => "W",
+            2 => "E",
+            3 => "R",
+            _ => "Skill" + skillIndex
+        };
     }
 
     public float GetOutgoingDamageMultiplier(int skillIndex)
@@ -620,17 +711,17 @@ public class RuneRuntimeState : MonoBehaviour
         int luckCount = GetGlobalRuneCount(RuneType.Luck);
         if (luckCount < 2)
         {
-            return Mathf.Clamp(originalPoint, 1, 5);
+            return Mathf.Clamp(originalPoint, 1, 8);
         }
 
         float baseChance = 0.30f;
         int triggers = RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
         if (triggers <= 0)
         {
-            return Mathf.Clamp(originalPoint, 1, 5);
+            return Mathf.Clamp(originalPoint, 1, 8);
         }
 
-        return Mathf.Clamp(originalPoint + triggers, 1, 5);
+        return Mathf.Clamp(originalPoint + triggers, 1, 8);
     }
 
     public int GetExtraGrowthSoulDropsOnKill()
@@ -821,6 +912,7 @@ public class RuneRuntimeState : MonoBehaviour
         BattleDamage retaliationDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
         {
             bypassAmbientAffinity = true,
+            isReflectDamage = true,
             debugTag = "BaseThornReflect"
         };
         attackerHealth.ApplyDirectDamage(retaliationDamage, DamagePopupType.Normal);
@@ -925,6 +1017,7 @@ public class RuneRuntimeState : MonoBehaviour
                 BattleDamage burstRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
                 {
                     bypassAmbientAffinity = true,
+                    isReflectDamage = true,
                     debugTag = "ThornCounter"
                 };
                 attackerHealth.ApplyDirectDamage(burstRetaliationDamage, DamagePopupType.Normal);
@@ -954,6 +1047,7 @@ public class RuneRuntimeState : MonoBehaviour
                     BattleDamage areaRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
                     {
                         bypassAmbientAffinity = true,
+                        isReflectDamage = true,
                         debugTag = "ThornCounter"
                     };
                     targetHealth.ApplyDirectDamage(areaRetaliationDamage, DamagePopupType.Normal);
@@ -1138,6 +1232,7 @@ public class RuneRuntimeState : MonoBehaviour
             BattleDamage backlashDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
             {
                 bypassAmbientAffinity = true,
+                isReflectDamage = true,
                 debugTag = "ThornSet4Retaliation"
             };
             attackerHealth.ApplyDirectDamage(backlashDamage, DamagePopupType.Normal);
@@ -1632,7 +1727,7 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        float cap = ResolveOwnerMaxHealth() * 3f;
+            float cap = ResolveOwnerMaxHealth() * BattleResourceBank.ShieldLimitMaxHealthRatio;
         if (resourceBank.CurrentShield > cap)
         {
             resourceBank.SetShield(cap);

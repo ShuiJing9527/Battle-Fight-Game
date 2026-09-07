@@ -13,13 +13,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
     [Header("Q - QuickShear / Damage Parameters")]
     [Tooltip("每次斩击使用的物理段基础伤害。")]
     [FormerlySerializedAs("baseDamage")]
-    [SerializeField, Min(0f)] private float physicalBaseDamage = 30f;
+    [SerializeField, Min(0f)] private float physicalBaseDamage = 55f;
     [Tooltip("每次斩击使用的特殊段基础伤害。")]
-    [SerializeField, Min(0f)] private float specialBaseDamage = 20f;
+    [SerializeField, Min(0f)] private float specialBaseDamage = 30f;
     [Tooltip("Q 特殊段从物理攻击获得的倍率。")]
-    [SerializeField, Min(0f)] private float physicalScaling = 0.2f;
+    [SerializeField, Min(0f)] private float physicalScaling = 0.65f;
     [Tooltip("Q 物理段从特殊攻击获得的倍率。")]
-    [SerializeField, Min(0f)] private float specialScaling = 0.6f;
+    [SerializeField, Min(0f)] private float specialScaling = 0.9f;
     [Tooltip("每段斩击的最终伤害倍率。")]
     [SerializeField, Min(0f)] private float quickShearPerSlashDamageMultiplier = 1f;
     [Tooltip("Q 固定追加伤害。")]
@@ -69,9 +69,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
     [Header("Q - Extra Crit")]
     [SerializeField, Range(0f, 1f)] private float quickShearExtraCritChance = 0.30f;
-    [SerializeField, Min(1f)] private float quickShearExtraCritMultiplier = 2.0f;
+    [SerializeField, Min(1f)] private float quickShearExtraCritMultiplier = 2.3f;
     [SerializeField, Range(0f, 1f)] private float quickShearSuperCritChance = 0.05f;
-    [SerializeField, Min(1f)] private float quickShearSuperCritMultiplier = 5.0f;
+    [SerializeField, Min(1f)] private float quickShearSuperCritMultiplier = 6.0f;
     [SerializeField] private bool debugQuickShearCritLog = false;
     [Header("Q - Movement Lock")]
     [SerializeField] private float qMovementLockDuration = -1f;
@@ -108,10 +108,10 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         debugLog = false;
         slashCount = 3;
         slashInterval = 0.15f;
-        physicalBaseDamage = 30f;
-        specialBaseDamage = 20f;
-        physicalScaling = 0.2f;
-        specialScaling = 0.6f;
+        physicalBaseDamage = 55f;
+        specialBaseDamage = 30f;
+        physicalScaling = 0.65f;
+        specialScaling = 0.9f;
         quickShearPerSlashDamageMultiplier = 1f;
         quickShearBonusDamage = 0f;
         quickShearFinalDamageMultiplier = 1f;
@@ -145,9 +145,9 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
         expandHitboxWithEffect = false;
         visualAttackRangeMultiplier = 1f;
         quickShearExtraCritChance = 0.30f;
-        quickShearExtraCritMultiplier = 2f;
+        quickShearExtraCritMultiplier = 2.3f;
         quickShearSuperCritChance = 0.05f;
-        quickShearSuperCritMultiplier = 5f;
+        quickShearSuperCritMultiplier = 6f;
         debugQuickShearCritLog = false;
         qMovementLockDuration = -1f;
         qMovementLockFallbackBuffer = 0.05f;
@@ -1032,6 +1032,13 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
 
         if (debugQuickShearCritLog)
         {
+            Debug.Log(
+                $"[SkillBalance] character=Player01 skill=Q change=BaseDamageAndCritBuff " +
+                $"mainBaseBefore=40 mainBaseAfter={physicalBaseDamage:F2} subBaseBefore=20 subBaseAfter={specialBaseDamage:F2} " +
+                $"magScaleBefore=0.80 magScaleAfter={specialScaling:F2} atkScaleBefore=0.50 atkScaleAfter={physicalScaling:F2} " +
+                $"commonCritMultiplierBefore=2.00 commonCritMultiplierAfter={quickShearExtraCritMultiplier:F2} " +
+                $"rareCritMultiplierBefore=5.00 rareCritMultiplierAfter={quickShearSuperCritMultiplier:F2}",
+                this);
             float baseChainMultiplier = rawDamage > 0f ? normalCritDamage / rawDamage : 1f;
             float totalMultiplier = rawDamage > 0f ? finalDamage / rawDamage : 1f;
             Debug.Log(

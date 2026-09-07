@@ -307,10 +307,10 @@ MonoBehaviour:
   debugMeleeHitCheck: 0
   debugAttackDiagnostics: 0
   debugSpeedDiagnostics: 0
-  debugChaseDiagnostics: 1
+  debugChaseDiagnostics: 0
   debugAttackStateTransitions: 0
   debugSlimeAttackLogs: 0
-  debugBossMeleeHit: 1
+  debugBossMeleeHit: 0
   debugAttackLogInterval: 0.3
   debugSpeedLogInterval: 1
   targetResolveRetryInterval: 0.25
@@ -402,7 +402,7 @@ MonoBehaviour:
   highRuneDropTestMode: 1
   normalRuneDropRateMultiplier: 0.25
   debugLuckDropLog: 0
-  debugRuneDropDiagLog: 1
+  debugRuneDropDiagLog: 0
 --- !u!114 &5420526972999163506
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -436,11 +436,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   maxHealth: 260
-  physicalAttack: 14
-  physicalDefense: 16
-  specialAttack: 8
-  specialDefense: 16
-  speed: 3
+  physicalAttack: 18
+  physicalDefense: 14
+  specialAttack: 10
+  specialDefense: 14
+  speed: 3.2
   luck: 4
   outgoingDamageMultiplier: 1
 --- !u!114 &5915538337989477822

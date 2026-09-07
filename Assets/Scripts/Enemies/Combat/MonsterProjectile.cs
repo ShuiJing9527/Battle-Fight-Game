@@ -1049,7 +1049,10 @@ public class MonsterProjectile : MonoBehaviour
             float hpBefore = ResolveCombatHealthValue(playerHealth);
             hasHit = true;
             damageEnabled = false;
-            playerHealth.TakeDamage(new BattleDamage(damage, damageType, source));
+            playerHealth.TakeDamage(new BattleDamage(damage, damageType, source)
+            {
+                attackKind = "Projectile"
+            });
             float hpAfter = ResolveCombatHealthValue(playerHealth);
             LogProjectileHit("player", other, hitPoint, sourceReason, playerHealth, hpBefore, hpAfter);
             OnHit(hitPoint, hitNormal);

@@ -4,6 +4,15 @@ using UnityEngine;
 
 public class CombatHealth : MonoBehaviour
 {
+    private const float RuneFlatDamageCooldownWindow = 0.15f;
+    private const float TwinLifestealCooldownWindow = 0.15f;
+    private const float NightChildFavorableLifestealRate = 0.15f;
+    private const float NightChildLifestealMaxHealthRatio = 0.08f;
+    private static int nextDamagePacketId;
+    private static readonly Dictionary<int, float> NextLifestealTimeByAttacker = new Dictionary<int, float>();
+
+    [Header("Combat Balance")]
+    [SerializeField] private bool enableCombatBalanceLogs = false;
     [Header("生命")]
     public CombatStats stats;
     public BattleResourceBank resourceBank;
@@ -151,6 +160,11 @@ public class CombatHealth : MonoBehaviour
 
     public void TakeDamage(BattleDamage damage)
     {
+        if (damage.packetId <= 0)
+        {
+            damage.packetId = ++nextDamagePacketId;
+        }
+        LogDamageEntry("TakeDamage", damage, defenseHandledBySkill: false);
         bool logBossPlayerDamage = ShouldLogBossPlayerDamageFlow(damage.source);
         float playerHpBefore = ResolveCurrentHealthForDebug();
         float playerShieldBefore = GetShield();
@@ -281,16 +295,15 @@ public class CombatHealth : MonoBehaviour
         float damageBonusPerRune = 0f;
         float runeBaseDamageBonus = 0f;
         string runeCountSource = "Skipped";
-        if (!damage.bypassAttackerMultipliers && isPlayerAttackingMonster)
-        {
-            baseDamage = BattleStatUtility.ApplyEquippedRuneBaseDamageBonus(
-                resolvedPlayerSource,
-                baseDamage,
-                out equippedRuneCount,
-                out damageBonusPerRune,
-                out runeBaseDamageBonus,
-                out runeCountSource);
-        }
+        baseDamage = ApplyLimitedRuneFlatDamage(
+            damage,
+            resolvedPlayerSource,
+            isPlayerAttackingMonster,
+            baseDamage,
+            out equippedRuneCount,
+            out damageBonusPerRune,
+            out runeBaseDamageBonus,
+            out runeCountSource);
 
         float outgoingDamage = damage.bypassAttackerMultipliers
             ? baseDamage
@@ -301,6 +314,7 @@ public class CombatHealth : MonoBehaviour
         {
             outgoingDamage *= demoPlayerDamageMultiplier;
         }
+        outgoingDamage = ApplyEnemyDebuffOutgoingMultiplier(resolvedMonsterSource, damage, outgoingDamage);
         damage.amount = outgoingDamage;
         float reducedDamage = stats != null ? stats.ReduceDamage(damage) : outgoingDamage;
         float finalDamage = reducedDamage;
@@ -322,15 +336,16 @@ public class CombatHealth : MonoBehaviour
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = ApplyMinimumMonsterHitDamageIfNeeded(baseDamage, resolvedMonsterSource, finalDamage);
         float afterIncomingMultiplierDamage = finalDamage;
-        float resolvedDamageBeforeShieldAndGuard = Mathf.Max(0f, finalDamage);
-        finalDamage = AbsorbShieldDamage(finalDamage);
-        float afterShieldDamage = finalDamage;
         Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
         if (player2 != null)
         {
             finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
         }
         float afterGuardDamage = finalDamage;
+        finalDamage = ApplyMonsterDamageSafetyClamp(resolvedMonsterSource, damage, finalDamage);
+        float resolvedDamageBeforeShieldAndGuard = Mathf.Max(0f, finalDamage);
+        finalDamage = AbsorbShieldDamage(finalDamage);
+        float afterShieldDamage = finalDamage;
         LogPlayerSkillDamageDebug(
             damage,
             resolvedPlayerSource,
@@ -358,6 +373,7 @@ public class CombatHealth : MonoBehaviour
         float combatHealthCurrentAfter = currentHealth;
         float resourceBankCurrentAfter = resourceBank != null ? resourceBank.currentHealth : -1f;
         bool damageApplied = combatHealthCurrentAfter < combatHealthCurrentBefore || (resourceBank != null && resourceBankCurrentAfter < resourceBankCurrentBefore);
+        ApplyNightChildFavorableLifesteal(resolvedPlayerSource, damage, Mathf.Max(0f, finalDamage));
         if (resolvedDamageBeforeShieldAndGuard > 0f)
         {
             ArmPlayerMonsterDamageInvincibility(resolvedMonsterSource);
@@ -577,6 +593,11 @@ public class CombatHealth : MonoBehaviour
 
     public void ApplyDirectDamage(BattleDamage damage, DamagePopupType popupType)
     {
+        if (damage.packetId <= 0)
+        {
+            damage.packetId = ++nextDamagePacketId;
+        }
+        LogDamageEntry("ApplyDirectDamage", damage, defenseHandledBySkill: true);
         float currentHealthBefore = resourceBank != null ? resourceBank.currentHealth : currentHealth;
         float maxHealthBefore = resourceBank != null ? resourceBank.maxHealth : MaxHealthValue;
 
@@ -615,16 +636,15 @@ public class CombatHealth : MonoBehaviour
         float damageBonusPerRune = 0f;
         float runeBaseDamageBonus = 0f;
         string runeCountSource = "Skipped";
-        if (!damage.bypassAttackerMultipliers && isPlayerAttackingMonster)
-        {
-            baseDamage = BattleStatUtility.ApplyEquippedRuneBaseDamageBonus(
-                resolvedPlayerSource,
-                baseDamage,
-                out equippedRuneCount,
-                out damageBonusPerRune,
-                out runeBaseDamageBonus,
-                out runeCountSource);
-        }
+        baseDamage = ApplyLimitedRuneFlatDamage(
+            damage,
+            resolvedPlayerSource,
+            isPlayerAttackingMonster,
+            baseDamage,
+            out equippedRuneCount,
+            out damageBonusPerRune,
+            out runeBaseDamageBonus,
+            out runeCountSource);
 
         float finalDamage = damage.bypassAttackerMultipliers
             ? baseDamage
@@ -635,6 +655,7 @@ public class CombatHealth : MonoBehaviour
         {
             finalDamage *= demoPlayerDamageMultiplier;
         }
+        finalDamage = ApplyEnemyDebuffOutgoingMultiplier(resolvedMonsterSource, damage, finalDamage);
 
         float dayNightDamageMultiplier = 1f;
         if (!damage.bypassAffinityModifier)
@@ -650,6 +671,12 @@ public class CombatHealth : MonoBehaviour
         }
         finalDamage *= GetIncomingDamageMultiplier();
         finalDamage = ApplyMinimumMonsterHitDamageIfNeeded(baseDamage, resolvedMonsterSource, finalDamage);
+        Player2PrototypeController player2 = GetComponent<Player2PrototypeController>();
+        if (player2 != null)
+        {
+            finalDamage = player2.ProcessIncomingDamageWithWGuard(finalDamage, damage);
+        }
+        finalDamage = ApplyMonsterDamageSafetyClamp(resolvedMonsterSource, damage, finalDamage);
         float resolvedDamageBeforeShield = Mathf.Max(0f, finalDamage);
         finalDamage = AbsorbShieldDamage(finalDamage);
         if (resolvedDamageBeforeShield > 0f)
@@ -679,6 +706,8 @@ public class CombatHealth : MonoBehaviour
         {
             currentHealth = Mathf.Max(0f, currentHealth - finalDamage);
         }
+
+        ApplyNightChildFavorableLifesteal(resolvedPlayerSource, damage, Mathf.Max(0f, finalDamage));
 
         bool shouldNotifyGaugeHit = ShouldCountAsSuccessfulHit(damage.amount, finalDamage, resolvedDamageBeforeShield);
         if (shouldNotifyGaugeHit && !damage.suppressGaugeNotification)
@@ -899,8 +928,9 @@ public class CombatHealth : MonoBehaviour
             return;
         }
 
-        localShield = amount;
-        localMaxShield = amount;
+        float limit = Mathf.Max(0f, MaxHealthValue * BattleResourceBank.ShieldLimitMaxHealthRatio);
+        localShield = Mathf.Clamp(amount, 0f, limit);
+        localMaxShield = limit;
         NotifyShieldStateChanged();
     }
 
@@ -931,7 +961,7 @@ public class CombatHealth : MonoBehaviour
             totalShield += Mathf.Max(0f, timedShields[i].CurrentShield);
         }
 
-        return totalShield;
+        return Mathf.Min(totalShield, Mathf.Max(0f, MaxHealthValue * BattleResourceBank.ShieldLimitMaxHealthRatio));
     }
 
     public float GetMaxShield()
@@ -948,7 +978,7 @@ public class CombatHealth : MonoBehaviour
             totalMaxShield += Mathf.Max(0f, timedShields[i].MaxShield);
         }
 
-        return totalMaxShield;
+        return Mathf.Min(totalMaxShield, Mathf.Max(0f, MaxHealthValue * BattleResourceBank.ShieldLimitMaxHealthRatio));
     }
 
     public bool HasActiveShield()
@@ -1003,6 +1033,7 @@ public class CombatHealth : MonoBehaviour
     private float AbsorbShieldDamage(float amount)
     {
         amount = Mathf.Max(0f, amount);
+        float remainingShieldBudget = Mathf.Max(0f, MaxHealthValue * BattleResourceBank.ShieldLimitMaxHealthRatio);
         PlayerTimedShieldStatus[] timedShields = GetComponents<PlayerTimedShieldStatus>();
         for (int i = 0; i < timedShields.Length; i++)
         {
@@ -1011,6 +1042,8 @@ public class CombatHealth : MonoBehaviour
                 continue;
             }
 
+            timedShields[i].ClampCurrentShield(remainingShieldBudget);
+            remainingShieldBudget = Mathf.Max(0f, remainingShieldBudget - timedShields[i].CurrentShield);
             amount = timedShields[i].AbsorbDamage(amount);
             if (amount <= 0f)
             {
@@ -1018,7 +1051,11 @@ public class CombatHealth : MonoBehaviour
             }
         }
 
-        float baseShield = GetBaseShield();
+        float baseShield = Mathf.Min(GetBaseShield(), remainingShieldBudget);
+        if (resourceBank != null && resourceBank.CurrentShield > baseShield)
+        {
+            resourceBank.SetShieldCurrent(baseShield);
+        }
         float shieldDamageMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldDamageTakenMultiplier() : 1f;
         float shieldUsed = Mathf.Min(baseShield, amount * shieldDamageMultiplier);
         if (shieldUsed <= 0f)
@@ -1066,6 +1103,195 @@ public class CombatHealth : MonoBehaviour
         }
 
         return multiplier;
+    }
+
+    private float ApplyLimitedRuneFlatDamage(
+        BattleDamage damage,
+        GameObject playerSource,
+        bool isPlayerAttackingMonster,
+        float amount,
+        out int equippedRuneCount,
+        out float damagePerRune,
+        out float runeFlatDamage,
+        out string resultSource)
+    {
+        equippedRuneCount = 0;
+        damagePerRune = 0f;
+        runeFlatDamage = 0f;
+        resultSource = "Skipped";
+        string skipReason = "NotPlayerAttack";
+        string skillLabel = damage.skillName;
+
+        if (!damage.bypassAttackerMultipliers && isPlayerAttackingMonster && playerSource != null)
+        {
+            RuneRuntimeState attackerRunes = playerSource.GetComponent<RuneRuntimeState>()
+                                             ?? playerSource.GetComponentInParent<RuneRuntimeState>();
+            if (attackerRunes != null)
+            {
+                damagePerRune = attackerRunes.GetDemoBaseDamageBonusPerEquippedRune();
+                bool triggered = attackerRunes.TryConsumeRuneFlatDamage(
+                    damage,
+                    out equippedRuneCount,
+                    out runeFlatDamage,
+                    out skillLabel,
+                    out skipReason);
+                resultSource = triggered ? "RuneRuntimeState.CastFirstHit" : skipReason;
+                if (enableCombatBalanceLogs)
+                {
+                    Debug.Log(
+                        $"[RuneFlatDamage] attacker={GetDebugObjectName(playerSource)} skillName={ResolveDamageLabel(skillLabel)} damageSource={ResolveDamageLabel(damage.damageSource)} " +
+                        $"equippedRuneCount={equippedRuneCount} runeFlatDamage={runeFlatDamage:F2} triggered={triggered} skipReason={(triggered ? "None" : skipReason)} " +
+                        $"cooldownWindow={RuneFlatDamageCooldownWindow:F2} packetId={damage.packetId}",
+                        this);
+                }
+
+                return triggered ? amount + runeFlatDamage : amount;
+            }
+
+            skipReason = "NoRuneRuntimeState";
+        }
+
+        if (enableCombatBalanceLogs)
+        {
+            Debug.Log(
+                $"[RuneFlatDamage] attacker={GetDebugObjectName(playerSource)} skillName={ResolveDamageLabel(skillLabel)} damageSource={ResolveDamageLabel(damage.damageSource)} " +
+                $"equippedRuneCount=0 runeFlatDamage=0.00 triggered=false skipReason={skipReason} cooldownWindow={RuneFlatDamageCooldownWindow:F2} packetId={damage.packetId}",
+                this);
+        }
+
+        return amount;
+    }
+
+    private float ApplyEnemyDebuffOutgoingMultiplier(GameObject monsterSource, BattleDamage damage, float amount)
+    {
+        if (monsterSource == null || !BattleTargetUtility.IsPlayer(gameObject))
+        {
+            return amount;
+        }
+
+        EnemyDebuffReceiver receiver = monsterSource.GetComponent<EnemyDebuffReceiver>()
+                                       ?? monsterSource.GetComponentInParent<EnemyDebuffReceiver>();
+        float multiplier = receiver != null ? Mathf.Max(0f, receiver.GetOutgoingDamageMultiplier()) : 1f;
+        float result = amount * multiplier;
+        if (enableCombatBalanceLogs)
+        {
+            Debug.Log(
+                $"[EnemyDebuffDamage] enemyName={GetDebugObjectName(monsterSource)} attackPath={ResolveAttackKind(damage)} " +
+                $"outgoingDamageMultiplier={multiplier:F2} applied={(receiver != null)} skipReason={(receiver != null ? "None" : "NoEnemyDebuffReceiver")}",
+                this);
+        }
+
+        return result;
+    }
+
+    private float ApplyMonsterDamageSafetyClamp(GameObject monsterSource, BattleDamage damage, float amount)
+    {
+        if (monsterSource == null || !BattleTargetUtility.IsPlayer(gameObject) || amount <= 0f)
+        {
+            return Mathf.Max(0f, amount);
+        }
+
+        MonsterIdentity identity = monsterSource.GetComponent<MonsterIdentity>()
+                                   ?? monsterSource.GetComponentInParent<MonsterIdentity>();
+        MonsterRank rank = identity != null ? identity.rank : MonsterRank.Normal;
+        string attackKind = ResolveAttackKind(damage);
+        bool bossStrongSkill = rank == MonsterRank.Boss && IsBossStrongAttack(attackKind);
+        float maxHealth = Mathf.Max(1f, MaxHealthValue);
+        float maxRatio = rank switch
+        {
+            MonsterRank.Elite => 0.32f,
+            MonsterRank.Boss => bossStrongSkill ? 0.65f : 0.45f,
+            _ => 0.18f
+        };
+        float maxAllowed = maxHealth * maxRatio;
+        float result = Mathf.Min(amount, maxAllowed);
+        if (enableCombatBalanceLogs)
+        {
+            Debug.Log(
+                $"[MonsterDamageClamp] enemyName={GetDebugObjectName(monsterSource)} enemyRank={rank} attackKind={attackKind} " +
+                $"playerMaxHP={maxHealth:F2} damageBeforeClamp={amount:F2} maxAllowedDamage={maxAllowed:F2} damageAfterClamp={result:F2} clamped={result < amount}",
+                this);
+        }
+
+        return result;
+    }
+
+    private void ApplyNightChildFavorableLifesteal(GameObject playerSource, BattleDamage damage, float actualDamage)
+    {
+        if (playerSource == null || actualDamage <= 0f || damage.bypassAttackerMultipliers || damage.isReflectDamage || IsReflectDamageTag(damage.debugTag))
+        {
+            return;
+        }
+
+        TwinStateRuntimeBonus bonus = DayNightAffinityDamageModifier.GetTwinStateRuntimeBonus(playerSource);
+        bool eligible = bonus.childType == TwinChildRuntimeType.NightChild
+                        && bonus.isInNightChildState
+                        && bonus.statusType == TwinStateRuntimeType.Buff;
+        int attackerId = playerSource.GetInstanceID();
+        bool offCooldown = !NextLifestealTimeByAttacker.TryGetValue(attackerId, out float nextTime) || Time.time >= nextTime;
+        float healBeforeClamp = eligible ? actualDamage * NightChildFavorableLifestealRate : 0f;
+        CombatHealth attackerHealth = playerSource.GetComponent<CombatHealth>() ?? playerSource.GetComponentInParent<CombatHealth>();
+        float healAfterClamp = attackerHealth != null
+            ? Mathf.Min(healBeforeClamp, attackerHealth.MaxHealthValue * NightChildLifestealMaxHealthRatio)
+            : 0f;
+        bool triggered = eligible && offCooldown && attackerHealth != null && !attackerHealth.IsDead && healAfterClamp > 0f;
+        if (triggered)
+        {
+            NextLifestealTimeByAttacker[attackerId] = Time.time + TwinLifestealCooldownWindow;
+            attackerHealth.Heal(healAfterClamp);
+        }
+
+        if (enableCombatBalanceLogs)
+        {
+            string skipReason = triggered ? "None" : !eligible ? "TwinBuffInactive" : !offCooldown ? "CooldownWindow" : attackerHealth == null ? "NoCombatHealth" : "NoEffectiveDamage";
+            Debug.Log(
+                $"[Lifesteal] character={GetDebugObjectName(playerSource)} skillName={ResolveDamageLabel(damage.skillName)} damageDealt={actualDamage:F2} " +
+                $"lifestealRate={(eligible ? NightChildFavorableLifestealRate : 0f):F2} healAmountBeforeClamp={healBeforeClamp:F2} " +
+                $"healAmountAfterClamp={healAfterClamp:F2} triggered={triggered} skipReason={skipReason}",
+                this);
+        }
+    }
+
+    private static string ResolveAttackKind(BattleDamage damage)
+    {
+        if (!string.IsNullOrWhiteSpace(damage.attackKind)) return damage.attackKind;
+        if (!string.IsNullOrWhiteSpace(damage.debugTag)) return damage.debugTag;
+        if (!string.IsNullOrWhiteSpace(damage.damageSource)) return damage.damageSource;
+        return "Unknown";
+    }
+
+    private static string ResolveDamageLabel(string value)
+    {
+        return string.IsNullOrWhiteSpace(value) ? "Unknown" : value;
+    }
+
+    private static bool IsBossStrongAttack(string attackKind)
+    {
+        return attackKind.IndexOf("Devour", StringComparison.OrdinalIgnoreCase) >= 0
+               || attackKind.IndexOf("Leap", StringComparison.OrdinalIgnoreCase) >= 0
+               || attackKind.IndexOf("Strong", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static bool IsReflectDamageTag(string tag)
+    {
+        if (string.IsNullOrWhiteSpace(tag)) return false;
+        return tag.IndexOf("Thorn", StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Reflect", StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Retaliation", StringComparison.OrdinalIgnoreCase) >= 0
+               || tag.IndexOf("Counter", StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private void LogDamageEntry(string entry, BattleDamage damage, bool defenseHandledBySkill)
+    {
+        if (!enableCombatBalanceLogs)
+        {
+            return;
+        }
+
+        Debug.Log(
+            $"[DamageEntry] entry={entry} attacker={GetDebugObjectName(damage.source)} target={name} damageType={damage.damageType} " +
+            $"rawAmount={damage.amount:F2} defenseHandledBySkill={defenseHandledBySkill} usesUnifiedPostProcess=true warning=None",
+            this);
     }
 
     private static string GetModifierKey(object source)

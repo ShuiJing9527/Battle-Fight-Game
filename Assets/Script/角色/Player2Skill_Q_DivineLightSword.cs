@@ -24,17 +24,20 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
     [SerializeField] private float specialScaling = 1.0f;
     [Header("Q - 神圣星刃 / 伤害参数")]
     [Tooltip("Q 物理段固定基础伤害。")]
-    [SerializeField, Min(0f)] private float qPhysicalBaseDamage = 5f;
+    [SerializeField, Min(0f)] private float qPhysicalBaseDamage = 16f;
     [Tooltip("Q 物理段从物理攻击获得的倍率。")]
-    [SerializeField, Min(0f)] private float qPhysicalFromPhysicalAttackScaling = 0.6f;
+    [SerializeField, Min(0f)] private float qPhysicalFromPhysicalAttackScaling = 0.65f;
     [Tooltip("Q 物理段从特殊攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float qPhysicalFromSpecialAttackScaling = 0f;
     [Tooltip("Q 特殊段固定基础伤害。")]
-    [SerializeField, Min(0f)] private float qSpecialBaseDamage = 20f;
+    [SerializeField, Min(0f)] private float qSpecialBaseDamage = 32f;
     [Tooltip("Q 特殊段从物理攻击获得的倍率。")]
     [SerializeField, Min(0f)] private float qSpecialFromPhysicalAttackScaling = 0f;
     [Tooltip("Q 特殊段从特殊攻击获得的倍率。")]
-    [SerializeField, Min(0f)] private float qSpecialFromSpecialAttackScaling = 0.3f;
+    [SerializeField, Min(0f)] private float qSpecialFromSpecialAttackScaling = 0.45f;
+    [Header("Q - Radiance Mark Explosion")]
+    [SerializeField, Min(0f)] private float qMarkExplosionBaseDamage = 35f;
+    [SerializeField, Min(0f)] private float qMarkExplosionSpecialAttackScaling = 0.65f;
     [InspectorName("Q Star Fall Damage Radius")]
     [SerializeField] private float qStarFallDamageRadius = 0.8f;
     [InspectorName("Q Star Fall Enable Damage")]
@@ -634,6 +637,7 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             }
 
             pendingSelection.ValidEnemyCount++;
+            bool markExistsBeforeHit = RadianceMarkStatus.TryGetMarkedStatus(combatHealth, out RadianceMarkStatus markBeforeHit);
             float damageAmount = ResolveQBladeDamage(attackerStats, combatHealth.stats, combatHealth, source, manaRuneDamageMultiplier);
             if (damageAmount <= 0f)
             {
@@ -654,6 +658,17 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
             float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
             runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
+            float markExplosionDamage = TryExplodeRadianceMark(markExistsBeforeHit, markBeforeHit, combatHealth, attackerStats, source);
+            if (qDamageDebugLog || debugRadianceMark)
+            {
+                Debug.Log(
+                    $"[SkillBalance] character=Player02 skill=Q change=BaseDamageAndMarkExplosionBuff " +
+                    $"physicalBaseBefore=10 physicalBaseAfter={qPhysicalBaseDamage:F2} magicalBaseBefore=20 magicalBaseAfter={qSpecialBaseDamage:F2} " +
+                    $"atkScaleBefore=0.60 atkScaleAfter={qPhysicalFromPhysicalAttackScaling:F2} magScaleBefore=0.30 magScaleAfter={qSpecialFromSpecialAttackScaling:F2} " +
+                    $"markExistsBeforeHit={markExistsBeforeHit} markExplosionTriggered={markExplosionDamage > 0f} markExplosionDamage={markExplosionDamage:F2} " +
+                    "markReapplied=pending runeFlatDamageTriggeredByExplosion=false",
+                    this);
+            }
             if (markCandidates == null)
             {
                 markCandidates = new List<CombatHealth>();
@@ -674,13 +689,11 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
     private void RegisterRadianceMarkCandidates(List<CombatHealth> markCandidates, Vector3 impactCenter, int radianceMarkCastId)
     {
-        if (!dayChildStateActiveThisCast || radianceMarkedCastIds.Contains(radianceMarkCastId) || markCandidates == null || markCandidates.Count == 0)
+        if (radianceMarkedCastIds.Contains(radianceMarkCastId) || markCandidates == null || markCandidates.Count == 0)
         {
             if (debugRadianceMark)
             {
-                string reason = !dayChildStateActiveThisCast
-                    ? "day-buff-inactive"
-                    : radianceMarkedCastIds.Contains(radianceMarkCastId)
+                string reason = radianceMarkedCastIds.Contains(radianceMarkCastId)
                         ? "cast-already-marked"
                         : "candidate-list-empty";
                 LogRadianceMarkDebug($"castId={radianceMarkCastId} RegisterRadianceMarkCandidates skipped reason={reason}");
@@ -751,12 +764,11 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
 
     private void CommitPendingRadianceMark(int radianceMarkCastId)
     {
-        if (!dayChildStateActiveThisCast || radianceMarkedCastIds.Contains(radianceMarkCastId))
+        if (radianceMarkedCastIds.Contains(radianceMarkCastId))
         {
             if (debugRadianceMark)
             {
-                string reason = !dayChildStateActiveThisCast ? "day-child-state-inactive" : "cast-already-marked";
-                LogRadianceMarkDebug($"castId={radianceMarkCastId} CommitPendingRadianceMark skipped reason={reason}");
+                LogRadianceMarkDebug($"castId={radianceMarkCastId} CommitPendingRadianceMark skipped reason=cast-already-marked");
             }
             return;
         }
@@ -921,6 +933,34 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
                 this);
         }
 
+        return finalDamage;
+    }
+
+    private float TryExplodeRadianceMark(
+        bool markExistsBeforeHit,
+        RadianceMarkStatus markBeforeHit,
+        CombatHealth target,
+        CombatStats attackerStats,
+        GameObject source)
+    {
+        if (!markExistsBeforeHit || markBeforeHit == null || target == null || target.IsDead || !markBeforeHit.IsMarked)
+        {
+            return 0f;
+        }
+
+        // Keep the component alive so the end-of-cast refresh cannot race a deferred Destroy.
+        markBeforeHit.ClearMark(removeComponent: false);
+        float specialAttack = attackerStats != null ? Mathf.Max(0f, attackerStats.specialAttack) : 0f;
+        float specialDefense = target.stats != null ? Mathf.Max(0f, target.stats.specialDefense) : 0f;
+        float rawDamage = Mathf.Max(0f, qMarkExplosionBaseDamage)
+                          + specialAttack * Mathf.Max(0f, qMarkExplosionSpecialAttackScaling);
+        float finalDamage = Mathf.Max(1f, rawDamage - specialDefense);
+        target.ApplyDirectDamage(new BattleDamage(finalDamage, BattleDamageType.Special, source)
+        {
+            skillName = "Player02 Q",
+            damageSource = "RadianceMarkExplosion",
+            debugTag = "Player02QMarkExplosion"
+        }, DamagePopupType.Special);
         return finalDamage;
     }
 

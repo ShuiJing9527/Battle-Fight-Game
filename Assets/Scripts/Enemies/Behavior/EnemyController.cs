@@ -115,10 +115,10 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private bool debugMeleeHitCheck = false;
     [SerializeField] private bool debugAttackDiagnostics = false;
     [SerializeField] private bool debugSpeedDiagnostics = false;
-    [SerializeField] private bool debugChaseDiagnostics = true;
+    [SerializeField] private bool debugChaseDiagnostics = false;
     [SerializeField] private bool debugAttackStateTransitions = false;
     [SerializeField] private bool debugSlimeAttackLogs = false;
-    [SerializeField] private bool debugBossMeleeHit = true;
+    [SerializeField] private bool debugBossMeleeHit = false;
     [SerializeField, Min(0.1f)] private float debugAttackLogInterval = 0.3f;
     [SerializeField, Min(0.1f)] private float debugSpeedLogInterval = 1f;
     [SerializeField, Min(0.02f)] private float expensiveAiUpdateInterval = 0.1f;
@@ -2273,7 +2273,11 @@ public class EnemyController : MonoBehaviour
                     this);
             }
 
-            targetHealth.TakeDamage(new BattleDamage(damage, BattleDamageType.Physical, gameObject));
+            BattleDamage landingDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
+            {
+                attackKind = source == BossLandingImpactSource.LeapSlam ? "BossLeapStrong" : "BossLanding"
+            };
+            targetHealth.TakeDamage(landingDamage);
             float playerHpAfter = ResolveCombatHealthValue(targetHealth);
             float playerShieldAfter = targetHealth.GetShield();
             LogBossLandingTrace(
@@ -5241,7 +5245,11 @@ public class EnemyController : MonoBehaviour
                     " playerHpAfter=pending",
                     this);
 
-                combatHealth.TakeDamage(new BattleDamage(currentAttackDamage, damageType, gameObject));
+                BattleDamage meleeDamage = new BattleDamage(currentAttackDamage, damageType, gameObject)
+                {
+                    attackKind = monsterIdentity != null && monsterIdentity.rank == MonsterRank.Boss ? "BossBasic" : "Melee"
+                };
+                combatHealth.TakeDamage(meleeDamage);
                 float playerHpAfter = ResolveCombatHealthValue(combatHealth);
                 float playerShieldAfter = combatHealth.GetShield();
                 string damageResult = ResolveEnemyMeleeDamageResult(playerHpBefore, playerHpAfter, playerShieldBefore, playerShieldAfter);
@@ -6625,7 +6633,8 @@ public class EnemyController : MonoBehaviour
     private float ResolveCurrentAttackDamage(BattleDamageType damageType)
     {
         float attackPower = BattleStatUtility.ResolveAttackPower(gameObject, damageType, attackDamage);
-        float damage = attackPower * Mathf.Max(0.01f, outgoingDamageMultiplier) * Mathf.Max(0f, ResolveOutgoingDamageMultiplier());
+        // CombatHealth applies EnemyDebuffReceiver once for every monster damage path.
+        float damage = attackPower * Mathf.Max(0.01f, outgoingDamageMultiplier);
         return BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out _);
     }
 

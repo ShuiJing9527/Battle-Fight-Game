@@ -584,7 +584,8 @@ public sealed class MonsterDayNightAffinity : MonoBehaviour
             return;
         }
 
-        float affinityMultiplier = RuntimeRuneScaling.GetTotalEquippedRuneMultiplier();
+        // Player rune loadout must never scale monster combat stats.
+        const float affinityMultiplier = 1f;
 
         switch (resolvedState)
         {

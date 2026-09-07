@@ -32,9 +32,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
     [SerializeField] private Transform thrustVfxAnchor;
 
     [Header("R - Thrust Damage")]
-    [SerializeField, Min(0f)] private float thrustPhysicalBaseDamage = 60f;
+    [SerializeField, Min(0f)] private float thrustPhysicalBaseDamage = 78f;
     [SerializeField, Min(0f)] private float thrustSpecialToPhysicalScale = 0.80f;
-    [SerializeField, Min(0f)] private float thrustSpecialBaseDamage = 40f;
+    [SerializeField, Min(0f)] private float thrustSpecialBaseDamage = 52f;
     [SerializeField, Min(0f)] private float thrustPhysicalToSpecialScale = 0.40f;
     [SerializeField, Min(0.1f)] private float thrustRange = 2.4f;
     [SerializeField, Min(0.1f)] private float thrustWidth = 1.2f;
@@ -131,9 +131,9 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
         needleInterval = 0.12f;
         skillEndTime = 1.25f;
         baseManaCost = 60f;
-        thrustPhysicalBaseDamage = 60f;
+        thrustPhysicalBaseDamage = 78f;
         thrustSpecialToPhysicalScale = 0.80f;
-        thrustSpecialBaseDamage = 40f;
+        thrustSpecialBaseDamage = 52f;
         thrustPhysicalToSpecialScale = 0.40f;
         thrustRange = 2.4f;
         thrustWidth = 1.2f;
@@ -245,6 +245,12 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
         if (debugLog)
         {
+            Debug.Log(
+                $"[SkillBalance] character=Player01 skill=R change=UltimateDamageBuff " +
+                $"damageNode=Thrust baseBefore=60/40 baseAfter={thrustPhysicalBaseDamage:F2}/{thrustSpecialBaseDamage:F2} " +
+                $"scaleBefore={thrustSpecialToPhysicalScale:F2}/{thrustPhysicalToSpecialScale:F2} scaleAfter={thrustSpecialToPhysicalScale:F2}/{thrustPhysicalToSpecialScale:F2} " +
+                $"multiplierApplied=1.30 damageNodeSecondary=Needles derivedDamageMultiplier=1.30 needleRatioBefore=0.50 needleRatioAfter={needleDamageMultiplier:F2} runeFlatDamageExtraTrigger=false",
+                this);
             ResolveCurrentStats(out float physicalAttack, out float specialAttack);
             ResolveThrustDamageValues(physicalAttack, specialAttack, out float thrustPhysicalDamage, out float thrustSpecialDamage);
             ResolveNeedleDamageValues(physicalAttack, specialAttack, out float needlePhysicalDamage, out float needleSpecialDamage);

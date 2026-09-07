@@ -3493,7 +3493,11 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         CombatHealth attackerCombatHealth = attacker.GetComponentInParent<CombatHealth>();
         if (attackerCombatHealth != null && attackerCombatHealth.gameObject != gameObject)
         {
-            attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject));
+            attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject)
+            {
+                isReflectDamage = true,
+                debugTag = "Player02WCounter"
+            });
             return;
         }
 
