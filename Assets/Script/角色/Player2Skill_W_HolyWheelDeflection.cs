@@ -20,7 +20,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
     [Header("W - 星刃护盾 / 护盾")]
     [InspectorName("W 护盾倍率")]
-    [SerializeField, Min(0f)] private float wShieldMaxHpMultiplier = 1f;
+    [SerializeField, Min(0f)] private float wShieldMaxHpMultiplier = 0.6f;
     [InspectorName("W 旧额外星刃护盾加成(仅兼容旧数据)")]
     [SerializeField, Min(0f)] private float wShieldBonusPerExtraSword = 0.1f;
     [InspectorName("W 结束时清空护盾")]
@@ -128,6 +128,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private float wOrbitAngle;
     private Coroutine wSkillRoutine;
     private float wAppliedShieldValue;
+    private float wOrbitDamageShieldReferenceValue;
     private float currentWOrbitBladeDamage;
     private float currentWOrbitRadius;
     private GameObject activeWOrbitVisualRoot;
@@ -143,6 +144,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
     private int currentWSwordCount;
     private float currentWFinalDamageReduction;
     private RuneRuntimeState runeRuntimeState;
+    private int activeRuneCastId = -1;
     // Day Child state is independent from day/night phase.
     private bool dayChildStateActiveThisCast;
     private bool shieldBrokenThisCast;
@@ -181,6 +183,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         shieldBrokenThisCast = false;
         PrepareRuneCastContext();
+        activeRuneCastId = CurrentRuneCastId;
         wSkillRoutine = StartCoroutine(ShieldRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -195,6 +198,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         ResetRuneCastContext();
+        activeRuneCastId = -1;
 
         for (int i = 0; i < activeWSwords.Count; i++)
         {
@@ -373,7 +377,7 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         currentWFinalDamageReduction = 0f;
         isWGuardActive = false;
         ApplyWShield(currentWSwordCount);
-        float orbitShieldDamageBeforeCap = Mathf.Max(0f, wAppliedShieldValue * wOrbitStarBladeDamageShieldRatio);
+        float orbitShieldDamageBeforeCap = Mathf.Max(0f, wOrbitDamageShieldReferenceValue * wOrbitStarBladeDamageShieldRatio);
         currentWOrbitBladeDamage = Mathf.Min(orbitShieldDamageBeforeCap, Mathf.Max(0f, wShieldBonusDamageCap));
 
         Debug.Log($"W技能统计：护盾值={wAppliedShieldValue:F2}，神印={sealCount}，星刃数量={currentWSwordCount}，星刃伤害={currentWOrbitBladeDamage:F2}，CD={wCooldown:F2}", this);
@@ -617,12 +621,19 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
 
     private BattleDamage CreateShieldDamagePacket(float amount, BattleDamageType damageType)
     {
-        return new BattleDamage(amount, damageType, Owner != null ? Owner.gameObject : gameObject)
+        GameObject damageOwner = Owner != null ? Owner.gameObject : gameObject;
+        return new BattleDamage(amount, damageType, damageOwner)
         {
+            castId = activeRuneCastId,
             skillName = "Player02 W",
             damageSource = "WShieldBonusDamage",
             debugTag = "Player02WShieldBonus",
-            isReflectDamage = true
+            isReflectDamage = true,
+            damageKind = BattleDamageKind.ShieldBonusDamage,
+            sourceOwner = damageOwner,
+            bypassRuneFlatDamage = true,
+            bypassLifesteal = true,
+            suppressThornReaction = true
         };
     }
 
@@ -1512,7 +1523,14 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
             attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject)
             {
                 isReflectDamage = true,
-                debugTag = "Player02WCounter"
+                skillName = "Player02 W",
+                damageSource = "WCounter",
+                debugTag = "Player02WCounter",
+                damageKind = BattleDamageKind.ReflectDamage,
+                sourceOwner = Owner != null ? Owner.gameObject : gameObject,
+                bypassRuneFlatDamage = true,
+                bypassLifesteal = true,
+                suppressThornReaction = true
             });
             return;
         }
@@ -1535,20 +1553,27 @@ public class Player2Skill_W_HolyWheelDeflection : PlayerSkillBase
         }
 
         float maxHp = ResolveOwnerMaxHp();
-        float manaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
-        float baseShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier * manaMultiplier);
-        float shieldRuneMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldGainMultiplier() : 1f;
-        float finalShield = baseShield * Mathf.Max(0f, shieldRuneMultiplier);
+        float shieldBefore = combatHealth.GetCurrentShield();
+        float finalShield = Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier);
+        int equippedRuneCount = runeRuntimeState != null ? runeRuntimeState.GetTotalEquippedRuneCount() : 0;
+        float legacyManaMultiplier = ResolveManaRuneScaledMultiplier(0.5f);
+        float legacyShieldRuneMultiplier = runeRuntimeState != null ? runeRuntimeState.GetShieldGainMultiplier() : 1f;
+        wOrbitDamageShieldReferenceValue = maxHp * legacyManaMultiplier * Mathf.Max(0f, legacyShieldRuneMultiplier);
         if (dayChildStateActiveThisCast)
         {
-            finalShield *= Mathf.Max(1f, dayBuffShieldMultiplier);
-        }
-        if (manaMultiplier > 1f)
-        {
-            LogManaRuneApplied("Player02 W", "Shield", Mathf.Max(0f, maxHp * wShieldMaxHpMultiplier), finalShield);
+            wOrbitDamageShieldReferenceValue *= Mathf.Max(1f, dayBuffShieldMultiplier);
         }
         wAppliedShieldValue = finalShield;
-        combatHealth.SetShield(wAppliedShieldValue);
+        combatHealth.SetShield(wAppliedShieldValue, "Player02WSkill");
+        if (EnemySpawner.CombatBalanceLogsEnabled)
+        {
+            Debug.Log(
+                $"[Player2WShieldAudit] maxHP={maxHp:F2} oldFormula=MaxHPx1.00xPhase1.30 newFormula=MaxHPx{wShieldMaxHpMultiplier:F2} " +
+                $"phaseBonusApplied=false equippedRuneCount={equippedRuneCount} shieldGranted={wAppliedShieldValue:F2} " +
+                $"shieldBefore={shieldBefore:F2} shieldAfter={combatHealth.GetCurrentShield():F2} " +
+                $"shieldCap={maxHp * BattleResourceBank.ShieldLimitMaxHealthRatio:F2}",
+                this);
+        }
         Debug.Log($"[W Shield] Applied shield={wAppliedShieldValue:F2}, maxHp={maxHp:F2}, multiplier={wShieldMaxHpMultiplier:F2}, swordCount={currentSwordCount}", this);
     }
 

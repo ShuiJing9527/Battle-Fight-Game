@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public enum TwinStateRuntimeType
@@ -48,15 +49,16 @@ public static class DayNightAffinityDamageModifier
     private const float NightChildFavorableOutgoingMultiplier = 1.45f;
     private const float NightChildFavorableIncomingMultiplier = 0.70f;
     private const float NightChildFavorableLifesteal = 0.15f;
-    private const float DayChildUnfavorableOutgoingMultiplier = 0.90f;
-    private const float NightChildUnfavorableOutgoingMultiplier = 0.85f;
-    private const float UnfavorableIncomingMultiplier = 1.25f;
-    private const float WrongTimeEvasionMultiplier = 1f;
-    private const float WrongTimeMoveSpeedMultiplier = 0.90f;
+    private const float DayChildUnfavorableOutgoingMultiplier = 0.75f;
+    private const float NightChildUnfavorableOutgoingMultiplier = 0.75f;
+    private const float UnfavorableIncomingMultiplier = 1.50f;
+    private const float WrongTimeEvasionMultiplier = 0.75f;
+    private const float WrongTimeMoveSpeedMultiplier = 0.85f;
     private const float SkillGaugeGainManaWeight = 0.5f;
     private const float SkillGaugeGainCooldownWeight = 0.5f;
     private const float SkillGaugeGainMin = 5f;
     private const float SkillGaugeGainMax = 30f;
+    private static readonly Dictionary<int, string> LastTwinDebuffLogSignatures = new Dictionary<int, string>();
 
     public static float ApplyModifier(GameObject attacker, GameObject defender, float damage, out float multiplier, bool includeAmbientAffinity = true)
     {
@@ -497,11 +499,49 @@ public static class DayNightAffinityDamageModifier
             bonus.incomingDamageMultiplier = UnfavorableIncomingMultiplier;
             bonus.evasionMultiplier = WrongTimeEvasionMultiplier;
             bonus.moveSpeedMultiplier = WrongTimeMoveSpeedMultiplier;
+            LogTwinDebuffBalanceIfChanged(resolvedTarget, bonus);
             return bonus;
         }
 
         bonus.statusType = TwinStateRuntimeType.Neutral;
         return bonus;
+    }
+
+    private static void LogTwinDebuffBalanceIfChanged(GameObject target, TwinStateRuntimeBonus bonus)
+    {
+        if (!EnemySpawner.CombatBalanceLogsEnabled || target == null)
+        {
+            return;
+        }
+
+        int instanceId = target.GetInstanceID();
+        string signature = bonus.childType + ":" + bonus.currentPhase + ":" + bonus.statusType + ":" +
+                           bonus.outgoingDamageMultiplier.ToString("F2") + ":" +
+                           bonus.incomingDamageMultiplier.ToString("F2") + ":" +
+                           bonus.moveSpeedMultiplier.ToString("F2") + ":" +
+                           bonus.evasionMultiplier.ToString("F2");
+        if (LastTwinDebuffLogSignatures.TryGetValue(instanceId, out string previousSignature)
+            && previousSignature == signature)
+        {
+            return;
+        }
+
+        LastTwinDebuffLogSignatures[instanceId] = signature;
+        Debug.Log(
+            "[TwinDebuffBalance] " +
+            $"character={bonus.childType} phase={bonus.currentPhase} isFavorable=false " +
+            $"outgoingDamageMultiplier={bonus.outgoingDamageMultiplier:F2} incomingDamageMultiplier={bonus.incomingDamageMultiplier:F2} " +
+            $"moveSpeedMultiplier={bonus.moveSpeedMultiplier:F2} dodgeMultiplier={bonus.evasionMultiplier:F2} lifesteal={bonus.lifesteal:F2}",
+            target);
+        Debug.Log(
+            "[TwinDebuffRuntimeAudit] " +
+            $"character={bonus.childType} phase={bonus.currentPhase} " +
+            $"uiOutgoing={bonus.outgoingDamageMultiplier:F2} runtimeOutgoing={GetTwinOutgoingDamageMultiplier(target):F2} " +
+            $"uiIncoming={bonus.incomingDamageMultiplier:F2} runtimeIncoming={GetTwinIncomingDamageMultiplier(target):F2} " +
+            $"uiMoveSpeed={bonus.moveSpeedMultiplier:F2} runtimeMoveSpeed={GetWrongTimeMoveSpeedMultiplier(target):F2} " +
+            $"uiDodge={bonus.evasionMultiplier:F2} runtimeDodge={GetWrongTimeEvasionMultiplier(target):F2} " +
+            "appliedToDamage=true appliedToMovement=true appliedToDodge=true",
+            target);
     }
 
     public static bool IsTwinChildPositivePhase(GameObject target)

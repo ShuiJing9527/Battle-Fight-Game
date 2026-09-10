@@ -6,10 +6,10 @@ public class RuneDropManager : MonoBehaviour
     private const float DefaultMinRuneScatterRadius = 1.25f;
     private const float DefaultMaxRuneScatterRadius = 2.25f;
     private const float RuneDropChanceDecayPerEquippedRune = 0.02f;
-    private const float DemoNormalRuneDropChance = 0.12f;
-    private const float DemoEliteRuneDropChance = 0.65f;
+    private const float DemoNormalRuneDropChance = 0.085f;
+    private const float DemoEliteRuneDropChance = 0.55f;
     private const float DemoBossRuneDropChance = 1f;
-    private const float DemoFinalRushRuneDropChanceMultiplier = 1.75f;
+    private const float DemoFinalRushRuneDropChanceMultiplier = 1.20f;
 
     public static RuneDropManager Instance { get; private set; }
 

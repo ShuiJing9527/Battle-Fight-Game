@@ -425,7 +425,16 @@ public class Player1Skill_Q_QuickShear : Player01SkillBase
                 }
 
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, gameObject, damageResult.isAnyCritical));
+                GameObject damageOwner = Controller != null ? Controller.gameObject : gameObject;
+                combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Physical, damageOwner, damageResult.isAnyCritical)
+                {
+                    castId = currentRuneCastId,
+                    skillName = "Player01 Q",
+                    damageSource = "QuickShear",
+                    debugTag = "Player01Q",
+                    damageKind = BattleDamageKind.PlayerActiveSkill,
+                    sourceOwner = damageOwner
+                });
                 TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
                     Controller != null ? Controller.gameObject : gameObject,
                     combatHealth,

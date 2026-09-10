@@ -50,7 +50,7 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
     [SerializeField, Min(0.05f)] private float globalFallRecoveryDistance = 8f;
     [SerializeField, Min(0f)] private float safeGroundUpdateMaxPenetration = 0.02f;
     [SerializeField] private CollisionDetectionMode externalLaunchCollisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
-    [SerializeField] private bool debugExternalLaunchMotion = true;
+    [SerializeField] private bool debugExternalLaunchMotion = false;
     [SerializeField] private bool debugPlayerAirborneLanding = false;
     private int lastExternalLaunchSequenceId;
     private float lastExternalLaunchReceivedTime = -999f;

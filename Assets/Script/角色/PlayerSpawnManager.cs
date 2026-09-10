@@ -14,7 +14,6 @@ public class PlayerSpawnManager : MonoBehaviour
     [SerializeField] private GameObject player02Prefab;
     [SerializeField] private bool spawnPlayer02 = true;
     [SerializeField] private float player01YOffset = 0.75f;
-    [SerializeField] private float player02YOffset = 1.2f;
     [SerializeField] private float partyMemberSpacing = 1.2f;
     [SerializeField] private LayerMask spawnBlockerLayers = ~0;
     [SerializeField, Min(0f)] private float spawnCheckRadius = 0.45f;
@@ -175,8 +174,16 @@ public class PlayerSpawnManager : MonoBehaviour
         player02Instance = EnsurePlayerInstance(player02Instance, ref player02InstanceOwned, player02Prefab, "Player02");
         if (player02Instance != null)
         {
-            player02Instance.transform.position = spawnPosition + Vector3.up * player02YOffset;
+            Player2PrototypeController player02Controller = player02Instance.GetComponent<Player2PrototypeController>();
+            float groundedRootOffset = player01YOffset;
+            if (player02Controller != null && player02Controller.TryGetGroundedRootOffset(out float resolvedGroundedRootOffset))
+            {
+                groundedRootOffset = resolvedGroundedRootOffset;
+            }
+
+            player02Instance.transform.position = spawnPosition + Vector3.up * groundedRootOffset;
             ResetMotion(player02Instance);
+            player02Controller?.TrySnapRootToGround(nameof(PlayerSpawnManager));
         }
 
         if (!spawnPlayer02)

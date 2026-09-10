@@ -118,7 +118,15 @@ public class Player01NeedleProjectile : MonoBehaviour
         if (combatHealth != null)
         {
             float beforeHealth = ResolveCurrentHealth(combatHealth);
-            combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Special, source));
+            combatHealth.TakeDamage(new BattleDamage(resolvedDamage, BattleDamageType.Special, source)
+            {
+                castId = runeCastId,
+                skillName = "Player01 R",
+                damageSource = "NeedleProjectile",
+                debugTag = "Player01RProjectile",
+                damageKind = BattleDamageKind.PlayerActiveSkill,
+                sourceOwner = source
+            });
             TwinStateCombatBonus.TryApplyNightChildFixedSkillDamage(
                 source,
                 combatHealth,

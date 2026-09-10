@@ -4,6 +4,7 @@ using UnityEngine;
 public class BattleResourceBank : MonoBehaviour
 {
     public const float ShieldLimitMaxHealthRatio = 1.5f;
+    private const int MaxGrowthSoulPoint = 12;
     private const float SpeedGrowthSoulRedirectChance = 0.5f;
     private const float SpeedGrowthSoulConsumableRedirectChance = 0.5f;
 
@@ -129,7 +130,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private string ApplySoulWithFeedbackInternal(SoulType type, int soulPoint, bool allowLuckyCopy)
     {
-        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, 8) : Mathf.Clamp(soulPoint, 1, 5);
+        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, MaxGrowthSoulPoint) : Mathf.Clamp(soulPoint, 1, 5);
         float resolvedValue = ResolveSoulValue(type, soulPoint);
         string feedback;
 
@@ -312,7 +313,7 @@ public class BattleResourceBank : MonoBehaviour
 
     private float ResolveSoulValue(SoulType type, int soulPoint)
     {
-        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, 8) : Mathf.Clamp(soulPoint, 1, 5);
+        soulPoint = type == SoulType.Growth ? Mathf.Clamp(soulPoint, 1, MaxGrowthSoulPoint) : Mathf.Clamp(soulPoint, 1, 5);
         return type == SoulType.Growth ? soulPoint : soulPoint * 10f;
     }
 
@@ -330,7 +331,7 @@ public class BattleResourceBank : MonoBehaviour
             redirected = true;
         }
 
-        int growthAmount = Mathf.Clamp(soulPoint, 1, 8);
+        int growthAmount = Mathf.Clamp(soulPoint, 1, MaxGrowthSoulPoint);
         float healthGrowth = growthAmount * 10f;
 
         if (stats == null)
@@ -500,7 +501,8 @@ public class BattleResourceBank : MonoBehaviour
 
         if (shieldBefore > 0f && shield <= 0f)
         {
-            runtimeState?.NotifyShieldBrokenByMonsterDamage(shieldBefore);
+            // This legacy entry has no source metadata, so it must not arm a monster-only rune effect.
+            runtimeState?.NotifyShieldBrokenByMonsterDamage(shieldBefore, null, null);
         }
 
         float absorbedIncomingDamage = shieldDamageMultiplier > 0f ? shieldUsed / shieldDamageMultiplier : amount;

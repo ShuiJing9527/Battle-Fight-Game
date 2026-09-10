@@ -15,10 +15,10 @@ MonoBehaviour:
   normalRuneDrops: 1
   eliteRuneDrops: 1
   bossRuneDrops: 2
-  normalRuneDropChance: 0.12
-  eliteRuneDropChance: 0.65
+  normalRuneDropChance: 0.085
+  eliteRuneDropChance: 0.55
   bossRuneDropChance: 1
-  finalRushRuneDropChanceMultiplier: 1.75
+  finalRushRuneDropChanceMultiplier: 1.2
   normalExtraRuneChance: 0
   eliteExtraRuneChance: 0
   bossExtraRuneChance: 0

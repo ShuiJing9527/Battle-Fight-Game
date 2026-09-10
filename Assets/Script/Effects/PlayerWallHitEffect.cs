@@ -70,6 +70,12 @@ public class PlayerWallHitEffect : MonoBehaviour
         Destroy(effectInstance, destroyDelay);
         StartCoroutine(ReleaseEffectAfterDelay(effectInstance, destroyDelay));
 
+        Player2PrototypeController player2Controller = GetComponent<Player2PrototypeController>();
+        if (player2Controller != null)
+        {
+            player2Controller.ReapplyVisualFloatOffsetAfterWallHit();
+        }
+
         nextEffectTime = Time.time + cooldown;
     }
 

@@ -102,6 +102,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
     private readonly HashSet<int> hitEnemiesThisDash = new HashSet<int>();
     private RuneRuntimeState runeRuntimeState;
     private int currentDashHitCount;
+    private int currentDashRuneCastId = -1;
+    private bool runeFirstHitLogWrittenThisCast;
     // Day Child state is independent from day/night phase.
     private bool dayChildStateActiveThisCast;
     protected override int SkillIndex => 2;
@@ -124,6 +126,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         runeRuntimeState = ResolveRuneRuntimeState();
         dayChildStateActiveThisCast = DayNightAffinityDamageModifier.HasDayChildState(Owner != null ? Owner.gameObject : gameObject);
         PrepareRuneCastContext();
+        currentDashRuneCastId = CurrentRuneCastId;
+        runeFirstHitLogWrittenThisCast = false;
         StartCoroutine(DashRoutine());
         Owner.GetComponentInChildren<Player2HaloRotateEffect>(true)?.TriggerSkillBoost();
         return true;
@@ -134,6 +138,8 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         StopAllCoroutines();
         isDashing = false;
         currentDashHitCount = 0;
+        currentDashRuneCastId = -1;
+        runeFirstHitLogWrittenThisCast = false;
         hitEnemiesThisDash.Clear();
         dayChildStateActiveThisCast = false;
         ResetRuneCastContext();
@@ -391,12 +397,26 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         GameObject source = Owner != null ? Owner.gameObject : gameObject;
+        string bonusTypes = "None";
+        float firstHitBonus = runeRuntimeState != null
+            ? runeRuntimeState.ConsumeFirstHitBonusDamage(2, currentDashRuneCastId, out bonusTypes)
+            : 0f;
+        if (firstHitBonus > 0f)
+        {
+            physicalFinal += firstHitBonus;
+        }
+
+        if (!runeFirstHitLogWrittenThisCast)
+        {
+            runeFirstHitLogWrittenThisCast = true;
+            LogRuneFirstHit(currentDashRuneCastId, firstHitBonus, bonusTypes);
+        }
         float beforeHealth = ResolveCurrentHealth(combatHealth);
 
         if (combatHealth != null && combatHealth.gameObject != source)
         {
-            combatHealth.ApplyDirectDamage(physicalFinal, source, DamagePopupType.Physical);
-            combatHealth.ApplyDirectDamage(specialFinal, source, DamagePopupType.Special);
+            combatHealth.ApplyDirectDamage(CreateActiveSkillDamage(physicalFinal, BattleDamageType.Physical, source), DamagePopupType.Physical);
+            combatHealth.ApplyDirectDamage(CreateActiveSkillDamage(specialFinal, BattleDamageType.Special, source), DamagePopupType.Special);
         }
         else if (enemyHealth != null && enemyHealth.gameObject != source)
         {
@@ -411,6 +431,29 @@ public class Player2Skill_E_CelestialShift : PlayerSkillBase
         }
 
         currentDashHitCount++;
+    }
+
+    private BattleDamage CreateActiveSkillDamage(float amount, BattleDamageType damageType, GameObject source)
+    {
+        return new BattleDamage(amount, damageType, source)
+        {
+            castId = currentDashRuneCastId,
+            skillName = "Player02 E",
+            damageSource = "CelestialShift",
+            debugTag = "Player02EDash",
+            damageKind = BattleDamageKind.PlayerActiveSkill,
+            sourceOwner = source
+        };
+    }
+
+    [System.Diagnostics.Conditional("UNITY_EDITOR")]
+    [System.Diagnostics.Conditional("DEVELOPMENT_BUILD")]
+    private void LogRuneFirstHit(int castId, float bonusDamage, string bonusTypes)
+    {
+        Debug.Log(
+            $"[RuneFirstHit] character=Player02 skill=E castId={castId} triggered={bonusDamage > 0f} " +
+            $"bonusTypes={bonusTypes} bonusDamage={bonusDamage:F2} skipReason={(bonusDamage > 0f ? "None" : "NoEligibleBonus")}",
+            this);
     }
 
     private float ResolveCurrentHealth(CombatHealth health)

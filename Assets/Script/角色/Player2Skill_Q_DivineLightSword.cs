@@ -655,10 +655,18 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
             }
 
             float beforeHealth = ResolveCurrentHealth(combatHealth);
-            combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
+            combatHealth.ApplyDirectDamage(new BattleDamage(finalDamage, BattleDamageType.Special, source, isCritical)
+            {
+                castId = runeCastId,
+                skillName = "Player02 Q",
+                damageSource = "DivineLightSword",
+                debugTag = "Player02Q",
+                damageKind = BattleDamageKind.PlayerActiveSkill,
+                sourceOwner = source
+            }, DamagePopupType.Special);
             float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
             runeRuntimeState?.NotifyMonsterDamagedBySkill(0, combatHealth, actualDamage);
-            float markExplosionDamage = TryExplodeRadianceMark(markExistsBeforeHit, markBeforeHit, combatHealth, attackerStats, source);
+            float markExplosionDamage = TryExplodeRadianceMark(markExistsBeforeHit, markBeforeHit, combatHealth, attackerStats, source, runeCastId);
             if (qDamageDebugLog || debugRadianceMark)
             {
                 Debug.Log(
@@ -941,7 +949,8 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         RadianceMarkStatus markBeforeHit,
         CombatHealth target,
         CombatStats attackerStats,
-        GameObject source)
+        GameObject source,
+        int runeCastId)
     {
         if (!markExistsBeforeHit || markBeforeHit == null || target == null || target.IsDead || !markBeforeHit.IsMarked)
         {
@@ -957,9 +966,13 @@ public class Player2Skill_Q_DivineLightSword : PlayerSkillBase
         float finalDamage = Mathf.Max(1f, rawDamage - specialDefense);
         target.ApplyDirectDamage(new BattleDamage(finalDamage, BattleDamageType.Special, source)
         {
+            castId = runeCastId,
             skillName = "Player02 Q",
             damageSource = "RadianceMarkExplosion",
-            debugTag = "Player02QMarkExplosion"
+            debugTag = "Player02QMarkExplosion",
+            damageKind = BattleDamageKind.MarkExplosion,
+            sourceOwner = source,
+            bypassRuneFlatDamage = true
         }, DamagePopupType.Special);
         return finalDamage;
     }

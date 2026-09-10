@@ -8,6 +8,7 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private const float DayBuffDamageMultiplier = 1.15f;
     private const float DayBuffAuraHealMultiplier = 1.3f;
     private const float DayBuffMarkedDamageMultiplier = 1.2f;
+    private const float RAuraHealCapPerSecondMaxHpRatio = 0.05f;
     [Header("R - 神眷剑涌 / 核心参数")]
     [SerializeField, Min(0f)] private float cooldown = 15f;
     [SerializeField, Min(0f)] private float manaCost = 60f;
@@ -248,6 +249,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
     private float lastMoveDirYawFallback = 0f;
     private Coroutine rSwarmRoutine;
     private Coroutine rAuraHealRoutine;
+    private float rAuraHealWindowStartTime = -1f;
+    private float rAuraHealAppliedThisWindow;
     private GameObject activeRSwarmRoot;
     private GameObject activeRCenterAura;
     private int usedDivineMarkCount;
@@ -953,6 +956,8 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
             return;
         }
 
+        rAuraHealWindowStartTime = Time.time;
+        rAuraHealAppliedThisWindow = 0f;
         rAuraHealRoutine = StartCoroutine(RAuraHealRoutine());
     }
 
@@ -1013,29 +1018,58 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 Debug.Log($"[SecondBuffDebug] Player02 R day buff aura heal bonus active x{DayBuffAuraHealMultiplier:F2}.", this);
             }
         }
-        int healAmount = Mathf.Max(1, Mathf.RoundToInt(healValue));
+        if (rAuraHealWindowStartTime < 0f || Time.time - rAuraHealWindowStartTime >= 1f)
+        {
+            rAuraHealWindowStartTime = Time.time;
+            rAuraHealAppliedThisWindow = 0f;
+        }
 
-        if (rAuraHealCanOverMaxHp)
+        float healCapPerSecond = maxHp * RAuraHealCapPerSecondMaxHpRatio;
+        float remainingHealBudget = Mathf.Max(0f, healCapPerSecond - rAuraHealAppliedThisWindow);
+        float cappedHealRequest = Mathf.Min(healValue, remainingHealBudget);
+        float healthBefore = ResolveCurrentHealth(combatHealth);
+        float shieldBefore = combatHealth.GetCurrentShield();
+
+        if (cappedHealRequest > 0f && rAuraHealCanOverMaxHp)
         {
             if (combatHealth.resourceBank != null)
             {
-                combatHealth.resourceBank.currentHealth += healAmount;
+                combatHealth.resourceBank.currentHealth += cappedHealRequest;
                 combatHealth.currentHealth = combatHealth.resourceBank.currentHealth;
             }
             else
             {
-                combatHealth.currentHealth += healAmount;
+                combatHealth.currentHealth += cappedHealRequest;
             }
         }
-        else
+        else if (cappedHealRequest > 0f)
         {
-            combatHealth.Heal(healAmount);
+            float healingMultiplier = runeRuntimeState != null
+                ? Mathf.Max(0.01f, runeRuntimeState.GetHealingReceivedMultiplier())
+                : 1f;
+            combatHealth.Heal(cappedHealRequest / healingMultiplier);
+        }
+
+        float healthAfter = ResolveCurrentHealth(combatHealth);
+        float shieldAfter = combatHealth.GetCurrentShield();
+        float actualHealthHeal = Mathf.Max(0f, healthAfter - healthBefore);
+        float overhealToShield = Mathf.Max(0f, shieldAfter - shieldBefore);
+        float healApplied = Mathf.Min(remainingHealBudget, actualHealthHeal + overhealToShield);
+        rAuraHealAppliedThisWindow += healApplied;
+
+        if (EnemySpawner.CombatBalanceLogsEnabled)
+        {
+            Debug.Log(
+                $"[Player2RLifestealAudit] timeSeconds={Time.time:F2} maxHP={maxHp:F2} rawHeal={healValue:F2} " +
+                $"healCapPerSecond={healCapPerSecond:F2} healAppliedThisSecond={rAuraHealAppliedThisWindow:F2} " +
+                $"healApplied={healApplied:F2} overhealToShield={overhealToShield:F2} targetCount=1 source=Player02RAura",
+                this);
         }
 
         if (rDebugFacingScreenAngle)
         {
             float currentHp = combatHealth.resourceBank != null ? combatHealth.resourceBank.currentHealth : combatHealth.currentHealth;
-            Debug.Log($"[R Aura Heal] amount={healAmount}, currentHp={currentHp:F2}, maxHp={maxHp:F2}", this);
+            Debug.Log($"[R Aura Heal] raw={healValue:F2}, applied={healApplied:F2}, currentHp={currentHp:F2}, maxHp={maxHp:F2}", this);
         }
     }
 
@@ -1196,7 +1230,15 @@ public class Player2Skill_R_DivineStarRain : PlayerSkillBase
                 }
 
                 float beforeHealth = ResolveCurrentHealth(combatHealth);
-                combatHealth.ApplyDirectDamage(finalDamage, source, DamagePopupType.Special, isCritical);
+                combatHealth.ApplyDirectDamage(new BattleDamage(finalDamage, BattleDamageType.Special, source, isCritical)
+                {
+                    castId = activeRuneCastId,
+                    skillName = "Player02 R",
+                    damageSource = "DivineStarRain",
+                    debugTag = "Player02R",
+                    damageKind = BattleDamageKind.PlayerActiveSkill,
+                    sourceOwner = source
+                }, DamagePopupType.Special);
                 float actualDamage = Mathf.Max(0f, beforeHealth - ResolveCurrentHealth(combatHealth));
                 runeRuntimeState?.NotifyMonsterDamagedBySkill(3, combatHealth, actualDamage);
                 continue;

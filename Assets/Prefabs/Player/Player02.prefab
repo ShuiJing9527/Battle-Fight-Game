@@ -186,7 +186,7 @@ Transform:
   m_GameObject: {fileID: 7168512462412306375}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 3, z: 0}
+  m_LocalPosition: {x: 0, y: 4.5, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -938,10 +938,12 @@ MonoBehaviour:
   dashDuration: 0.15
   lockCharacterRotation: 1
   visualRoot: {fileID: 0}
-  visualFloatHeight: 0.6
+  visualFloatHeight: 0
+  visualFloatHeightVersion: 2
+  debugVisualHeight: 0
   keepColliderOnGround: 1
   groundAnchor: {fileID: 0}
-  footAnchor: {fileID: 0}
+  footAnchor: {fileID: 2343996877811622976}
   enableSpawnUnstuck: 1
   spawnUnstuckDelay: 0.1
   spawnUnstuckSearchStep: 0.5
@@ -1357,7 +1359,7 @@ MonoBehaviour:
   wDamageReduction: 0.4
   dayBuffShieldMultiplier: 1.3
   dayBuffRemainingShieldHealRatio: 0.5
-  wShieldMaxHpMultiplier: 1
+  wShieldMaxHpMultiplier: 0.6
   wShieldBonusPerExtraSword: 0.4
   wClearShieldOnEnd: 1
   wOrbitStarBladeDamageShieldRatio: 0.05

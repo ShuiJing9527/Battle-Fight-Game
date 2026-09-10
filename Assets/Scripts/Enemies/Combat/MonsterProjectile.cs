@@ -71,6 +71,7 @@ public class MonsterProjectile : MonoBehaviour
     private GameObject source;
     private float spawnTime;
     private bool hasHit;
+    private bool hitPlayer;
     private Transform bodyMeshTransform;
     private MeshRenderer bodyMeshRenderer;
     private TrailRenderer cachedTrailRenderer;
@@ -97,6 +98,14 @@ public class MonsterProjectile : MonoBehaviour
 
     private void OnDisable()
     {
+        if (!hitPlayer)
+        {
+            MonsterIdentity sourceIdentity = source != null ? source.GetComponentInParent<MonsterIdentity>() : null;
+            if (sourceIdentity != null && sourceIdentity.rank == MonsterRank.Boss)
+            {
+                CombatRuntimeAuditLogger.RecordNoHit(source, "BossProjectile", hasHit ? "HitNonPlayer" : "ExpiredWithoutHit");
+            }
+        }
         StopTrailEmissionAndClear();
     }
 
@@ -114,6 +123,7 @@ public class MonsterProjectile : MonoBehaviour
         previousPosition = transform.position;
         traveledDistance = 0f;
         hasHit = false;
+        hitPlayer = false;
         damageEnabled = true;
 
         EnsureRuntimeVisuals();
@@ -1047,13 +1057,36 @@ public class MonsterProjectile : MonoBehaviour
         if (playerHealth != null)
         {
             float hpBefore = ResolveCombatHealthValue(playerHealth);
+            float shieldBefore = playerHealth.GetShield();
             hasHit = true;
+            hitPlayer = true;
             damageEnabled = false;
             playerHealth.TakeDamage(new BattleDamage(damage, damageType, source)
             {
-                attackKind = "Projectile"
+                skillName = "Monster Projectile",
+                damageSource = sourceReason,
+                attackKind = "Projectile",
+                damageKind = BattleDamageKind.MonsterDamage,
+                sourceOwner = source
             });
             float hpAfter = ResolveCombatHealthValue(playerHealth);
+            float shieldAfter = playerHealth.GetShield();
+            MonsterIdentity sourceIdentity = source != null ? source.GetComponentInParent<MonsterIdentity>() : null;
+            if (EnemySpawner.CombatBalanceLogsEnabled && sourceIdentity != null && sourceIdentity.rank == MonsterRank.Boss)
+            {
+                Debug.Log(
+                    "[BossAttackAudit] " +
+                    $"bossPrefab={source.name.Replace("(Clone)", string.Empty).Trim()} " +
+                    $"attackName=BossProjectile attackScript={nameof(MonsterProjectile)} attackType=BossProjectile " +
+                    $"hasCollider={projectileCollider != null} colliderIsTrigger={(projectileCollider != null && projectileCollider.isTrigger)} " +
+                    $"layer={LayerMask.LayerToName(gameObject.layer)} targetLayerMask={hitLayerMask.value} " +
+                    $"hitDetectionMethod={sourceReason} target={playerHealth.name} requestedDamage={damage:F2} " +
+                    $"hpBefore={hpBefore:F2} hpAfter={hpAfter:F2} shieldBefore={shieldBefore:F2} shieldAfter={shieldAfter:F2} " +
+                    "callsDamage=true damageEntry=CombatHealth.TakeDamage sourceOwnerSet=true " +
+                    $"damageKind={BattleDamageKind.MonsterDamage} attackerRank={sourceIdentity.rank} " +
+                    "entersShieldPressure=true entersMonsterDamageClamp=true entersTwinDebuff=true",
+                    this);
+            }
             LogProjectileHit("player", other, hitPoint, sourceReason, playerHealth, hpBefore, hpAfter);
             OnHit(hitPoint, hitNormal);
             return;

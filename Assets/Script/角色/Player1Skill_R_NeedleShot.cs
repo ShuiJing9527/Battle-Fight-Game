@@ -1059,10 +1059,16 @@ public class Player1Skill_R_NeedleShot : Player01SkillBase
 
     private BattleDamage CreateUltimateDamage(float amount, BattleDamageType damageType, string debugTag)
     {
-        return new BattleDamage(amount, damageType, gameObject)
+        GameObject damageOwner = Controller != null ? Controller.gameObject : gameObject;
+        return new BattleDamage(amount, damageType, damageOwner)
         {
             bypassEvasion = true,
-            debugTag = debugTag
+            castId = currentRuneCastId,
+            skillName = "Player01 R",
+            damageSource = "NeedleShot",
+            debugTag = debugTag,
+            damageKind = BattleDamageKind.PlayerActiveSkill,
+            sourceOwner = damageOwner
         };
     }
 

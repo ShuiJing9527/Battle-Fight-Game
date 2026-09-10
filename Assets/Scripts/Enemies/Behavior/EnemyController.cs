@@ -12,6 +12,9 @@ public class EnemyController : MonoBehaviour
     private const float EdgeDistanceEpsilon = 0.02f;
     private const float BossDevourUnexpectedVerticalMovementThreshold = 0.02f;
     private const float BossDevourFlightTraceInterval = 0.15f;
+    private const float NormalAttackIntervalMultiplier = 0.88f;
+    private const float EliteAttackIntervalMultiplier = 0.72f;
+    private const float BossAttackIntervalMultiplier = 0.82f;
     private const string DefaultProjectilePrefabResourcePath = "Prefabs/Enemy/BossProjectile";
 
     [Header("Target")]
@@ -2275,11 +2278,25 @@ public class EnemyController : MonoBehaviour
 
             BattleDamage landingDamage = new BattleDamage(damage, BattleDamageType.Physical, gameObject)
             {
-                attackKind = source == BossLandingImpactSource.LeapSlam ? "BossLeapStrong" : "BossLanding"
+                skillName = source == BossLandingImpactSource.LeapSlam ? "Boss Leap" : "Boss Landing",
+                damageSource = source.ToString(),
+                attackKind = source == BossLandingImpactSource.LeapSlam ? "BossLeapStrong" : "BossLanding",
+                damageKind = BattleDamageKind.MonsterDamage,
+                sourceOwner = gameObject
             };
             targetHealth.TakeDamage(landingDamage);
             float playerHpAfter = ResolveCombatHealthValue(targetHealth);
             float playerShieldAfter = targetHealth.GetShield();
+            LogBossAttackAudit(
+                landingDamage.skillName,
+                "OverlapSphere",
+                targetHealth.transform,
+                damage,
+                playerHpBefore,
+                playerHpAfter,
+                playerShieldBefore,
+                playerShieldAfter,
+                landingDamage.attackKind);
             LogBossLandingTrace(
                 "DamageApplied",
                 sequenceId,
@@ -2361,6 +2378,14 @@ public class EnemyController : MonoBehaviour
                     " distanceToBossCenterAfterImpact=" + distanceAfterImpact.ToString("F2"),
                     this);
             }
+        }
+
+        if (processedTargets.Count == 0)
+        {
+            CombatRuntimeAuditLogger.RecordNoHit(
+                gameObject,
+                source == BossLandingImpactSource.LeapSlam ? "BossLeapStrong" : "BossLanding",
+                "NoPlayerInLandingImpact");
         }
 
         PlayLandingVfxSafely(landingPosition, sequenceId, source);
@@ -5026,14 +5051,14 @@ public class EnemyController : MonoBehaviour
         if (hadPendingAttack && !UsesProjectileAttack() && !attackHitFrameTriggeredThisAttack)
         {
             lastMeleeAttackResult = "no-hit-frame";
-            Debug.Log(
+            CombatRuntimeAuditLogger.RecordNoHit(gameObject, "Melee", "NoHitFrame");
+            LogEnemyMeleeDamageFlow(
                 "[EnemyMeleeDamageFlow] " +
                 "enemy=" + name +
                 " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
                 " target=" + (finishedTarget != null ? finishedTarget.name : "null") +
                 " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
-                " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-hit-frame playerHpBefore=n/a playerHpAfter=n/a",
-                this);
+                " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-hit-frame playerHpBefore=n/a playerHpAfter=n/a");
         }
         LogSlimeAttackLifecycle("AttackFinished", pendingAttackTarget, "RecoveryComplete");
         pendingAttackTarget = null;
@@ -5088,6 +5113,7 @@ public class EnemyController : MonoBehaviour
             damageApplied: false);
         if (hitTarget == null)
         {
+            CombatRuntimeAuditLogger.RecordNoHit(gameObject, UsesProjectileAttack() ? "Projectile" : "Melee", "NoTarget");
             if (debugAttackDiagnostics)
             {
                 Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target=null damage=0 reason=NoTarget", this);
@@ -5113,6 +5139,7 @@ public class EnemyController : MonoBehaviour
             float projectileAttackDistance = ResolveAttackDistance(projectileCenterDistance, projectileEdgeDistance);
             if (projectileAttackDistance > attackHitRange)
             {
+                CombatRuntimeAuditLogger.RecordNoHit(gameObject, "Projectile", "TooFarAtHitFrame");
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=TooFarDistance", this);
@@ -5153,20 +5180,20 @@ public class EnemyController : MonoBehaviour
 
             if (!insideHitRange)
             {
+                CombatRuntimeAuditLogger.RecordNoHit(gameObject, "Melee", string.IsNullOrEmpty(meleeRejectReason) ? "NoTargetInHitRange" : meleeRejectReason);
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=HitCheckFailed", this);
                 }
                 string failureReason = string.IsNullOrEmpty(meleeRejectReason) ? "no-target-in-hit-range" : meleeRejectReason;
                 lastMeleeAttackResult = failureReason;
-                Debug.Log(
+                LogEnemyMeleeDamageFlow(
                     "[EnemyMeleeDamageFlow] " +
                     "enemy=" + name +
                     " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
                     " target=" + hitTarget.name +
                     " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
-                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-target-in-hit-range playerHpBefore=n/a playerHpAfter=n/a",
-                    this);
+                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=no-target-in-hit-range playerHpBefore=n/a playerHpAfter=n/a");
                 LogAttackAttempt(hitTarget, true, false, true, false, failureReason);
                 if (attackStyle == MonsterAttackStyle.ElementalBoss)
                 {
@@ -5181,19 +5208,19 @@ public class EnemyController : MonoBehaviour
 
             if (combatHealth == null)
             {
+                CombatRuntimeAuditLogger.RecordNoHit(gameObject, "Melee", "InvalidTarget");
                 if (debugAttackDiagnostics)
                 {
                     Debug.Log($"[EnemyAttack] DamageFrame enemy={name} target={hitTarget.name} damage=0 reason=NotPlayer", this);
                 }
                 lastMeleeAttackResult = "invalid-target";
-                Debug.Log(
+                LogEnemyMeleeDamageFlow(
                     "[EnemyMeleeDamageFlow] " +
                     "enemy=" + name +
                     " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
                     " target=" + hitTarget.name +
                     " source=EnemyMelee damageBeforeModifiers=0.00 damageAfterModifiers=0.00 hitChance=unresolved missRoll=unresolved isMiss=false" +
-                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=invalid-target playerHpBefore=n/a playerHpAfter=n/a",
-                    this);
+                    " targetInvincible=false targetShield=0.00 targetCombatHealthFound=false TakeDamageCalled=false result=invalid-target playerHpBefore=n/a playerHpAfter=n/a");
                 LogAttackAttempt(hitTarget, true, insideHitRange, true, false, "invalid-target");
                 if (attackStyle == MonsterAttackStyle.ElementalBoss)
                 {
@@ -5225,7 +5252,7 @@ public class EnemyController : MonoBehaviour
 
                 float playerHpBefore = ResolveCombatHealthValue(combatHealth);
                 float playerShieldBefore = combatHealth.GetShield();
-                Debug.Log(
+                LogEnemyMeleeDamageFlow(
                     "[EnemyMeleeDamageFlow] " +
                     "enemy=" + name +
                     " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
@@ -5242,16 +5269,29 @@ public class EnemyController : MonoBehaviour
                     " TakeDamageCalled=true" +
                     " result=pending" +
                     " playerHpBefore=" + playerHpBefore.ToString("F2") +
-                    " playerHpAfter=pending",
-                    this);
+                    " playerHpAfter=pending");
 
                 BattleDamage meleeDamage = new BattleDamage(currentAttackDamage, damageType, gameObject)
                 {
-                    attackKind = monsterIdentity != null && monsterIdentity.rank == MonsterRank.Boss ? "BossBasic" : "Melee"
+                    skillName = monsterIdentity != null && monsterIdentity.rank == MonsterRank.Boss ? "Boss Basic Attack" : "Monster Melee",
+                    damageSource = "EnemyControllerMelee",
+                    attackKind = monsterIdentity != null && monsterIdentity.rank == MonsterRank.Boss ? "BossBasic" : "Melee",
+                    damageKind = BattleDamageKind.MonsterDamage,
+                    sourceOwner = gameObject
                 };
                 combatHealth.TakeDamage(meleeDamage);
                 float playerHpAfter = ResolveCombatHealthValue(combatHealth);
                 float playerShieldAfter = combatHealth.GetShield();
+                LogBossAttackAudit(
+                    meleeDamage.skillName,
+                    "MeleeOverlap",
+                    hitTarget,
+                    currentAttackDamage,
+                    playerHpBefore,
+                    playerHpAfter,
+                    playerShieldBefore,
+                    playerShieldAfter,
+                    meleeDamage.attackKind);
                 string damageResult = ResolveEnemyMeleeDamageResult(playerHpBefore, playerHpAfter, playerShieldBefore, playerShieldAfter);
                 lastMeleeAttackResult = damageResult;
                 LogEliteAttackDiagFromCurrentState(
@@ -5259,7 +5299,7 @@ public class EnemyController : MonoBehaviour
                     tryStartMeleeCalled: true,
                     attackRoutineStarted: true,
                     damageApplied: damageResult == "applied" || damageResult == "shielded");
-                Debug.Log(
+                LogEnemyMeleeDamageFlow(
                     "[EnemyMeleeDamageFlow] " +
                     "enemy=" + name +
                     " rank=" + (monsterIdentity != null ? monsterIdentity.rank.ToString() : "Unknown") +
@@ -5276,8 +5316,7 @@ public class EnemyController : MonoBehaviour
                     " TakeDamageCalled=true" +
                     " result=" + damageResult +
                     " playerHpBefore=" + playerHpBefore.ToString("F2") +
-                    " playerHpAfter=" + playerHpAfter.ToString("F2"),
-                    this);
+                    " playerHpAfter=" + playerHpAfter.ToString("F2"));
                 LogAttackAttempt(hitTarget, true, insideHitRange, true, true, "DamageApplied");
             }
             else if (debugAttackDiagnostics)
@@ -6272,12 +6311,24 @@ public class EnemyController : MonoBehaviour
             cooldown += EnemyDifficultyDirector.ResolveBossAttackRecoveryBonus(gameObject);
         }
 
-        return cooldown;
+        return Mathf.Max(0.1f, cooldown * ResolveRankAttackIntervalMultiplier());
     }
 
     private float ResolveBossCooldownWithDemoRecovery(float cooldown)
     {
-        return Mathf.Max(0.1f, cooldown) + EnemyDifficultyDirector.ResolveBossAttackRecoveryBonus(gameObject);
+        float cooldownWithRecovery = Mathf.Max(0.1f, cooldown) + EnemyDifficultyDirector.ResolveBossAttackRecoveryBonus(gameObject);
+        return Mathf.Max(0.1f, cooldownWithRecovery * BossAttackIntervalMultiplier);
+    }
+
+    private float ResolveRankAttackIntervalMultiplier()
+    {
+        MonsterRank rank = monsterIdentity != null ? monsterIdentity.rank : MonsterRank.Normal;
+        return rank switch
+        {
+            MonsterRank.Elite => EliteAttackIntervalMultiplier,
+            MonsterRank.Boss => BossAttackIntervalMultiplier,
+            _ => NormalAttackIntervalMultiplier
+        };
     }
 
     private void LogAttackDiagnostics(
@@ -6617,6 +6668,45 @@ public class EnemyController : MonoBehaviour
 
         Debug.Log(
             $"[SlimeAttackLifecycle] stage={stage} name={name} kind={monsterIdentity.species} rank={monsterIdentity.rank} attackStyle={attackStyle} target={(target != null ? target.name : "null")} detail={detail}",
+            this);
+    }
+
+    private void LogEnemyMeleeDamageFlow(string message)
+    {
+        if (!debugAttackDiagnostics && !debugLog && !EnemySpawner.CombatBalanceLogsEnabled)
+        {
+            return;
+        }
+
+        Debug.Log(message, this);
+    }
+
+    private void LogBossAttackAudit(
+        string attackName,
+        string hitDetectionMethod,
+        Transform target,
+        float requestedDamage,
+        float hpBefore,
+        float hpAfter,
+        float shieldBefore,
+        float shieldAfter,
+        string attackKind)
+    {
+        if (!EnemySpawner.CombatBalanceLogsEnabled || monsterIdentity == null || monsterIdentity.rank != MonsterRank.Boss)
+        {
+            return;
+        }
+
+        Debug.Log(
+            "[BossAttackAudit] " +
+            $"bossPrefab={name.Replace("(Clone)", string.Empty).Trim()} " +
+            $"attackName={attackName} attackScript={nameof(EnemyController)} " +
+            $"attackType={attackKind} hitDetectionMethod={hitDetectionMethod} " +
+            $"target={(target != null ? target.name : "null")} requestedDamage={requestedDamage:F2} " +
+            $"hpBefore={hpBefore:F2} hpAfter={hpAfter:F2} shieldBefore={shieldBefore:F2} shieldAfter={shieldAfter:F2} " +
+            "callsDamage=true damageEntry=CombatHealth.TakeDamage sourceOwnerSet=true " +
+            $"damageKind={BattleDamageKind.MonsterDamage} attackerRank={monsterIdentity.rank} " +
+            "entersShieldPressure=true entersMonsterDamageClamp=true entersTwinDebuff=true",
             this);
     }
 

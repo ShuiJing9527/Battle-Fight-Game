@@ -1372,10 +1372,10 @@ public class PlayerAttributePanelUI : MonoBehaviour
         builder.Append(LocalizedTwinText("Battle Mult.", "战斗倍率", "戦闘倍率"))
             .Append(": ")
             .Append(LocalizedTwinText("Damage", "造成", "与ダメ"))
-            .Append(" ×").Append(bonus.outgoingDamageMultiplier.ToString("0.0"))
+            .Append(" ×").Append(bonus.outgoingDamageMultiplier.ToString("0.00"))
             .Append(separator)
             .Append(LocalizedTwinText("Taken", "受伤", "被ダメ"))
-            .Append(" ×").Append(bonus.incomingDamageMultiplier.ToString("0.0"));
+            .Append(" ×").Append(bonus.incomingDamageMultiplier.ToString("0.00"));
 
         if (bonus.statusType == TwinStateRuntimeType.Debuff)
         {
@@ -1383,10 +1383,10 @@ public class PlayerAttributePanelUI : MonoBehaviour
             builder.Append(LocalizedTwinText("Weakened", "弱化", "弱体化"))
                 .Append(": ")
                 .Append(LocalizedTwinText("Evasion", "闪避", "回避"))
-                .Append(" ×").Append(bonus.evasionMultiplier.ToString("0.0"))
+                .Append(" ×").Append(bonus.evasionMultiplier.ToString("0.00"))
                 .Append(separator)
                 .Append(LocalizedTwinText("Move speed", "移速", "移動速度"))
-                .Append(" ×").Append(bonus.moveSpeedMultiplier.ToString("0.0"));
+                .Append(" ×").Append(bonus.moveSpeedMultiplier.ToString("0.00"));
         }
 
         return builder.ToString();

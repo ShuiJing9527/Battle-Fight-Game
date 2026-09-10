@@ -59,6 +59,20 @@ public enum RuneType
     Luck = 5
 }
 
+public enum BattleDamageKind
+{
+    Unknown = 0,
+    PlayerActiveSkill = 1,
+    MarkExplosion = 2,
+    ReflectDamage = 3,
+    ThornRetaliation = 4,
+    ThornExplosion = 5,
+    ShieldBonusDamage = 6,
+    MonsterDamage = 7,
+    EnvironmentDamage = 8,
+    SelfDamage = 9
+}
+
 [System.Serializable]
 public struct BattleDamage
 {
@@ -77,6 +91,12 @@ public struct BattleDamage
     public string attackKind;
     public int packetId;
     public bool isReflectDamage;
+    public int castId;
+    public GameObject sourceOwner;
+    public BattleDamageKind damageKind;
+    public bool bypassRuneFlatDamage;
+    public bool bypassLifesteal;
+    public bool suppressThornReaction;
 
     public BattleDamage(float amount, BattleDamageType damageType, GameObject source, bool isCritical = false)
     {
@@ -95,5 +115,11 @@ public struct BattleDamage
         attackKind = string.Empty;
         packetId = 0;
         isReflectDamage = false;
+        castId = -1;
+        sourceOwner = null;
+        damageKind = BattleDamageKind.Unknown;
+        bypassRuneFlatDamage = false;
+        bypassLifesteal = false;
+        suppressThornReaction = false;
     }
 }

@@ -19,10 +19,10 @@ public class RuneDropSettings : ScriptableObject
     [SerializeField, Min(0)] private int bossRuneDrops = 2;
 
     [Header("Base Drop Chance")]
-    [SerializeField, Range(0f, 1f)] private float normalRuneDropChance = 0.12f;
-    [SerializeField, Range(0f, 1f)] private float eliteRuneDropChance = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float normalRuneDropChance = 0.085f;
+    [SerializeField, Range(0f, 1f)] private float eliteRuneDropChance = 0.55f;
     [SerializeField, Range(0f, 1f)] private float bossRuneDropChance = 1f;
-    [SerializeField, Min(0f)] private float finalRushRuneDropChanceMultiplier = 1.75f;
+    [SerializeField, Min(0f)] private float finalRushRuneDropChanceMultiplier = 1.20f;
 
     [Header("Extra Drop Chance")]
     [SerializeField, Range(0f, 1f)] private float normalExtraRuneChance = 0f;

@@ -16,7 +16,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     [SerializeField, Min(0)] private int lifeSoulWeight = 25;
     [SerializeField, Min(0)] private int energySoulWeight = 20;
     [SerializeField, Min(0)] private int functionSoulWeight = 15;
-    [SerializeField, Min(0)] private int growthSoulWeight = 25;
+    [SerializeField, Min(0)] private int growthSoulWeight = 18;
     [SerializeField, Min(0)] private int resourcePoint1Weight = 50;
     [SerializeField, Min(0)] private int resourcePoint2Weight = 25;
     [SerializeField, Min(0)] private int resourcePoint3Weight = 15;
@@ -37,14 +37,15 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
     [SerializeField, Min(0f)] private float maxExtraRuneDropChance = 0.3f;
     [SerializeField] private bool highRuneDropTestMode = true;
     [SerializeField, Min(0f)] private float normalRuneDropRateMultiplier = 0.25f;
-    [SerializeField, Range(0f, 1f)] private float normalRuneDropChance = 0.12f;
-    [SerializeField, Range(0f, 1f)] private float eliteRuneDropChance = 0.65f;
+    [SerializeField, Range(0f, 1f)] private float normalRuneDropChance = 0.085f;
+    [SerializeField, Range(0f, 1f)] private float eliteRuneDropChance = 0.55f;
     [SerializeField, Range(0f, 1f)] private float bossRuneDropChance = 1f;
-    [SerializeField, Min(0f)] private float finalRushRuneDropChanceMultiplier = 1.75f;
+    [SerializeField, Min(0f)] private float finalRushRuneDropChanceMultiplier = 1.20f;
 
     [Header("Debug")]
     [SerializeField] private bool debugLuckDropLog = false;
     [SerializeField] private bool debugRuneDropDiagLog = false;
+    [SerializeField] private bool debugBalanceLogs = false;
 
     private CombatHealth combatHealth;
     private RuneDropManager runeDropManager;
@@ -130,6 +131,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             {
                 soulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(soulPoint);
             }
+            LogGrowthBalance(rank, soulType, soulPoint);
             CreateSoul(soulType, soulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
 
@@ -142,6 +144,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
             {
                 extraSoulPoint = runeRuntimeState.ModifyGrowthSoulPointOnDrop(extraSoulPoint);
             }
+            LogGrowthBalance(rank, extraSoulType, extraSoulPoint);
             CreateSoul(extraSoulType, extraSoulPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
         }
 
@@ -155,6 +158,7 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
                 int requestPoint = request.soulType == SoulType.Growth
                     ? runeRuntimeState.ModifyGrowthSoulPointOnDrop(request.soulPoint)
                     : Mathf.Clamp(request.soulPoint, 1, 5);
+                LogGrowthBalance(rank, request.soulType, requestPoint);
                 CreateSoul(request.soulType, requestPoint, transform.position + Vector3.up * dropYOffset + RandomOffset());
             }
         }
@@ -176,6 +180,16 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         {
             Debug.Log(
                 $"[RuneDropDiag] enemy={name} rank={rank} eliteRoll={(eliteRuneRoll.HasValue ? eliteRuneRoll.Value.ToString("F4") : "n/a")} suppressRuneDrop={suppressRuneDrop} luck={killerLuck:F2} ownedRuneCount={ownedRuneCount} finalRuneCount={runeCount} source=RuntimeLootDropOnDeath healthInstanceId={healthInstanceId} dropperInstanceId={dropperInstanceId} hasDropped={hasDropped} path={runeDropSource} baseRuneCount={baseRuneDropCount} extraRuneChance={extraRuneChance:F4} extraRuneCount={extraRuneCount} dropCallId={dropCallId}",
+                this);
+        }
+
+        if (debugBalanceLogs)
+        {
+            float beforeChance = rank == MonsterRank.Boss ? 1f : (rank == MonsterRank.Elite ? 0.4875f : 0.072f);
+            float afterChance = rank == MonsterRank.Boss ? 1f : (rank == MonsterRank.Elite ? 0.55f : 0.085f);
+            Debug.Log(
+                $"[RuneDropBalance] enemyRank={rank} baseDropChanceBefore={beforeChance:F4} baseDropChanceAfter={afterChance:F4} " +
+                $"finalRushDropMultiplierBefore=1.20 finalRushDropMultiplierAfter=1.20 dropTriggered={runeCount > 0}",
                 this);
         }
 
@@ -251,9 +265,25 @@ public class RuntimeLootDropOnDeath : MonoBehaviour
         return rank switch
         {
             MonsterRank.Boss => Random.Range(4, 9),
-            MonsterRank.Elite => Random.Range(2, 5),
+            MonsterRank.Elite => Random.Range(3, 5),
             _ => Random.Range(1, 3)
         };
+    }
+
+    private void LogGrowthBalance(MonsterRank rank, SoulType soulType, int growthAmount)
+    {
+        if (!debugBalanceLogs || soulType != SoulType.Growth)
+        {
+            return;
+        }
+
+        string beforeRange = rank == MonsterRank.Boss ? "6-12" : (rank == MonsterRank.Elite ? "4-6" : "2");
+        string afterRange = rank == MonsterRank.Boss ? "4-8" : (rank == MonsterRank.Elite ? "3-4" : "1-2");
+        Debug.Log(
+            $"[GrowthBalance] growthSoulWeight={growthSoulWeight} enemyRank={rank} " +
+            $"growthPointRangeBefore={beforeRange} growthPointRangeAfter={afterRange} " +
+            $"growthType=PendingRandomOnPickup growthAmount={growthAmount} note=RandomGrowthKept_NoDistributionBias",
+            this);
     }
 
     private static int GetWeightedPoint(int point1Weight, int point2Weight, int point3Weight, int point4Weight, int point5Weight)

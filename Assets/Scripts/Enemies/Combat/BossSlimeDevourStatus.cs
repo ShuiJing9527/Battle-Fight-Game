@@ -103,7 +103,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
                     out float targetDefense);
                 float healthBefore = ResolveCombatHealthValue(combatHealth);
                 float shieldBefore = combatHealth.GetShield();
-                Debug.Log(
+                LogDevourTrace(
                     "[BossDevourDamageTrace] " +
                     "event=InitialDamageApplying " +
                     "target=" + combatHealth.name +
@@ -115,13 +115,25 @@ public class BossSlimeDevourStatus : MonoBehaviour
                     this);
                 combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource)
                 {
-                    attackKind = "BossDevourStrong"
+                    skillName = "Boss Devour",
+                    damageSource = "BossDevourInitial",
+                    attackKind = "BossDevourStrong",
+                    damageKind = BattleDamageKind.MonsterDamage,
+                    sourceOwner = damageSource
                 });
                 float healthAfter = ResolveCombatHealthValue(combatHealth);
                 float shieldAfter = combatHealth.GetShield();
                 float actualHealthLoss = Mathf.Max(0f, healthBefore - healthAfter);
                 float actualShieldLoss = Mathf.Max(0f, shieldBefore - shieldAfter);
-                Debug.Log(
+                LogBossAttackAudit(
+                    "BossDevourInitial",
+                    combatHealth,
+                    valuePassedToTakeDamage,
+                    healthBefore,
+                    healthAfter,
+                    shieldBefore,
+                    shieldAfter);
+                LogDevourTrace(
                     "[BossDevourDamageTrace] " +
                     "event=InitialDamageApplied " +
                     "target=" + combatHealth.name +
@@ -136,7 +148,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
             }
             else
             {
-                Debug.Log(
+                LogDevourTrace(
                     "[BossDevourDamageTrace] " +
                     "event=InitialDamageSkipped " +
                     "reason=" + (!config.DealInitialDamage ? "Disabled" : "ZeroDamage") +
@@ -147,7 +159,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
 
             if (config.DealDamageWhileHolding)
             {
-                Debug.Log(
+                LogDevourTrace(
                     "[BossDevourDamageTrace] " +
                     "event=TickDamageSequenceStarted " +
                     "sequenceId=" + ownerSequenceId +
@@ -161,7 +173,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
         }
         else
         {
-            Debug.Log(
+            LogDevourTrace(
                 "[BossDevourDamageTrace] " +
                 "event=InitialDamageSkipped " +
                 "reason=InvalidTarget " +
@@ -194,7 +206,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
             if (Time.time >= nextTraceTime)
             {
                 nextTraceTime = Time.time + 0.5f;
-                Debug.Log(
+                LogDevourTrace(
                     "[BossActionLockTrace] event=AttractionActive " +
                     "activeKind=Devour target=" + name +
                     " sequenceId=" + ownerSequenceId,
@@ -221,7 +233,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
                         out float scaledDamage,
                         out float targetDefense);
 
-                    Debug.Log(
+                    LogDevourTrace(
                         "[BossDevourDamageTrace] " +
                         "event=TickDamageApplying " +
                         "sequenceId=" + ownerSequenceId +
@@ -238,18 +250,30 @@ public class BossSlimeDevourStatus : MonoBehaviour
                     float shieldBefore = combatHealth.GetShield();
                     combatHealth.TakeDamage(new BattleDamage(valuePassedToTakeDamage, BattleDamageType.Special, damageSource)
                     {
-                        attackKind = "BossDevourStrong"
+                        skillName = "Boss Devour",
+                        damageSource = "BossDevourTick",
+                        attackKind = "BossDevourStrong",
+                        damageKind = BattleDamageKind.MonsterDamage,
+                        sourceOwner = damageSource
                     });
                     float healthAfter = ResolveCombatHealthValue(combatHealth);
                     float shieldAfter = combatHealth.GetShield();
                     float actualHealthLoss = Mathf.Max(0f, healthBefore - healthAfter);
                     float actualShieldLoss = Mathf.Max(0f, shieldBefore - shieldAfter);
                     float actualDurabilityLoss = actualHealthLoss + actualShieldLoss;
+                    LogBossAttackAudit(
+                        "BossDevourTick",
+                        combatHealth,
+                        valuePassedToTakeDamage,
+                        healthBefore,
+                        healthAfter,
+                        shieldBefore,
+                        shieldAfter);
 
                     totalDamageTicksApplied++;
                     totalDamageApplied += actualDurabilityLoss;
 
-                    Debug.Log(
+                    LogDevourTrace(
                         "[BossDevourDamageTrace] " +
                         "event=TickDamageApplied " +
                         "sequenceId=" + ownerSequenceId +
@@ -315,7 +339,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
         runtimeConfig = default;
         totalDamageTicksApplied = 0;
         totalDamageApplied = 0f;
-        Debug.Log(
+        LogDevourTrace(
             "[BossActionLockTrace] event=ActionLockReleased kind=Devour sequenceId=0 endReason=" + reason,
             this);
     }
@@ -518,7 +542,7 @@ public class BossSlimeDevourStatus : MonoBehaviour
             return;
         }
 
-        Debug.Log(
+        LogDevourTrace(
             "[BossDevourDamageTrace] " +
             "event=TickDamageSequenceStopped " +
             "sequenceId=" + ownerSequenceId +
@@ -584,5 +608,42 @@ public class BossSlimeDevourStatus : MonoBehaviour
         }
 
         return null;
+    }
+
+    private static void LogDevourTrace(object message, Object context)
+    {
+        if (EnemySpawner.CombatBalanceLogsEnabled)
+        {
+            Debug.Log(message, context);
+        }
+    }
+
+    private void LogBossAttackAudit(
+        string attackName,
+        CombatHealth targetHealth,
+        float requestedDamage,
+        float hpBefore,
+        float hpAfter,
+        float shieldBefore,
+        float shieldAfter)
+    {
+        if (!EnemySpawner.CombatBalanceLogsEnabled)
+        {
+            return;
+        }
+
+        MonsterIdentity identity = currentDamageSource != null
+            ? currentDamageSource.GetComponentInParent<MonsterIdentity>()
+            : null;
+        Debug.Log(
+            "[BossAttackAudit] " +
+            $"bossPrefab={(currentDamageSource != null ? currentDamageSource.name.Replace("(Clone)", string.Empty).Trim() : "null")} " +
+            $"attackName={attackName} attackScript={nameof(BossSlimeDevourStatus)} attackType=BossDevourStrong " +
+            $"hitDetectionMethod=DevourStatus target={(targetHealth != null ? targetHealth.name : "null")} requestedDamage={requestedDamage:F2} " +
+            $"hpBefore={hpBefore:F2} hpAfter={hpAfter:F2} shieldBefore={shieldBefore:F2} shieldAfter={shieldAfter:F2} " +
+            "callsDamage=true damageEntry=CombatHealth.TakeDamage sourceOwnerSet=true " +
+            $"damageKind={BattleDamageKind.MonsterDamage} attackerRank={(identity != null ? identity.rank.ToString() : "Unknown")} " +
+            "entersShieldPressure=true entersMonsterDamageClamp=true entersTwinDebuff=true",
+            this);
     }
 }

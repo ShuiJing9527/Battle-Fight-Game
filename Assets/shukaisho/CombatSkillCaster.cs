@@ -169,7 +169,17 @@ public class CombatSkillCaster : MonoBehaviour
 
         damage *= runeRuntimeState != null ? runeRuntimeState.GetOutgoingDamageMultiplier(skillIndex) : 1f;
         float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, damage, out bool isCritical);
-        target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
+        target.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical)
+        {
+            skillName = skill.skillName,
+            damageSource = "ThornCounter",
+            debugTag = "CombatSkillCasterThornCounter",
+            damageKind = BattleDamageKind.ThornExplosion,
+            sourceOwner = gameObject,
+            bypassRuneFlatDamage = true,
+            bypassLifesteal = true,
+            suppressThornReaction = true
+        });
     }
 
     private void ExecuteSkill(BattleSkill skill, int skillIndex, int runeCastId, float manaRuneEffectStrength)
@@ -205,7 +215,15 @@ public class CombatSkillCaster : MonoBehaviour
                     resolvedDamage += runeRuntimeState != null ? runeRuntimeState.ConsumeFirstHitBonusDamage(skillIndex, runeCastId) : 0f;
                     float finalDamage = BattleStatUtility.ApplyCriticalDamage(gameObject, resolvedDamage, out bool isCritical);
                     float beforeHealth = ResolveTargetCurrentHealth(health);
-                    health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical));
+                    health.TakeDamage(new BattleDamage(finalDamage, damageType, gameObject, isCritical)
+                    {
+                        castId = runeCastId,
+                        skillName = skill.skillName,
+                        damageSource = "CombatSkillCaster",
+                        debugTag = "CombatSkillCasterActiveSkill",
+                        damageKind = BattleDamageKind.PlayerActiveSkill,
+                        sourceOwner = gameObject
+                    });
                     float afterHealth = ResolveTargetCurrentHealth(health);
                     float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
                     runeRuntimeState?.NotifyMonsterDamagedBySkill(skillIndex, health, actualDamage);

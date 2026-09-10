@@ -382,7 +382,7 @@ MonoBehaviour:
   lifeSoulWeight: 30
   energySoulWeight: 25
   functionSoulWeight: 20
-  growthSoulWeight: 25
+  growthSoulWeight: 18
   resourcePoint1Weight: 50
   resourcePoint2Weight: 25
   resourcePoint3Weight: 15
@@ -435,10 +435,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 752e0244c3f847a0a7fbb0fca55b4b7d, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  maxHealth: 420
-  physicalAttack: 34
+  maxHealth: 520
+  physicalAttack: 50
   physicalDefense: 22
-  specialAttack: 36
+  specialAttack: 53
   specialDefense: 28
   speed: 9.5
   luck: 8

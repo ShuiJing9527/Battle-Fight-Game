@@ -59,17 +59,17 @@ public class EnemyDifficultyDirector : MonoBehaviour
 
     [Header("Final Rush Multipliers")]
     [Tooltip("Extra HP multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 1.35f;
+    [SerializeField, Min(0.01f)] private float finalRushHpMultiplier = 1.50f;
     [Tooltip("Extra physical attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 1.35f;
+    [SerializeField, Min(0.01f)] private float finalRushAttackMultiplier = 1.95f;
     [Tooltip("Extra physical defense multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushDefenseMultiplier = 1.15f;
     [Tooltip("Extra special attack multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 1.35f;
+    [SerializeField, Min(0.01f)] private float finalRushSpecialAttackMultiplier = 1.95f;
     [Tooltip("Extra special defense multiplier applied when FinalRush is active.")]
     [SerializeField, Min(0.01f)] private float finalRushSpecialDefenseMultiplier = 1.15f;
     [Tooltip("Extra speed multiplier applied when FinalRush is active.")]
-    [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.10f;
+    [SerializeField, Min(0.01f)] private float finalRushSpeedMultiplier = 1.15f;
 
     [Header("Spawn Pressure")]
     [Tooltip("Additive spawn-rate growth per difficulty level. Higher values make spawn intervals shorter.")]
@@ -254,6 +254,10 @@ public class EnemyDifficultyDirector : MonoBehaviour
         }
 
         instance = this;
+        finalRushHpMultiplier = 1.50f;
+        finalRushAttackMultiplier = 1.95f;
+        finalRushSpecialAttackMultiplier = 1.95f;
+        finalRushSpeedMultiplier = 1.15f;
     }
 
     private void Start()

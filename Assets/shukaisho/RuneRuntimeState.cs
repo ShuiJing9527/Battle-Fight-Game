@@ -19,7 +19,11 @@ public class RuneRuntimeState : MonoBehaviour
 
     private const int SkillCount = 4;
     private const int SkillSlotCount = 5;
+    private const int MaxBaseGrowthSoulPoint = 12;
+    private const int LuckGrowthSoulBonusPointCap = 8;
     private const float ShieldNoDamageDelay = 3f;
+    private const float ShieldPassiveTargetMaxHealthRatio = 0.30f;
+    private const float LifeRuneCastHealMaxHealthRatio = 0.02f;
     private const float ThornCounterExecutionLockSeconds = 1f;
     private const string DefaultThornCounterBurstPrefabResourcePath = "Prefabs/Effects/Runes/RuneThornCounterBurst";
     private const float ShieldEfficiencyCap = 3f;
@@ -33,24 +37,38 @@ public class RuneRuntimeState : MonoBehaviour
     private const float LifeResonanceDamageMultiplier = 1.20f;
     private const float LifeResonanceIncomingMonsterMultiplier = 0.75f;
     private const float LifeResonanceDuration = 8f;
-    private const float ShieldSetShieldDamageMultiplier = 0.85f;
+    private const float ShieldSetShieldDamageMultiplier = 0.95f;
     private const float BarrierReconstructionIncomingMonsterMultiplier = 0.60f;
     private const float BarrierReconstructionDuration = 3f;
     private const float BarrierReconstructionCooldown = 15f;
     private const float BarrierReconstructionShieldRatio = 0.30f;
-    private const float ManaSetRefundRatio = 0.15f;
+    private const float ManaSetRefundRatio = 0.08f;
     private const float ManaResonanceDamageMultiplier = 1.25f;
-    private const float ManaResonanceCooldownRecoveryMultiplier = 1.25f;
+    private const float ManaResonanceCooldownRecoveryMultiplier = 1.15f;
     private const float ManaResonanceRuneBonusMultiplier = 1.75f;
     private const float ManaResonanceDuration = 8f;
     private const float ThornDrainCooldown = 1f;
     private const float ThornDrainHealRatio = 0.02f;
     private const float ThornSet4IncomingMonsterMultiplier = 0.70f;
-    private const float ThornSet4RetaliationMultiplier = 2f;
+    private const float ThornBaseRetaliationDamageMultiplier = 0.60f;
+    private const float ThornSkillFirstHitDamageMultiplier = 0.60f;
+    private const float ThornSet4OriginalRetaliationMultiplier = 2f;
+    private const float ThornSet4BalanceMultiplier = 0.45f;
+    private const float ThornSet4DamageMaxHealthRatio = 0.12f;
+    private const float ThornSet5BalanceMultiplier = 0.35f;
+    private const float ThornSet5DamageMaxHealthRatio = 0.08f;
     private const float ThornSet4Cooldown = 5f;
     private const float LuckSet2LotteryChance = 0.20f;
     private const float LuckSet4LotteryChance = 0.35f;
     private const float LuckSet5JackpotChance = 0.15f;
+    private const float LifeRuneExtraGrowthSoulChance = 0.20f;
+    private const float LuckExtraGrowthSoulChance = 0.15f;
+    private const float LuckSoulCopyChance = 0.12f;
+    private const int LuckEliteBossExtraGrowthCount = 2;
+    private const int RuneEquipResonanceMaxRuneCount = 5;
+    private const float RuneEquipResonanceOutgoingPerRune = 0.03f;
+    private const float RuneEquipResonanceIncomingReductionPerRune = 0.02f;
+    private const float RuneEquipResonanceMaxHealthPerRune = 20f;
 
     [Header("Thorn Counter")]
     [SerializeField, Min(0.1f)] private float thornCounterBurstRadius = 3f;
@@ -83,7 +101,9 @@ public class RuneRuntimeState : MonoBehaviour
     private readonly Dictionary<RuneType, int>[] skillRuneCounts = new Dictionary<RuneType, int>[SkillCount];
     private readonly Dictionary<RuneType, int> globalRuneCounts = new Dictionary<RuneType, int>();
     private readonly List<int>[] pendingSkillFirstHitCastIds = new List<int>[SkillCount];
-    private readonly int[] nextSkillCastIds = new int[SkillCount];
+    private readonly HashSet<int> runeFlatDamageConsumedCastIds = new HashSet<int>();
+    private readonly Dictionary<string, float> runeFlatDamageFallbackReadyTimes = new Dictionary<string, float>();
+    private int nextGlobalSkillCastId;
 
     private float lastMonsterDamageTime = float.NegativeInfinity;
     private bool shieldGeneratedSinceLastMonsterDamage;
@@ -103,6 +123,7 @@ public class RuneRuntimeState : MonoBehaviour
     private float nextThornBacklashReadyTime;
     private float pendingLuckThornMimicMultiplier;
     private bool isResolvingLuckLottery;
+    private int lastLoggedRuneEquipResonanceCount = -1;
 
     private float shieldEfficiencyBonus;
     private float manaConversionEfficiencyBonus;
@@ -189,7 +210,7 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        float shieldTarget = ResolveOwnerMaxHealth() * 0.50f;
+        float shieldTarget = ResolveOwnerMaxHealth() * ShieldPassiveTargetMaxHealthRatio;
         float currentShield = resourceBank.CurrentShield;
         if (shieldTarget <= 0f || currentShield >= shieldTarget)
         {
@@ -289,6 +310,26 @@ public class RuneRuntimeState : MonoBehaviour
             GetGlobalRuneCount(RuneType.Luck);
     }
 
+    public int GetRuneEquipResonanceEffectiveRuneCount()
+    {
+        return Mathf.Clamp(GetTotalEquippedRuneCount(), 0, RuneEquipResonanceMaxRuneCount);
+    }
+
+    public float GetRuneEquipResonanceOutgoingMultiplier()
+    {
+        return 1f + GetRuneEquipResonanceEffectiveRuneCount() * RuneEquipResonanceOutgoingPerRune;
+    }
+
+    public float GetRuneEquipResonanceIncomingMultiplier()
+    {
+        return 1f - GetRuneEquipResonanceEffectiveRuneCount() * RuneEquipResonanceIncomingReductionPerRune;
+    }
+
+    public float GetRuneEquipResonanceMaxHealthBonus()
+    {
+        return GetRuneEquipResonanceEffectiveRuneCount() * RuneEquipResonanceMaxHealthPerRune;
+    }
+
     public float GetDemoBaseDamageBonusPerEquippedRune()
     {
         return Mathf.Max(0f, demoBaseDamageBonusPerEquippedRune);
@@ -301,12 +342,11 @@ public class RuneRuntimeState : MonoBehaviour
             return -1;
         }
 
-        int castId = ++nextSkillCastIds[skillIndex];
+        int castId = ++nextGlobalSkillCastId;
         pendingSkillFirstHitCastIds[skillIndex].Add(castId);
         latestSkillCastId = castId;
         latestSkillIndex = skillIndex;
         latestSkillCastStartedAt = Time.time;
-        latestSkillCastFlatDamageConsumed = false;
 
         int lifeCount = GetGlobalRuneCount(RuneType.Life);
         if (lifeCount >= 2)
@@ -322,9 +362,6 @@ public class RuneRuntimeState : MonoBehaviour
     private int latestSkillCastId = -1;
     private int latestSkillIndex = -1;
     private float latestSkillCastStartedAt = -1f;
-    private bool latestSkillCastFlatDamageConsumed;
-    private float nextFallbackFlatDamageTime;
-
     public bool TryConsumeRuneFlatDamage(
         BattleDamage damage,
         out int equippedRuneCount,
@@ -338,7 +375,13 @@ public class RuneRuntimeState : MonoBehaviour
             ? damage.skillName
             : latestSkillIndex >= 0 ? ResolveSkillSlotLabel(latestSkillIndex) : damage.debugTag;
 
-        if (damage.isReflectDamage || IsReflectDamageTag(damage.debugTag))
+        if (damage.bypassRuneFlatDamage)
+        {
+            skipReason = "BypassRuneFlatDamage";
+            return false;
+        }
+
+        if (damage.isReflectDamage || IsSecondaryDamageKind(damage.damageKind) || IsReflectDamageTag(damage.debugTag))
         {
             skipReason = "ReflectDamage";
             return false;
@@ -350,15 +393,14 @@ public class RuneRuntimeState : MonoBehaviour
             return false;
         }
 
-        if (latestSkillCastId >= 0)
+        if (damage.castId > 0)
         {
-            if (latestSkillCastFlatDamageConsumed)
+            if (!runeFlatDamageConsumedCastIds.Add(damage.castId))
             {
                 skipReason = "AlreadyTriggeredThisCast";
                 return false;
             }
 
-            latestSkillCastFlatDamageConsumed = true;
             skipReason = string.Empty;
             return true;
         }
@@ -369,15 +411,35 @@ public class RuneRuntimeState : MonoBehaviour
             return false;
         }
 
-        if (Time.time < nextFallbackFlatDamageTime)
+        string fallbackKey = BuildRuneFlatDamageFallbackKey(damage);
+        if (runeFlatDamageFallbackReadyTimes.TryGetValue(fallbackKey, out float readyTime) && Time.time < readyTime)
         {
             skipReason = "CooldownWindow";
             return false;
         }
 
-        nextFallbackFlatDamageTime = Time.time + RuneFlatDamageFallbackWindow;
+        runeFlatDamageFallbackReadyTimes[fallbackKey] = Time.time + RuneFlatDamageFallbackWindow;
         skipReason = string.Empty;
         return true;
+    }
+
+    private static string BuildRuneFlatDamageFallbackKey(BattleDamage damage)
+    {
+        if (!string.IsNullOrWhiteSpace(damage.skillName)) return damage.skillName;
+        if (!string.IsNullOrWhiteSpace(damage.damageSource)) return damage.damageSource;
+        return damage.debugTag;
+    }
+
+    private static bool IsSecondaryDamageKind(BattleDamageKind damageKind)
+    {
+        return damageKind == BattleDamageKind.MarkExplosion
+               || damageKind == BattleDamageKind.ReflectDamage
+               || damageKind == BattleDamageKind.ThornRetaliation
+               || damageKind == BattleDamageKind.ThornExplosion
+               || damageKind == BattleDamageKind.ShieldBonusDamage
+               || damageKind == BattleDamageKind.MonsterDamage
+               || damageKind == BattleDamageKind.EnvironmentDamage
+               || damageKind == BattleDamageKind.SelfDamage;
     }
 
     private static bool IsReflectDamageTag(string tag)
@@ -429,11 +491,18 @@ public class RuneRuntimeState : MonoBehaviour
 
     public float ConsumeFirstHitBonusDamage(int skillIndex)
     {
-        return ConsumeFirstHitBonusDamage(skillIndex, -1);
+        return ConsumeFirstHitBonusDamage(skillIndex, -1, out _);
     }
 
     public float ConsumeFirstHitBonusDamage(int skillIndex, int castId)
     {
+        return ConsumeFirstHitBonusDamage(skillIndex, castId, out _);
+    }
+
+    public float ConsumeFirstHitBonusDamage(int skillIndex, int castId, out string bonusTypes)
+    {
+        List<string> triggeredTypes = new List<string>();
+        bonusTypes = "None";
         if (skillIndex < 0 || skillIndex >= pendingSkillFirstHitCastIds.Length)
         {
             return 0f;
@@ -462,20 +531,23 @@ public class RuneRuntimeState : MonoBehaviour
         if (lifeCount >= 3)
         {
             bonusDamage += ResolveOwnerMaxHealth() * 0.05f;
+            triggeredTypes.Add("LifeMaxHP");
         }
 
         int shieldCount = GetGlobalRuneCount(RuneType.Shield);
         if (shieldCount >= 5 && resourceBank != null)
         {
             bonusDamage += resourceBank.CurrentShield * 0.15f * GetShieldEfficiency();
+            triggeredTypes.Add("ShieldCurrent");
         }
 
         int thornCount = GetGlobalRuneCount(RuneType.Thorn);
         if (thornCount >= 4)
         {
-            float thornDamage = ResolveCurrentThornDamage(thornCount) * 1.5f;
+            float thornDamage = ResolveCurrentThornDamage(thornCount) * 1.5f * ThornSkillFirstHitDamageMultiplier;
             bonusDamage += thornDamage;
             TryTriggerThornDrain(thornDamage, "ThornSkillFirstHit");
+            triggeredTypes.Add("Thorn");
         }
 
         if (pendingLuckThornMimicMultiplier > 0f)
@@ -484,8 +556,10 @@ public class RuneRuntimeState : MonoBehaviour
             pendingLuckThornMimicMultiplier = 0f;
             bonusDamage += thornDamage;
             TryTriggerThornDrain(thornDamage, "LuckThornMimic");
+            triggeredTypes.Add("LuckThornMimic");
         }
 
+        bonusTypes = triggeredTypes.Count > 0 ? string.Join("+", triggeredTypes) : "None";
         DebugLog($"[RuneRuntimeState] First-hit bonus skill={skillIndex} damage={bonusDamage:F2}");
         return bonusDamage;
     }
@@ -610,13 +684,13 @@ public class RuneRuntimeState : MonoBehaviour
         DevThornCounterLog($"Active thorn count={thornCount}");
         if (thornCount >= 2)
         {
-            ApplyThornRetaliation(resolvedAttacker, thornCount);
+            ApplyThornRetaliation(resolvedAttacker, thornCount, damageAmount);
         }
 
         if (thornCount >= 5)
         {
             ThornCounterLog($"Incoming monster damage detected. attacker={(resolvedAttacker != null ? resolvedAttacker.name : "<null>")}, damage={damageAmount:F2}, thornCount={thornCount}");
-            TryTriggerThornCounter(resolvedAttacker, thornCount);
+            TryTriggerThornCounter(resolvedAttacker, thornCount, damageAmount);
         }
         else
         {
@@ -708,20 +782,22 @@ public class RuneRuntimeState : MonoBehaviour
 
     public int ModifyGrowthSoulPointOnDrop(int originalPoint)
     {
+        int resolvedOriginalPoint = Mathf.Clamp(originalPoint, 1, MaxBaseGrowthSoulPoint);
         int luckCount = GetGlobalRuneCount(RuneType.Luck);
         if (luckCount < 2)
         {
-            return Mathf.Clamp(originalPoint, 1, 8);
+            return resolvedOriginalPoint;
         }
 
         float baseChance = 0.30f;
         int triggers = RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
         if (triggers <= 0)
         {
-            return Mathf.Clamp(originalPoint, 1, 8);
+            return resolvedOriginalPoint;
         }
 
-        return Mathf.Clamp(originalPoint + triggers, 1, 8);
+        int luckyBonusCap = Mathf.Max(resolvedOriginalPoint, LuckGrowthSoulBonusPointCap);
+        return Mathf.Clamp(resolvedOriginalPoint + triggers, resolvedOriginalPoint, luckyBonusCap);
     }
 
     public int GetExtraGrowthSoulDropsOnKill()
@@ -732,8 +808,7 @@ public class RuneRuntimeState : MonoBehaviour
             return 0;
         }
 
-        float baseChance = 0.25f;
-        return RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
+        return RollRepeatableChance(LuckExtraGrowthSoulChance, GetLuckChanceMultiplier());
     }
 
     public int GetSoulPickupCopyCount()
@@ -744,8 +819,11 @@ public class RuneRuntimeState : MonoBehaviour
             return 0;
         }
 
-        float baseChance = 0.20f;
-        return RollRepeatableChance(baseChance, GetLuckChanceMultiplier());
+        int copyCount = RollRepeatableChance(LuckSoulCopyChance, GetLuckChanceMultiplier());
+        RuneBalanceLog(
+            $"[LuckRuneBalance] luckRuneCount={luckCount} extraGrowthSoulChance={LuckExtraGrowthSoulChance:F2} " +
+            $"copyChance={LuckSoulCopyChance:F2} eliteBossExtraGrowthCount={LuckEliteBossExtraGrowthCount} triggered={copyCount > 0}");
+        return copyCount;
     }
 
     public int GetSoulPickupCopyPoint()
@@ -763,8 +841,15 @@ public class RuneRuntimeState : MonoBehaviour
         int lifeCount = GetGlobalRuneCount(RuneType.Life);
         if (lifeCount >= 1)
         {
-            extraDrops.Add(new SoulDropRequest(SoulType.Growth, 1));
+            bool extraGrowthTriggered = Random.value < LifeRuneExtraGrowthSoulChance;
+            if (extraGrowthTriggered)
+            {
+                extraDrops.Add(new SoulDropRequest(SoulType.Growth, 1));
+            }
             extraDrops.Add(new SoulDropRequest(SoulType.Life, 1));
+            RuneBalanceLog(
+                $"[LifeRuneBalance] lifeRuneCount={lifeCount} enemyRank={rank} " +
+                $"extraGrowthSoulChance={LifeRuneExtraGrowthSoulChance:F2} triggered={extraGrowthTriggered}");
         }
 
         int shieldCount = GetGlobalRuneCount(RuneType.Shield);
@@ -790,11 +875,17 @@ public class RuneRuntimeState : MonoBehaviour
             int luckCount = GetGlobalRuneCount(RuneType.Luck);
             if (luckCount >= 5)
             {
-                for (int i = 0; i < 5; i++)
+                for (int i = 0; i < LuckEliteBossExtraGrowthCount; i++)
                 {
                     extraDrops.Add(new SoulDropRequest(SoulType.Growth, 1));
                 }
             }
+
+            RuneBalanceLog(
+                $"[LuckRuneBalance] luckRuneCount={luckCount} enemyRank={rank} " +
+                $"extraGrowthSoulChance={LuckExtraGrowthSoulChance:F2} copyChance={LuckSoulCopyChance:F2} " +
+                $"eliteBossExtraGrowthCount={(luckCount >= 5 ? LuckEliteBossExtraGrowthCount : 0)} " +
+                $"triggered={extraGrowthDrops > 0 || luckCount >= 5}");
 
             ApplyEliteOrBossKillPermanentGrowth();
         }
@@ -863,9 +954,8 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        float healRatio = 0.05f;
         float maxHealth = ResolveOwnerMaxHealth();
-        float healAmount = maxHealth * healRatio;
+        float healAmount = maxHealth * LifeRuneCastHealMaxHealthRatio;
         if (healAmount <= 0f)
         {
             return;
@@ -890,7 +980,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
     }
 
-    private void ApplyThornRetaliation(GameObject attacker, int thornCount)
+    private void ApplyThornRetaliation(GameObject attacker, int thornCount, float incomingDamage)
     {
         if (attacker == null)
         {
@@ -903,7 +993,8 @@ public class RuneRuntimeState : MonoBehaviour
             return;
         }
 
-        float damage = ResolveCurrentThornDamage(thornCount);
+        float damageBeforeNerf = ResolveCurrentThornDamage(thornCount);
+        float damage = damageBeforeNerf * ThornBaseRetaliationDamageMultiplier;
         if (damage <= 0f)
         {
             return;
@@ -913,13 +1004,32 @@ public class RuneRuntimeState : MonoBehaviour
         {
             bypassAmbientAffinity = true,
             isReflectDamage = true,
-            debugTag = "BaseThornReflect"
+            debugTag = "BaseThornReflect",
+            damageKind = BattleDamageKind.ThornRetaliation,
+            sourceOwner = gameObject,
+            bypassRuneFlatDamage = true,
+            bypassLifesteal = true,
+            suppressThornReaction = true
         };
+        float beforeEffectiveHealth = ResolveCurrentEffectiveHealth(attackerHealth);
         attackerHealth.ApplyDirectDamage(retaliationDamage, DamagePopupType.Normal);
-        TryTriggerThornDrain(damage, "BaseThornReflect");
+        float actualDamage = Mathf.Max(0f, beforeEffectiveHealth - ResolveCurrentEffectiveHealth(attackerHealth));
+        float healFromReflect = TryTriggerThornDrain(actualDamage, "BaseThornReflect");
+        ThornBalanceLog(
+            $"effect=BaseRetaliation thornCount={thornCount} incomingDamage={incomingDamage:F2} damageBeforeNerf={damageBeforeNerf:F2} " +
+            $"damageAfterMultiplier={damage:F2} damageCap=none finalDamage={damage:F2} target={attackerHealth.name} " +
+            $"actualDamageDealt={actualDamage:F2} healFromReflect={healFromReflect:F2}");
     }
 
-    private void TryTriggerThornCounter(GameObject attacker, int thornCount)
+    private void RuneBalanceLog(string message)
+    {
+        if (runeDebugLog)
+        {
+            Debug.Log(message, this);
+        }
+    }
+
+    private void TryTriggerThornCounter(GameObject attacker, int thornCount, float incomingDamage)
     {
         if (attacker == null)
         {
@@ -955,7 +1065,7 @@ public class RuneRuntimeState : MonoBehaviour
         float resolvedCooldown = ResolveThornCounterCooldown();
         DevThornCounterLog($"Trigger accepted. attacker={attackerHealth.name} cooldown={resolvedCooldown:F2}");
         ThornCounterLog($"Triggering thorn burst counter. center={burstCenter}, radius={thornCounterBurstRadius:F2}, cooldown={resolvedCooldown:F2}s");
-        bool triggered = ExecuteThornCounterBurst(attackerHealth, thornCount);
+        bool triggered = ExecuteThornCounterBurst(attackerHealth, thornCount, incomingDamage);
         if (!triggered)
         {
             ThornCounterLog("Thorn burst counter found no valid monster targets or could not execute.");
@@ -968,7 +1078,7 @@ public class RuneRuntimeState : MonoBehaviour
         }
     }
 
-    private bool ExecuteThornCounterBurst(CombatHealth attackerHealth, int thornCount)
+    private bool ExecuteThornCounterBurst(CombatHealth attackerHealth, int thornCount, float incomingDamage)
     {
         if (attackerHealth == null)
         {
@@ -980,7 +1090,10 @@ public class RuneRuntimeState : MonoBehaviour
         float radius = Mathf.Max(0.1f, thornCounterBurstRadius);
         float burstMultiplier = Mathf.Max(0f, thornCounterDamageMultiplier);
         float baseThornDamage = ResolveCurrentThornDamage(thornCount);
-        float burstDamage = baseThornDamage * burstMultiplier;
+        float damageBeforeNerf = baseThornDamage * burstMultiplier;
+        float damageAfterMultiplier = damageBeforeNerf * ThornSet5BalanceMultiplier;
+        float damageCap = ResolveOwnerMaxHealth() * ThornSet5DamageMaxHealthRatio;
+        float burstDamage = Mathf.Min(damageAfterMultiplier, damageCap);
         Vector3 burstCenter = ResolveThornCounterBurstCenter();
         DevThornCounterLog($"Burst center={burstCenter}, radius={radius:F2}");
         DevThornCounterLog($"Base thorn damage={baseThornDamage:F2}, multiplier={burstMultiplier:F2}, final damage={burstDamage:F2}");
@@ -1007,24 +1120,36 @@ public class RuneRuntimeState : MonoBehaviour
 
         HashSet<CombatHealth> damagedCombatTargets = new HashSet<CombatHealth>();
         int hitCount = 0;
+        float totalActualDamage = 0f;
         suppressReactiveAutoEffects = true;
 
         try
         {
             if (!damagedCombatTargets.Contains(attackerHealth) && attackerHealth != combatHealth)
             {
-                float beforeHealth = ResolveCurrentHealth(attackerHealth);
+                float beforeHealth = ResolveCurrentEffectiveHealth(attackerHealth);
                 BattleDamage burstRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
                 {
                     bypassAmbientAffinity = true,
                     isReflectDamage = true,
-                    debugTag = "ThornCounter"
+                    debugTag = "ThornCounter",
+                    damageKind = BattleDamageKind.ThornExplosion,
+                    sourceOwner = gameObject,
+                    bypassRuneFlatDamage = true,
+                    bypassLifesteal = true,
+                    suppressThornReaction = true
                 };
                 attackerHealth.ApplyDirectDamage(burstRetaliationDamage, DamagePopupType.Normal);
-                float afterHealth = ResolveCurrentHealth(attackerHealth);
+                float afterHealth = ResolveCurrentEffectiveHealth(attackerHealth);
+                float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+                totalActualDamage += actualDamage;
                 damagedCombatTargets.Add(attackerHealth);
                 hitCount++;
-                DevThornCounterLog($"Applied damage to {attackerHealth.name} result={Mathf.Max(0f, beforeHealth - afterHealth):F2}");
+                DevThornCounterLog($"Applied damage to {attackerHealth.name} result={actualDamage:F2}");
+                ThornBalanceLog(
+                    $"effect=Set5Explosion thornCount={thornCount} incomingDamage={incomingDamage:F2} damageBeforeNerf={damageBeforeNerf:F2} " +
+                    $"damageAfterMultiplier={damageAfterMultiplier:F2} damageCap={damageCap:F2} finalDamage={burstDamage:F2} " +
+                    $"target={attackerHealth.name} actualDamageDealt={actualDamage:F2} healFromReflect=0.00");
             }
 
             for (int i = 0; i < hits.Length; i++)
@@ -1043,17 +1168,28 @@ public class RuneRuntimeState : MonoBehaviour
                         continue;
                     }
 
-                    float beforeHealth = ResolveCurrentHealth(targetHealth);
+                    float beforeHealth = ResolveCurrentEffectiveHealth(targetHealth);
                     BattleDamage areaRetaliationDamage = new BattleDamage(burstDamage, BattleDamageType.Physical, gameObject)
                     {
                         bypassAmbientAffinity = true,
                         isReflectDamage = true,
-                        debugTag = "ThornCounter"
+                        debugTag = "ThornCounter",
+                        damageKind = BattleDamageKind.ThornExplosion,
+                        sourceOwner = gameObject,
+                        bypassRuneFlatDamage = true,
+                        bypassLifesteal = true,
+                        suppressThornReaction = true
                     };
                     targetHealth.ApplyDirectDamage(areaRetaliationDamage, DamagePopupType.Normal);
-                    float afterHealth = ResolveCurrentHealth(targetHealth);
+                    float afterHealth = ResolveCurrentEffectiveHealth(targetHealth);
+                    float actualDamage = Mathf.Max(0f, beforeHealth - afterHealth);
+                    totalActualDamage += actualDamage;
                     hitCount++;
-                    DevThornCounterLog($"Applied damage to {targetHealth.name} result={Mathf.Max(0f, beforeHealth - afterHealth):F2}");
+                    DevThornCounterLog($"Applied damage to {targetHealth.name} result={actualDamage:F2}");
+                    ThornBalanceLog(
+                        $"effect=Set5Explosion thornCount={thornCount} incomingDamage={incomingDamage:F2} damageBeforeNerf={damageBeforeNerf:F2} " +
+                        $"damageAfterMultiplier={damageAfterMultiplier:F2} damageCap={damageCap:F2} finalDamage={burstDamage:F2} " +
+                        $"target={targetHealth.name} actualDamageDealt={actualDamage:F2} healFromReflect=0.00");
                     continue;
                 }
             }
@@ -1063,13 +1199,17 @@ public class RuneRuntimeState : MonoBehaviour
             suppressReactiveAutoEffects = false;
         }
 
-        if (hitCount > 0)
-        {
-            TryTriggerThornDrain(burstDamage, "ThornCounter");
-        }
+        float healFromReflect = TryTriggerThornDrain(totalActualDamage, "ThornCounter");
+        ThornBalanceLog(
+            $"effect=Set5ExplosionTotal thornCount={thornCount} incomingDamage={incomingDamage:F2} damageBeforeNerf={damageBeforeNerf:F2} " +
+            $"damageAfterMultiplier={damageAfterMultiplier:F2} damageCap={damageCap:F2} finalDamage={burstDamage:F2} " +
+            $"target=Multiple actualDamageDealt={totalActualDamage:F2} healFromReflect={healFromReflect:F2}");
 
         DevThornCounterLog($"Unique enemies found={damagedCombatTargets.Count}");
         ThornCounterLog($"Thorn burst dealt {burstDamage:F2} damage in radius {radius:F2}, targetsHit={hitCount}.");
+        ThornFixLog(
+            $"event=Set5Explosion thornCount={thornCount} radius={radius:F2} targetCount={hitCount} " +
+            $"damage={burstDamage:F2} triggered={hitCount > 0}");
         return hitCount > 0;
     }
 
@@ -1177,13 +1317,19 @@ public class RuneRuntimeState : MonoBehaviour
 
     public float GetIncomingMonsterDamageMultiplier()
     {
-        return GetIncomingMonsterDamageMultiplier(null, 0f);
+        return GetIncomingMonsterDamageMultiplier(null, 0f, default);
     }
 
     public float GetIncomingMonsterDamageMultiplier(GameObject attacker, float damageBeforeRune)
     {
+        return GetIncomingMonsterDamageMultiplier(attacker, damageBeforeRune, default);
+    }
+
+    public float GetIncomingMonsterDamageMultiplier(GameObject attacker, float damageBeforeRune, BattleDamage damage)
+    {
         float multiplier = 1f;
-        if (GetGlobalRuneCount(RuneType.Thorn) >= 1)
+        int thornCount = GetGlobalRuneCount(RuneType.Thorn);
+        if (thornCount >= 1)
         {
             multiplier *= ThornBaseMonsterDamageReductionMultiplier;
         }
@@ -1198,29 +1344,57 @@ public class RuneRuntimeState : MonoBehaviour
             multiplier *= BarrierReconstructionIncomingMonsterMultiplier;
         }
 
-        if (thornSet4Active && Time.time >= nextThornBacklashReadyTime)
+        if (thornSet4Active)
         {
-            nextThornBacklashReadyTime = Time.time + ThornSet4Cooldown;
-            multiplier *= ThornSet4IncomingMonsterMultiplier;
-            TriggerThornSet4Backlash(attacker);
+            GameObject resolvedAttacker = ResolveMonsterAttackerObject(attacker);
+            string skipReason = ResolveThornSet4SkipReason(resolvedAttacker, damageBeforeRune, damage);
+            bool canTrigger = string.IsNullOrEmpty(skipReason);
+            bool cooldownConsumed = false;
+            if (canTrigger)
+            {
+                nextThornBacklashReadyTime = Time.time + ThornSet4Cooldown;
+                cooldownConsumed = true;
+                multiplier *= ThornSet4IncomingMonsterMultiplier;
+                TriggerThornSet4Backlash(resolvedAttacker, damageBeforeRune);
+            }
+
+            ThornFixLog(
+                $"event=Set4Check player={name} rawSource={(attacker != null ? attacker.name : "<null>")} " +
+                $"resolvedMonster={(resolvedAttacker != null ? resolvedAttacker.name : "<null>")} thornCount={thornCount} " +
+                $"canTrigger={canTrigger} skipReason={(canTrigger ? "None" : skipReason)} cooldownConsumed={cooldownConsumed}");
         }
 
         return multiplier;
     }
 
-    private void TriggerThornSet4Backlash(GameObject attacker)
+    private string ResolveThornSet4SkipReason(GameObject resolvedAttacker, float damageBeforeRune, BattleDamage damage)
     {
-        RuneSetBonusLog(
-            $"event=ThornBacklashTriggered incomingBefore=unknown incomingAfter=unknown thornDamage={ResolveCurrentThornDamage(GetGlobalRuneCount(RuneType.Thorn)) * ThornSet4RetaliationMultiplier:F2} cooldown={ThornSet4Cooldown:F2}");
+        if (damageBeforeRune <= 0f) return "NoEffectiveDamage";
+        if (resolvedAttacker == null || !BattleTargetUtility.IsMonster(resolvedAttacker)) return "SourceNotMonster";
+        bool secondaryDamage = damage.damageKind == BattleDamageKind.ReflectDamage
+                               || damage.damageKind == BattleDamageKind.ThornRetaliation
+                               || damage.damageKind == BattleDamageKind.ThornExplosion
+                               || damage.damageKind == BattleDamageKind.ShieldBonusDamage
+                               || damage.damageKind == BattleDamageKind.MarkExplosion;
+        if (damage.suppressThornReaction || damage.isReflectDamage || secondaryDamage || IsReflectDamageTag(damage.debugTag)) return "SecondaryDamage";
+        if (Time.time < nextThornBacklashReadyTime) return "Cooldown";
+        return string.Empty;
+    }
 
-        GameObject resolvedAttacker = ResolveMonsterAttackerObject(attacker);
-        CombatHealth attackerHealth = resolvedAttacker != null ? resolvedAttacker.GetComponentInParent<CombatHealth>() : null;
+    private void TriggerThornSet4Backlash(GameObject attacker, float incomingDamage)
+    {
+        CombatHealth attackerHealth = attacker != null ? attacker.GetComponentInParent<CombatHealth>() : null;
         if (attackerHealth == null || attackerHealth == combatHealth)
         {
             return;
         }
 
-        float damage = ResolveCurrentThornDamage(GetGlobalRuneCount(RuneType.Thorn)) * ThornSet4RetaliationMultiplier;
+        int thornCount = GetGlobalRuneCount(RuneType.Thorn);
+        float baseThornDamage = ResolveCurrentThornDamage(thornCount);
+        float damageBeforeNerf = baseThornDamage * ThornSet4OriginalRetaliationMultiplier;
+        float damageAfterMultiplier = damageBeforeNerf * ThornSet4BalanceMultiplier;
+        float damageCap = ResolveOwnerMaxHealth() * ThornSet4DamageMaxHealthRatio;
+        float damage = Mathf.Min(damageAfterMultiplier, damageCap);
         if (damage <= 0f)
         {
             return;
@@ -1233,16 +1407,30 @@ public class RuneRuntimeState : MonoBehaviour
             {
                 bypassAmbientAffinity = true,
                 isReflectDamage = true,
-                debugTag = "ThornSet4Retaliation"
+                debugTag = "ThornSet4Retaliation",
+                damageKind = BattleDamageKind.ThornRetaliation,
+                sourceOwner = gameObject,
+                bypassRuneFlatDamage = true,
+                bypassLifesteal = true,
+                suppressThornReaction = true
             };
+            float beforeEffectiveHealth = ResolveCurrentEffectiveHealth(attackerHealth);
             attackerHealth.ApplyDirectDamage(backlashDamage, DamagePopupType.Normal);
+            float actualDamage = Mathf.Max(0f, beforeEffectiveHealth - ResolveCurrentEffectiveHealth(attackerHealth));
+            float healFromReflect = TryTriggerThornDrain(actualDamage, "ThornSet4Retaliation");
+            ThornBalanceLog(
+                $"effect=Set4Retaliation thornCount={thornCount} incomingDamage={incomingDamage:F2} damageBeforeNerf={damageBeforeNerf:F2} " +
+                $"damageAfterMultiplier={damageAfterMultiplier:F2} damageCap={damageCap:F2} finalDamage={damage:F2} " +
+                $"target={attackerHealth.name} actualDamageDealt={actualDamage:F2} healFromReflect={healFromReflect:F2}");
         }
         finally
         {
             suppressReactiveAutoEffects = false;
         }
 
-        TryTriggerThornDrain(damage, "ThornSet4Retaliation");
+        ThornFixLog(
+            $"event=Set4Retaliation target={attackerHealth.name} damage={damage:F2} isReflectDamage=true " +
+            "bypassRuneFlatDamage=true bypassLifesteal=true");
     }
 
     private void ApplyBonusManaRecovery(float amount)
@@ -1405,9 +1593,22 @@ public class RuneRuntimeState : MonoBehaviour
         RuneSetBonusLog($"event=LifeResonanceEnded reason={reason}");
     }
 
-    public void NotifyShieldBrokenByMonsterDamage(float shieldBefore)
+    public void NotifyShieldBrokenByMonsterDamage(float shieldBefore, GameObject rawSource, GameObject resolvedMonster)
     {
-        if (!shieldSet4Active || shieldBefore <= 0f || Time.time < nextBarrierReconstructionReadyTime)
+        int shieldRuneCount = GetGlobalRuneCount(RuneType.Shield);
+        GameObject verifiedMonster = ResolveMonsterAttackerObject(resolvedMonster != null ? resolvedMonster : rawSource);
+        string skipReason = string.Empty;
+        if (!shieldSet4Active) skipReason = "ShieldRuneCountBelow4";
+        else if (shieldBefore <= 0f) skipReason = "NoShieldBroken";
+        else if (verifiedMonster == null || !BattleTargetUtility.IsMonster(verifiedMonster)) skipReason = "SourceNotMonster";
+        else if (Time.time < nextBarrierReconstructionReadyTime) skipReason = "Cooldown";
+
+        bool triggered = string.IsNullOrEmpty(skipReason);
+        ShieldFixLog(
+            $"event=ShieldBreakCheck player={name} rawSource={(rawSource != null ? rawSource.name : "<null>")} " +
+            $"resolvedMonster={(verifiedMonster != null ? verifiedMonster.name : "<null>")} isMonsterDamage={verifiedMonster != null} " +
+            $"shieldRuneCount={shieldRuneCount} triggered={triggered} skipReason={(triggered ? "None" : skipReason)}");
+        if (!triggered)
         {
             return;
         }
@@ -1453,16 +1654,18 @@ public class RuneRuntimeState : MonoBehaviour
         }
     }
 
-    private bool TryTriggerThornDrain(float thornDamage, string source)
+    private float TryTriggerThornDrain(float actualThornDamage, string source)
     {
-        if (!thornSet2Active || thornDamage <= 0f || Time.time < nextThornDrainReadyTime || combatHealth == null)
+        if (!thornSet2Active || actualThornDamage <= 0f || Time.time < nextThornDrainReadyTime || combatHealth == null)
         {
-            return false;
+            return 0f;
         }
 
         nextThornDrainReadyTime = Time.time + ThornDrainCooldown;
-        combatHealth.Heal(ResolveOwnerMaxHealth() * ThornDrainHealRatio);
-        return true;
+        float beforeHealth = ResolveCurrentHealth(combatHealth);
+        float requestedHeal = Mathf.Min(ResolveOwnerMaxHealth() * ThornDrainHealRatio, actualThornDamage);
+        combatHealth.Heal(requestedHeal);
+        return Mathf.Max(0f, ResolveCurrentHealth(combatHealth) - beforeHealth);
     }
 
     private void TryResolveLuckLottery()
@@ -1825,6 +2028,36 @@ public class RuneRuntimeState : MonoBehaviour
         Debug.Log($"[Rune][ThornCounter] {message}", this);
     }
 
+    private void ThornFixLog(string message)
+    {
+        if (!debugRuneThornCounter && !debugRuneSetBonuses)
+        {
+            return;
+        }
+
+        Debug.Log($"[ThornRuneFix] {message}", this);
+    }
+
+    private void ThornBalanceLog(string message)
+    {
+        if (!debugRuneThornCounter && !debugRuneSetBonuses)
+        {
+            return;
+        }
+
+        Debug.Log($"[ThornBalance] {message}", this);
+    }
+
+    private void ShieldFixLog(string message)
+    {
+        if (!debugRuneSetBonuses)
+        {
+            return;
+        }
+
+        Debug.Log($"[ShieldRuneFix] {message}", this);
+    }
+
     private bool TryResolveRuneTestTargetSkill(out BattleSkill targetSkill)
     {
         targetSkill = null;
@@ -1943,8 +2176,10 @@ public class RuneRuntimeState : MonoBehaviour
         {
             skillRuneCounts[i].Clear();
             pendingSkillFirstHitCastIds[i].Clear();
-            nextSkillCastIds[i] = 0;
         }
+
+        runeFlatDamageConsumedCastIds.Clear();
+        runeFlatDamageFallbackReadyTimes.Clear();
     }
 
     private void ApplyGlobalPassiveBonuses()
@@ -2032,7 +2267,11 @@ public class RuneRuntimeState : MonoBehaviour
             }
         }
 
+        int resonanceRuneCount = GetRuneEquipResonanceEffectiveRuneCount();
+        appliedHealthBonus += resonanceRuneCount * RuneEquipResonanceMaxHealthPerRune;
+
         ApplyStoredStatBonuses();
+        LogRuneEquipResonance(resonanceRuneCount);
         LogAttributeDiagnostics();
 
         ClampCurrentShieldToRuneCap();
@@ -2251,6 +2490,24 @@ public class RuneRuntimeState : MonoBehaviour
         appliedManaRegenBonus = 0f;
     }
 
+    private void LogRuneEquipResonance(int effectiveRuneCount)
+    {
+        if (!EnemySpawner.CombatBalanceLogsEnabled || lastLoggedRuneEquipResonanceCount == effectiveRuneCount)
+        {
+            return;
+        }
+
+        lastLoggedRuneEquipResonanceCount = effectiveRuneCount;
+        int equippedRuneCount = GetTotalEquippedRuneCount();
+        Debug.Log(
+            $"[RuneEquipResonance] equippedRuneCount={equippedRuneCount} effectiveRuneCount={effectiveRuneCount} " +
+            $"outgoingMultiplier={GetRuneEquipResonanceOutgoingMultiplier():F2} " +
+            $"incomingMultiplier={GetRuneEquipResonanceIncomingMultiplier():F2} " +
+            $"maxHpBonus={GetRuneEquipResonanceMaxHealthBonus():F0} applied={effectiveRuneCount > 0} " +
+            $"reason={(effectiveRuneCount > 0 ? "EquippedRunes" : "NoEquippedRunes")}",
+            this);
+    }
+
     private float ResolveCooldownManagerBaseMaxMana()
     {
         if (cooldownManager == null)
@@ -2416,6 +2673,13 @@ public class RuneRuntimeState : MonoBehaviour
         return health.resourceBank != null
             ? Mathf.Max(0f, health.resourceBank.currentHealth)
             : Mathf.Max(0f, health.currentHealth);
+    }
+
+    private static float ResolveCurrentEffectiveHealth(CombatHealth health)
+    {
+        return health != null
+            ? ResolveCurrentHealth(health) + Mathf.Max(0f, health.GetCurrentShield())
+            : 0f;
     }
 
     private float ResolveThornCounterCooldown()

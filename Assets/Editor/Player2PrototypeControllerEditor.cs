@@ -13,6 +13,8 @@ public class Player2PrototypeControllerEditor : Editor
     private SerializedProperty dashDistanceProp;
     private SerializedProperty dashDurationProp;
     private SerializedProperty lockCharacterRotationProp;
+    private SerializedProperty visualFloatHeightProp;
+    private SerializedProperty debugVisualHeightProp;
 
     private SerializedProperty currentDivineMarkProp;
 
@@ -31,6 +33,8 @@ public class Player2PrototypeControllerEditor : Editor
         dashDistanceProp = serializedObject.FindProperty("dashDistance");
         dashDurationProp = serializedObject.FindProperty("dashDuration");
         lockCharacterRotationProp = serializedObject.FindProperty("lockCharacterRotation");
+        visualFloatHeightProp = serializedObject.FindProperty("visualFloatHeight");
+        debugVisualHeightProp = serializedObject.FindProperty("debugVisualHeight");
 
         currentDivineMarkProp = serializedObject.FindProperty("currentSwordEnergy");
 
@@ -59,6 +63,14 @@ public class Player2PrototypeControllerEditor : Editor
         DrawIfNotNull(dashDistanceProp);
         DrawIfNotNull(dashDurationProp);
         DrawIfNotNull(lockCharacterRotationProp);
+        if (visualFloatHeightProp != null)
+        {
+            EditorGUILayout.PropertyField(
+                visualFloatHeightProp,
+                new GUIContent(
+                    "Visual Float Height",
+                    "Extra visual offset. Default 0 because Player02 Spine prefab base position already includes correct floating height."));
+        }
         EditorGUILayout.EndVertical();
     }
 
@@ -95,6 +107,7 @@ public class Player2PrototypeControllerEditor : Editor
         DrawIfNotNull(rRenderCameraProp);
         DrawIfNotNull(rSwarmEnemyLayerProp);
         DrawIfNotNull(useRawPrefabRotationForSkillEffectsProp);
+        DrawIfNotNull(debugVisualHeightProp);
 
         EditorGUILayout.EndVertical();
     }

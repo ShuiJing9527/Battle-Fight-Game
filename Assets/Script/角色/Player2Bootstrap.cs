@@ -16,7 +16,6 @@ public class Player2Bootstrap : MonoBehaviour
 
     [Header("Height Offsets")]
     [SerializeField] private float player01YOffset = 0.75f;
-    [SerializeField] private float player02YOffset = 1.2f;
 
     [Header("Fallback Names (Optional)")]
     [SerializeField] private string player01Name = "Player01";
@@ -883,7 +882,13 @@ public class Player2Bootstrap : MonoBehaviour
 
         if (character == player02 || character.GetComponent<Player2PrototypeController>() != null || (!string.IsNullOrEmpty(player02Name) && character.name.Contains(player02Name)))
         {
-            return player02YOffset;
+            Player2PrototypeController player02Controller = character.GetComponent<Player2PrototypeController>();
+            if (player02Controller != null && player02Controller.TryGetGroundedRootOffset(out float groundedRootOffset))
+            {
+                return groundedRootOffset;
+            }
+
+            return player01YOffset;
         }
 
         return player01YOffset;

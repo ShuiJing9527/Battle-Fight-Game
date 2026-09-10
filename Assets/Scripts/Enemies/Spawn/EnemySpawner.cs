@@ -53,6 +53,16 @@ public class EnemySpawner : MonoBehaviour
         public RigidbodyConstraints constraints;
     }
 
+    private struct EnemySpawnWeightProfile
+    {
+        public float slime;
+        public float lava;
+        public float poison;
+        public float rainbow;
+    }
+
+    public static bool CombatBalanceLogsEnabled { get; private set; }
+
     [Header("Enemy")]
     public GameObject[] enemyPrefabs;
     public GameObject[] normalEnemyPrefabs;
@@ -161,32 +171,32 @@ public class EnemySpawner : MonoBehaviour
     public float normalSpeedMultiplier = 1f;
     [Header("Rank Multipliers - Elite")]
     [Tooltip("Elite monster HP multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteHealthMultiplier = 1.9f;
+    public float eliteHealthMultiplier = 4f;
     [Tooltip("Elite monster physical attack multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteAttackMultiplier = 1.45f;
+    public float eliteAttackMultiplier = 2.8f;
     [Tooltip("Elite monster physical defense multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteDefenseMultiplier = 1.2f;
+    public float eliteDefenseMultiplier = 1.4f;
     [Tooltip("Elite monster special attack multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteMagicMultiplier = 1.45f;
+    public float eliteMagicMultiplier = 2.8f;
     [Tooltip("Elite monster special defense multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteResistanceMultiplier = 1.2f;
+    public float eliteResistanceMultiplier = 1.4f;
     [Tooltip("Elite monster speed multiplier after base and time growth. 1 means unchanged.")]
-    public float eliteSpeedMultiplier = 1.05f;
+    public float eliteSpeedMultiplier = 1.2f;
     [Tooltip("Elite attack interval multiplier passed to EnemyController. Values above 1 make attacks slower in the current formula.")]
     public float eliteAttackIntervalMultiplier = 1.1f;
     [Tooltip("Elite outgoing damage multiplier passed to EnemyController. 1 means unchanged.")]
     public float eliteOutgoingDamageMultiplier = 1f;
     [Header("Rank Multipliers - Boss")]
     [Tooltip("Boss HP multiplier after base and time growth. 1 means unchanged.")]
-    public float bossHealthMultiplier = 5.5f;
+    public float bossHealthMultiplier = 9f;
     [Tooltip("Boss physical attack multiplier after base and time growth. 1 means unchanged.")]
-    public float bossAttackMultiplier = 2f;
+    public float bossAttackMultiplier = 3.2f;
     [Tooltip("Boss physical defense multiplier after base and time growth. 1 means unchanged.")]
-    public float bossDefenseMultiplier = 1.45f;
+    public float bossDefenseMultiplier = 1.6f;
     [Tooltip("Boss special attack multiplier after base and time growth. 1 means unchanged.")]
-    public float bossMagicMultiplier = 2f;
+    public float bossMagicMultiplier = 3.2f;
     [Tooltip("Boss special defense multiplier after base and time growth. 1 means unchanged.")]
-    public float bossResistanceMultiplier = 1.45f;
+    public float bossResistanceMultiplier = 1.6f;
     [Tooltip("Boss speed multiplier after base and time growth. 1 means unchanged.")]
     public float bossSpeedMultiplier = 1f;
     [Tooltip("Boss attack interval multiplier passed to EnemyController. Values above 1 make attacks slower in the current formula.")]
@@ -198,6 +208,7 @@ public class EnemySpawner : MonoBehaviour
     [Header("Elite")]
     public float eliteSpawnIntervalMin = 18f;
     public float eliteSpawnIntervalMax = 30f;
+    [SerializeField, Range(0.1f, 1f)] private float finalRushEliteSpawnIntervalMultiplier = 0.75f;
     [SerializeField, Min(0f)] private float eliteGuaranteedSpawnTime = 24f;
     public int maxAliveEliteCount = 3;
 
@@ -232,13 +243,13 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Cleanup boss speed multiplier from the dynamic spawn-stopped boss reinforcement.")]
     [SerializeField, Min(0.01f)] private float ultimateBossSpeedMultiplier = 1f;
     [Tooltip("Additional cleanup boss HP multiplier applied only to the post-FinalRush cleanup boss.")]
-    [SerializeField, Min(0.01f)] private float cleanupBossHealthMultiplier = 1f;
+    [SerializeField, Min(0.01f)] private float cleanupBossHealthMultiplier = 1.30f;
     [Tooltip("Additional cleanup boss physical attack multiplier applied only to the post-FinalRush cleanup boss.")]
-    [SerializeField, Min(0.01f)] private float cleanupBossAttackMultiplier = 1f;
+    [SerializeField, Min(0.01f)] private float cleanupBossAttackMultiplier = 1.35f;
     [Tooltip("Additional cleanup boss physical defense multiplier applied only to the post-FinalRush cleanup boss.")]
     [SerializeField, Min(0.01f)] private float cleanupBossDefenseMultiplier = 1f;
     [Tooltip("Additional cleanup boss special attack multiplier applied only to the post-FinalRush cleanup boss.")]
-    [SerializeField, Min(0.01f)] private float cleanupBossSpecialAttackMultiplier = 1f;
+    [SerializeField, Min(0.01f)] private float cleanupBossSpecialAttackMultiplier = 1.35f;
     [Tooltip("Additional cleanup boss special defense multiplier applied only to the post-FinalRush cleanup boss.")]
     [SerializeField, Min(0.01f)] private float cleanupBossSpecialDefenseMultiplier = 1f;
     [Tooltip("Additional cleanup boss speed multiplier applied only to the post-FinalRush cleanup boss.")]
@@ -318,6 +329,11 @@ public class EnemySpawner : MonoBehaviour
     [SerializeField] private bool enableCombatBalanceLogs = false;
     private float nextSpawnerBudgetLogTime;
     private float nextTimelineGrowthRefreshTime;
+    private float nextFinalRushPressureAuditTime;
+    private int finalRushEliteSpawnedSinceAudit;
+    private bool finalRushPlayerPositionInitialized;
+    private bool finalRushPlayerMovedSinceAudit;
+    private Vector3 lastFinalRushPlayerPosition;
 
     private Player2Bootstrap playerBootstrap;
     private TODController todController;
@@ -382,6 +398,29 @@ public class EnemySpawner : MonoBehaviour
 
     private void Start()
     {
+        // Formal scenes serialize older tuning values, so keep the runtime rank templates authoritative.
+        eliteHealthMultiplier = 4f;
+        eliteAttackMultiplier = 2.8f;
+        eliteDefenseMultiplier = 1.4f;
+        eliteMagicMultiplier = 2.8f;
+        eliteResistanceMultiplier = 1.4f;
+        eliteSpeedMultiplier = 1.2f;
+        bossHealthMultiplier = 9f;
+        bossAttackMultiplier = 3.2f;
+        bossDefenseMultiplier = 1.6f;
+        bossMagicMultiplier = 3.2f;
+        bossResistanceMultiplier = 1.6f;
+        if (eliteGeometry != null)
+        {
+            // Preserve the project's original elite template: prefab visual scale 0.2 x 2 = 0.4.
+            eliteGeometry.visualScale = new Vector3(2f, 2f, 2f);
+        }
+
+        cleanupBossHealthMultiplier = 1.30f;
+        cleanupBossAttackMultiplier = 1.35f;
+        cleanupBossSpecialAttackMultiplier = 1.35f;
+        CombatBalanceLogsEnabled = enableCombatBalanceLogs;
+        CombatRuntimeAuditLogger.SetEnabled(enableCombatBalanceLogs, "EnemySpawner.EnableCombatBalanceLogs");
         SubscribeDifficultyDirectorEvents();
         CachePrefabPools();
         ResolveEnemyLayer();
@@ -394,6 +433,7 @@ public class EnemySpawner : MonoBehaviour
 
     private void OnDestroy()
     {
+        CombatBalanceLogsEnabled = false;
         UnsubscribeDifficultyDirectorEvents();
     }
 
@@ -437,6 +477,7 @@ public class EnemySpawner : MonoBehaviour
         CheckFinalMomentBossTrigger();
         CheckSpawnStoppedUltimateBossResolution();
         RefreshLivingEnemiesForTimelineGrowth();
+        LogFinalRushPressureAuditIfNeeded();
     }
 
     private void RefreshLivingEnemiesForTimelineGrowth()
@@ -606,11 +647,12 @@ public class EnemySpawner : MonoBehaviour
     {
         while (true)
         {
-            float earliestAttemptTime = Mathf.Max(10f, Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax));
+            float eliteIntervalMultiplier = ResolveEliteSpawnIntervalMultiplier();
+            float earliestAttemptTime = Mathf.Max(10f, Mathf.Min(eliteSpawnIntervalMin, eliteSpawnIntervalMax) * eliteIntervalMultiplier);
             float guaranteedSpawnTime = Mathf.Max(
                 earliestAttemptTime,
-                eliteGuaranteedSpawnTime,
-                Mathf.Max(eliteSpawnIntervalMin, eliteSpawnIntervalMax));
+                eliteGuaranteedSpawnTime * eliteIntervalMultiplier,
+                Mathf.Max(eliteSpawnIntervalMin, eliteSpawnIntervalMax) * eliteIntervalMultiplier);
             float randomAttemptTime = Random.Range(
                 earliestAttemptTime,
                 Mathf.Max(earliestAttemptTime + 0.01f, guaranteedSpawnTime - 0.01f));
@@ -785,8 +827,7 @@ public class EnemySpawner : MonoBehaviour
             return null;
         }
 
-        int randomIndex = Random.Range(0, sourcePool.Count);
-        GameObject selectedEnemy = sourcePool[randomIndex];
+        GameObject selectedEnemy = SelectEnemyPrefabForCurrentPhase(sourcePool, forcedRank);
         if (selectedEnemy == null)
         {
             return null;
@@ -833,6 +874,140 @@ public class EnemySpawner : MonoBehaviour
             source: "EnemySpawner");
 
         return spawnedEnemy;
+    }
+
+    private GameObject SelectEnemyPrefabForCurrentPhase(List<GameObject> sourcePool, MonsterRank rank)
+    {
+        if (sourcePool == null || sourcePool.Count == 0)
+        {
+            return null;
+        }
+
+        // Boss selection remains on its existing dedicated pool and is not affected by phase weighting.
+        if (rank == MonsterRank.Boss)
+        {
+            return sourcePool[Random.Range(0, sourcePool.Count)];
+        }
+
+        DayNightPhase phase = TODDayNightAdapter.TryGetCurrentPhase(out DayNightPhase currentPhase)
+            ? currentPhase
+            : DayNightPhase.Day;
+        EnemySpawnWeightProfile baseWeights = ResolveBaseSpawnWeights(phase);
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        bool isFinalRush = director != null && director.IsFinalRushActive;
+        EnemySpawnWeightProfile modifiers = new EnemySpawnWeightProfile
+        {
+            slime = isFinalRush ? 0.80f : 1f,
+            lava = isFinalRush ? 1.25f : 1f,
+            poison = 1f,
+            rainbow = isFinalRush ? 1.35f : 1f
+        };
+        EnemySpawnWeightProfile finalWeights = new EnemySpawnWeightProfile
+        {
+            slime = baseWeights.slime * modifiers.slime,
+            lava = baseWeights.lava * modifiers.lava,
+            poison = baseWeights.poison * modifiers.poison,
+            rainbow = baseWeights.rainbow * modifiers.rainbow
+        };
+
+        float totalWeight = 0f;
+        for (int i = 0; i < sourcePool.Count; i++)
+        {
+            totalWeight += ResolvePrefabSpawnWeight(sourcePool[i], finalWeights);
+        }
+
+        GameObject selected = null;
+        if (totalWeight > 0f)
+        {
+            float roll = Random.value * totalWeight;
+            for (int i = 0; i < sourcePool.Count; i++)
+            {
+                GameObject candidate = sourcePool[i];
+                float candidateWeight = ResolvePrefabSpawnWeight(candidate, finalWeights);
+                if (candidate == null || candidateWeight <= 0f)
+                {
+                    continue;
+                }
+
+                roll -= candidateWeight;
+                if (roll <= 0f)
+                {
+                    selected = candidate;
+                    break;
+                }
+            }
+        }
+
+        if (selected == null)
+        {
+            for (int i = 0; i < sourcePool.Count; i++)
+            {
+                if (sourcePool[i] != null)
+                {
+                    selected = sourcePool[i];
+                    break;
+                }
+            }
+        }
+
+        if (enableCombatBalanceLogs)
+        {
+            Debug.Log(
+                "[EnemySpawnWeights] " +
+                $"phase={phase} isFinalRush={isFinalRush} " +
+                $"baseWeightSlime={baseWeights.slime:F2} baseWeightLava={baseWeights.lava:F2} baseWeightPoison={baseWeights.poison:F2} baseWeightRainbow={baseWeights.rainbow:F2} " +
+                $"finalRushWeightModifierSlime={modifiers.slime:F2} finalRushWeightModifierLava={modifiers.lava:F2} finalRushWeightModifierPoison={modifiers.poison:F2} finalRushWeightModifierRainbow={modifiers.rainbow:F2} " +
+                $"finalWeightSlime={finalWeights.slime:F2} finalWeightLava={finalWeights.lava:F2} finalWeightPoison={finalWeights.poison:F2} finalWeightRainbow={finalWeights.rainbow:F2} " +
+                $"selectedEnemy={(selected != null ? selected.name : "null")} rank={rank} timeSeconds={(director != null ? director.ElapsedTime : 0f):F2}",
+                this);
+        }
+
+        return selected;
+    }
+
+    private static EnemySpawnWeightProfile ResolveBaseSpawnWeights(DayNightPhase phase)
+    {
+        switch (phase)
+        {
+            case DayNightPhase.Dawn:
+                return new EnemySpawnWeightProfile { slime = 30f, poison = 25f, lava = 30f, rainbow = 15f };
+            case DayNightPhase.Dusk:
+                return new EnemySpawnWeightProfile { slime = 20f, poison = 30f, lava = 30f, rainbow = 20f };
+            case DayNightPhase.Night:
+                return new EnemySpawnWeightProfile { slime = 15f, poison = 20f, lava = 40f, rainbow = 25f };
+            default:
+                return new EnemySpawnWeightProfile { slime = 35f, poison = 35f, lava = 20f, rainbow = 10f };
+        }
+    }
+
+    private float ResolveEliteSpawnIntervalMultiplier()
+    {
+        EnemyDifficultyDirector director = ResolveDifficultyDirector();
+        return director != null && director.IsFinalRushActive
+            ? Mathf.Clamp(finalRushEliteSpawnIntervalMultiplier, 0.1f, 1f)
+            : 1f;
+    }
+
+    private static float ResolvePrefabSpawnWeight(GameObject prefab, EnemySpawnWeightProfile weights)
+    {
+        if (prefab == null)
+        {
+            return 0f;
+        }
+
+        MonsterIdentity identity = prefab.GetComponent<MonsterIdentity>();
+        MonsterSpecies species = identity != null ? identity.species : MonsterSpecies.BlueSlime;
+        switch (species)
+        {
+            case MonsterSpecies.LavaSlime:
+                return Mathf.Max(0f, weights.lava);
+            case MonsterSpecies.PoisonSlime:
+                return Mathf.Max(0f, weights.poison);
+            case MonsterSpecies.RainbowSlime:
+                return Mathf.Max(0f, weights.rainbow);
+            default:
+                return Mathf.Max(0f, weights.slime);
+        }
     }
 
     public void SpawnSplitNormalsFromElite(GameObject eliteSource, int count, float scatterRadius, bool allowDuringExternalTest = false)
@@ -1328,6 +1503,11 @@ public class EnemySpawner : MonoBehaviour
         }
 
         aliveEnemies.Add(enemy);
+        MonsterIdentity spawnedIdentity = enemy.GetComponent<MonsterIdentity>();
+        if (difficultyDirector != null && difficultyDirector.IsFinalRushActive && spawnedIdentity != null && spawnedIdentity.rank == MonsterRank.Elite)
+        {
+            finalRushEliteSpawnedSinceAudit++;
+        }
         trackedEnemyCleanupDirty = true;
         CacheMonsterBaseSnapshot(enemy);
         ConfigureSpawnedEnemyPhysics(enemy);
@@ -1596,6 +1776,15 @@ public class EnemySpawner : MonoBehaviour
             }
 
             LogEliteScaleTrace(enemy, source, "ApplyRankGeometryAfter", prefabBaseVisualScale, geometry.visualScale, expectedFinalVisualScale, visualRoot, slimeAnimationController);
+
+            if (rank == MonsterRank.Elite)
+            {
+                StartCoroutine(ValidateEliteTemplateAfterFirstFrame(
+                    enemy,
+                    source,
+                    prefabBaseVisualScale,
+                    expectedFinalVisualScale));
+            }
         }
 
         Transform groundContact = EnsureRankGroundContact(enemy);
@@ -1705,7 +1894,7 @@ public class EnemySpawner : MonoBehaviour
         return sanitizedConfiguredScale;
     }
 
-    private static void LogEliteScaleTrace(
+    private void LogEliteScaleTrace(
         GameObject enemy,
         string source,
         string phase,
@@ -1715,7 +1904,7 @@ public class EnemySpawner : MonoBehaviour
         Transform visualRoot,
         SlimeAnimationController slimeAnimationController)
     {
-        if (enemy == null)
+        if (!enableCombatBalanceLogs || enemy == null)
         {
             return;
         }
@@ -2147,7 +2336,10 @@ public class EnemySpawner : MonoBehaviour
             specialBossSpeedMultiplier = Mathf.Max(specialBossSpeedMultiplier, Mathf.Max(0.01f, finalMomentBossSpeedMultiplier));
         }
 
-        if (rank == MonsterRank.Boss && ultimateBossModifiersByEnemyId.TryGetValue(enemyId, out UltimateBossModifiers ultimateModifiers))
+        UltimateBossModifiers ultimateModifiers = default;
+        bool isUltimateBoss = rank == MonsterRank.Boss
+                              && ultimateBossModifiersByEnemyId.TryGetValue(enemyId, out ultimateModifiers);
+        if (isUltimateBoss)
         {
             specialBossHpMultiplier = Mathf.Max(specialBossHpMultiplier, Mathf.Max(0.01f, ultimateModifiers.hpMultiplier));
             specialBossAttackMultiplier = Mathf.Max(specialBossAttackMultiplier, Mathf.Max(0.01f, ultimateModifiers.attackMultiplier));
@@ -2177,13 +2369,19 @@ public class EnemySpawner : MonoBehaviour
             specialBossSpeedMultiplier *= Mathf.Max(0.01f, cleanupBossSpeedMultiplier);
         }
 
-        // Stable baseline: only base stats, Director time curve, rank and Final Rush may scale combat stats.
+        // Keep ordinary enemies on the stable baseline; only the post-countdown boss gets an extra HP/attack band.
         specialBossHpMultiplier = 1f;
         specialBossAttackMultiplier = 1f;
         specialBossDefenseMultiplier = 1f;
         specialBossSpecialAttackMultiplier = 1f;
         specialBossSpecialDefenseMultiplier = 1f;
         specialBossSpeedMultiplier = 1f;
+        if (isCleanupBoss && isUltimateBoss)
+        {
+            specialBossHpMultiplier = Mathf.Max(0.01f, cleanupBossHealthMultiplier);
+            specialBossAttackMultiplier = Mathf.Max(0.01f, cleanupBossAttackMultiplier);
+            specialBossSpecialAttackMultiplier = Mathf.Max(0.01f, cleanupBossSpecialAttackMultiplier);
+        }
 
         float healthMultiplier = Mathf.Max(0.01f, baseHealthMultiplier) * hpTimeMultiplier * rankHealthMultiplier * specialBossHpMultiplier * runeScaling.strengthMultiplier;
         float attackMultiplier = Mathf.Max(0.01f, baseAttackMultiplier) * attackTimeMultiplier * rankAttackMultiplier * specialBossAttackMultiplier * runeScaling.strengthMultiplier;
@@ -2200,24 +2398,50 @@ public class EnemySpawner : MonoBehaviour
         stats.speed = Mathf.Max(0.1f, RoundToDecimals(snapshot.speed * speedMultiplier, 2));
         stats.luck = Mathf.Max(0f, snapshot.luck);
 
-        if (enableCombatBalanceLogs)
+        if (enableCombatBalanceLogs && refillCurrentHealth)
         {
             EnemyDifficultyDirector director = ResolveDifficultyDirector();
             bool finalRushActive = director != null && director.IsFinalRushActive;
-            float finalRushHpMultiplier = finalRushActive ? 1.35f : 1f;
-            float finalRushAttackMultiplier = finalRushActive ? 1.35f : 1f;
+            float finalRushHpMultiplier = finalRushActive ? 1.50f : 1f;
+            float finalRushAttackMultiplier = finalRushActive ? 1.95f : 1f;
             float finalRushDefenseMultiplier = finalRushActive ? 1.15f : 1f;
+            float finalRushMagicMultiplier = finalRushAttackMultiplier;
+            float finalRushResistanceMultiplier = finalRushDefenseMultiplier;
+            float finalRushSpeedMultiplier = finalRushActive ? 1.15f : 1f;
             float timeHpMultiplier = director != null ? director.CurrentHpMultiplier / finalRushHpMultiplier : 1f;
             float timeAttackMultiplier = director != null ? director.CurrentAttackMultiplier / finalRushAttackMultiplier : 1f;
             float timeDefenseMultiplier = director != null ? director.CurrentDefenseMultiplier / finalRushDefenseMultiplier : 1f;
+            float timeMagicMultiplier = director != null ? director.CurrentSpecialAttackMultiplier / finalRushMagicMultiplier : 1f;
+            float timeResistanceMultiplier = director != null ? director.CurrentSpecialDefenseMultiplier / finalRushResistanceMultiplier : 1f;
+            float timeSpeedMultiplier = director != null ? director.CurrentSpeedMultiplier / finalRushSpeedMultiplier : 1f;
+            float appliedUltimateHpMultiplier = isCleanupBoss && isUltimateBoss ? specialBossHpMultiplier : 1f;
+            float appliedUltimateAttackMultiplier = isCleanupBoss && isUltimateBoss ? specialBossAttackMultiplier : 1f;
+            float appliedUltimateMagicMultiplier = isCleanupBoss && isUltimateBoss ? specialBossSpecialAttackMultiplier : 1f;
             Debug.Log(
-                $"[EnemyGrowth] enemyName={enemy.name} rank={rank} baseHP={snapshot.maxHealth:F2} timeHpMultiplier={timeHpMultiplier:F2} " +
-                $"rankHpMultiplier={rankHealthMultiplier:F2} finalRushHpMultiplier={finalRushHpMultiplier:F2} finalHP={stats.maxHealth:F2} " +
-                $"baseATK={snapshot.physicalAttack:F2} timeAttackMultiplier={timeAttackMultiplier:F2} rankAttackMultiplier={rankAttackMultiplier:F2} " +
-                $"finalRushAttackMultiplier={finalRushAttackMultiplier:F2} finalATK={stats.physicalAttack:F2} " +
-                $"baseDEF={snapshot.physicalDefense:F2} timeDefenseMultiplier={timeDefenseMultiplier:F2} rankDefenseMultiplier={rankDefenseMultiplier:F2} " +
-                $"finalRushDefenseMultiplier={finalRushDefenseMultiplier:F2} finalDEF={stats.physicalDefense:F2} " +
-                "playerRuneGrowthMultiplier=1.00 hiddenAttackMultiplier=1.00 randomGrowthMultiplier=1.00",
+                "[RuntimeEnemyStatsAudit] " +
+                $"enemyName={enemy.name} rank={rank} " +
+                $"baseHP={snapshot.maxHealth:F2} baseATK={snapshot.physicalAttack:F2} baseMAG={snapshot.specialAttack:F2} " +
+                $"baseDEF={snapshot.physicalDefense:F2} baseRES={snapshot.specialDefense:F2} baseSPD={snapshot.speed:F2} " +
+                $"timeSeconds={(director != null ? director.ElapsedTime : 0f):F2} " +
+                $"timeGrowthHP={timeHpMultiplier:F2} timeGrowthATK={timeAttackMultiplier:F2} timeGrowthMAG={timeMagicMultiplier:F2} " +
+                $"timeGrowthDEF={timeDefenseMultiplier:F2} timeGrowthRES={timeResistanceMultiplier:F2} timeGrowthSPD={timeSpeedMultiplier:F2} " +
+                $"rankHpMultiplier={rankHealthMultiplier:F2} rankAtkMultiplier={rankAttackMultiplier:F2} rankMagMultiplier={rankMagicMultiplier:F2} " +
+                $"rankDefMultiplier={rankDefenseMultiplier:F2} rankResMultiplier={rankResistanceMultiplier:F2} rankSpdMultiplier={rankSpeedMultiplier:F2} " +
+                $"finalRushHpMultiplier={finalRushHpMultiplier:F2} finalRushAtkMultiplier={finalRushAttackMultiplier:F2} finalRushMagMultiplier={finalRushMagicMultiplier:F2} " +
+                $"finalRushDefMultiplier={finalRushDefenseMultiplier:F2} finalRushResMultiplier={finalRushResistanceMultiplier:F2} finalRushSpdMultiplier={finalRushSpeedMultiplier:F2} " +
+                $"ultimateBossHpMultiplier={appliedUltimateHpMultiplier:F2} ultimateBossAtkMultiplier={appliedUltimateAttackMultiplier:F2} ultimateBossMagMultiplier={appliedUltimateMagicMultiplier:F2} " +
+                $"finalHP={stats.maxHealth:F2} finalATK={stats.physicalAttack:F2} finalMAG={stats.specialAttack:F2} " +
+                $"finalDEF={stats.physicalDefense:F2} finalRES={stats.specialDefense:F2} finalSPD={stats.speed:F2}",
+                enemy);
+        }
+
+        if (isCleanupBoss && isUltimateBoss && enableCombatBalanceLogs)
+        {
+            Debug.Log(
+                $"[BossBalance] isUltimateBoss=true hpMultiplier={specialBossHpMultiplier:F2} " +
+                $"attackMultiplier={specialBossAttackMultiplier:F2} defenseMultiplier={specialBossDefenseMultiplier:F2} " +
+                $"speedMultiplier={specialBossSpeedMultiplier:F2} finalHP={stats.maxHealth:F2} " +
+                $"finalATK={stats.physicalAttack:F2} finalMAG={stats.specialAttack:F2}",
                 enemy);
         }
 
@@ -3184,6 +3408,138 @@ public class EnemySpawner : MonoBehaviour
             enemy);
     }
 
+    private IEnumerator ValidateEliteTemplateAfterFirstFrame(
+        GameObject enemy,
+        string source,
+        Vector3 prefabBaseVisualScale,
+        Vector3 expectedFinalVisualScale)
+    {
+        yield return null;
+
+        if (enemy == null)
+        {
+            yield break;
+        }
+
+        MonsterIdentity identity = enemy.GetComponent<MonsterIdentity>();
+        if (identity == null || identity.rank != MonsterRank.Elite)
+        {
+            yield break;
+        }
+
+        Transform visualRoot = ResolveRankVisualRoot(enemy);
+        bool visualScaleOverwritten = visualRoot == null
+                                      || !Approximately(visualRoot.localScale, expectedFinalVisualScale, 0.001f);
+        if (visualRoot != null && visualScaleOverwritten)
+        {
+            visualRoot.localScale = expectedFinalVisualScale;
+            SlimeAnimationController animationController = enemy.GetComponent<SlimeAnimationController>();
+            if (animationController != null)
+            {
+                animationController.SetVisualBaseScale(expectedFinalVisualScale);
+            }
+        }
+
+        CombatStats stats = enemy.GetComponent<CombatStats>();
+        monsterBaseSnapshots.TryGetValue(enemy.GetInstanceID(), out MonsterBaseSnapshot snapshot);
+        float expectedMinimumHealth = snapshot.initialized
+            ? snapshot.maxHealth * eliteHealthMultiplier
+            : 0f;
+        bool rankStatsMismatch = stats == null
+                                 || (snapshot.initialized && stats.maxHealth + 0.5f < expectedMinimumHealth);
+        bool multiplierMismatch = !Mathf.Approximately(eliteHealthMultiplier, 4f)
+                                  || !Mathf.Approximately(eliteAttackMultiplier, 2.8f)
+                                  || !Mathf.Approximately(eliteMagicMultiplier, 2.8f)
+                                  || !Mathf.Approximately(eliteDefenseMultiplier, 1.4f)
+                                  || !Mathf.Approximately(eliteResistanceMultiplier, 1.4f)
+                                  || !Mathf.Approximately(eliteSpeedMultiplier, 1.2f);
+        bool mismatch = visualScaleOverwritten || rankStatsMismatch || multiplierMismatch;
+
+        if (!enableCombatBalanceLogs)
+        {
+            yield break;
+        }
+
+        string prefabName = enemy.name.Replace("(Clone)", string.Empty).Trim();
+        int runtimeSuffixIndex = prefabName.IndexOf('[');
+        if (runtimeSuffixIndex >= 0)
+        {
+            prefabName = prefabName.Substring(0, runtimeSuffixIndex).Trim();
+        }
+        string prefabPath = "Assets/Prefabs/Enemy/" + prefabName + ".prefab";
+        string mismatchReason = visualScaleOverwritten
+            ? "VisualScaleOverwrittenAfterTemplateApply"
+            : rankStatsMismatch
+                ? "EliteStatsMatchNormalTemplate"
+                : multiplierMismatch
+                    ? "EliteRankMultiplierMismatch"
+                    : "None";
+
+        Debug.Log(
+            "[EnemyTemplateCheck] " +
+            "enemyName=" + enemy.name +
+            " instanceId=" + enemy.GetInstanceID() +
+            " rank=" + identity.rank +
+            " templateType=Elite" +
+            " templateSource=" + source + ":eliteEnemyPrefabs" +
+            " prefabPath=" + prefabPath +
+            " isPooledInstance=false" +
+            " baseScale=" + prefabBaseVisualScale +
+            " templateScale=" + eliteGeometry.visualScale +
+            " rankScale=" + eliteGeometry.visualScale +
+            " finalRootScale=" + enemy.transform.localScale +
+            " finalVisualScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+            " baseHP=" + (snapshot.initialized ? snapshot.maxHealth.ToString("F1") : "n/a") +
+            " baseATK=" + (snapshot.initialized ? snapshot.physicalAttack.ToString("F1") : "n/a") +
+            " baseMAG=" + (snapshot.initialized ? snapshot.specialAttack.ToString("F1") : "n/a") +
+            " baseDEF=" + (snapshot.initialized ? snapshot.physicalDefense.ToString("F1") : "n/a") +
+            " baseRES=" + (snapshot.initialized ? snapshot.specialDefense.ToString("F1") : "n/a") +
+            " baseSPD=" + (snapshot.initialized ? snapshot.speed.ToString("F2") : "n/a") +
+            " rankHpMultiplier=" + eliteHealthMultiplier.ToString("F2") +
+            " rankAtkMultiplier=" + eliteAttackMultiplier.ToString("F2") +
+            " rankMagMultiplier=" + eliteMagicMultiplier.ToString("F2") +
+            " rankDefMultiplier=" + eliteDefenseMultiplier.ToString("F2") +
+            " rankResMultiplier=" + eliteResistanceMultiplier.ToString("F2") +
+            " rankSpdMultiplier=" + eliteSpeedMultiplier.ToString("F2") +
+            " finalHP=" + (stats != null ? stats.maxHealth.ToString("F1") : "n/a") +
+            " finalATK=" + (stats != null ? stats.physicalAttack.ToString("F1") : "n/a") +
+            " finalMAG=" + (stats != null ? stats.specialAttack.ToString("F1") : "n/a") +
+            " finalDEF=" + (stats != null ? stats.physicalDefense.ToString("F1") : "n/a") +
+            " finalRES=" + (stats != null ? stats.specialDefense.ToString("F1") : "n/a") +
+            " finalSPD=" + (stats != null ? stats.speed.ToString("F2") : "n/a") +
+            " dropProfile=Elite" +
+            " runeDropChance=0.55" +
+            " growthPointRange=3-4" +
+            " mismatch=" + mismatch +
+            " mismatchReason=" + mismatchReason,
+            enemy);
+
+        if (mismatch)
+        {
+            Debug.LogWarning(
+                "[EliteTemplateMismatch] " +
+                "enemyName=" + enemy.name +
+                " dropProfile=Elite" +
+                " templateType=Elite" +
+                " rank=" + identity.rank +
+                " actualTemplate=" + source + ":eliteEnemyPrefabs" +
+                " expectedTemplate=Elite" +
+                " finalVisualScale=" + (visualRoot != null ? visualRoot.localScale.ToString() : "null") +
+                " expectedEliteScale=" + expectedFinalVisualScale +
+                " finalHP=" + (stats != null ? stats.maxHealth.ToString("F1") : "n/a") +
+                " expectedEliteHPRange=>=" + expectedMinimumHealth.ToString("F1") +
+                " reason=" + mismatchReason,
+                enemy);
+        }
+    }
+
+    private static bool Approximately(Vector3 left, Vector3 right, float tolerance)
+    {
+        return Mathf.Abs(left.x - right.x) <= tolerance
+               && Mathf.Abs(left.y - right.y) <= tolerance
+               && Mathf.Abs(left.z - right.z) <= tolerance;
+    }
+
     private IEnumerator VerifyBossGroundingAfterSpawn(GameObject enemy, string spawnSource)
     {
         yield return new WaitForFixedUpdate();
@@ -3751,6 +4107,7 @@ public class EnemySpawner : MonoBehaviour
         ApplyCurrentMultiplierToMonster(ultimateBoss, refillCurrentHealth: true);
         ConfigureCleanupBossPhaseSplit(ultimateBoss);
         ResolveDifficultyDirector()?.ArmSpawnStoppedBossVictory(ultimateBoss);
+        CombatRuntimeAuditLogger.NotifyBossSpawned(ultimateBoss);
     }
 
     private void EnsureFinalMomentBoss()
@@ -4013,6 +4370,64 @@ public class EnemySpawner : MonoBehaviour
         return count;
     }
 
+    private void LogFinalRushPressureAuditIfNeeded()
+    {
+        if (!enableCombatBalanceLogs || difficultyDirector == null || !difficultyDirector.IsFinalRushActive)
+        {
+            nextFinalRushPressureAuditTime = 0f;
+            finalRushEliteSpawnedSinceAudit = 0;
+            finalRushPlayerPositionInitialized = false;
+            finalRushPlayerMovedSinceAudit = false;
+            return;
+        }
+
+        Transform trackedPlayer = ResolveActivePlayerTarget();
+        if (trackedPlayer != null)
+        {
+            if (finalRushPlayerPositionInitialized &&
+                (trackedPlayer.position - lastFinalRushPlayerPosition).sqrMagnitude > 0.0004f)
+            {
+                finalRushPlayerMovedSinceAudit = true;
+            }
+
+            lastFinalRushPlayerPosition = trackedPlayer.position;
+            finalRushPlayerPositionInitialized = true;
+        }
+
+        if (nextFinalRushPressureAuditTime <= 0f)
+        {
+            nextFinalRushPressureAuditTime = Time.time + 5f;
+            CombatHealth.ConsumeFinalRushPressureMetrics(out _, out _, out _);
+            return;
+        }
+
+        if (Time.time < nextFinalRushPressureAuditTime)
+        {
+            return;
+        }
+
+        nextFinalRushPressureAuditTime = Time.time + 5f;
+        CombatHealth.ConsumeFinalRushPressureMetrics(out int hitCount, out float shieldDamage, out float hpDamage);
+        Transform activePlayer = trackedPlayer;
+        CombatHealth playerHealth = activePlayer != null ? activePlayer.GetComponentInParent<CombatHealth>() : null;
+        bool playerIsStationary = !finalRushPlayerMovedSinceAudit;
+        float playerHp = playerHealth != null
+            ? (playerHealth.resourceBank != null ? playerHealth.resourceBank.currentHealth : playerHealth.currentHealth)
+            : 0f;
+        float playerShield = playerHealth != null ? playerHealth.GetCurrentShield() : 0f;
+
+        Debug.Log(
+            $"[FinalRushPressureAudit] timeSeconds={difficultyDirector.ElapsedTime:F2} aliveEnemies={CountAliveEnemiesForVictory()} " +
+            $"aliveNormal={CountAliveEnemies(MonsterRank.Normal)} aliveElite={CountAliveEnemies(MonsterRank.Elite)} " +
+            $"aliveBoss={CountAliveEnemies(MonsterRank.Boss)} enemyHitsOnPlayerLast5s={hitCount} " +
+            $"enemyDamageToShieldLast5s={shieldDamage:F2} enemyDamageToHpLast5s={hpDamage:F2} " +
+            $"playerHP={playerHp:F2} playerShield={playerShield:F2} playerIsStationary={playerIsStationary} " +
+            $"eliteSpawnedLast5s={finalRushEliteSpawnedSinceAudit}",
+            this);
+        finalRushEliteSpawnedSinceAudit = 0;
+        finalRushPlayerMovedSinceAudit = false;
+    }
+
     private bool TrySpawnEliteIfAvailable()
     {
         if (externalTestPauseActive)
@@ -4190,6 +4605,9 @@ public class EnemySpawner : MonoBehaviour
             }
 
             CacheMonsterBaseSnapshot(enemy);
+            // The director refreshes its time curve before raising this event; immediately restore
+            // the authoritative base x time x rank chain instead of leaving rank stats absent for 0.5s.
+            ApplyCurrentMultiplierToMonster(enemy, refillCurrentHealth: false);
         }
     }
 

@@ -8,6 +8,7 @@ using Spine.Unity;
 public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 {
     private const string LegacyRDisabledWarning = "[Player2PrototypeController] Legacy R fallback is disabled. Please use Player2Skill_R_DivineStarRain.";
+    private const int CurrentVisualFloatHeightVersion = 2;
 
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private PlayerSkillBase qSkill;
@@ -26,8 +27,12 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
     [HideInInspector]
     [SerializeField] private Transform visualRoot;
+    [Tooltip("Extra visual offset. Default 0 because Player02 Spine prefab base position already includes correct floating height.")]
+    [SerializeField, Min(0f), InspectorName("Visual Float Height")]
+    private float visualFloatHeight;
     [HideInInspector]
-    [SerializeField] private float visualFloatHeight = 0.6f;
+    [SerializeField] private int visualFloatHeightVersion;
+    [SerializeField] private bool debugVisualHeight;
     [HideInInspector]
     [SerializeField] private bool keepColliderOnGround = true;
     [HideInInspector]
@@ -619,6 +624,9 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     private Transform cachedVisualRoot;
     private Vector3 cachedVisualRootBaseLocalPosition;
     private bool cachedVisualRootBaseLocalPositionReady;
+    private bool visualOwnershipLogged;
+    private bool visualHeightLateUpdateOverwriteLogged;
+    private bool visualHeightStartCompleted;
     private Coroutine spawnUnstuckRoutine;
     private Coroutine externalLaunchRoutine;
     private bool externalLaunchUseGravityBefore;
@@ -645,7 +653,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     [SerializeField, Min(0f)] private float externalLaunchMinimumAcceptedUpwardVelocity = 1f;
     [SerializeField, Min(0f)] private float externalLaunchMinimumAcceptedRiseDistance = 0.02f;
     [SerializeField, Min(1)] private int externalLaunchRiseVerificationSteps = 2;
-    [SerializeField] private bool debugExternalLaunchMotion = true;
+    [SerializeField] private bool debugExternalLaunchMotion = false;
     [SerializeField] private bool debugPlayerAirborneLanding = false;
     private int lastExternalLaunchSequenceId;
     private float lastExternalLaunchReceivedTime = -999f;
@@ -710,6 +718,8 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
     private void Awake()
     {
+        MigrateVisualFloatHeightIfNeeded();
+        CombatRuntimeAuditLogger.SetEnabled(debugVisualHeight, "Player02.DebugVisualHeight");
         initialRotation = transform.rotation;
         EnsureCooldownManager();
         InitializeSkillSlots();
@@ -728,15 +738,48 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         rb.constraints = RigidbodyConstraints.FreezeRotation | RigidbodyConstraints.FreezePositionY;
 
         ResolveRRenderCamera();
+        ApplyVisualFloatOffset("AwakeApply", "Unknown");
+        LogVisualOwnershipReportOnce();
 
         // Initialize the cooldown and mana system.
         // Update global cooldown timers and automatic mana recovery.
         cooldownManager?.TickCooldownAndMana(Time.deltaTime);
     }
 
+    private void OnEnable()
+    {
+        visualHeightLateUpdateOverwriteLogged = false;
+        ApplyVisualFloatOffset("OnEnableApply", "Unknown");
+
+        if (visualHeightStartCompleted)
+        {
+            ApplyVisualFloatOffset("AfterCharacterSwitch", "GameObjectReactivated");
+        }
+    }
+
+    private void OnValidate()
+    {
+        MigrateVisualFloatHeightIfNeeded();
+        visualFloatHeight = Mathf.Max(0f, visualFloatHeight);
+    }
+
+    private void MigrateVisualFloatHeightIfNeeded()
+    {
+        if (visualFloatHeightVersion >= CurrentVisualFloatHeightVersion)
+        {
+            return;
+        }
+
+        // Version 2 moves the intended floating height into the prefab transform itself.
+        visualFloatHeight = 0f;
+        visualFloatHeightVersion = CurrentVisualFloatHeightVersion;
+    }
+
     private void Start()
     {
         InitializeSkillSlots();
+        ApplyVisualFloatOffset("StartApply", "Unknown");
+        visualHeightStartCompleted = true;
     }
 
     public void ClearRuntimeSkillVisualsForSwitch()
@@ -814,6 +857,11 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         }
 
         UpdateSpineFacingMirror();
+        if (debugVisualHeight && !visualHeightLateUpdateOverwriteLogged && IsVisualFloatPositionOverwritten())
+        {
+            LogVisualHeightEvent("LateUpdateDiagnostic", "ObservedTransformDifference");
+            visualHeightLateUpdateOverwriteLogged = true;
+        }
     }
 
     private void Update()
@@ -1036,7 +1084,8 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 
         if (footAnchor == null)
         {
-            footAnchor = visualRoot != null ? visualRoot : transform;
+            Transform configuredFootAnchor = transform.Find("FootAnchor");
+            footAnchor = configuredFootAnchor != null ? configuredFootAnchor : transform;
         }
 
         if (visualRoot != null && (!cachedVisualRootBaseLocalPositionReady || cachedVisualRoot != visualRoot))
@@ -1101,7 +1150,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         return horizontal;
     }
 
-    private void ApplyVisualFloatOffset()
+    private void ApplyVisualFloatOffset(string eventName = null, string overwrittenByCandidate = "Unknown")
     {
         ResolveVisualFloatTargets();
 
@@ -1110,15 +1159,134 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        if (cachedVisualRoot != visualRoot)
+        bool runtimeCorrectionEnabled = visualFloatHeight > 0.0001f;
+        Vector3 targetLocalPosition = cachedVisualRootBaseLocalPosition;
+        targetLocalPosition.y = cachedVisualRootBaseLocalPosition.y + Mathf.Max(0f, visualFloatHeight);
+        if (runtimeCorrectionEnabled && (visualRoot.localPosition - targetLocalPosition).sqrMagnitude > 0.000001f)
         {
-            cachedVisualRoot = visualRoot;
-            cachedVisualRootBaseLocalPosition = visualRoot.localPosition;
-            cachedVisualRootBaseLocalPositionReady = true;
+            visualRoot.localPosition = targetLocalPosition;
         }
 
-        Vector3 floatOffset = Vector3.up * Mathf.Max(0f, visualFloatHeight);
-        visualRoot.localPosition = cachedVisualRootBaseLocalPosition + floatOffset;
+        if (!string.IsNullOrEmpty(eventName))
+        {
+            LogVisualHeightEvent(eventName, overwrittenByCandidate);
+        }
+    }
+
+    private bool IsVisualFloatPositionOverwritten()
+    {
+        ResolveVisualFloatTargets();
+        if (visualRoot == null || !cachedVisualRootBaseLocalPositionReady)
+        {
+            return false;
+        }
+
+        Vector3 expectedLocalPosition = cachedVisualRootBaseLocalPosition;
+        expectedLocalPosition.y = cachedVisualRootBaseLocalPosition.y + Mathf.Max(0f, visualFloatHeight);
+        return (visualRoot.localPosition - expectedLocalPosition).sqrMagnitude > 0.000001f;
+    }
+
+    private void LogVisualHeightEvent(string eventName, string reason)
+    {
+        if (!debugVisualHeight)
+        {
+            return;
+        }
+
+        bool hasBottomOffset = TryResolveMainColliderBottomOffset(out float bottomOffset);
+        bool hasGround = TryResolveGroundedSupport(out float groundY, out Collider groundCollider);
+        Debug.Log(
+            "[Player02VisualHeightRuntime] " +
+            $"event={eventName} " +
+            $"rootPath={GetTransformPath(transform)} " +
+            $"rootLocalPosition={FormatPosition(transform.localPosition)} " +
+            $"rootWorldPosition={FormatPosition(transform.position)} " +
+            $"spinePath={GetTransformPath(visualRoot)} " +
+            $"prefabBaseLocalY={cachedVisualRootBaseLocalPosition.y:F3} " +
+            $"visualFloatHeight={visualFloatHeight:F3} " +
+            $"expectedLocalY={(cachedVisualRootBaseLocalPosition.y + Mathf.Max(0f, visualFloatHeight)):F3} " +
+            $"actualLocalY={(visualRoot != null ? visualRoot.localPosition.y : 0f):F3} " +
+            $"spineWorldY={(visualRoot != null ? visualRoot.position.y : 0f):F3} " +
+            $"colliderBottomOffset={(hasBottomOffset ? bottomOffset.ToString("F3") : "n/a")} " +
+            $"colliderBottomY={(hasBottomOffset ? (transform.position.y - bottomOffset).ToString("F3") : "n/a")} " +
+            $"resolvedGroundY={(hasGround ? groundY.ToString("F3") : "n/a")} " +
+            $"groundObject={(groundCollider != null ? groundCollider.name : "None")} " +
+            $"isRuntimeCorrectionEnabled={visualFloatHeight > 0.0001f} " +
+            $"reason={reason}",
+            this);
+        CombatRuntimeAuditLogger.LogPlayer02HeightSummary(
+            eventName,
+            transform.position.y,
+            visualRoot != null ? visualRoot.localPosition.y : 0f,
+            visualRoot != null ? visualRoot.position.y : 0f,
+            hasBottomOffset,
+            hasBottomOffset ? transform.position.y - bottomOffset : 0f,
+            hasGround,
+            hasGround ? groundY : 0f,
+            groundCollider != null ? groundCollider.name : "None");
+    }
+
+    private void LogVisualOwnershipReportOnce()
+    {
+        if (!debugVisualHeight || visualOwnershipLogged)
+        {
+            return;
+        }
+
+        visualOwnershipLogged = true;
+        ResolveVisualFloatTargets();
+        SkeletonAnimation skeletonAnimation = ResolveSpineAnimation();
+        Renderer renderedObject = visualRoot != null ? visualRoot.GetComponent<Renderer>() : null;
+        Collider solidCollider = GetComponent<Collider>();
+        Debug.Log(
+            "[Player02VisualOwnershipReport] " +
+            "runtimePrefabPath=Assets/Prefabs/Player/Player02.prefab " +
+            $"rootPath={GetTransformPath(transform)} " +
+            $"rootLocalPosition={FormatPosition(transform.localPosition)} " +
+            $"rootWorldPosition={FormatPosition(transform.position)} " +
+            $"rootScale={FormatPosition(transform.localScale)} " +
+            $"spinePath={GetTransformPath(visualRoot)} " +
+            $"spineLocalPosition={(visualRoot != null ? FormatPosition(visualRoot.localPosition) : "null")} " +
+            $"spineWorldPosition={(visualRoot != null ? FormatPosition(visualRoot.position) : "null")} " +
+            $"skeletonAnimationPath={GetTransformPath(skeletonAnimation != null ? skeletonAnimation.transform : null)} " +
+            $"footAnchorPath={GetTransformPath(footAnchor)} " +
+            $"actualRenderedObjectPath={GetTransformPath(renderedObject != null ? renderedObject.transform : null)} " +
+            $"colliderPath={GetTransformPath(solidCollider != null ? solidCollider.transform : null)} " +
+            "scriptsWritingRootPosition=Player2PrototypeController,PlayerMovement,Player2Bootstrap,PlayerSpawnManager,Player2Skill_E_CelestialShift " +
+            "scriptsWritingSpinePosition=Player2PrototypeController(extra-offset-only) " +
+            "animationWritesTransform=false " +
+            "knockbackChangesRoot=true landingChangesRoot=true landingChangesSpine=false " +
+            "trueVisualHeightOwner=Player02/神眷之子Spine " +
+            "recommendedFix=InspectRootLandingWorldY_NoPerFrameVisualCorrection",
+            this);
+    }
+
+    public void ReapplyVisualFloatOffsetAfterWallHit()
+    {
+        ApplyVisualFloatOffset("AfterWallHit", "PlayerWallHitEffect");
+    }
+
+    private static string GetTransformPath(Transform target)
+    {
+        if (target == null)
+        {
+            return "null";
+        }
+
+        string path = target.name;
+        Transform parent = target.parent;
+        while (parent != null)
+        {
+            path = parent.name + "/" + path;
+            parent = parent.parent;
+        }
+
+        return path;
+    }
+
+    private static string FormatPosition(Vector3 position)
+    {
+        return $"({position.x:F3},{position.y:F3},{position.z:F3})";
     }
 
     private IEnumerator SpawnUnstuckRoutine()
@@ -1326,35 +1494,27 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         bool duplicateSequence = launchSequenceId > 0 &&
                                  launchSequenceId == lastExternalLaunchSequenceId &&
                                  Time.time - lastExternalLaunchReceivedTime <= Mathf.Max(0.01f, minimumExternalLaunchRetriggerInterval);
-        Debug.Log(
-            "[BossLaunchRepeatTrace] event=LaunchReceived " +
-            "controller=Player2PrototypeController" +
-            " target=" + name +
-            " frame=" + Time.frameCount +
-            " fixedTime=" + Time.fixedTime.ToString("F3") +
-            " launchSequenceId=" + launchSequenceId +
-            " previousLaunchSequenceId=" + lastExternalLaunchSequenceId +
-            " externalLaunchAlreadyActive=" + isUnderExternalLaunch +
-            " currentVelocityBefore=" + (rb != null ? rb.linearVelocity.ToString() : "<no-rigidbody>") +
-            " launchVelocity=" + launchVelocity +
-            " duplicateSequence=" + duplicateSequence,
-            this);
+        if (debugExternalLaunchMotion)
+        {
+            Debug.Log(
+                "[BossLaunchRepeatTrace] event=LaunchReceived " +
+                "controller=Player2PrototypeController" +
+                " target=" + name +
+                " frame=" + Time.frameCount +
+                " fixedTime=" + Time.fixedTime.ToString("F3") +
+                " launchSequenceId=" + launchSequenceId +
+                " previousLaunchSequenceId=" + lastExternalLaunchSequenceId +
+                " externalLaunchAlreadyActive=" + isUnderExternalLaunch +
+                " currentVelocityBefore=" + (rb != null ? rb.linearVelocity.ToString() : "<no-rigidbody>") +
+                " launchVelocity=" + launchVelocity +
+                " duplicateSequence=" + duplicateSequence,
+                this);
+        }
 
         if (duplicateSequence)
         {
             return;
         }
-
-        Debug.Log(
-            "[ExternalLaunchYTrace] event=LaunchStart " +
-            "controller=Player2PrototypeController" +
-            " target=" + name +
-            " frame=" + Time.frameCount +
-            " positionBefore=" + transform.position +
-            " launchVelocity=" + launchVelocity +
-            " separationOffset=" + separationOffset +
-            " duration=" + duration,
-            this);
 
         if (rb == null)
         {
@@ -1364,6 +1524,21 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         if (rb == null)
         {
             return;
+        }
+
+        LogVisualHeightEvent("BeforeKnockback", "ExternalLaunchEntry");
+        if (debugExternalLaunchMotion)
+        {
+            Debug.Log(
+                "[ExternalLaunchYTrace] event=LaunchStart " +
+                "controller=Player2PrototypeController" +
+                " target=" + name +
+                " frame=" + Time.frameCount +
+                " positionBefore=" + transform.position +
+                " launchVelocity=" + launchVelocity +
+                " separationOffset=" + separationOffset +
+                " duration=" + duration,
+                this);
         }
 
         if (externalLaunchRoutine != null)
@@ -1437,6 +1612,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             " sequenceId=" + launchSequenceId,
             this);
         LogGroundFallTrace("LaunchStarted", "ApplyExternalLaunch");
+        ApplyVisualFloatOffset("AfterKnockback", "ExternalLaunchFlow");
         float holdDuration = Mathf.Max(duration, externalLaunchMinimumLockDuration);
         externalLaunchRoutine = StartCoroutine(ExternalLaunchRoutine(holdDuration));
     }
@@ -1507,7 +1683,50 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     public Camera GetRenderCamera() => ResolveRRenderCamera();
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
     public Transform GroundAnchor => groundAnchor != null ? groundAnchor : transform;
-    public Transform FootAnchor => footAnchor != null ? footAnchor : (visualRoot != null ? visualRoot : transform);
+    public Transform FootAnchor => footAnchor != null ? footAnchor : transform;
+
+    public bool TryGetGroundedRootOffset(out float groundedRootOffset)
+    {
+        groundedRootOffset = 0f;
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (!TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            return false;
+        }
+
+        groundedRootOffset = bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        return true;
+    }
+
+    public bool TrySnapRootToGround(string reason)
+    {
+        if (rb == null)
+        {
+            rb = GetComponent<Rigidbody>();
+        }
+
+        if (rb == null)
+        {
+            return false;
+        }
+
+        Physics.SyncTransforms();
+        if (!TryResolveGroundYAt(rb.position, out float groundY) ||
+            !TryResolveMainColliderBottomOffset(out float bottomOffset))
+        {
+            return false;
+        }
+
+        float safeRootY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        Vector3 safePosition = new Vector3(rb.position.x, safeRootY, rb.position.z);
+        MoveExternalLaunchRoot(safePosition, reason, null, Vector3.up);
+        ApplyVisualFloatOffset("SpawnGroundSnap", reason);
+        return true;
+    }
     public bool IsUnderExternalLaunchActive => isUnderExternalLaunch;
     public bool IsExternalLaunchActive => isUnderExternalLaunch;
     public Rigidbody ExternalLaunchBody => rb;
@@ -2172,6 +2391,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         LogGroundFallTrace("LandingResolve", reason, groundY, bottomOffset, groundCollider, groundNormal);
         MoveExternalLaunchRoot(safePosition, reason, groundCollider, groundNormal);
         FinishExternalLaunchState(reason);
+        ApplyVisualFloatOffset("AfterLanding", "ExternalLaunchLanding");
     }
 
     private void CompleteNaturalExternalLaunchLanding(string reason)
@@ -2188,11 +2408,13 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             LogGroundFallTrace("MinorGroundPenetrationCorrection", reason, groundY, bottomOffset, groundCollider, Vector3.up, safePosition, correctionDistance);
             MoveExternalLaunchRoot(safePosition, reason, groundCollider, Vector3.up);
             FinishExternalLaunchState(reason);
+            ApplyVisualFloatOffset("AfterLanding", "ExternalLaunchLanding");
             return;
         }
 
         LogGroundFallTrace("NaturalGroundCollision", reason);
         FinishExternalLaunchState(reason);
+        ApplyVisualFloatOffset("AfterLanding", "ExternalLaunchLanding");
     }
 
     private void MoveExternalLaunchRoot(Vector3 safePosition, string reason, Collider groundCollider, Vector3 groundNormal)
@@ -2242,6 +2464,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         }
 
         RestoreExternalLaunchState();
+        ApplyVisualFloatOffset("AfterRecover", "ExternalLaunchRecovery");
 
         if (debugPlayerAirborneLanding)
         {
@@ -3496,7 +3719,14 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             attackerCombatHealth.TakeDamage(new BattleDamage(counterDamage, incomingDamage.damageType, gameObject)
             {
                 isReflectDamage = true,
-                debugTag = "Player02WCounter"
+                skillName = "Player02 W",
+                damageSource = "WCounterLegacy",
+                debugTag = "Player02WCounter",
+                damageKind = BattleDamageKind.ReflectDamage,
+                sourceOwner = gameObject,
+                bypassRuneFlatDamage = true,
+                bypassLifesteal = true,
+                suppressThornReaction = true
             });
             return;
         }

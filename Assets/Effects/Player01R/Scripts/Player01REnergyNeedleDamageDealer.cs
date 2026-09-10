@@ -119,7 +119,12 @@ public class Player01REnergyNeedleDamageDealer : MonoBehaviour
         return new BattleDamage(amount, damageType, source)
         {
             bypassEvasion = true,
-            debugTag = "Player01 R Needle"
+            castId = runeCastId,
+            skillName = "Player01 R",
+            damageSource = "EnergyNeedle",
+            debugTag = "Player01 R Needle",
+            damageKind = BattleDamageKind.PlayerActiveSkill,
+            sourceOwner = source
         };
     }
 

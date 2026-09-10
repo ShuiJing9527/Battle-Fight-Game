@@ -252,6 +252,7 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         resultTriggered = true;
+        CombatRuntimeAuditLogger.EmitSummary("GameOver", "BattleSceneResultRouter");
         FreezeBattleBeforeResultScene();
         AudioManager.Instance?.PlayGameOverBgm();
         LogPlayerDeathTrace("GameOver entered");
@@ -266,6 +267,7 @@ public class BattleSceneResultRouter : MonoBehaviour
         }
 
         resultTriggered = true;
+        CombatRuntimeAuditLogger.EmitSummary("Victory", "BattleSceneResultRouter");
         FreezeBattleBeforeResultScene();
         AudioManager.Instance?.PlayVictoryBgm();
         SceneManager.LoadScene(GameWinSceneName);
