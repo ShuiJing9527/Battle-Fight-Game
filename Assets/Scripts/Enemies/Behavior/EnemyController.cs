@@ -3535,7 +3535,10 @@ public class EnemyController : MonoBehaviour
         }
 
         groundY = groundHit.point.y;
-        adjustedBodyY = groundY + playerBottomOffset + Mathf.Max(0f, bossLeapLaunchGroundClearance);
+        Player2PrototypeController player2Controller = playerBody.GetComponent<Player2PrototypeController>();
+        adjustedBodyY = player2Controller != null
+            ? groundY + player2Controller.GroundedRootOffset
+            : groundY + playerBottomOffset + Mathf.Max(0f, bossLeapLaunchGroundClearance);
         return true;
     }
 

@@ -939,6 +939,13 @@ public class PlayerMovement : MonoBehaviour, IExternalLaunchReceiver
 
     private void TryExecuteGlobalFallSafety(string source)
     {
+        Player2PrototypeController player2PrototypeController = GetComponent<Player2PrototypeController>();
+        if (player2PrototypeController != null && player2PrototypeController.enabled)
+        {
+            // Player02 owns its grounded-root convention and fall recovery in its dedicated controller.
+            return;
+        }
+
         if (rb == null || !hasLastValidGroundedPosition)
         {
             return;

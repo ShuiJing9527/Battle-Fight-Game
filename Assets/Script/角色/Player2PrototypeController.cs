@@ -9,6 +9,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
 {
     private const string LegacyRDisabledWarning = "[Player2PrototypeController] Legacy R fallback is disabled. Please use Player2Skill_R_DivineStarRain.";
     private const int CurrentVisualFloatHeightVersion = 2;
+    private const float Player02GroundedRootOffset = 1.2f;
 
     [Header("E - 星痕瞬移 / 基础")]
     [SerializeField] private PlayerSkillBase qSkill;
@@ -1684,22 +1685,17 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
     public GameObject GetSharedSkillEffectPrefab() => sharedSkillEffectPrefab;
     public Transform GroundAnchor => groundAnchor != null ? groundAnchor : transform;
     public Transform FootAnchor => footAnchor != null ? footAnchor : transform;
+    public float GroundedRootOffset => Player02GroundedRootOffset;
 
     public bool TryGetGroundedRootOffset(out float groundedRootOffset)
     {
-        groundedRootOffset = 0f;
-        if (rb == null)
-        {
-            rb = GetComponent<Rigidbody>();
-        }
-
-        if (!TryResolveMainColliderBottomOffset(out float bottomOffset))
-        {
-            return false;
-        }
-
-        groundedRootOffset = bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        groundedRootOffset = GroundedRootOffset;
         return true;
+    }
+
+    private float ResolveGroundedRootY(float groundY)
+    {
+        return groundY + GroundedRootOffset;
     }
 
     public bool TrySnapRootToGround(string reason)
@@ -1715,13 +1711,12 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         }
 
         Physics.SyncTransforms();
-        if (!TryResolveGroundYAt(rb.position, out float groundY) ||
-            !TryResolveMainColliderBottomOffset(out float bottomOffset))
+        if (!TryResolveGroundYAt(rb.position, out float groundY))
         {
             return false;
         }
 
-        float safeRootY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        float safeRootY = ResolveGroundedRootY(groundY);
         Vector3 safePosition = new Vector3(rb.position.x, safeRootY, rb.position.z);
         MoveExternalLaunchRoot(safePosition, reason, null, Vector3.up);
         ApplyVisualFloatOffset("SpawnGroundSnap", reason);
@@ -2092,18 +2087,13 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return horizontalOffset;
         }
 
-        if (!TryResolveMainColliderBottomOffset(out float bottomOffset))
-        {
-            return horizontalOffset;
-        }
-
         Vector3 candidate = rb.position + horizontalOffset;
         if (!TryResolveGroundYAt(candidate, out float groundY))
         {
             return horizontalOffset;
         }
 
-        float safeRootY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        float safeRootY = ResolveGroundedRootY(groundY);
         float deltaY = safeRootY - rb.position.y;
         return horizontalOffset + Vector3.up * deltaY;
     }
@@ -2122,8 +2112,9 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return false;
         }
 
-        Vector3 origin = rb.position + Vector3.up * Mathf.Max(0.2f, bottomOffset + 0.25f);
-        float distance = Mathf.Max(0.2f, bottomOffset + Mathf.Max(0.01f, externalLaunchGroundProbeDistance) + 0.25f);
+        float rayStartHeight = Mathf.Max(0.2f, bottomOffset + 0.25f);
+        Vector3 origin = rb.position + Vector3.up * rayStartHeight;
+        float distance = rayStartHeight + GroundedRootOffset + Mathf.Max(0.01f, externalLaunchGroundProbeDistance);
         RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, distance, ~0, QueryTriggerInteraction.Ignore);
         float bestDistance = float.PositiveInfinity;
         for (int i = 0; i < hits.Length; i++)
@@ -2153,8 +2144,9 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return false;
         }
 
-        Vector3 origin = candidatePosition + Vector3.up * Mathf.Max(0.5f, bottomOffset + 1f);
-        float distance = Mathf.Max(2f, bottomOffset + 2f);
+        float rayStartHeight = Mathf.Max(0.5f, bottomOffset + 1f);
+        Vector3 origin = candidatePosition + Vector3.up * rayStartHeight;
+        float distance = rayStartHeight + GroundedRootOffset + 1f;
         RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, distance, ~0, QueryTriggerInteraction.Ignore);
         float bestDistance = float.PositiveInfinity;
         for (int i = 0; i < hits.Length; i++)
@@ -2207,15 +2199,15 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         }
 
         float skin = Mathf.Max(0.001f, externalLaunchGroundSkin);
-        float previousFootY = previousRbPosition.y - bottomOffset;
-        float currentFootY = currentRbPosition.y - bottomOffset;
+        float previousFootY = previousRbPosition.y - GroundedRootOffset;
+        float currentFootY = currentRbPosition.y - GroundedRootOffset;
         if (currentFootY >= previousFootY - skin)
         {
             return false;
         }
 
         Vector3 origin = previousRbPosition + Vector3.up * Mathf.Max(0.05f, skin);
-        float castDistance = Mathf.Max(0.1f, previousFootY - currentFootY + bottomOffset + skin + 0.1f);
+        float castDistance = Mathf.Max(0.1f, previousFootY - currentFootY + GroundedRootOffset + skin + 0.1f);
         RaycastHit[] hits = Physics.RaycastAll(origin, Vector3.down, castDistance, ~0, QueryTriggerInteraction.Ignore);
         float bestY = float.NegativeInfinity;
         for (int i = 0; i < hits.Length; i++)
@@ -2316,13 +2308,16 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        if (TryResolveGroundYAt(rb.position, out float groundY) && TryResolveMainColliderBottomOffset(out float bottomOffset))
+        if (TryResolveGroundYAt(rb.position, out float groundY))
         {
             Vector3 safePosition = new Vector3(
                 rb.position.x,
-                groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin),
+                ResolveGroundedRootY(groundY),
                 rb.position.z);
-            LogGroundFallTrace("EmergencyFallRecovery", reason, groundY, bottomOffset, null, Vector3.up, safePosition);
+            float physicalBottomOffset = TryResolveMainColliderBottomOffset(out float resolvedBottomOffset)
+                ? resolvedBottomOffset
+                : float.NaN;
+            LogGroundFallTrace("EmergencyFallRecovery", reason, groundY, physicalBottomOffset, null, Vector3.up, safePosition);
             MoveExternalLaunchRoot(safePosition, reason, null, Vector3.up);
             FinishExternalLaunchState(reason);
             return;
@@ -2351,13 +2346,9 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
         }
 
         Vector3 safePosition = lastValidGroundedPosition;
-        if (TryResolveMainColliderBottomOffset(out float bottomOffset))
+        if (TryResolveGroundYAt(lastValidGroundedPosition, out float safeGroundY))
         {
-            safePosition.y = lastValidGroundedPosition.y + Mathf.Max(0f, externalLaunchGroundSkin);
-            if (TryResolveGroundYAt(lastValidGroundedPosition, out float safeGroundY))
-            {
-                safePosition.y = safeGroundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
-            }
+            safePosition.y = ResolveGroundedRootY(safeGroundY);
         }
 
         LogGroundFallTrace("EmergencyFallRecovery", "GlobalFallSafety_" + source, float.NaN, float.NaN, null, Vector3.up, safePosition, verticalDistance);
@@ -2386,7 +2377,7 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        float safeY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+        float safeY = ResolveGroundedRootY(groundY);
         Vector3 safePosition = new Vector3(rb.position.x, safeY, rb.position.z);
         LogGroundFallTrace("LandingResolve", reason, groundY, bottomOffset, groundCollider, groundNormal);
         MoveExternalLaunchRoot(safePosition, reason, groundCollider, groundNormal);
@@ -2401,11 +2392,12 @@ public class Player2PrototypeController : MonoBehaviour, IExternalLaunchReceiver
             return;
         }
 
-        if (TryResolveMinorGroundPenetration(out float groundY, out float bottomOffset, out Collider groundCollider, out float correctionDistance))
+        if (TryResolveGroundedSupport(out float groundY, out Collider groundCollider) &&
+            TryResolveMainColliderBottomOffset(out float bottomOffset))
         {
-            float safeY = groundY + bottomOffset + Mathf.Max(0f, externalLaunchGroundSkin);
+            float safeY = ResolveGroundedRootY(groundY);
             Vector3 safePosition = new Vector3(rb.position.x, safeY, rb.position.z);
-            LogGroundFallTrace("MinorGroundPenetrationCorrection", reason, groundY, bottomOffset, groundCollider, Vector3.up, safePosition, correctionDistance);
+            LogGroundFallTrace("GroundedRootOffsetCorrection", reason, groundY, bottomOffset, groundCollider, Vector3.up, safePosition, Mathf.Abs(safeY - rb.position.y));
             MoveExternalLaunchRoot(safePosition, reason, groundCollider, Vector3.up);
             FinishExternalLaunchState(reason);
             ApplyVisualFloatOffset("AfterLanding", "ExternalLaunchLanding");

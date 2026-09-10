@@ -433,7 +433,7 @@ Transform:
   m_GameObject: {fileID: 8605461027058166016}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 99.50003, y: 1.2000153, z: 98.500015}
+  m_LocalPosition: {x: 99.50003, y: 1.2, z: 98.500015}
   m_LocalScale: {x: 0.1, y: 0.1, z: 0.1}
   m_ConstrainProportionsScale: 0
   m_Children:
@@ -510,6 +510,27 @@ MonoBehaviour:
   rb: {fileID: 4389982266256825078}
   debugSpeedDiagnostics: 0
   debugSpeedLogInterval: 1
+  minimumExternalLaunchRetriggerInterval: 0.15
+  externalLaunchMinimumLockDuration: 0.15
+  externalLaunchMaximumAirborneDuration: 2.5
+  externalLaunchGroundProbeDistance: 0.2
+  externalLaunchLandingConfirmFrames: 2
+  externalLaunchGroundSkin: 0.02
+  externalLaunchLeaveGroundDistance: 0.05
+  externalLaunchStartGroundCorrectionMax: 0.15
+  externalLaunchStartGroundSkin: 0.03
+  enableExternalLaunchRiseSafety: 1
+  externalLaunchRiseSafetyImpulse: 7
+  externalLaunchMinimumAcceptedUpwardVelocity: 1
+  externalLaunchMinimumAcceptedRiseDistance: 0.02
+  externalLaunchRiseVerificationSteps: 2
+  externalLaunchMinorGroundPenetrationMaxCorrection: 0.1
+  externalLaunchFallRecoveryDistance: 6
+  globalFallRecoveryDistance: 8
+  safeGroundUpdateMaxPenetration: 0.02
+  externalLaunchCollisionDetectionMode: 2
+  debugExternalLaunchMotion: 0
+  debugPlayerAirborneLanding: 0
 --- !u!114 &1546861807539437966
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -555,6 +576,7 @@ MonoBehaviour:
   functionSoul: 0
   functionCooldownMultiplierPerSoul: 0.97
   debugGrowthSoulRollLog: 0
+  enableCombatBalanceLogs: 0
 --- !u!114 &2543590936332733996
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -567,6 +589,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2f2997d5a0e249c1968ac6499795c313, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  enableCombatBalanceLogs: 0
   stats: {fileID: 1546861807539437966}
   resourceBank: {fileID: 4540091804298959558}
   currentHealth: 100
@@ -584,6 +607,7 @@ MonoBehaviour:
   missDamageColor: {r: 0.75, g: 0.95, b: 1, a: 1}
   damagePopupOffset: {x: 0, y: 1, z: 0}
   damagePopupRandomOffset: {x: 0.3, y: 0.15}
+  debugPlayerDeathTrace: 0
 --- !u!114 &6060743048085689631
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -894,6 +918,7 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 0
   damageType: 0
+  debugMeleeHitTrace: 0
 --- !u!114 &6674306750646675457
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1222,6 +1247,27 @@ MonoBehaviour:
   standbySwordVisualRoll: 0
   standbySwordSpinSpeed: 120
   rb: {fileID: 0}
+  minimumExternalLaunchRetriggerInterval: 0.15
+  externalLaunchMinimumLockDuration: 0.15
+  externalLaunchMaximumAirborneDuration: 2.5
+  externalLaunchGroundProbeDistance: 0.2
+  externalLaunchLandingConfirmFrames: 2
+  externalLaunchGroundSkin: 0.02
+  externalLaunchLeaveGroundDistance: 0.05
+  externalLaunchMinorGroundPenetrationMaxCorrection: 0.1
+  externalLaunchFallRecoveryDistance: 6
+  globalFallRecoveryDistance: 8
+  safeGroundUpdateMaxPenetration: 0.02
+  externalLaunchCollisionDetectionMode: 2
+  externalLaunchStartGroundCorrectionMax: 0.15
+  externalLaunchStartGroundSkin: 0.03
+  enableExternalLaunchRiseSafety: 1
+  externalLaunchRiseSafetyImpulse: 7
+  externalLaunchMinimumAcceptedUpwardVelocity: 1
+  externalLaunchMinimumAcceptedRiseDistance: 0.02
+  externalLaunchRiseVerificationSteps: 2
+  debugExternalLaunchMotion: 0
+  debugPlayerAirborneLanding: 0
 --- !u!114 &9035828650274735556
 MonoBehaviour:
   m_ObjectHideFlags: 0
